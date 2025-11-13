@@ -1,0 +1,82 @@
+"use client";
+
+import { polygon } from "@reown/appkit/networks";
+import { createAppKit } from "@reown/appkit/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { ThemeProvider } from "next-themes";
+import type { ReactNode } from "react";
+import { type Config, cookieToInitialState, WagmiProvider } from "wagmi";
+import { networks, projectId, wagmiAdapter } from "@/config";
+
+// Set up queryClient with default options
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+if (!projectId) {
+  throw new Error("Project ID is not defined");
+}
+
+// Set up metadata
+const metadata = {
+  name: "Polycaster",
+  description: "Polymarket predictions with Farcaster",
+  url: "https://polycaster.app", // origin must match your domain & subdomain
+  icons: ["https://avatars.githubusercontent.com/u/179229932"],
+};
+
+// Create the modal
+const _modal = createAppKit({
+  adapters: [wagmiAdapter],
+  projectId,
+  networks,
+  defaultNetwork: polygon, // Set Polygon as default since Polymarket uses it
+  metadata: metadata,
+  features: {
+    analytics: true, // Optional - defaults to your Cloud configuration
+    email: true, // Enable email login
+    socials: ["google", "x", "farcaster"], // Enable social logins
+    emailShowWallets: true, // Show other wallets alongside email
+  },
+});
+
+function ContextProvider({
+  children,
+  cookies,
+}: {
+  children: ReactNode;
+  cookies: string | null;
+}) {
+  const initialState = cookieToInitialState(
+    wagmiAdapter.wagmiConfig as Config,
+    cookies,
+  );
+
+  return (
+    <WagmiProvider
+      config={wagmiAdapter.wagmiConfig as Config}
+      initialState={initialState}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <ReactQueryDevtools initialIsOpen={false} />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}
+
+export default ContextProvider;
