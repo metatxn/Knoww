@@ -8,8 +8,8 @@ import {
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { cookieStorage, createStorage } from "wagmi";
 
-// Get projectId from https://dashboard.reown.com
-export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
+// Get projectId from https://dashboard.reown.com2
+export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
 if (!projectId) {
   throw new Error("Project ID is not defined");
@@ -19,7 +19,7 @@ if (!projectId) {
 // Using Polygon since Polymarket runs on Polygon
 export const networks = [polygon, mainnet, arbitrum, polygonAmoy] as [
   AppKitNetwork,
-  ...AppKitNetwork[],
+  ...AppKitNetwork[]
 ];
 
 // Set up the Wagmi Adapter (Config)
