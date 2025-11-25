@@ -12,7 +12,7 @@ import { cookieStorage, createStorage } from "wagmi";
 export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
 if (!projectId) {
-  throw new Error("Project ID is not defined");
+  throw new Error("Project ID is not defined in config");
 }
 
 // Set up the networks you want to support

@@ -21,7 +21,7 @@ const queryClient = new QueryClient({
 });
 
 if (!projectId) {
-  throw new Error("Project ID is not defined");
+  throw new Error("Project ID is not defined in context");
 }
 
 // Set up metadata
@@ -41,8 +41,8 @@ const _modal = createAppKit({
   metadata: metadata,
   features: {
     analytics: true, // Optional - defaults to your Cloud configuration
-    email: true, // Enable email login
-    socials: ["google", "x", "farcaster"], // Enable social logins
+    //  email: true, // Enable email login
+    //socials: ["google", "x", "farcaster"], // Enable social logins
     emailShowWallets: true, // Show other wallets alongside email
   },
 });
@@ -56,7 +56,7 @@ function ContextProvider({
 }) {
   const initialState = cookieToInitialState(
     wagmiAdapter.wagmiConfig as Config,
-    cookies,
+    cookies
   );
 
   return (
