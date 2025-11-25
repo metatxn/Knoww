@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 import {
-  ArrowLeft,
   Bookmark,
+  ChevronLeft,
   Clock,
   Copy,
   Share2,
@@ -41,7 +41,7 @@ export default function MarketDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8 space-y-8">
+        <main className="px-4 md:px-6 lg:px-8 py-8 space-y-8">
           {/* Back Button Skeleton */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -177,7 +177,17 @@ export default function MarketDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+        <main className="px-4 md:px-6 lg:px-8 py-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex items-center gap-1 hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span>All Markets</span>
+            </button>
+          </div>
           <Card className="text-center py-12">
             <CardHeader>
               <CardTitle>Market Not Found</CardTitle>
@@ -186,9 +196,9 @@ export default function MarketDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+              <Button onClick={() => router.push("/")}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back to Markets
               </Button>
             </CardContent>
           </Card>
@@ -252,86 +262,95 @@ export default function MarketDetailPage() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8 space-y-6"
+        className="px-4 md:px-6 lg:px-8 py-6 space-y-6"
       >
-        {/* Back Button */}
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>All Markets</span>
+          </button>
+          <span>/</span>
+          <span className="text-foreground font-medium truncate max-w-[200px] sm:max-w-none">
+            {market.question}
+          </span>
+        </div>
 
         {/* Header Section */}
-        <Card className="border-none shadow-none bg-card/50">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4 flex-1">
-                {market.image && (
-                  <img
-                    src={market.image}
-                    alt={market.question}
-                    className="w-16 h-16 rounded-lg object-cover shrink-0"
-                  />
-                )}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex items-start gap-4 flex-1">
+            {market.image && (
+              <img
+                src={market.image}
+                alt={market.question}
+                className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover shrink-0"
+              />
+            )}
 
-                <div className="flex-1">
-                  <h1 className="text-2xl md:text-3xl font-bold mb-4">
-                    {market.question}
-                  </h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                {market.question}
+              </h1>
 
-                  {/* Metadata */}
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <Trophy className="h-4 w-4" />
-                      <span className="font-medium">
-                        {formatVolume(market.volumeNum || market.volume)} Vol.
-                      </span>
-                    </div>
-                    {market.end_date_iso && (
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {new Date(market.end_date_iso).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
-                        </span>
-                      </div>
-                    )}
+              {/* Metadata */}
+              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
+                  <Trophy className="h-4 w-4" />
+                  <span className="font-medium">
+                    {formatVolume(market.volumeNum || market.volume)} Vol.
+                  </span>
+                </div>
+                {market.end_date_iso && (
+                  <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {new Date(market.end_date_iso).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        },
+                      )}
+                    </span>
                   </div>
+                )}
+                <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
+                  <span className="font-medium">{outcomes.length} outcomes</span>
                 </div>
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      navigator.share?.({
-                        title: market.question,
-                        url: window.location.href,
-                      });
-                    }
-                  }}
-                >
-                  <Share2 className="h-5 w-5" />
-                </Button>
-                <Button type="button" variant="ghost" size="icon">
-                  <Bookmark className="h-5 w-5" />
-                </Button>
-              </div>
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  navigator.share?.({
+                    title: market.question,
+                    url: window.location.href,
+                  });
+                }
+              }}
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="gap-2">
+              <Bookmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Save</span>
+            </Button>
+          </div>
+        </div>
 
             {/* Date Selection Pills - Mock for now */}
             <div className="flex items-center gap-2 mt-4">

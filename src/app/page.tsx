@@ -18,13 +18,11 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { EventCard } from "@/components/event-card";
 import { Navbar } from "@/components/navbar";
-import { NegRiskBadge } from "@/components/neg-risk-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -289,7 +287,7 @@ export default function Home() {
       <Navbar />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+      <main className="px-4 md:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
@@ -354,78 +352,28 @@ export default function Home() {
 
             {/* Loading State */}
             {currentData.isLoading && !currentData.error && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {[...Array(8)].map((_, i) => (
-                  <Card key={`event-skeleton-${i}`}>
-                    <CardHeader>
-                      <Skeleton className="h-48 w-full mb-4 rounded" />
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-full mb-2" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                {[...Array(10)].map((_, i) => (
+                  <div
+                    key={`event-skeleton-${i}`}
+                    className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                  >
+                    <Skeleton className="aspect-[16/10] w-full" />
+                    <div className="p-4 space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-4 w-2/3" />
-                    </CardHeader>
-                  </Card>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
 
             {/* Events Grid */}
             {!currentData.isLoading && currentData.events.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                 {currentData.events.map((event, index) => (
-                  <motion.div
-                    key={event.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    whileHover={{ y: -4 }}
-                    className="h-full"
-                  >
-                    <Card
-                      className="cursor-pointer transition-all h-full hover:shadow-lg"
-                      onClick={() => handleEventClick(event.id)}
-                    >
-                      {event.image && (
-                        <div className="aspect-video w-full overflow-hidden rounded-t-lg">
-                          <img
-                            src={event.image}
-                            alt={event.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <CardHeader>
-                        <div className="flex items-center gap-2 mb-2">
-                          {event.active && <Badge>Active</Badge>}
-                          {event.closed && (
-                            <Badge variant="secondary">Closed</Badge>
-                          )}
-                          {event.negRisk && <NegRiskBadge />}
-                        </div>
-                        <CardTitle className="line-clamp-2">
-                          {event.title}
-                        </CardTitle>
-                        {event.description && (
-                          <CardDescription className="line-clamp-2">
-                            {event.description}
-                          </CardDescription>
-                        )}
-                        <div className="flex items-center justify-between pt-4 text-sm">
-                          {event.volume && (
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <TrendingUp className="h-4 w-4" />
-                              <span>{formatVolume(event.volume)}</span>
-                            </div>
-                          )}
-                          {event.markets && event.markets.length > 0 && (
-                            <Badge variant="outline">
-                              {event.markets.length} market
-                              {event.markets.length !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </motion.div>
+                  <EventCard key={event.id} event={event} index={index} />
                 ))}
               </div>
             )}
@@ -465,16 +413,19 @@ export default function Home() {
 
             {/* Loading State */}
             {currentData.isLoading && !currentData.error && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {[...Array(8)].map((_, i) => (
-                  <Card key={`event-skeleton-${i}`}>
-                    <CardHeader>
-                      <Skeleton className="h-48 w-full mb-4 rounded" />
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-full mb-2" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                {[...Array(10)].map((_, i) => (
+                  <div
+                    key={`cat-skeleton-${i}`}
+                    className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                  >
+                    <Skeleton className="aspect-[16/10] w-full" />
+                    <div className="p-4 space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-4 w-2/3" />
-                    </CardHeader>
-                  </Card>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -482,62 +433,13 @@ export default function Home() {
             {/* Events Grid */}
             {!currentData.isLoading && currentData.events.length > 0 && (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                   {currentData.events.map((event, index) => (
-                    <motion.div
+                    <EventCard
                       key={`${event.id}-${index}`}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: Math.min(index * 0.05, 1),
-                      }}
-                      whileHover={{ y: -4 }}
-                      className="h-full"
-                    >
-                      <Card
-                        className="cursor-pointer transition-all h-full hover:shadow-lg"
-                        onClick={() => handleEventClick(event.id)}
-                      >
-                        {event.image && (
-                          <div className="aspect-video w-full overflow-hidden rounded-t-lg">
-                            <img
-                              src={event.image}
-                              alt={event.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <CardHeader>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge>Active</Badge>
-                            {event.negRisk && <NegRiskBadge />}
-                          </div>
-                          <CardTitle className="line-clamp-2">
-                            {event.title}
-                          </CardTitle>
-                          {event.description && (
-                            <CardDescription className="line-clamp-2">
-                              {event.description}
-                            </CardDescription>
-                          )}
-                          <div className="flex items-center justify-between pt-4 text-sm">
-                            {event.volume && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <TrendingUp className="h-4 w-4" />
-                                <span>{formatVolume(event.volume)}</span>
-                              </div>
-                            )}
-                            {event.markets && event.markets.length > 0 && (
-                              <Badge variant="outline">
-                                {event.markets.length} market
-                                {event.markets.length !== 1 ? "s" : ""}
-                              </Badge>
-                            )}
-                          </div>
-                        </CardHeader>
-                      </Card>
-                    </motion.div>
+                      event={event}
+                      index={index}
+                    />
                   ))}
                 </div>
 
@@ -546,9 +448,9 @@ export default function Home() {
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mt-6"
                   >
-                    {[...Array(4)].map((_, i) => (
+                    {[...Array(5)].map((_, i) => (
                       <motion.div
                         key={`loading-skeleton-${i}`}
                         initial={{ opacity: 0, y: 20 }}
@@ -635,7 +537,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t mt-12 py-8">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
+        <div className="px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
           <p>Powered by Reown AppKit & Polymarket</p>
         </div>
       </footer>

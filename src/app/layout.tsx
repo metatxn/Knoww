@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
+import { Sidebar } from "@/components/sidebar";
 import ContextProvider from "@/context";
 import "./globals.css";
 
@@ -32,7 +33,10 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ContextProvider cookies={cookies}>{children}</ContextProvider>
+        <ContextProvider cookies={cookies}>
+          <Sidebar />
+          <div className="lg:ml-60">{children}</div>
+        </ContextProvider>
       </body>
     </html>
   );

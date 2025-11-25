@@ -44,7 +44,7 @@ export function Navbar() {
   // Close mobile menu when route changes
   useEffect(() => {
     setMobileMenuOpen(false);
-  }, []);
+  }, [pathname]);
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -56,9 +56,9 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-      {/* Main Navbar */}
-      <div className="flex h-16 items-center px-4 md:px-6 lg:px-8">
+    <nav className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+      {/* Main Navbar - Mobile Only */}
+      <div className="flex h-16 items-center px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center gap-6 mr-6">
           <button
@@ -71,30 +71,6 @@ export function Navbar() {
           </button>
         </div>
 
-        {/* Desktop Navigation Links */}
-        <div className="hidden lg:flex flex-1 items-center gap-1 overflow-x-auto">
-          {navLinks.map((link) => {
-            const isActive =
-              pathname === link.href ||
-              (link.href !== "/" && pathname?.startsWith(link.href));
-
-            return (
-              <button
-                type="button"
-                key={link.href}
-                onClick={() => router.push(link.href)}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                  isActive
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
-              >
-                {link.label}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Right Side - Theme Toggle, Wallet Info & Actions */}
         <div className="flex items-center gap-3 ml-auto">
           {/* Theme Toggle */}
@@ -102,21 +78,9 @@ export function Navbar() {
 
           {isConnected ? (
             <>
-              {/* Portfolio Value (Desktop) */}
+              {/* Balance Badge */}
               {balance && (
-                <div className="hidden md:flex flex-col items-end">
-                  <span className="text-xs text-muted-foreground">
-                    Portfolio
-                  </span>
-                  <span className="text-sm font-semibold">
-                    ${formatBalance(balance.formatted)}
-                  </span>
-                </div>
-              )}
-
-              {/* Balance Badge (Desktop) */}
-              {balance && (
-                <Badge variant="secondary" className="hidden md:inline-flex">
+                <Badge variant="secondary" className="hidden sm:inline-flex">
                   {formatBalance(balance.formatted)} {balance.symbol}
                 </Badge>
               )}
@@ -189,7 +153,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 hover:bg-muted rounded-md"
+            className="p-2 hover:bg-muted rounded-md"
           >
             {mobileMenuOpen ? (
               <X className="h-5 w-5" />
@@ -202,8 +166,22 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t bg-background">
+        <div className="border-t bg-background">
           <div className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
+            {/* Home link */}
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                pathname === "/"
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              All Markets
+            </button>
+
+            {/* Category links */}
             {navLinks.map((link) => {
               const isActive =
                 pathname === link.href ||
