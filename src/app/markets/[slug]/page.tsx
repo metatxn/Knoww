@@ -247,10 +247,10 @@ export default function MarketDetailPage() {
         idx === 0
           ? "orange"
           : idx === 1
-            ? "blue"
-            : idx === 2
-              ? "purple"
-              : "green",
+          ? "blue"
+          : idx === 2
+          ? "purple"
+          : "green",
     };
   });
 
@@ -314,13 +314,15 @@ export default function MarketDetailPage() {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
-                        },
+                        }
                       )}
                     </span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                  <span className="font-medium">{outcomes.length} outcomes</span>
+                  <span className="font-medium">
+                    {outcomes.length} outcomes
+                  </span>
                 </div>
               </div>
             </div>
@@ -352,50 +354,48 @@ export default function MarketDetailPage() {
           </div>
         </div>
 
-            {/* Date Selection Pills - Mock for now */}
-            <div className="flex items-center gap-2 mt-4">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div className="flex gap-2 overflow-x-auto">
-                <Badge variant="default" className="shrink-0">
-                  Dec 10
-                </Badge>
-                <Badge variant="outline" className="shrink-0">
-                  Jan 28, 2026
-                </Badge>
-                <Badge variant="outline" className="shrink-0">
-                  Mar 18, 2026
-                </Badge>
-              </div>
-            </div>
+        {/* Date Selection Pills - Mock for now */}
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <div className="flex gap-2 overflow-x-auto">
+            <Badge variant="default" className="shrink-0">
+              Dec 10
+            </Badge>
+            <Badge variant="outline" className="shrink-0">
+              Jan 28, 2026
+            </Badge>
+            <Badge variant="outline" className="shrink-0">
+              Mar 18, 2026
+            </Badge>
+          </div>
+        </div>
 
-            {/* Probability Legend */}
-            <div className="flex flex-wrap gap-4 mt-6">
-              {outcomeData.map(
-                (
-                  outcome: { name: string; probability: number; color: string },
-                  idx: number,
-                ) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div
-                      className={`w-3 h-3 rounded-full ${
-                        outcome.color === "orange"
-                          ? "bg-orange-500"
-                          : outcome.color === "blue"
-                            ? "bg-blue-500"
-                            : outcome.color === "purple"
-                              ? "bg-purple-400"
-                              : "bg-green-500"
-                      }`}
-                    />
-                    <span className="text-sm">
-                      {outcome.name} {outcome.probability}%
-                    </span>
-                  </div>
-                ),
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Probability Legend */}
+        <div className="flex flex-wrap gap-4">
+          {outcomeData.map(
+            (
+              outcome: { name: string; probability: number; color: string },
+              idx: number
+            ) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    outcome.color === "orange"
+                      ? "bg-orange-500"
+                      : outcome.color === "blue"
+                      ? "bg-blue-500"
+                      : outcome.color === "purple"
+                      ? "bg-purple-400"
+                      : "bg-green-500"
+                  }`}
+                />
+                <span className="text-sm">
+                  {outcome.name} {outcome.probability}%
+                </span>
+              </div>
+            )
+          )}
+        </div>
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -467,7 +467,7 @@ export default function MarketDetailPage() {
                           change: number;
                           color: string;
                         },
-                        idx: number,
+                        idx: number
                       ) => (
                         <Button
                           key={idx}
@@ -485,7 +485,7 @@ export default function MarketDetailPage() {
                             {formatPrice(prices[idx] || "0")}¢
                           </span>
                         </Button>
-                      ),
+                      )
                     )}
                   </div>
                 </div>
@@ -504,7 +504,7 @@ export default function MarketDetailPage() {
                     {formatPrice(
                       (
                         1 - Number.parseFloat(prices[selectedOutcome] || "0")
-                      ).toString(),
+                      ).toString()
                     )}
                     ¢
                   </Button>
@@ -651,7 +651,7 @@ export default function MarketDetailPage() {
                   change: number;
                   color: string;
                 },
-                idx: number,
+                idx: number
               ) => (
                 <Card key={idx}>
                   <CardContent className="p-4">
@@ -722,7 +722,7 @@ export default function MarketDetailPage() {
                           {formatPrice(
                             (
                               1 - Number.parseFloat(prices[idx] || "0")
-                            ).toString(),
+                            ).toString()
                           )}
                           ¢
                         </Button>
@@ -730,7 +730,7 @@ export default function MarketDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
-              ),
+              )
             )}
           </div>
 
