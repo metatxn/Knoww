@@ -1,5 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 
+/** Token data for a market outcome */
+interface MarketToken {
+  token_id: string;
+  outcome: string; // "Yes" or "No"
+  price?: string;
+  winner?: boolean;
+}
+
 interface Market {
   id: string;
   question: string;
@@ -9,11 +17,19 @@ interface Market {
   image?: string;
   outcomes?: string;
   outcomePrices?: string;
+  /** CLOB token IDs - JSON string array of token IDs for each outcome */
+  clobTokenIds?: string;
+  /** Tokens array with token_id for YES and NO outcomes */
+  tokens?: MarketToken[];
+  /** Condition ID for the market */
+  conditionId?: string;
   volume?: string;
   liquidity?: string;
   active?: boolean;
   closed?: boolean;
   createdAt?: string;
+  /** Whether this is a negative risk market */
+  negRisk?: boolean;
 }
 
 interface Event {

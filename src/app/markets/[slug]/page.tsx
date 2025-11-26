@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
+import { OrderBook } from "@/components/order-book";
+import { type OutcomeData, TradingForm } from "@/components/trading-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +39,24 @@ export default function MarketDetailPage() {
 
   // Fetch market details with TanStack Query (slug-based only, as recommended by API team)
   const { data: market, isLoading: loading, error } = useMarketDetail(slug);
+
+  // Handle order success - must be at top level before any early returns
+  const handleOrderSuccess = useCallback((order: unknown) => {
+    console.log("Order placed successfully:", order);
+    // Could add toast notification here
+  }, []);
+
+  // Handle order error
+  const handleOrderError = useCallback((err: Error) => {
+    console.error("Order failed:", err);
+    // Could add toast notification here
+  }, []);
+
+  // Handle price click from order book
+  const handlePriceClick = useCallback((price: number) => {
+    // This could be used to set the price in the trading form
+    console.log("Price clicked:", price);
+  }, []);
 
   if (loading) {
     return (
@@ -255,6 +275,52 @@ export default function MarketDetailPage() {
     };
   });
 
+  // Prepare outcome data for trading form
+  const tradingOutcomes: OutcomeData[] = (() => {
+    // Get token IDs from tokens array (preferred) or clobTokenIds (fallback)
+    // The tokens array contains { token_id, outcome } for each outcome
+    const tokens = market.tokens || [];
+    const clobTokenIds = market.clobTokenIds
+      ? JSON.parse(market.clobTokenIds)
+      : [];
+
+    return outcomes.map((outcome: string, idx: number) => {
+      const price = prices[idx] ? Number.parseFloat(prices[idx]) : 0.5;
+
+      // Find token ID - priority: tokens array > clobTokenIds array
+      let tokenId = "";
+      if (tokens.length > 0) {
+        const token = tokens.find(
+          (t) => t.outcome?.toLowerCase() === outcome.toLowerCase()
+        );
+        tokenId = token?.token_id || "";
+      }
+      if (!tokenId && clobTokenIds.length > 0) {
+        tokenId = clobTokenIds[idx] || "";
+      }
+
+      return {
+        name: outcome,
+        tokenId,
+        price,
+        probability: price * 100,
+      };
+    });
+  })();
+
+  // Prepare token info for the chart
+  const chartColors = [
+    "hsl(25, 95%, 53%)", // Orange
+    "hsl(221, 83%, 53%)", // Blue
+    "hsl(280, 100%, 70%)", // Purple/Pink
+    "hsl(142, 76%, 36%)", // Green
+  ];
+  const chartTokens = tradingOutcomes.map((outcome, idx) => ({
+    tokenId: outcome.tokenId,
+    name: outcome.name,
+    color: chartColors[idx % chartColors.length],
+  }));
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -268,7 +334,7 @@ export default function MarketDetailPage() {
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <button
-            type="button"
+          type="button"
             onClick={() => router.push("/")}
             className="flex items-center gap-1 hover:text-foreground transition-colors"
           >
@@ -283,60 +349,60 @@ export default function MarketDetailPage() {
 
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-start gap-4 flex-1">
-            {market.image && (
+              <div className="flex items-start gap-4 flex-1">
+                {market.image && (
               <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
                 <Image
-                  src={market.image}
-                  alt={market.question}
+                    src={market.image}
+                    alt={market.question}
                   fill
                   sizes="80px"
                   className="rounded-xl object-cover"
-                />
+                  />
               </div>
-            )}
+                )}
 
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                {market.question}
-              </h1>
+                    {market.question}
+                  </h1>
 
-              {/* Metadata */}
+                  {/* Metadata */}
               <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                  <Trophy className="h-4 w-4" />
-                  <span className="font-medium">
-                    {formatVolume(market.volumeNum || market.volume)} Vol.
-                  </span>
-                </div>
-                {market.end_date_iso && (
+                      <Trophy className="h-4 w-4" />
+                      <span className="font-medium">
+                        {formatVolume(market.volumeNum || market.volume)} Vol.
+                      </span>
+                    </div>
+                    {market.end_date_iso && (
                   <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(market.end_date_iso).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {new Date(market.end_date_iso).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </span>
+                      </div>
+                    )}
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
                   <span className="font-medium">
                     {outcomes.length} outcomes
                   </span>
                 </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  type="button"
               variant="outline"
               size="sm"
               className="gap-2"
@@ -344,9 +410,9 @@ export default function MarketDetailPage() {
                 if (typeof window !== "undefined" && navigator.share) {
                   try {
                     await navigator.share({
-                      title: market.question,
-                      url: window.location.href,
-                    });
+                        title: market.question,
+                        url: window.location.href,
+                      });
                   } catch (err) {
                     // User cancelled or share failed - ignore
                     if ((err as Error).name !== "AbortError") {
@@ -358,56 +424,56 @@ export default function MarketDetailPage() {
             >
               <Share2 className="h-4 w-4" />
               <span className="hidden sm:inline">Share</span>
-            </Button>
+                </Button>
             <Button type="button" variant="outline" size="sm" className="gap-2">
               <Bookmark className="h-4 w-4" />
               <span className="hidden sm:inline">Save</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Date Selection Pills - Mock for now */}
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <div className="flex gap-2 overflow-x-auto">
-            <Badge variant="default" className="shrink-0">
-              Dec 10
-            </Badge>
-            <Badge variant="outline" className="shrink-0">
-              Jan 28, 2026
-            </Badge>
-            <Badge variant="outline" className="shrink-0">
-              Mar 18, 2026
-            </Badge>
-          </div>
-        </div>
-
-        {/* Probability Legend */}
-        <div className="flex flex-wrap gap-4">
-          {outcomeData.map(
-            (
-              outcome: { name: string; probability: number; color: string },
-              idx: number,
-            ) => (
-              <div key={idx} className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    outcome.color === "orange"
-                      ? "bg-orange-500"
-                      : outcome.color === "blue"
-                        ? "bg-blue-500"
-                        : outcome.color === "purple"
-                          ? "bg-purple-400"
-                          : "bg-green-500"
-                  }`}
-                />
-                <span className="text-sm">
-                  {outcome.name} {outcome.probability}%
-                </span>
+                </Button>
               </div>
-            ),
-          )}
-        </div>
+            </div>
+
+            {/* Date Selection Pills - Mock for now */}
+        <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex gap-2 overflow-x-auto">
+                <Badge variant="default" className="shrink-0">
+                  Dec 10
+                </Badge>
+                <Badge variant="outline" className="shrink-0">
+                  Jan 28, 2026
+                </Badge>
+                <Badge variant="outline" className="shrink-0">
+                  Mar 18, 2026
+                </Badge>
+              </div>
+            </div>
+
+            {/* Probability Legend */}
+        <div className="flex flex-wrap gap-4">
+              {outcomeData.map(
+                (
+                  outcome: { name: string; probability: number; color: string },
+                  idx: number,
+                ) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        outcome.color === "orange"
+                          ? "bg-orange-500"
+                          : outcome.color === "blue"
+                            ? "bg-blue-500"
+                            : outcome.color === "purple"
+                              ? "bg-purple-400"
+                              : "bg-green-500"
+                      }`}
+                    />
+                    <span className="text-sm">
+                      {outcome.name} {outcome.probability}%
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -416,6 +482,7 @@ export default function MarketDetailPage() {
             <Card>
               <CardContent className="pt-6">
                 <MarketPriceChart
+                  tokens={chartTokens}
                   outcomes={outcomes}
                   outcomePrices={prices.map((p: string) => p.toString())}
                 />
@@ -424,233 +491,18 @@ export default function MarketDetailPage() {
           </div>
 
           {/* Trading Panel - Right Side (1/3 width) */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  {market.image && (
-                    <div className="relative w-10 h-10 shrink-0">
-                      <Image
-                        src={market.image}
-                        alt={outcomeData[selectedOutcome]?.name || "Market"}
-                        fill
-                        sizes="40px"
-                        className="rounded object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate">
-                      {outcomeData[selectedOutcome]?.name ||
-                        "Select an outcome"}
-                    </h3>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Buy/Sell Toggle */}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="default"
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Buy
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Sell
-                  </Button>
-                </div>
-
-                {/* Outcome Selector */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Outcome
-                  </div>
-                  <div className="space-y-2">
-                    {outcomeData.map(
-                      (
-                        outcome: {
-                          name: string;
-                          probability: number;
-                          volume: number;
-                          change: number;
-                          color: string;
-                        },
-                        idx: number,
-                      ) => (
-                        <Button
-                          key={idx}
-                          type="button"
-                          variant={
-                            selectedOutcome === idx ? "default" : "outline"
-                          }
-                          className="w-full justify-between h-auto py-3"
-                          onClick={() => setSelectedOutcome(idx)}
-                        >
-                          <span className="font-medium text-left flex-1">
-                            {outcome.name}
-                          </span>
-                          <span className="font-bold">
-                            {formatPrice(prices[idx] || "0")}¢
-                          </span>
-                        </Button>
-                      ),
-                    )}
-                  </div>
-                </div>
-
-                {/* Yes/No Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    disabled
-                  >
-                    Yes {formatPrice(prices[selectedOutcome] || "0")}¢
-                  </Button>
-                  <Button type="button" variant="destructive" disabled>
-                    No{" "}
-                    {formatPrice(
-                      (
-                        1 - Number.parseFloat(prices[selectedOutcome] || "0")
-                      ).toString(),
-                    )}
-                    ¢
-                  </Button>
-                </div>
-
-                {/* Limit Price */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Limit Price</label>
-                    <div className="text-sm text-muted-foreground">
-                      Balance $2.72
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      disabled
-                    >
-                      −
-                    </Button>
-                    <div className="flex-1 text-center">
-                      <span className="text-2xl font-semibold">0.0¢</span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      disabled
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Shares */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Shares</label>
-                    <div className="text-sm text-muted-foreground">Max</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 text-center">
-                      <span className="text-2xl font-semibold">0</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      disabled
-                    >
-                      -100
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      disabled
-                    >
-                      -10
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      disabled
-                    >
-                      +10
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      disabled
-                    >
-                      +100
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Set Expiration Toggle */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Set Expiration</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-11 p-0 rounded-full bg-muted"
-                    disabled
-                  >
-                    <div className="h-5 w-5 rounded-full bg-background ml-auto" />
-                  </Button>
-                </div>
-
-                {/* Totals */}
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Total</span>
-                    <span className="text-xl font-bold text-primary">$0</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">To Win</span>
-                    <span className="text-xl font-bold text-green-500">$0</span>
-                  </div>
-                </div>
-
-                {/* Buy Button */}
-                <Button
-                  type="button"
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  size="lg"
-                  disabled
-                >
-                  Buy Yes
-                </Button>
-
-                <p className="text-xs text-muted-foreground text-center">
-                  By trading, you agree to the Terms of Use
-                </p>
-              </CardContent>
-            </Card>
+          <div className="lg:col-span-1 space-y-4">
+            {/* Trading Form */}
+            <TradingForm
+              marketTitle={market.question}
+              tokenId={tradingOutcomes[selectedOutcome]?.tokenId || ""}
+              outcomes={tradingOutcomes}
+              selectedOutcomeIndex={selectedOutcome}
+              onOutcomeChange={setSelectedOutcome}
+              negRisk={market.negRisk}
+              onOrderSuccess={handleOrderSuccess}
+              onOrderError={handleOrderError}
+            />
           </div>
         </div>
 
@@ -755,6 +607,15 @@ export default function MarketDetailPage() {
             Trading functionality coming soon. Connect your wallet to get
             started.
           </p>
+
+          {/* Order Book - Below Outcomes List */}
+          {tradingOutcomes[selectedOutcome]?.tokenId && (
+            <OrderBook
+              tokenId={tradingOutcomes[selectedOutcome].tokenId}
+              maxLevels={10}
+              onPriceClick={handlePriceClick}
+            />
+          )}
         </div>
 
         {/* Related Markets Section */}
@@ -817,12 +678,12 @@ export default function MarketDetailPage() {
                           {relatedMarket.image && (
                             <div className="relative w-12 h-12 shrink-0">
                               <Image
-                                src={relatedMarket.image}
-                                alt={relatedMarket.title}
+                              src={relatedMarket.image}
+                              alt={relatedMarket.title}
                                 fill
                                 sizes="48px"
                                 className="rounded object-cover"
-                              />
+                            />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
@@ -880,12 +741,12 @@ export default function MarketDetailPage() {
                           {relatedMarket.image && (
                             <div className="relative w-12 h-12 shrink-0">
                               <Image
-                                src={relatedMarket.image}
-                                alt={relatedMarket.title}
+                              src={relatedMarket.image}
+                              alt={relatedMarket.title}
                                 fill
                                 sizes="48px"
                                 className="rounded object-cover"
-                              />
+                            />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">

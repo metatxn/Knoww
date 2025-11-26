@@ -12,10 +12,12 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { NegRiskBadge } from "@/components/neg-risk-badge";
+import { OrderBook } from "@/components/order-book";
+import { type OutcomeData, TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,9 +28,25 @@ export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [selectedMarketId, setSelectedMarketId] = useState<string>("");
+  const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState(0);
 
   const eventId = params?.id as string;
   const { data: event, isLoading: loading, error } = useEventDetail(eventId);
+
+  // Handle order success
+  const handleOrderSuccess = useCallback((order: unknown) => {
+    console.log("Order placed successfully:", order);
+  }, []);
+
+  // Handle order error
+  const handleOrderError = useCallback((error: Error) => {
+    console.error("Order failed:", error);
+  }, []);
+
+  // Handle price click from order book
+  const handlePriceClick = useCallback((price: number) => {
+    console.log("Price clicked:", price);
+  }, []);
 
   if (loading) {
     return (
@@ -98,6 +116,13 @@ export default function EventDetailPage() {
     const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
     const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
 
+    // Get token IDs from tokens array (preferred) or clobTokenIds (fallback)
+    // The tokens array contains { token_id, outcome } for each outcome
+    const tokens = market.tokens || [];
+    const clobTokenIds = market.clobTokenIds
+      ? JSON.parse(market.clobTokenIds)
+      : [];
+
     const yesIndex = outcomes.findIndex((o: string) =>
       o.toLowerCase().includes("yes")
     );
@@ -107,6 +132,23 @@ export default function EventDetailPage() {
 
     const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
     const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
+
+    // Get the correct CLOB token IDs for Yes and No outcomes
+    // Priority: tokens array > clobTokenIds array
+    let yesTokenId = "";
+    let noTokenId = "";
+
+    if (tokens.length > 0) {
+      // Use tokens array - find by outcome name
+      const yesToken = tokens.find((t) => t.outcome?.toLowerCase() === "yes");
+      const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
+      yesTokenId = yesToken?.token_id || "";
+      noTokenId = noToken?.token_id || "";
+    } else if (clobTokenIds.length > 0) {
+      // Fallback to clobTokenIds array
+      yesTokenId = yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
+      noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
+    }
 
     const yesProbability = yesPrice
       ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
@@ -122,6 +164,9 @@ export default function EventDetailPage() {
       yesProbability,
       yesPrice: yesPrice || "0",
       noPrice: noPrice || "0",
+      yesTokenId: yesTokenId || "", // Actual CLOB token ID for Yes
+      noTokenId: noTokenId || "", // Actual CLOB token ID for No
+      negRisk: market.negRisk || false,
       change: Number.parseFloat(change),
       volume: market.volume || "0",
       color: colors[idx % colors.length],
@@ -146,6 +191,19 @@ export default function EventDetailPage() {
   const marketTitles = top4Markets.map((m) => m.groupItemTitle);
   const yesProb = top4Markets.map((m) => m.yesPrice);
 
+  // Prepare token info for the chart (uses Yes token IDs)
+  const chartColors = [
+    "hsl(25, 95%, 53%)", // Orange
+    "hsl(221, 83%, 53%)", // Blue
+    "hsl(280, 100%, 70%)", // Purple/Pink
+    "hsl(142, 76%, 36%)", // Green
+  ];
+  const chartTokens = top4Markets.map((m, idx) => ({
+    tokenId: m.yesTokenId,
+    name: m.groupItemTitle,
+    color: chartColors[idx % chartColors.length],
+  }));
+
   // Find the earliest createdAt from all markets or use event createdAt
   const earliestCreatedAt = markets.reduce<string | undefined>(
     (earliest, market) => {
@@ -157,6 +215,30 @@ export default function EventDetailPage() {
     },
     event.createdAt
   );
+
+  // Prepare trading outcomes for the selected market
+  const tradingOutcomes: OutcomeData[] = (() => {
+    if (!selectedMarket) return [];
+
+    // For event detail, we create Yes/No outcomes for the selected market
+    const yesPrice = Number.parseFloat(selectedMarket.yesPrice) || 0.5;
+    const noPrice = Number.parseFloat(selectedMarket.noPrice) || 0.5;
+
+    return [
+      {
+        name: "Yes",
+        tokenId: selectedMarket.yesTokenId, // Use actual CLOB token ID
+        price: yesPrice,
+        probability: yesPrice * 100,
+      },
+      {
+        name: "No",
+        tokenId: selectedMarket.noTokenId, // Use actual CLOB token ID
+        price: noPrice,
+        probability: noPrice * 100,
+      },
+    ];
+  })();
 
   return (
     <div className="min-h-screen bg-background">
@@ -298,6 +380,7 @@ export default function EventDetailPage() {
               </CardHeader>
               <CardContent className="pt-0">
                 <MarketPriceChart
+                  tokens={chartTokens}
                   outcomes={marketTitles}
                   outcomePrices={yesProb}
                   startDate={earliestCreatedAt}
@@ -446,203 +529,62 @@ export default function EventDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Order Book - Below Outcomes Table */}
+            {selectedMarket &&
+              tradingOutcomes[selectedOutcomeIndex]?.tokenId && (
+                <OrderBook
+                  tokenId={tradingOutcomes[selectedOutcomeIndex].tokenId}
+                  maxLevels={10}
+                  onPriceClick={handlePriceClick}
+                />
+              )}
           </div>
 
           {/* Trading Panel */}
-          <div className="lg:col-span-1">
-            <Card className="lg:sticky lg:top-4">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  {selectedMarket?.image && (
-                    <div className="relative w-12 h-12 shrink-0">
-                      <Image
-                        src={selectedMarket.image}
-                        alt={selectedMarket?.groupItemTitle || "Market"}
-                        fill
-                        sizes="48px"
-                        className="rounded object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate">
-                      {selectedMarket?.groupItemTitle || "Select a market"}
-                    </h3>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Buy/Sell Toggle */}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="default"
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Buy
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Sell
-                  </Button>
-                </div>
-
-                {/* Limit */}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="default"
-                    className="flex-1"
-                    size="sm"
-                  >
-                    Limit
-                  </Button>
-                </div>
-
-                {/* Yes/No Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    disabled
-                  >
-                    Yes {formatPrice(selectedMarket?.yesPrice || "0")}¢
-                  </Button>
-                  <Button type="button" variant="destructive" disabled>
-                    No {formatPrice(selectedMarket?.noPrice || "0")}¢
-                  </Button>
-                </div>
-
-                {/* Limit Price */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Limit Price</label>
-                    <div className="text-sm text-muted-foreground">
-                      Balance $2.72
+          <div className="lg:col-span-1 space-y-4">
+            {/* Selected Market Header */}
+            {selectedMarket && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    {selectedMarket.image && (
+                      <div className="relative w-10 h-10 shrink-0">
+                        <Image
+                          src={selectedMarket.image}
+                          alt={selectedMarket.groupItemTitle || "Market"}
+                          fill
+                          sizes="40px"
+                          className="rounded object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm truncate">
+                        {selectedMarket.groupItemTitle || "Select a market"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedMarket.yesProbability}% Yes
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      disabled
-                    >
-                      −
-                    </Button>
-                    <div className="flex-1 text-center">
-                      <span className="text-2xl font-semibold">
-                        {formatPrice(selectedMarket?.yesPrice || "0")}¢
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      disabled
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
+                </CardHeader>
+              </Card>
+            )}
 
-                {/* Shares */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Shares</label>
-                    <div className="text-sm text-muted-foreground">Max</div>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-2xl font-semibold">0</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5 md:gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs md:text-sm"
-                      disabled
-                    >
-                      -100
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs md:text-sm"
-                      disabled
-                    >
-                      -10
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs md:text-sm"
-                      disabled
-                    >
-                      +10
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs md:text-sm"
-                      disabled
-                    >
-                      +100
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Set Expiration */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Set Expiration</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-11 p-0 rounded-full bg-muted"
-                    disabled
-                  >
-                    <div className="h-5 w-5 rounded-full bg-background ml-auto" />
-                  </Button>
-                </div>
-
-                {/* Totals */}
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Total</span>
-                    <span className="text-xl font-bold text-primary">$0</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">To Win</span>
-                    <span className="text-xl font-bold text-green-500">$0</span>
-                  </div>
-                </div>
-
-                {/* Buy Button */}
-                <Button
-                  type="button"
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  size="lg"
-                  disabled
-                >
-                  Buy Yes
-                </Button>
-
-                <p className="text-xs text-muted-foreground text-center">
-                  By trading, you agree to the Terms of Use
-                </p>
-              </CardContent>
-            </Card>
+            {/* Trading Form */}
+            {selectedMarket && tradingOutcomes.length > 0 && (
+              <TradingForm
+                marketTitle={selectedMarket.groupItemTitle || event.title}
+                tokenId={tradingOutcomes[selectedOutcomeIndex]?.tokenId || ""}
+                outcomes={tradingOutcomes}
+                selectedOutcomeIndex={selectedOutcomeIndex}
+                onOutcomeChange={setSelectedOutcomeIndex}
+                negRisk={selectedMarket.negRisk || event.negRisk}
+                onOrderSuccess={handleOrderSuccess}
+                onOrderError={handleOrderError}
+              />
+            )}
           </div>
         </div>
 

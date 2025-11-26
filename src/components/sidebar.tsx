@@ -48,6 +48,8 @@ const navLinks = [
   { label: "Mentions", href: "/events/mention-markets", icon: MessageSquare },
 ];
 
+const userLinks = [{ label: "Portfolio", href: "/portfolio", icon: BarChart3 }];
+
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -120,6 +122,36 @@ export function Sidebar() {
             const isActive =
               pathname === link.href ||
               (link.href !== "/" && pathname?.startsWith(link.href));
+
+            return (
+              <li key={link.href}>
+                <button
+                  type="button"
+                  onClick={() => router.push(link.href)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{link.label}</span>
+                </button>
+              </li>
+            );
+          })}
+
+          {/* User Section Divider */}
+          <li className="pt-4 pb-2">
+            <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Account
+            </span>
+          </li>
+
+          {/* User Links */}
+          {userLinks.map((link) => {
+            const Icon = link.icon;
+            const isActive = pathname === link.href;
 
             return (
               <li key={link.href}>
