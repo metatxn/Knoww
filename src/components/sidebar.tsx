@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { usePolPrice } from "@/hooks/use-pol-price";
 
 const navLinks = [
   { label: "Politics", href: "/events/politics", icon: Landmark },
@@ -54,6 +55,7 @@ export function Sidebar() {
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
+  const { data: polPriceData, isLoading: isPriceLoading } = usePolPrice();
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -62,6 +64,14 @@ export function Sidebar() {
   const formatBalance = (bal?: string) => {
     if (!bal) return "0.00";
     return Number(bal).toFixed(2);
+  };
+
+  // Calculate USD value of POL balance
+  const getUsdValue = (polBalance?: string) => {
+    if (!polBalance || !polPriceData?.price) return null;
+    const polAmount = Number(polBalance);
+    const usdValue = polAmount * polPriceData.price;
+    return usdValue.toFixed(2);
   };
 
   return (
@@ -147,10 +157,23 @@ export function Sidebar() {
               <div className="px-3 py-2 rounded-lg bg-muted/50">
                 <div className="text-xs text-muted-foreground">Portfolio</div>
                 <div className="text-lg font-semibold">
-                  ${formatBalance(balance.formatted)}
+                  {isPriceLoading ? (
+                    <span className="animate-pulse">Loading...</span>
+                  ) : getUsdValue(balance.formatted) ? (
+                    `$${getUsdValue(balance.formatted)}`
+                  ) : (
+                    `${formatBalance(balance.formatted)} ${balance.symbol}`
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatBalance(balance.formatted)} {balance.symbol}
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span>
+                    {formatBalance(balance.formatted)} {balance.symbol}
+                  </span>
+                  {polPriceData?.price && (
+                    <span className="text-muted-foreground/70">
+                      @ ${polPriceData.price.toFixed(4)}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -191,11 +214,23 @@ export function Sidebar() {
                   </div>
 
                   {balance && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Balance:</span>
-                      <span className="font-medium text-xs">
-                        {formatBalance(balance.formatted)} {balance.symbol}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Balance:</span>
+                        <span className="font-medium text-xs">
+                          {formatBalance(balance.formatted)} {balance.symbol}
+                        </span>
+                      </div>
+                      {polPriceData?.price && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            USD Value:
+                          </span>
+                          <span className="font-medium text-xs text-green-600 dark:text-green-400">
+                            ${getUsdValue(balance.formatted)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
