@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
 import { useTagDetails } from "@/hooks/use-tag-details";
 
-
 export default function TagEventsPage() {
   const router = useRouter();
   const params = useParams();
@@ -63,7 +62,7 @@ export default function TagEventsPage() {
           fetchNextPage();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observer.observe(loadMoreRef.current);
@@ -87,8 +86,8 @@ export default function TagEventsPage() {
   const tagLabel = tagDetails?.label
     ? formatTagLabel(tagDetails.label)
     : tagSlug
-    ? formatTagLabel(tagSlug.replace(/-/g, " "))
-    : "Markets";
+      ? formatTagLabel(tagSlug.replace(/-/g, " "))
+      : "Markets";
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,7 +173,7 @@ export default function TagEventsPage() {
                 key={`skeleton-${i}`}
                 className="rounded-2xl bg-card border border-border/50 overflow-hidden"
               >
-                <Skeleton className="aspect-[16/10] w-full" />
+                <Skeleton className="aspect-16/10 w-full" />
                 <div className="p-4 space-y-3">
                   <Skeleton className="h-5 w-3/4" />
                   <Skeleton className="h-4 w-full" />
@@ -189,13 +188,29 @@ export default function TagEventsPage() {
         {!isLoading && !error && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-              {events.map((event: { id: string; slug?: string; title: string; description?: string; image?: string; volume?: string; active?: boolean; closed?: boolean; negRisk?: boolean; markets?: Array<{ id: string; question: string }> }, index: number) => (
-                <EventCard
-                  key={`${event.id}-${index}`}
-                  event={event}
-                  index={index}
-                />
-              ))}
+              {events.map(
+                (
+                  event: {
+                    id: string;
+                    slug?: string;
+                    title: string;
+                    description?: string;
+                    image?: string;
+                    volume?: string;
+                    active?: boolean;
+                    closed?: boolean;
+                    negRisk?: boolean;
+                    markets?: Array<{ id: string; question: string }>;
+                  },
+                  index: number,
+                ) => (
+                  <EventCard
+                    key={`${event.id}-${index}`}
+                    event={event}
+                    index={index}
+                  />
+                ),
+              )}
             </div>
 
             {events.length === 0 && (

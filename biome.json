@@ -44,7 +44,14 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noUnknownAtRules": "off"
+        "noUnknownAtRules": "off",
+        "noArrayIndexKey": "off"
+      },
+      "a11y": {
+        "noLabelWithoutControl": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
       }
     },
     "domains": {

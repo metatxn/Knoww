@@ -24,4 +24,3 @@ export function usePolPrice() {
     retry: 2,
   });
 }
-

@@ -42,6 +42,7 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu when route changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname dependency is intentional to close menu on navigation
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);

@@ -10,46 +10,17 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { NegRiskBadge } from "@/components/neg-risk-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEventDetail } from "@/hooks/use-event-detail";
-
-interface Market {
-  id: string;
-  question: string;
-  groupItemTitle?: string;
-  slug?: string;
-  description?: string;
-  image?: string;
-  outcomes?: string;
-  outcomePrices?: string;
-  volume?: string;
-  liquidity?: string;
-  active?: boolean;
-  closed?: boolean;
-  createdAt?: string;
-}
-
-interface MarketData {
-  id: string;
-  question: string;
-  groupItemTitle: string;
-  yesProbability: number;
-  yesPrice: string;
-  noPrice: string;
-  change: number;
-  volume: string;
-  color: string;
-  image?: string;
-}
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -216,11 +187,15 @@ export default function EventDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-4 flex-1">
             {event.image && (
-              <img
-                src={event.image}
-                alt={event.title}
-                className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover shrink-0"
-              />
+              <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
+                <Image
+                  src={event.image}
+                  alt={event.title}
+                  fill
+                  sizes="80px"
+                  className="rounded-xl object-cover"
+                />
+              </div>
             )}
 
             <div className="flex-1 min-w-0">
@@ -338,9 +313,10 @@ export default function EventDetailPage() {
               <CardContent>
                 <div className="space-y-2">
                   {sortedMarketData.map((market) => (
-                    <div
+                    <button
+                      type="button"
                       key={market.id}
-                      className={`p-3 md:p-4 rounded-lg border transition-all cursor-pointer ${
+                      className={`w-full text-left p-3 md:p-4 rounded-lg border transition-all cursor-pointer ${
                         selectedMarket?.id === market.id
                           ? "bg-primary/10 border-primary"
                           : "hover:bg-accent/50 border-border"
@@ -352,11 +328,15 @@ export default function EventDetailPage() {
                         {/* Top Row (Mobile) / Left Section (Desktop): Image + Market Title + Percentage */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {market.image && (
-                            <img
-                              src={market.image}
-                              alt={market.groupItemTitle}
-                              className="w-10 h-10 rounded object-cover shrink-0"
-                            />
+                            <div className="relative w-10 h-10 shrink-0">
+                              <Image
+                                src={market.image}
+                                alt={market.groupItemTitle || "Market"}
+                                fill
+                                sizes="40px"
+                                className="rounded object-cover"
+                              />
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm md:text-base truncate">
@@ -453,7 +433,7 @@ export default function EventDetailPage() {
                           </Button>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -466,11 +446,15 @@ export default function EventDetailPage() {
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
                   {selectedMarket?.image && (
-                    <img
-                      src={selectedMarket.image}
-                      alt={selectedMarket?.groupItemTitle || "Market"}
-                      className="w-10 h-10 rounded object-cover shrink-0"
-                    />
+                    <div className="relative w-12 h-12 shrink-0">
+                      <Image
+                        src={selectedMarket.image}
+                        alt={selectedMarket?.groupItemTitle || "Market"}
+                        fill
+                        sizes="48px"
+                        className="rounded object-cover"
+                      />
+                    </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm truncate">

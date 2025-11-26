@@ -114,7 +114,7 @@ export default function Home() {
   }, [viewMode, mounted]);
 
   // Fetch all tags
-  const { data: tags, isLoading: loadingTags, error: tagsError } = useTags();
+  const { data: tags, error: tagsError } = useTags();
 
   // Fetch paginated events for "All Categories" (no tagSlug = all events)
   const {
@@ -210,10 +210,6 @@ export default function Home() {
     setViewMode(mode);
   };
 
-  const handleEventClick = (eventId: string) => {
-    router.push(`/events/detail/${eventId}`);
-  };
-
   // Get current events based on view mode
   const getCurrentEvents = () => {
     switch (viewMode) {
@@ -270,17 +266,6 @@ export default function Home() {
   };
 
   const currentData = getCurrentEvents();
-  const formatVolume = (vol?: string) => {
-    if (!vol) return "N/A";
-    const num = parseFloat(vol);
-    if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-      return `$${(num / 1000).toFixed(0)}K`;
-    }
-    return `$${num.toFixed(0)}`;
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -358,7 +343,7 @@ export default function Home() {
                     key={`event-skeleton-${i}`}
                     className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    <Skeleton className="aspect-[16/10] w-full" />
+                    <Skeleton className="aspect-16/10 w-full" />
                     <div className="p-4 space-y-3">
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-4 w-full" />
@@ -419,7 +404,7 @@ export default function Home() {
                     key={`cat-skeleton-${i}`}
                     className="rounded-2xl bg-card border border-border/50 overflow-hidden"
                   >
-                    <Skeleton className="aspect-[16/10] w-full" />
+                    <Skeleton className="aspect-16/10 w-full" />
                     <div className="p-4 space-y-3">
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-4 w-full" />

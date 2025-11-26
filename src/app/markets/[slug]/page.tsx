@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
@@ -284,11 +285,15 @@ export default function MarketDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-4 flex-1">
             {market.image && (
-              <img
-                src={market.image}
-                alt={market.question}
-                className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover shrink-0"
-              />
+              <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
+                <Image
+                  src={market.image}
+                  alt={market.question}
+                  fill
+                  sizes="80px"
+                  className="rounded-xl object-cover"
+                />
+              </div>
             )}
 
             <div className="flex-1 min-w-0">
@@ -424,11 +429,15 @@ export default function MarketDetailPage() {
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
                   {market.image && (
-                    <img
-                      src={market.image}
-                      alt={outcomeData[selectedOutcome]?.name || "Market"}
-                      className="w-10 h-10 rounded object-cover shrink-0"
-                    />
+                    <div className="relative w-10 h-10 shrink-0">
+                      <Image
+                        src={market.image}
+                        alt={outcomeData[selectedOutcome]?.name || "Market"}
+                        fill
+                        sizes="40px"
+                        className="rounded object-cover"
+                      />
+                    </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm truncate">
@@ -798,19 +807,23 @@ export default function MarketDetailPage() {
                       probability: "3%",
                       image: market.image,
                     },
-                  ].map((relatedMarket, idx) => (
+                  ].map((relatedMarket) => (
                     <Card
-                      key={idx}
+                      key={relatedMarket.title}
                       className="cursor-pointer hover:bg-accent/50 transition-colors"
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           {relatedMarket.image && (
-                            <img
-                              src={relatedMarket.image}
-                              alt={relatedMarket.title}
-                              className="w-12 h-12 rounded object-cover shrink-0"
-                            />
+                            <div className="relative w-12 h-12 shrink-0">
+                              <Image
+                                src={relatedMarket.image}
+                                alt={relatedMarket.title}
+                                fill
+                                sizes="48px"
+                                className="rounded object-cover"
+                              />
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm mb-2 line-clamp-2">
@@ -857,19 +870,23 @@ export default function MarketDetailPage() {
                       probability: "3%",
                       image: market.image,
                     },
-                  ].map((relatedMarket, idx) => (
+                  ].map((relatedMarket) => (
                     <Card
-                      key={idx}
+                      key={relatedMarket.title}
                       className="cursor-pointer hover:bg-accent/50 transition-colors"
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           {relatedMarket.image && (
-                            <img
-                              src={relatedMarket.image}
-                              alt={relatedMarket.title}
-                              className="w-12 h-12 rounded object-cover shrink-0"
-                            />
+                            <div className="relative w-12 h-12 shrink-0">
+                              <Image
+                                src={relatedMarket.image}
+                                alt={relatedMarket.title}
+                                fill
+                                sizes="48px"
+                                className="rounded object-cover"
+                              />
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm mb-2 line-clamp-2">

@@ -19,7 +19,7 @@ if (!projectId) {
 // Using Polygon since Polymarket runs on Polygon
 export const networks = [polygon, mainnet, arbitrum, polygonAmoy] as [
   AppKitNetwork,
-  ...AppKitNetwork[]
+  ...AppKitNetwork[],
 ];
 
 // Set up the Wagmi Adapter (Config)

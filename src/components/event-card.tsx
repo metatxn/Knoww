@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { TrendingUp } from "lucide-react";
+import { AlertCircle, TrendingUp } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 interface EventCardProps {
@@ -53,17 +54,20 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
       whileTap={{ scale: 0.98 }}
       className="h-full"
     >
-      <div
-        className="group relative h-full cursor-pointer rounded-2xl bg-card border border-border/50 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
+      <button
+        type="button"
+        className="group relative h-full w-full text-left cursor-pointer rounded-2xl bg-card border border-border/50 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
         onClick={handleViewEvent}
       >
         {/* Image Section with Overlay */}
         <div className="relative aspect-[16/10] w-full overflow-hidden">
           {event.image ? (
-            <img
+            <Image
               src={event.image}
               alt={event.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-110"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -88,17 +92,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
             {event.negRisk && (
               <span className="px-2.5 py-1 text-xs font-medium bg-rose-500/90 text-white rounded-full backdrop-blur-sm flex items-center gap-1 shadow-lg">
                 Neg Risk
-                <svg
-                  className="w-3 h-3"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <AlertCircle className="w-3 h-3" />
               </span>
             )}
           </div>
@@ -139,8 +133,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
 
         {/* Hover Indicator */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-      </div>
+      </button>
     </motion.div>
   );
 }
-
