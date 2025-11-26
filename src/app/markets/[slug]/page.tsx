@@ -335,12 +335,19 @@ export default function MarketDetailPage() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  navigator.share?.({
-                    title: market.question,
-                    url: window.location.href,
-                  });
+              onClick={async () => {
+                if (typeof window !== "undefined" && navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: market.question,
+                      url: window.location.href,
+                    });
+                  } catch (err) {
+                    // User cancelled or share failed - ignore
+                    if ((err as Error).name !== "AbortError") {
+                      console.error("Share failed:", err);
+                    }
+                  }
                 }
               }}
             >

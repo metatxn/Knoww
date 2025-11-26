@@ -264,12 +264,19 @@ export default function EventDetailPage() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  navigator.share?.({
-                    title: event.title,
-                    url: window.location.href,
-                  });
+              onClick={async () => {
+                if (typeof window !== "undefined" && navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: event.title,
+                      url: window.location.href,
+                    });
+                  } catch (err) {
+                    // User cancelled or share failed - ignore
+                    if ((err as Error).name !== "AbortError") {
+                      console.error("Share failed:", err);
+                    }
+                  }
                 }
               }}
             >
