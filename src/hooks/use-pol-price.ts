@@ -19,8 +19,8 @@ export function usePolPrice() {
       }
       return response.json();
     },
-    staleTime: 60 * 1000, // Consider data stale after 60 seconds
-    refetchInterval: 60 * 1000, // Refetch every 60 seconds
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     retry: 2,
   });
 }

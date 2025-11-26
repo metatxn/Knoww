@@ -22,9 +22,11 @@ interface CoinMarketCapResponse {
   };
 }
 
-// Cache the price for 60 seconds to avoid hitting rate limits
+// Cache the price for 5 minutes to stay within CoinMarketCap free tier limits
+// Free tier: 10,000 requests/month
+// 5 min cache = 12 req/hour × 24 hours × 30 days = 8,640 req/month (safe buffer)
 let cachedPrice: { price: number; timestamp: number } | null = null;
-const CACHE_DURATION = 60 * 1000; // 60 seconds
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export async function GET() {
   try {
@@ -53,7 +55,7 @@ export async function GET() {
           "X-CMC_PRO_API_KEY": apiKey,
           Accept: "application/json",
         },
-        next: { revalidate: 60 }, // Next.js cache for 60 seconds
+        next: { revalidate: 300 }, // Next.js cache for 5 minutes
       }
     );
 
