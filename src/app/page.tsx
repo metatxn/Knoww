@@ -174,7 +174,7 @@ export default function Home() {
           fetchNextAllPaginated();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observer.observe(loadMoreRef.current);

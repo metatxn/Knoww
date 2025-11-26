@@ -313,15 +313,23 @@ export default function EventDetailPage() {
               <CardContent>
                 <div className="space-y-2">
                   {sortedMarketData.map((market) => (
-                    <button
-                      type="button"
+                    // biome-ignore lint/a11y/useSemanticElements: Cannot use button as it contains interactive Button children
+                    <div
                       key={market.id}
+                      role="button"
+                      tabIndex={0}
                       className={`w-full text-left p-3 md:p-4 rounded-lg border transition-all cursor-pointer ${
                         selectedMarket?.id === market.id
                           ? "bg-primary/10 border-primary"
                           : "hover:bg-accent/50 border-border"
                       }`}
                       onClick={() => setSelectedMarketId(market.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedMarketId(market.id);
+                        }
+                      }}
                     >
                       {/* Mobile & Desktop Layout */}
                       <div className="flex flex-col md:flex-row md:items-center gap-3">
@@ -433,7 +441,7 @@ export default function EventDetailPage() {
                           </Button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </CardContent>
