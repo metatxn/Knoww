@@ -1,66 +1,21 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { ERROR_MESSAGES } from "@/lib/constants";
-import { createRelayClient } from "@/lib/polymarket";
-
-// Validation schema
-const listOrdersSchema = z.object({
-  userAddress: z.string().describe("User's wallet address"),
-});
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/orders/list
- * Get all open orders for a specific user address
+ *
+ * This endpoint has been deprecated.
+ * Order listing now happens on the frontend using the useClobClient hook
+ * which uses the real user signer for authentication.
+ *
+ * Use the `getOpenOrders()` method from the useClobClient hook instead.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const userAddress = searchParams.get("userAddress");
-
-    const parsed = listOrdersSchema.safeParse({ userAddress });
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid query parameters",
-          details: parsed.error.message,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Initialize relay client
-    const client = createRelayClient();
-
-    // Get open orders for the user
-    const allOrders = await client.getOpenOrders();
-
-    // Filter orders by user address
-    const userOrders =
-      allOrders?.filter(
-        (order) =>
-          (
-            (order as unknown as Record<string, unknown>).maker as
-              | string
-              | undefined
-          )?.toLowerCase() === parsed.data.userAddress.toLowerCase(),
-      ) || [];
-
-    return NextResponse.json({
-      success: true,
-      count: userOrders.length,
-      orders: userOrders,
-    });
-  } catch (error) {
-    console.error("Error fetching orders:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
-      },
-      { status: 500 },
-    );
-  }
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "This endpoint has been deprecated. Use the frontend useClobClient hook's getOpenOrders() method instead.",
+      hint: "Order operations require user wallet authentication which is now handled on the frontend.",
+    },
+    { status: 410 } // 410 Gone
+  );
 }

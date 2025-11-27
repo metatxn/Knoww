@@ -1,22 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { initPolymarketClient } from "@/lib/polymarket";
+import { fetchMarket } from "@/lib/polymarket";
 
 /**
  * GET /api/markets/info/:conditionID
  * Get market information by condition ID
+ *
+ * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ conditionID: string }> },
+  { params }: { params: Promise<{ conditionID: string }> }
 ) {
   try {
     const { conditionID } = await params;
 
-    // Initialize Polymarket client
-    const client = initPolymarketClient();
-
-    // Get market info
-    const market = await client.getMarket(conditionID);
+    // Fetch market info directly from CLOB API
+    const market = await fetchMarket(conditionID);
 
     return NextResponse.json({
       success: true,
@@ -29,7 +28,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

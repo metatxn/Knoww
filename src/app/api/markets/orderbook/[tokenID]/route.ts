@@ -1,22 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { initPolymarketClient } from "@/lib/polymarket";
+import { fetchOrderBook } from "@/lib/polymarket";
 
 /**
  * GET /api/markets/orderbook/:tokenID
  * Get order book for a token
+ *
+ * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ tokenID: string }> },
+  { params }: { params: Promise<{ tokenID: string }> }
 ) {
   try {
     const { tokenID } = await params;
 
-    // Initialize Polymarket client
-    const client = initPolymarketClient();
-
-    // Get order book
-    const orderBook = await client.getOrderBook(tokenID);
+    // Fetch order book directly from CLOB API
+    const orderBook = await fetchOrderBook(tokenID);
 
     return NextResponse.json({
       success: true,
@@ -30,7 +29,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

@@ -103,6 +103,15 @@ export interface SignedOrder {
 }
 
 /**
+ * User API credentials for CLOB authentication
+ */
+export interface UserApiCreds {
+  apiKey: string;
+  apiSecret: string;
+  apiPassphrase: string;
+}
+
+/**
  * Generate a random salt for order uniqueness
  */
 function generateSalt(): string {
@@ -166,6 +175,10 @@ function calculateAmounts(
  * 1. Build order structs matching Polymarket's CTF Exchange format
  * 2. Sign orders using wagmi's useSignTypedData
  * 3. Return signed orders ready for submission to the CLOB
+ *
+ * Note: The backend handles CLOB authentication using builder credentials.
+ * Orders are signed by the user on the frontend, then relayed through the backend
+ * which adds the necessary authentication headers.
  */
 export function useOrderSigning() {
   const { address, isConnected } = useAccount();
@@ -299,18 +312,22 @@ export function useOrderSigning() {
     },
     [address, buildOrder, signTypedDataAsync]
   );
-
   /**
    * Submit a signed order to the backend API
+   * If userCreds are provided, they will be used for L2 authentication
    */
   const submitOrder = useCallback(
     async (
       signedOrder: SignedOrder,
-      orderType: OrderType = OrderType.GTC
+      orderType: OrderType = OrderType.GTC,
+      userCreds?: UserApiCreds
     ): Promise<{ success: boolean; order?: unknown; error?: string }> => {
       if (!address) {
         throw new Error("Wallet not connected");
       }
+
+      setIsLoading(true);
+      setError(null);
 
       try {
         const response = await fetch("/api/orders/create", {
@@ -336,6 +353,7 @@ export function useOrderSigning() {
             },
             signature: signedOrder.signature,
             orderType,
+            userCreds,
           }),
         });
 
@@ -355,6 +373,8 @@ export function useOrderSigning() {
           err instanceof Error ? err : new Error("Failed to submit order");
         setError(error);
         throw error;
+      } finally {
+        setIsLoading(false);
       }
     },
     [address]
@@ -362,14 +382,16 @@ export function useOrderSigning() {
 
   /**
    * Sign and submit an order in one call
+   * If userCreds are provided, they will be used for L2 authentication
    */
   const createOrder = useCallback(
     async (
       params: OrderParams,
-      orderType: OrderType = OrderType.GTC
+      orderType: OrderType = OrderType.GTC,
+      userCreds?: UserApiCreds
     ): Promise<{ success: boolean; order?: unknown; error?: string }> => {
       const signedOrder = await signOrder(params);
-      return submitOrder(signedOrder, orderType);
+      return submitOrder(signedOrder, orderType, userCreds);
     },
     [signOrder, submitOrder]
   );

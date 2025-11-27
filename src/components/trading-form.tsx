@@ -21,12 +21,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { calculatePotentialPnL, OrderSide } from "@/hooks/use-order-signing";
 import {
-  calculatePotentialPnL,
-  OrderSide,
-  OrderType,
-  useOrderSigning,
-} from "@/hooks/use-order-signing";
+  useClobClient,
+  Side,
+  OrderType as ClobOrderType,
+} from "@/hooks/use-clob-client";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * Outcome data for the trading form
@@ -98,7 +99,17 @@ export function TradingForm({
 }: TradingFormProps) {
   const { isConnected } = useAccount();
   const { open } = useAppKit();
-  const { createOrder, isLoading, error } = useOrderSigning();
+  const {
+    createOrder,
+    isLoading,
+    error,
+    hasCredentials,
+    deriveCredentials,
+    canTrade,
+    updateAllowance,
+    getUsdcBalance,
+    getUsdcAllowance,
+  } = useClobClient();
 
   // Form state
   const [side, setSide] = useState<TradingSide>("BUY");
@@ -107,6 +118,7 @@ export function TradingForm({
   const [shares, setShares] = useState<number>(10);
   const [useExpiration, setUseExpiration] = useState<boolean>(false);
   const [expirationHours, setExpirationHours] = useState<number>(24);
+  const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
 
   // Get selected outcome
   const selectedOutcome = outcomes[selectedOutcomeIndex];
@@ -141,6 +153,49 @@ export function TradingForm({
     };
   }, [side, orderType, limitPrice, shares, selectedOutcome]);
 
+  // Fetch USDC balance directly from Polygon chain
+  const { data: onChainBalance, refetch: refetchBalance } = useQuery({
+    queryKey: ["usdcBalance", isConnected],
+    queryFn: () => getUsdcBalance(),
+    enabled: isConnected,
+    staleTime: 15_000, // 15 seconds
+    refetchInterval: 30_000, // Refetch every 30 seconds
+  });
+
+  // Fetch USDC allowance directly from Polygon chain
+  const { data: onChainAllowance, refetch: refetchAllowance } = useQuery({
+    queryKey: ["usdcAllowance", isConnected],
+    queryFn: () => getUsdcAllowance(),
+    enabled: isConnected,
+    staleTime: 15_000, // 15 seconds
+    refetchInterval: 30_000, // Refetch every 30 seconds
+  });
+
+  // Use on-chain USDC balance and allowance (more accurate)
+  const usdcBalance = onChainBalance?.balance;
+  const allowance = onChainAllowance?.allowance;
+
+  // Check allowance status
+  const hasInsufficientAllowance =
+    allowance !== undefined && calculations.total > allowance;
+  const hasNoAllowance = allowance !== undefined && allowance === 0;
+
+  // Handle setting allowance
+  const handleSetAllowance = useCallback(async () => {
+    setIsUpdatingAllowance(true);
+    try {
+      await updateAllowance();
+      // Refetch both balance and allowance after approval
+      await Promise.all([refetchBalance(), refetchAllowance()]);
+    } catch (err) {
+      const error =
+        err instanceof Error ? err : new Error("Failed to set allowance");
+      onOrderError?.(error);
+    } finally {
+      setIsUpdatingAllowance(false);
+    }
+  }, [updateAllowance, refetchBalance, refetchAllowance, onOrderError]);
+
   // Handle price change with bounds
   const handlePriceChange = useCallback((delta: number) => {
     setLimitPrice((prev) => {
@@ -154,40 +209,61 @@ export function TradingForm({
     setShares((prev) => Math.max(1, prev + delta));
   }, []);
 
+  // Handle deriving credentials (one-time setup)
+  const handleDeriveCredentials = useCallback(async () => {
+    try {
+      await deriveCredentials();
+    } catch (err) {
+      const error =
+        err instanceof Error ? err : new Error("Failed to derive credentials");
+      onOrderError?.(error);
+    }
+  }, [deriveCredentials, onOrderError]);
+
   // Handle order submission
   const handleSubmit = useCallback(async () => {
-    if (!isConnected || !selectedOutcome || !hasValidTokenId) return;
+    if (!canTrade || !selectedOutcome || !hasValidTokenId) return;
 
     try {
-      const expiration = useExpiration
-        ? Math.floor(Date.now() / 1000) + expirationHours * 60 * 60
-        : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30 days default
+      // Determine order type and expiration
+      // - GTC (Good Till Cancelled): expiration = 0
+      // - FOK (Fill Or Kill): expiration = 0
+      // - GTD (Good Till Date): expiration = timestamp
+      const isGTD = useExpiration;
+      const clobOrderType =
+        orderType === "MARKET"
+          ? ClobOrderType.FOK
+          : isGTD
+          ? ClobOrderType.GTD
+          : ClobOrderType.GTC;
 
-      const result = await createOrder(
-        {
-          tokenId: selectedOutcome.tokenId,
-          price: orderType === "MARKET" ? selectedOutcome.price : limitPrice,
-          size: shares,
-          side: side === "BUY" ? OrderSide.BUY : OrderSide.SELL,
-          expiration,
-          negRisk,
-        },
-        orderType === "MARKET" ? OrderType.FOK : OrderType.GTC,
-      );
+      // Only set expiration for GTD orders, otherwise use 0
+      const expiration = isGTD
+        ? Math.floor(Date.now() / 1000) + expirationHours * 60 * 60
+        : 0;
+
+      const result = await createOrder({
+        tokenId: selectedOutcome.tokenId,
+        price: orderType === "MARKET" ? selectedOutcome.price : limitPrice,
+        size: shares,
+        side: side === "BUY" ? Side.BUY : Side.SELL,
+        orderType: clobOrderType,
+        expiration,
+      });
 
       if (result.success) {
         onOrderSuccess?.(result.order);
         // Reset form
         setShares(10);
       } else {
-        throw new Error(result.error || "Order failed");
+        throw new Error("Order failed");
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Order failed");
       onOrderError?.(error);
     }
   }, [
-    isConnected,
+    canTrade,
     selectedOutcome,
     hasValidTokenId,
     side,
@@ -196,7 +272,6 @@ export function TradingForm({
     shares,
     useExpiration,
     expirationHours,
-    negRisk,
     createOrder,
     onOrderSuccess,
     onOrderError,
@@ -205,9 +280,14 @@ export function TradingForm({
   // Format price as cents
   const formatCents = (price: number) => `${(price * 100).toFixed(1)}¢`;
 
-  // Check if user has sufficient balance
+  // Check if user has sufficient balance (use fetched balance or prop)
+  const effectiveBalance = usdcBalance ?? userBalance;
   const hasInsufficientBalance =
-    userBalance !== undefined && calculations.total > userBalance;
+    effectiveBalance !== undefined && calculations.total > effectiveBalance;
+
+  // Polymarket minimum order size is $1
+  const MIN_ORDER_SIZE = 1;
+  const isBelowMinimum = calculations.total < MIN_ORDER_SIZE;
 
   return (
     <Card className="sticky top-4">
@@ -237,7 +317,9 @@ export function TradingForm({
           <Button
             type="button"
             variant={side === "BUY" ? "default" : "outline"}
-            className={`flex-1 ${side === "BUY" ? "bg-green-600 hover:bg-green-700" : ""}`}
+            className={`flex-1 ${
+              side === "BUY" ? "bg-green-600 hover:bg-green-700" : ""
+            }`}
             size="lg"
             onClick={() => setSide("BUY")}
           >
@@ -246,7 +328,9 @@ export function TradingForm({
           <Button
             type="button"
             variant={side === "SELL" ? "default" : "outline"}
-            className={`flex-1 ${side === "SELL" ? "bg-red-600 hover:bg-red-700" : ""}`}
+            className={`flex-1 ${
+              side === "SELL" ? "bg-red-600 hover:bg-red-700" : ""
+            }`}
             size="lg"
             onClick={() => setSide("SELL")}
           >
@@ -304,9 +388,9 @@ export function TradingForm({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-sm font-medium">Limit Price</label>
-              {userBalance !== undefined && (
+              {effectiveBalance !== undefined && (
                 <div className="text-sm text-muted-foreground">
-                  Balance: ${userBalance.toFixed(2)}
+                  Balance: ${effectiveBalance.toFixed(2)}
                 </div>
               )}
             </div>
@@ -377,9 +461,9 @@ export function TradingForm({
               type="button"
               className="text-sm text-primary hover:underline"
               onClick={() => {
-                if (userBalance && calculations.price > 0) {
+                if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
-                    userBalance / calculations.price,
+                    effectiveBalance / calculations.price
                   );
                   setShares(Math.max(1, maxShares));
                 }
@@ -529,14 +613,95 @@ export function TradingForm({
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>
-              Insufficient balance. You need $
-              {(calculations.total - (userBalance || 0)).toFixed(2)} more.
+              Insufficient USDC balance. You need $
+              {(calculations.total - (effectiveBalance || 0)).toFixed(2)} more.
+            </span>
+          </motion.div>
+        )}
+
+        {/* Insufficient Allowance Warning */}
+        {(hasNoAllowance || hasInsufficientAllowance) &&
+          !hasInsufficientBalance && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              <div className="flex items-center gap-2 p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>
+                  {hasNoAllowance
+                    ? "You need to approve USDC spending before trading."
+                    : `Insufficient allowance. Current: $${
+                        allowance?.toFixed(2) || 0
+                      }, needed: $${calculations.total.toFixed(2)}`}
+                </span>
+              </div>
+              <Button
+                type="button"
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={handleSetAllowance}
+                disabled={isUpdatingAllowance}
+              >
+                {isUpdatingAllowance ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>Approve USDC Spending</>
+                )}
+              </Button>
+            </motion.div>
+          )}
+
+        {/* Minimum Order Size Warning */}
+        {isBelowMinimum && !hasInsufficientBalance && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-lg text-sm"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              Minimum order size is $1. Current order: $
+              {calculations.total.toFixed(2)}
             </span>
           </motion.div>
         )}
 
         {/* Submit Button */}
-        {isConnected ? (
+        {!isConnected ? (
+          <Button
+            type="button"
+            className="w-full"
+            size="lg"
+            onClick={() => open()}
+          >
+            <Wallet className="mr-2 h-4 w-4" />
+            Connect Wallet to Trade
+          </Button>
+        ) : !hasCredentials ? (
+          <Button
+            type="button"
+            className="w-full bg-blue-600 hover:bg-blue-700"
+            size="lg"
+            onClick={handleDeriveCredentials}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Setting up...
+              </>
+            ) : (
+              <>
+                <Wallet className="mr-2 h-4 w-4" />
+                Setup Trading (Sign Once)
+              </>
+            )}
+          </Button>
+        ) : (
           <Button
             type="button"
             className={`w-full ${
@@ -549,6 +714,9 @@ export function TradingForm({
             disabled={
               isLoading ||
               hasInsufficientBalance ||
+              hasInsufficientAllowance ||
+              hasNoAllowance ||
+              isBelowMinimum ||
               !selectedOutcome ||
               !hasValidTokenId
             }
@@ -556,26 +724,18 @@ export function TradingForm({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing Order...
+                Placing Order...
               </>
             ) : !hasValidTokenId ? (
               <>Trading not available</>
+            ) : isBelowMinimum ? (
+              <>Minimum order: $1</>
             ) : (
               <>
                 {side === "BUY" ? "Buy" : "Sell"}{" "}
                 {selectedOutcome?.name || "Outcome"}
               </>
             )}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            className="w-full"
-            size="lg"
-            onClick={() => open()}
-          >
-            <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet to Trade
           </Button>
         )}
 

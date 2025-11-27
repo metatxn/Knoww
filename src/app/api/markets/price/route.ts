@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { initPolymarketClient } from "@/lib/polymarket";
+import { fetchPrice } from "@/lib/polymarket";
 
 // Validation schema
 const priceSchema = z.object({
@@ -11,6 +11,8 @@ const priceSchema = z.object({
 /**
  * GET /api/markets/price
  * Get current price for a token
+ *
+ * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,20 +29,12 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    // Initialize Polymarket client
-    const client = initPolymarketClient();
-
-    // Get price
-    const price = parsed.data.side
-      ? await client.getPrice(
-          parsed.data.tokenID,
-          parsed.data.side as "BUY" | "SELL",
-        )
-      : await client.getMidpoint(parsed.data.tokenID);
+    // Fetch price directly from CLOB API
+    const price = await fetchPrice(parsed.data.tokenID);
 
     return NextResponse.json({
       success: true,
@@ -55,7 +49,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

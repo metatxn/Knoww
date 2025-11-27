@@ -1,57 +1,21 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { ERROR_MESSAGES } from "@/lib/constants";
-import { initPolymarketClient } from "@/lib/polymarket";
-
-// Validation schema
-const userAddressSchema = z.object({
-  userAddress: z.string().describe("User's wallet address"),
-});
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/wallet/balances
- * Get wallet balance and allowance for a specific user address
  *
- * Query params: ?userAddress=0x...
+ * This endpoint has been deprecated.
+ * Wallet balance queries now happen on the frontend using the useClobClient hook
+ * which uses the real user signer for authentication.
+ *
+ * For balance information, use wagmi's useBalance hook or query the blockchain directly.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const userAddress = searchParams.get("userAddress");
-
-    const parsed = userAddressSchema.safeParse({ userAddress });
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid query parameters",
-          details: parsed.error.message,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Initialize Polymarket client with user's address
-    const client = initPolymarketClient(parsed.data.userAddress);
-
-    // Get balance and allowance for the user
-    const balances = await client.getBalanceAllowance();
-
-    return NextResponse.json({
-      success: true,
-      userAddress: parsed.data.userAddress,
-      balances,
-    });
-  } catch (error) {
-    console.error("Error fetching balances:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
-      },
-      { status: 500 },
-    );
-  }
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "This endpoint has been deprecated. Use wagmi's useBalance hook or the frontend useClobClient hook instead.",
+      hint: "Wallet operations require user wallet authentication which is now handled on the frontend.",
+    },
+    { status: 410 } // 410 Gone
+  );
 }

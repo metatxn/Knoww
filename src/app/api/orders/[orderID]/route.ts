@@ -1,24 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { ERROR_MESSAGES } from "@/lib/constants";
-import { createRelayClient } from "@/lib/polymarket";
+import { getClobHost } from "@/lib/polymarket";
 
 /**
  * GET /api/orders/:orderID
  * Get order details by ID
- * Public endpoint - no authentication needed
+ *
+ * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ orderID: string }> },
+  { params }: { params: Promise<{ orderID: string }> }
 ) {
   try {
     const { orderID } = await params;
+    const host = getClobHost();
 
-    // Initialize relay client for querying
-    const client = createRelayClient();
+    // Fetch order details directly from CLOB API
+    const response = await fetch(`${host}/order/${orderID}`);
 
-    // Get order details
-    const order = await client.getOrder(orderID);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch order: ${response.statusText}`);
+    }
+
+    const order = await response.json();
 
     return NextResponse.json({
       success: true,
@@ -32,7 +37,7 @@ export async function GET(
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
