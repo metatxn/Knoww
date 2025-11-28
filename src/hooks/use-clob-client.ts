@@ -124,7 +124,8 @@ export function useClobClient() {
 
         // Configure builder attribution via remote signing server
         // Note: token is optional - if not set, requests go without auth
-        const authToken = process.env.INTERNAL_AUTH_TOKEN;
+        // Must use NEXT_PUBLIC_ prefix for client-side env vars in Next.js
+        const authToken = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
         const builderConfig = new BuilderConfig({
           remoteBuilderConfig: {
             url: builderSigningServerUrl,
@@ -330,8 +331,10 @@ export function useClobClient() {
 
   /**
    * Update (set) the allowance for trading
-   * This approves the Polymarket CTF Exchange to spend your USDC
+   * This approves the Polymarket CTF Exchange to spend your USDC.e
    * Sends an actual on-chain transaction that requires MetaMask confirmation
+   *
+   * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
    */
   const updateAllowance = useCallback(async () => {
     if (!address) {
@@ -349,9 +352,9 @@ export function useClobClient() {
       const { createWalletClient, custom, maxUint256 } = await import("viem");
       const { polygon } = await import("viem/chains");
 
-      // USDC contract address on Polygon
+      // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
       const USDC_ADDRESS =
-        "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as const;
+        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
 
       // Polymarket CTF Exchange contract on Polygon mainnet
       const CTF_EXCHANGE_ADDRESS =
@@ -479,11 +482,13 @@ export function useClobClient() {
   );
 
   /**
-   * Get USDC balance directly from the Polygon chain using viem
-   * This fetches the actual on-chain balance using the USDC contract
+   * Get USDC.e balance directly from the Polygon chain using viem
+   * This fetches the actual on-chain balance using the USDC.e contract
    *
-   * USDC on Polygon: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
-   * Note: USDC has 6 decimals
+   * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
+   * USDC.e on Polygon: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
+   * Native USDC on Polygon: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359 (NOT used by Polymarket)
+   * Note: USDC.e has 6 decimals
    */
   const getUsdcBalance = useCallback(async () => {
     if (!address) {
@@ -494,9 +499,9 @@ export function useClobClient() {
       const { createPublicClient, http, formatUnits } = await import("viem");
       const { polygon } = await import("viem/chains");
 
-      // USDC contract address on Polygon
+      // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
       const USDC_ADDRESS =
-        "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as const;
+        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
       const USDC_DECIMALS = 6;
 
       // ERC20 ABI for balanceOf function
@@ -539,8 +544,10 @@ export function useClobClient() {
   }, [address]);
 
   /**
-   * Get USDC allowance directly from the Polygon chain using viem
+   * Get USDC.e allowance directly from the Polygon chain using viem
    * This fetches the actual on-chain allowance for the CTF Exchange
+   *
+   * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
    */
   const getUsdcAllowance = useCallback(async () => {
     if (!address) {
@@ -551,9 +558,9 @@ export function useClobClient() {
       const { createPublicClient, http, formatUnits } = await import("viem");
       const { polygon } = await import("viem/chains");
 
-      // USDC contract address on Polygon
+      // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
       const USDC_ADDRESS =
-        "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as const;
+        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
       const USDC_DECIMALS = 6;
 
       // Polymarket CTF Exchange contract on Polygon mainnet
