@@ -1,12 +1,18 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { motion } from "framer-motion";
-import { AlertCircle, Loader2, Minus, Plus, Wallet } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { AlertCircle, Loader2, Minus, Plus, Wallet, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -28,6 +34,7 @@ import {
   OrderType as ClobOrderType,
 } from "@/hooks/use-clob-client";
 import { useQuery } from "@tanstack/react-query";
+import { TradingOnboarding } from "@/components/trading-onboarding";
 
 /**
  * Outcome data for the trading form
@@ -119,6 +126,7 @@ export function TradingForm({
   const [useExpiration, setUseExpiration] = useState<boolean>(false);
   const [expirationHours, setExpirationHours] = useState<number>(24);
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Get selected outcome
   const selectedOutcome = outcomes[selectedOutcomeIndex];
@@ -684,9 +692,9 @@ export function TradingForm({
         ) : !hasCredentials ? (
           <Button
             type="button"
-            className="w-full bg-blue-600 hover:bg-blue-700"
+            className="w-full bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             size="lg"
-            onClick={handleDeriveCredentials}
+            onClick={() => setShowOnboarding(true)}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -697,7 +705,7 @@ export function TradingForm({
             ) : (
               <>
                 <Wallet className="mr-2 h-4 w-4" />
-                Setup Trading (Sign Once)
+                Setup Trading Account
               </>
             )}
           </Button>
@@ -760,6 +768,19 @@ export function TradingForm({
             " Market orders execute immediately at best available price."}
         </p>
       </CardContent>
+
+      {/* Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Setup Trading Account</DialogTitle>
+          </DialogHeader>
+          <TradingOnboarding
+            onComplete={() => setShowOnboarding(false)}
+            onSkip={() => setShowOnboarding(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

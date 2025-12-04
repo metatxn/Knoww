@@ -1,13 +1,20 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { ChevronDown, LogOut, Menu, User, Wallet, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Rocket, User, Wallet, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useClobCredentials } from "@/hooks/use-clob-credentials";
 
 const navLinks = [
   { label: "Politics", href: "/events/politics" },
@@ -40,6 +48,11 @@ export function Navbar() {
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { hasCredentials } = useClobCredentials();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Determine if user needs to complete trading setup
+  const needsTradingSetup = isConnected && !hasCredentials;
 
   // Close mobile menu when route changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname dependency is intentional to close menu on navigation
@@ -79,6 +92,19 @@ export function Navbar() {
 
           {isConnected ? (
             <>
+              {/* Setup Trading Account Button - Show when user hasn't completed setup */}
+              {needsTradingSetup && (
+                <Button
+                  onClick={() => setShowOnboarding(true)}
+                  size="sm"
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  <Rocket className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Setup Trading</span>
+                  <span className="sm:hidden">Setup</span>
+                </Button>
+              )}
+
               {/* Balance Badge */}
               {balance && (
                 <Badge variant="secondary" className="hidden sm:inline-flex">
@@ -169,6 +195,21 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="border-t bg-background">
           <div className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
+            {/* Setup Trading Account - Mobile */}
+            {needsTradingSetup && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnboarding(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+              >
+                <Rocket className="inline mr-2 h-4 w-4" />
+                Setup Trading Account
+              </button>
+            )}
+
             {/* Home link */}
             <button
               type="button"
@@ -206,6 +247,19 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Setup Trading Account</DialogTitle>
+          </DialogHeader>
+          <TradingOnboarding
+            onComplete={() => setShowOnboarding(false)}
+            onSkip={() => setShowOnboarding(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }

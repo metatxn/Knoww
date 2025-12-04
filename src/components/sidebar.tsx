@@ -7,12 +7,17 @@ import {
   Briefcase,
   Building2,
   ChevronDown,
+  Copy,
   DollarSign,
+  ExternalLink,
   Globe,
   Landmark,
+  LayoutGrid,
   LogOut,
   MessageSquare,
   Newspaper,
+  Rocket,
+  Settings,
   Trophy,
   User,
   Vote,
@@ -20,24 +25,40 @@ import {
   Zap,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAccount, useBalance, useDisconnect } from "wagmi";
+import { useState } from "react";
+import { useAccount, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { usePolPrice } from "@/hooks/use-pol-price";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useClobCredentials } from "@/hooks/use-clob-credentials";
+import { useProxyWallet } from "@/hooks/use-proxy-wallet";
+import { useRelayerClient } from "@/hooks/use-relayer-client";
 
-const navLinks = [
+// Categories with icons
+const categories = [
   { label: "Politics", href: "/events/politics", icon: Landmark },
   { label: "Sports", href: "/events/sports", icon: Trophy },
-  { label: "Finance", href: "/events/finance", icon: Briefcase },
   { label: "Crypto", href: "/events/crypto", icon: Bitcoin },
+  { label: "Finance", href: "/events/finance", icon: Briefcase },
   { label: "Geopolitics", href: "/events/geopolitics", icon: Globe },
   { label: "Earnings", href: "/events/earnings", icon: DollarSign },
   { label: "Tech", href: "/events/tech", icon: Zap },
@@ -48,254 +69,252 @@ const navLinks = [
   { label: "Mentions", href: "/events/mention-markets", icon: MessageSquare },
 ];
 
-const userLinks = [{ label: "Portfolio", href: "/portfolio", icon: BarChart3 }];
-
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { address, isConnected, chain } = useAccount();
+  const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
-  const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
-  const { data: polPriceData, isLoading: isPriceLoading } = usePolPrice();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
+  const {
+    proxyAddress: proxyWalletAddress,
+    isDeployed: hasProxyWalletFromHook,
+    usdcBalance: proxyUsdcBalance,
+    isLoading: isProxyLoading,
+  } = useProxyWallet();
 
-  const formatBalance = (bal?: string) => {
-    if (!bal) return "0.00";
-    return Number(bal).toFixed(2);
-  };
+  const {
+    proxyAddress: relayerProxyAddress,
+    hasDeployedSafe: hasDeployedSafeFromRelayer,
+    isLoading: isRelayerLoading,
+  } = useRelayerClient();
 
-  // Calculate USD value of POL balance
-  const getUsdValue = (polBalance?: string) => {
-    if (!polBalance || !polPriceData?.price) return null;
-    const polAmount = Number(polBalance);
-    const usdValue = polAmount * polPriceData.price;
-    return usdValue.toFixed(2);
+  const { hasCredentials, isLoading: isCredentialsLoading } =
+    useClobCredentials();
+
+  const proxyAddress = relayerProxyAddress || proxyWalletAddress;
+  const hasProxyWallet = hasDeployedSafeFromRelayer || hasProxyWalletFromHook;
+  const isFullySetUp = hasCredentials && hasProxyWallet;
+  const isStillLoading =
+    isCredentialsLoading || isProxyLoading || isRelayerLoading;
+  const needsTradingSetup = isConnected && !isStillLoading && !isFullySetUp;
+
+  const formatAddress = (addr: string) =>
+    `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-60 flex-col border-r bg-background">
+    <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-56 flex-col border-r border-border/50 bg-background">
       {/* Logo */}
-      <div className="flex h-16 items-center px-6 border-b">
+      <div className="flex h-14 items-center px-4 border-b border-border/50">
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity"
         >
-          <span className="text-2xl">📊</span>
+          <span className="text-xl">📊</span>
           <span>Polycaster</span>
         </button>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <ul className="space-y-1">
-          {/* Home / All Categories */}
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
+        {/* Main Nav */}
+        <ul className="space-y-0.5">
           <li>
             <button
               type="button"
               onClick={() => router.push("/")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                 pathname === "/"
-                  ? "bg-foreground text-background"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
-              <BarChart3 className="h-5 w-5" />
+              <LayoutGrid className="h-4 w-4" />
               <span>All Markets</span>
             </button>
           </li>
 
-          {/* Divider */}
-          <li className="pt-4 pb-2">
-            <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Categories
-            </span>
-          </li>
-
-          {/* Category Links */}
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive =
-              pathname === link.href ||
-              (link.href !== "/" && pathname?.startsWith(link.href));
-
-            return (
-              <li key={link.href}>
-                <button
-                  type="button"
-                  onClick={() => router.push(link.href)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{link.label}</span>
-                </button>
-              </li>
-            );
-          })}
-
-          {/* User Section Divider */}
-          <li className="pt-4 pb-2">
-            <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Account
-            </span>
-          </li>
-
-          {/* User Links */}
-          {userLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href;
-
-            return (
-              <li key={link.href}>
-                <button
-                  type="button"
-                  onClick={() => router.push(link.href)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{link.label}</span>
-                </button>
-              </li>
-            );
-          })}
+          {/* Portfolio - only show when connected */}
+          {isConnected && (
+            <li>
+              <button
+                type="button"
+                onClick={() => router.push("/portfolio")}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  pathname === "/portfolio"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Portfolio</span>
+              </button>
+            </li>
+          )}
         </ul>
+
+        {/* Separator */}
+        <div className="my-4 mx-3 border-t border-border/50" />
+
+        {/* Categories */}
+        <div>
+          <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Categories
+          </p>
+          <ul className="space-y-0.5">
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = pathname === cat.href;
+              return (
+                <li key={cat.href}>
+                  <button
+                    type="button"
+                    onClick={() => router.push(cat.href)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors ${
+                      isActive
+                        ? "text-foreground font-medium bg-muted"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{cat.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </nav>
 
-      {/* Bottom Section: Theme, Portfolio & Wallet */}
-      <div className="border-t px-3 py-4 space-y-3">
-        {/* Theme Toggle Row */}
-        <div className="flex items-center justify-between px-3">
-          <span className="text-sm text-muted-foreground">Theme</span>
-          <ThemeToggle />
-        </div>
-
-        {/* Portfolio & Wallet */}
-        {isConnected ? (
-          <div className="space-y-3">
-            {/* Portfolio Value */}
-            {balance && (
-              <div className="px-3 py-2 rounded-lg bg-muted/50">
-                <div className="text-xs text-muted-foreground">Portfolio</div>
-                <div className="text-lg font-semibold">
-                  {isPriceLoading ? (
-                    <span className="animate-pulse">Loading...</span>
-                  ) : getUsdValue(balance.formatted) ? (
-                    `$${getUsdValue(balance.formatted)}`
-                  ) : (
-                    `${formatBalance(balance.formatted)} ${balance.symbol}`
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <span>
-                    {formatBalance(balance.formatted)} {balance.symbol}
-                  </span>
-                  {polPriceData?.price && (
-                    <span className="text-muted-foreground/70">
-                      @ ${polPriceData.price.toFixed(4)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Account Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between gap-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4" />
-                    <span className="truncate">
-                      {formatAddress(address || "")}
-                    </span>
-                  </div>
-                  <ChevronDown className="h-3 w-3 shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-
-                <div className="px-2 py-2 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Address:</span>
-                    <span className="font-mono text-xs">
-                      {formatAddress(address || "")}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Network:</span>
-                    <span className="font-medium text-xs">
-                      {chain?.name || "Unknown"}
-                    </span>
-                  </div>
-
-                  {balance && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Balance:</span>
-                        <span className="font-medium text-xs">
-                          {formatBalance(balance.formatted)} {balance.symbol}
-                        </span>
-                      </div>
-                      {polPriceData?.price && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            USD Value:
-                          </span>
-                          <span className="font-medium text-xs text-green-600 dark:text-green-400">
-                            ${getUsdValue(balance.formatted)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <DropdownMenuSeparator />
-
-                <DropdownMenuItem onClick={() => open()}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Account Settings</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={() => disconnect()}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Disconnect</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      {/* Bottom Section */}
+      <div className="border-t border-border/50 p-3 space-y-3">
+        {/* Trading Wallet Card - Compact */}
+        {isConnected && hasProxyWallet && proxyAddress && (
+          <div className="p-3 rounded-xl bg-linear-to-br from-violet-500/10 to-purple-500/5 border border-violet-500/20">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wider">
+                Trading Balance
+              </span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={`https://polygonscan.com/address/${proxyAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>View on Polygonscan</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <p className="text-xl font-bold text-violet-400">
+              ${proxyUsdcBalance.toFixed(2)}
+            </p>
+            <div className="flex items-center gap-1 mt-1">
+              <code className="text-[10px] text-muted-foreground font-mono">
+                {formatAddress(proxyAddress)}
+              </code>
+              <button
+                type="button"
+                onClick={() => handleCopy(proxyAddress)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {copied ? (
+                  <span className="text-[10px] text-green-500">✓</span>
+                ) : (
+                  <Copy className="h-2.5 w-2.5" />
+                )}
+              </button>
+            </div>
           </div>
-        ) : (
-          <Button onClick={() => open()} className="w-full">
-            <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet
+        )}
+
+        {/* Setup CTA */}
+        {needsTradingSetup && (
+          <Button
+            onClick={() => setShowOnboarding(true)}
+            size="sm"
+            className="w-full bg-linear-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-xs h-9"
+          >
+            <Rocket className="mr-1.5 h-3.5 w-3.5" />
+            Setup Trading
           </Button>
         )}
 
-        {/* Footer */}
-        <p className="text-xs text-muted-foreground text-center pt-2">
-          Powered by Polymarket
-        </p>
+        {/* Account Section */}
+        {isConnected ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-between h-9"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-linear-to-br from-violet-500 to-purple-500 flex items-center justify-center">
+                    <User className="h-3 w-3 text-white" />
+                  </div>
+                  <span className="text-xs font-mono">
+                    {formatAddress(address || "")}
+                  </span>
+                </div>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => open()}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => disconnect()}
+                className="text-red-500 focus:text-red-500"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Disconnect
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button onClick={() => open()} size="sm" className="w-full h-9">
+            <Wallet className="mr-2 h-3.5 w-3.5" />
+            Connect
+          </Button>
+        )}
+
+        {/* Theme Toggle */}
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <ThemeToggle />
+        </div>
       </div>
+
+      {/* Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Setup Trading Account</DialogTitle>
+          </DialogHeader>
+          <TradingOnboarding
+            onComplete={() => setShowOnboarding(false)}
+            onSkip={() => setShowOnboarding(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

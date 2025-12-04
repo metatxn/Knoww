@@ -83,6 +83,8 @@ export interface UseUserTradesOptions {
   endDate?: string;
   /** Enable/disable the query */
   enabled?: boolean;
+  /** Override the user address (e.g., use proxy wallet) */
+  userAddress?: string;
 }
 
 /**
@@ -152,11 +154,14 @@ async function fetchTrades(
  */
 export function useUserTrades(options: UseUserTradesOptions = {}) {
   const { address, isConnected } = useAccount();
+  
+  // Use provided address or fall back to connected wallet
+  const userAddress = options.userAddress || address;
 
   return useQuery<TradesResponse, Error>({
     queryKey: [
       "userTrades",
-      address,
+      userAddress,
       options.limit,
       options.offset,
       options.market,
@@ -165,10 +170,10 @@ export function useUserTrades(options: UseUserTradesOptions = {}) {
       options.endDate,
     ],
     queryFn: () => {
-      if (!address) throw new Error("Address not available");
-      return fetchTrades(address, options);
+      if (!userAddress) throw new Error("Address not available");
+      return fetchTrades(userAddress, options);
     },
-    enabled: isConnected && !!address && options.enabled !== false,
+    enabled: isConnected && !!userAddress && options.enabled !== false,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute
   });

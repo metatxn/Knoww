@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
     const clobHost =
       process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 
+    console.log("[derive-api-key] Request:", {
+      address,
+      timestamp,
+      nonce,
+      signatureLength: signature.length,
+      clobHost,
+    });
+
     // Call Polymarket's derive-api-key endpoint with L1 headers
     const response = await fetch(`${clobHost}/auth/derive-api-key`, {
       method: "GET",
@@ -61,23 +69,45 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const data = (await response.json()) as {
+    const responseText = await response.text();
+    console.log("[derive-api-key] Polymarket response:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
+    let data: {
       error?: string;
       apiKey?: string;
       secret?: string;
       passphrase?: string;
     };
 
-    if (!response.ok) {
-      console.error("Failed to derive API key:", data);
+    try {
+      data = JSON.parse(responseText);
+    } catch {
       return NextResponse.json(
         {
           success: false,
-          error: data.error || "Failed to derive API key",
+          error: `Invalid JSON response from Polymarket: ${responseText}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!response.ok) {
+      console.error("[derive-api-key] Failed:", data);
+      return NextResponse.json(
+        {
+          success: false,
+          error: data.error || `Failed to derive API key (${response.status})`,
+          details: responseText,
         },
         { status: response.status }
       );
     }
+
+    console.log("[derive-api-key] Success - credentials received");
 
     // Return the derived credentials
     // Note: The frontend should securely store these
@@ -86,7 +116,7 @@ export async function POST(request: NextRequest) {
       credentials: data,
     });
   } catch (error) {
-    console.error("Error deriving API key:", error);
+    console.error("[derive-api-key] Error:", error);
     return NextResponse.json(
       {
         success: false,

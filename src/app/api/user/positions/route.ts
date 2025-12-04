@@ -8,55 +8,93 @@ import { ERROR_MESSAGES } from "@/lib/constants";
 const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
- * Position data from Polymarket
+ * Position data from Polymarket Data API
+ * Based on actual response from: /positions?user={address}&sizeThreshold=.1&redeemable=true
  */
 interface PolymarketPosition {
-  id: string;
+  proxyWallet: string;
   asset: string;
   conditionId: string;
-  outcomeIndex: number;
-  size: string;
-  avgPrice: string;
-  currentPrice: string;
-  realizedPnl: string;
-  unrealizedPnl: string;
-  curValue: string;
-  initialValue: string;
-  cashBalance: string;
+  size: number;
+  avgPrice: number;
+  initialValue: number;
+  currentValue: number;
+  cashPnl: number;
+  percentPnl: number;
+  totalBought: number;
+  realizedPnl: number;
+  percentRealizedPnl: number;
+  curPrice: number;
+  redeemable: boolean;
+  mergeable: boolean;
   title: string;
   slug: string;
   icon: string;
-  outcome: string;
+  eventId: string;
   eventSlug: string;
+  outcome: string;
+  outcomeIndex: number;
+  oppositeOutcome: string;
+  oppositeAsset: string;
   endDate: string;
-  market: {
-    question: string;
-    outcomes: string[];
-  };
+  negativeRisk: boolean;
 }
+
+/**
+ * Helper to convert null/empty to undefined for optional fields
+ */
+const optionalString = z
+  .string()
+  .optional()
+  .nullable()
+  .transform((val) => (val === null || val === "" ? undefined : val));
+
+const optionalNumber = z
+  .union([z.string(), z.number()])
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (val === null || val === "" || val === undefined) return undefined;
+    return Number(val);
+  });
+
+const optionalBoolean = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (val === null || val === "" || val === undefined) return undefined;
+    if (typeof val === "boolean") return val;
+    return val === "true";
+  });
 
 /**
  * Validation schema for query parameters
  */
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
-  limit: z.coerce.number().min(1).max(100).optional().default(50),
-  offset: z.coerce.number().min(0).optional().default(0),
-  market: z.string().optional(), // Filter by market/condition ID
-  active: z.coerce.boolean().optional().default(true), // Only active positions
+  limit: optionalNumber.pipe(
+    z.number().min(1).max(100).optional().default(100)
+  ),
+  offset: optionalNumber.pipe(z.number().min(0).optional().default(0)),
+  sizeThreshold: optionalNumber.pipe(z.number().optional().default(0.1)),
+  redeemable: optionalBoolean.pipe(z.boolean().optional().default(true)),
+  market: optionalString,
 });
 
 /**
  * GET /api/user/positions
  *
  * Fetch current positions for a user from Polymarket Data API
+ * Uses the exact endpoint format: /positions?user={address}&sizeThreshold=.1&redeemable=true&limit=100&offset=0
  *
  * Query Parameters:
  * - user: User's wallet address (required)
- * - limit: Number of positions to return (default: 50, max: 100)
+ * - limit: Number of positions to return (default: 100, max: 100)
  * - offset: Pagination offset (default: 0)
+ * - sizeThreshold: Minimum position size (default: 0.1)
+ * - redeemable: Include redeemable positions (default: true)
  * - market: Filter by market/condition ID (optional)
- * - active: Only return active positions (default: true)
  *
  * Response:
  * - positions: Array of position objects with market details
@@ -73,8 +111,9 @@ export async function GET(request: NextRequest) {
       user: searchParams.get("user"),
       limit: searchParams.get("limit"),
       offset: searchParams.get("offset"),
+      sizeThreshold: searchParams.get("sizeThreshold"),
+      redeemable: searchParams.get("redeemable"),
       market: searchParams.get("market"),
-      active: searchParams.get("active"),
     });
 
     if (!parsed.success) {
@@ -84,15 +123,18 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    const { user, limit, offset, market, active } = parsed.data;
+    const { user, limit, offset, sizeThreshold, redeemable, market } =
+      parsed.data;
 
-    // Build query URL
+    // Build query URL using exact Polymarket format
     const queryParams = new URLSearchParams({
       user: user.toLowerCase(),
+      sizeThreshold: sizeThreshold.toString(),
+      redeemable: redeemable.toString(),
       limit: limit.toString(),
       offset: offset.toString(),
     });
@@ -109,7 +151,7 @@ export async function GET(request: NextRequest) {
           Accept: "application/json",
         },
         next: { revalidate: 30 }, // Cache for 30 seconds
-      },
+      }
     );
 
     if (!response.ok) {
@@ -121,65 +163,56 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch positions from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
-    const data: PolymarketPosition[] = await response.json();
+    const positions: PolymarketPosition[] = await response.json();
 
-    // Filter active positions if requested
-    let positions = data;
-    if (active) {
-      positions = data.filter(
-        (p) =>
-          Number.parseFloat(p.size) > 0 && Number.parseFloat(p.curValue) > 0,
-      );
-    }
-
-    // Calculate totals
+    // Calculate totals using actual field names from API
     const totalValue = positions.reduce(
-      (sum, p) => sum + Number.parseFloat(p.curValue || "0"),
-      0,
+      (sum, p) => sum + (p.currentValue || 0),
+      0
     );
 
     const totalUnrealizedPnl = positions.reduce(
-      (sum, p) => sum + Number.parseFloat(p.unrealizedPnl || "0"),
-      0,
+      (sum, p) => sum + (p.cashPnl || 0),
+      0
     );
 
     const totalRealizedPnl = positions.reduce(
-      (sum, p) => sum + Number.parseFloat(p.realizedPnl || "0"),
-      0,
+      (sum, p) => sum + (p.realizedPnl || 0),
+      0
     );
 
     // Transform positions for frontend
     const transformedPositions = positions.map((p) => ({
-      id: p.id,
+      id: `${p.conditionId}-${p.outcomeIndex}`,
       asset: p.asset,
       conditionId: p.conditionId,
       outcomeIndex: p.outcomeIndex,
       outcome: p.outcome,
-      size: Number.parseFloat(p.size),
-      avgPrice: Number.parseFloat(p.avgPrice),
-      currentPrice: Number.parseFloat(p.currentPrice),
-      currentValue: Number.parseFloat(p.curValue),
-      initialValue: Number.parseFloat(p.initialValue),
-      unrealizedPnl: Number.parseFloat(p.unrealizedPnl),
-      unrealizedPnlPercent:
-        Number.parseFloat(p.initialValue) > 0
-          ? (Number.parseFloat(p.unrealizedPnl) /
-              Number.parseFloat(p.initialValue)) *
-            100
-          : 0,
-      realizedPnl: Number.parseFloat(p.realizedPnl),
+      oppositeOutcome: p.oppositeOutcome,
+      size: p.size,
+      avgPrice: p.avgPrice,
+      currentPrice: p.curPrice,
+      currentValue: p.currentValue,
+      initialValue: p.initialValue,
+      unrealizedPnl: p.cashPnl,
+      unrealizedPnlPercent: p.percentPnl,
+      realizedPnl: p.realizedPnl,
+      realizedPnlPercent: p.percentRealizedPnl,
+      totalBought: p.totalBought,
+      redeemable: p.redeemable,
+      mergeable: p.mergeable,
       market: {
         title: p.title,
         slug: p.slug,
         eventSlug: p.eventSlug,
+        eventId: p.eventId,
         icon: p.icon,
-        question: p.market?.question,
-        outcomes: p.market?.outcomes,
         endDate: p.endDate,
+        negativeRisk: p.negativeRisk,
       },
     }));
 
@@ -197,7 +230,7 @@ export async function GET(request: NextRequest) {
       pagination: {
         limit,
         offset,
-        hasMore: data.length === limit,
+        hasMore: positions.length === limit,
       },
     });
   } catch (error) {
@@ -208,7 +241,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

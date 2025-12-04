@@ -6,6 +6,9 @@ import { useAccount, useSignTypedData } from "wagmi";
 /**
  * EIP-712 Domain for CLOB Authentication (L1)
  * Used for authenticating API requests with the CLOB
+ * 
+ * Note: chainId should match the chain you're authenticating for
+ * Polymarket uses chainId in the domain for signature verification
  */
 const CLOB_AUTH_DOMAIN = {
   name: "ClobAuthDomain",
@@ -15,6 +18,7 @@ const CLOB_AUTH_DOMAIN = {
 
 /**
  * EIP-712 Type definitions for CLOB Authentication
+ * Must match exactly what Polymarket expects
  */
 const CLOB_AUTH_TYPES = {
   ClobAuth: [
@@ -24,6 +28,11 @@ const CLOB_AUTH_TYPES = {
     { name: "message", type: "string" },
   ],
 } as const;
+
+/**
+ * The message to sign for CLOB authentication
+ */
+const MSG_TO_SIGN = "This message attests that I control the given wallet";
 
 /**
  * API Key credentials returned by Polymarket
@@ -108,6 +117,7 @@ export function useClobCredentials() {
 
   /**
    * Generate L1 authentication signature
+   * This creates an EIP-712 signature that Polymarket uses for authentication
    */
   const generateL1Signature = useCallback(async (): Promise<{
     signature: string;
@@ -118,8 +128,16 @@ export function useClobCredentials() {
       throw new Error("Wallet not connected");
     }
 
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const nonce = "0";
+    // Timestamp should be current unix time in seconds
+    const timestamp = Math.floor(Date.now() / 1000);
+    const nonce = 0; // Default nonce is 0
+
+    console.log("[ClobCredentials] Generating L1 signature:", {
+      address,
+      timestamp,
+      nonce,
+      message: MSG_TO_SIGN,
+    });
 
     const signature = await signTypedDataAsync({
       domain: CLOB_AUTH_DOMAIN,
@@ -127,13 +145,19 @@ export function useClobCredentials() {
       primaryType: "ClobAuth",
       message: {
         address: address as `0x${string}`,
-        timestamp: timestamp,
-        nonce: BigInt(nonce),
-        message: "This message attests that I control the given wallet",
+        timestamp: `${timestamp}`, // Must be string in the message
+        nonce: BigInt(nonce), // Must be BigInt for uint256
+        message: MSG_TO_SIGN,
       },
     });
 
-    return { signature, timestamp, nonce };
+    console.log("[ClobCredentials] Signature generated:", signature);
+
+    return { 
+      signature, 
+      timestamp: `${timestamp}`, // Return as string for headers
+      nonce: `${nonce}` // Return as string for headers
+    };
   }, [address, signTypedDataAsync]);
 
   /**
@@ -152,6 +176,13 @@ export function useClobCredentials() {
       // Generate L1 signature
       const { signature, timestamp, nonce } = await generateL1Signature();
 
+      console.log("[ClobCredentials] Deriving credentials with:", {
+        address,
+        timestamp,
+        nonce,
+        signatureLength: signature.length,
+      });
+
       // Call our API to derive credentials
       const response = await fetch("/api/auth/derive-api-key", {
         method: "POST",
@@ -169,6 +200,7 @@ export function useClobCredentials() {
       const data = (await response.json()) as {
         success?: boolean;
         error?: string;
+        details?: string;
         credentials?: {
           apiKey?: string;
           secret?: string;
@@ -176,8 +208,16 @@ export function useClobCredentials() {
         };
       };
 
+      console.log("[ClobCredentials] API response:", {
+        status: response.status,
+        success: data.success,
+        error: data.error,
+        details: data.details,
+        hasCredentials: !!data.credentials,
+      });
+
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to derive API credentials");
+        throw new Error(data.error || data.details || "Failed to derive API credentials");
       }
 
       const creds: ApiKeyCreds = {
@@ -190,8 +230,11 @@ export function useClobCredentials() {
       storeCredentials(address, creds);
       setCredentials(creds);
 
+      console.log("[ClobCredentials] Credentials derived successfully");
+
       return creds;
     } catch (err) {
+      console.error("[ClobCredentials] Error deriving credentials:", err);
       const error = err instanceof Error ? err : new Error("Failed to derive credentials");
       setError(error);
       throw error;

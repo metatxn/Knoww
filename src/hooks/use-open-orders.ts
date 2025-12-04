@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
+import { useClobClient } from "./use-clob-client";
+import { useClobCredentials } from "./use-clob-credentials";
 
 /**
  * Open order data structure
@@ -26,27 +28,6 @@ export interface OpenOrder {
 }
 
 /**
- * API response structure
- */
-interface OpenOrdersResponse {
-  success: boolean;
-  userAddress: string;
-  count: number;
-  orders: OpenOrder[];
-  error?: string;
-}
-
-/**
- * Cancel order response
- */
-interface CancelOrderResponse {
-  success: boolean;
-  response?: unknown;
-  message?: string;
-  error?: string;
-}
-
-/**
  * Query options for fetching open orders
  */
 export interface UseOpenOrdersOptions {
@@ -54,129 +35,124 @@ export interface UseOpenOrdersOptions {
   market?: string;
   /** Enable/disable the query */
   enabled?: boolean;
+  /** Override the user address (e.g., use proxy wallet) */
+  userAddress?: string;
 }
 
 /**
- * Fetch open orders from the API
- */
-async function fetchOpenOrders(
-  userAddress: string,
-  options: UseOpenOrdersOptions,
-): Promise<OpenOrdersResponse> {
-  const params = new URLSearchParams({
-    userAddress,
-  });
-
-  if (options.market) {
-    params.set("market", options.market);
-  }
-
-  const response = await fetch(`/api/orders/list?${params.toString()}`);
-
-  if (!response.ok) {
-    const errorData = (await response.json()) as { error?: string };
-    throw new Error(errorData.error || "Failed to fetch open orders");
-  }
-
-  return response.json() as Promise<OpenOrdersResponse>;
-}
-
-/**
- * Cancel an order via the API
- */
-async function cancelOrderApi(
-  userAddress: string,
-  orderId: string,
-): Promise<CancelOrderResponse> {
-  const response = await fetch("/api/orders/cancel", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      userAddress,
-      orderID: orderId,
-      signature: "cancel", // Backend handles this
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json()) as { error?: string };
-    throw new Error(errorData.error || "Failed to cancel order");
-  }
-
-  return response.json() as Promise<CancelOrderResponse>;
-}
-
-/**
- * Hook to fetch user's open orders
+ * Hook to fetch user's open orders using the CLOB client
  *
- * Automatically uses the connected wallet address.
- * Returns all open (unfilled) orders.
+ * Uses the ClobClient's getOpenOrders() method which requires
+ * wallet authentication (L2 credentials).
  *
  * @param options - Query options
  * @returns Query result with open orders
- *
- * @example
- * ```tsx
- * const { data, isLoading, error } = useOpenOrders();
- *
- * if (isLoading) return <Loading />;
- * if (error) return <Error message={error.message} />;
- *
- * return (
- *   <div>
- *     <p>Open Orders: {data.count}</p>
- *     {data.orders.map(order => (
- *       <OrderRow key={order.id} order={order} />
- *     ))}
- *   </div>
- * );
- * ```
  */
 export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
   const { address, isConnected } = useAccount();
+  const { hasCredentials } = useClobCredentials();
+  const { getOpenOrders } = useClobClient();
 
-  return useQuery<OpenOrdersResponse, Error>({
-    queryKey: ["openOrders", address, options.market],
-    queryFn: () => {
-      if (!address) throw new Error("Address not available");
-      return fetchOpenOrders(address, options);
+  // Use provided address or fall back to connected wallet
+  const userAddress = options.userAddress || address;
+
+  return useQuery({
+    queryKey: ["openOrders", userAddress, options.market],
+    queryFn: async () => {
+      if (!userAddress) throw new Error("Address not available");
+
+      try {
+        const orders = await getOpenOrders();
+
+        // Transform orders to match our interface
+        const transformedOrders: OpenOrder[] = (orders || []).map(
+          (order: {
+            id?: string;
+            order_id?: string;
+            maker?: string;
+            asset_id?: string;
+            token_id?: string;
+            side?: string;
+            price?: string | number;
+            original_size?: string | number;
+            size_matched?: string | number;
+            status?: string;
+            created_at?: string | number;
+            expiration?: string | number;
+          }) => ({
+            id: order.id || order.order_id || "",
+            maker: order.maker || userAddress,
+            tokenId: order.asset_id || order.token_id || "",
+            side: (order.side?.toUpperCase() || "BUY") as "BUY" | "SELL",
+            price: Number(order.price || 0),
+            size: Number(order.original_size || 0),
+            filledSize: Number(order.size_matched || 0),
+            remainingSize:
+              Number(order.original_size || 0) -
+              Number(order.size_matched || 0),
+            status: (order.status?.toUpperCase() || "LIVE") as
+              | "LIVE"
+              | "MATCHED"
+              | "CANCELLED",
+            createdAt: typeof order.created_at === "number" 
+              ? new Date(order.created_at * 1000).toISOString()
+              : order.created_at || new Date().toISOString(),
+            expiration: order.expiration
+              ? new Date(Number(order.expiration) * 1000).toISOString()
+              : "",
+          })
+        );
+
+        // Filter by market if specified
+        const filteredOrders = options.market
+          ? transformedOrders.filter((o) => o.tokenId === options.market)
+          : transformedOrders;
+
+        return {
+          success: true,
+          userAddress,
+          count: filteredOrders.length,
+          orders: filteredOrders,
+        };
+      } catch (err) {
+        console.error("Failed to fetch open orders:", err);
+        // Return empty result on error instead of throwing
+        return {
+          success: false,
+          userAddress,
+          count: 0,
+          orders: [],
+          error: err instanceof Error ? err.message : "Failed to fetch orders",
+        };
+      }
     },
-    enabled: isConnected && !!address && options.enabled !== false,
+    enabled:
+      isConnected &&
+      !!userAddress &&
+      hasCredentials &&
+      options.enabled !== false,
     staleTime: 10 * 1000, // 10 seconds (orders can change quickly)
     refetchInterval: 15 * 1000, // Refetch every 15 seconds
   });
 }
 
 /**
- * Hook to cancel an order
+ * Hook to cancel an order using the CLOB client
  *
  * Returns a mutation that can be used to cancel orders.
  * Automatically invalidates the open orders query on success.
  *
  * @returns Mutation for canceling orders
- *
- * @example
- * ```tsx
- * const { mutate: cancelOrder, isPending } = useCancelOrder();
- *
- * const handleCancel = (orderId: string) => {
- *   cancelOrder(orderId, {
- *     onSuccess: () => toast.success('Order cancelled'),
- *     onError: (error) => toast.error(error.message),
- *   });
- * };
- * ```
  */
 export function useCancelOrder() {
   const { address } = useAccount();
+  const { cancelOrder } = useClobClient();
   const queryClient = useQueryClient();
 
-  return useMutation<CancelOrderResponse, Error, string>({
-    mutationFn: (orderId: string) => {
+  return useMutation({
+    mutationFn: async (orderId: string) => {
       if (!address) throw new Error("Address not available");
-      return cancelOrderApi(address, orderId);
+      return cancelOrder(orderId);
     },
     onSuccess: () => {
       // Invalidate open orders query to refetch
@@ -194,28 +170,28 @@ export function useCancelOrder() {
  */
 export function useCancelAllOrders() {
   const { address } = useAccount();
+  const { getOpenOrders, cancelOrder } = useClobClient();
   const queryClient = useQueryClient();
 
-  return useMutation<CancelOrderResponse[], Error, void>({
+  return useMutation({
     mutationFn: async () => {
       if (!address) throw new Error("Address not available");
 
       // First fetch all open orders
-      const ordersResponse = await fetchOpenOrders(address, {});
-      const orders = ordersResponse.orders || [];
+      const orders = await getOpenOrders();
 
       // Cancel each order
       const results = await Promise.allSettled(
-        orders.map((order) => cancelOrderApi(address, order.id)),
+        (orders || []).map((order: { id?: string; order_id?: string }) =>
+          cancelOrder(order.id || order.order_id || "")
+        )
       );
 
-      // Return successful cancellations
-      return results
-        .filter(
-          (r): r is PromiseFulfilledResult<CancelOrderResponse> =>
-            r.status === "fulfilled",
-        )
-        .map((r) => r.value);
+      // Return successful cancellations count
+      const successCount = results.filter(
+        (r) => r.status === "fulfilled"
+      ).length;
+      return { cancelled: successCount, total: orders?.length || 0 };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["openOrders", address] });

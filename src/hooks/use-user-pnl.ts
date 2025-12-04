@@ -97,6 +97,8 @@ export interface UseUserPnLOptions {
   includeHistory?: boolean;
   /** Enable/disable the query */
   enabled?: boolean;
+  /** Override the user address (e.g., use proxy wallet) */
+  userAddress?: string;
 }
 
 /**
@@ -149,14 +151,17 @@ async function fetchPnL(
  */
 export function useUserPnL(options: UseUserPnLOptions = {}) {
   const { address, isConnected } = useAccount();
+  
+  // Use provided address or fall back to connected wallet
+  const userAddress = options.userAddress || address;
 
   return useQuery<PnLResponse, Error>({
-    queryKey: ["userPnL", address, options.period, options.includeHistory],
+    queryKey: ["userPnL", userAddress, options.period, options.includeHistory],
     queryFn: () => {
-      if (!address) throw new Error("Address not available");
-      return fetchPnL(address, options);
+      if (!userAddress) throw new Error("Address not available");
+      return fetchPnL(userAddress, options);
     },
-    enabled: isConnected && !!address && options.enabled !== false,
+    enabled: isConnected && !!userAddress && options.enabled !== false,
     staleTime: 60 * 1000, // 1 minute (P&L doesn't change as frequently)
     refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes
   });

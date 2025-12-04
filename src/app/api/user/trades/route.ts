@@ -8,20 +8,20 @@ import { ERROR_MESSAGES } from "@/lib/constants";
 const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
- * Trade/Activity data from Polymarket
+ * Trade/Activity data from Polymarket Data API
+ * Based on actual response from: /activity?user={address}&limit=100&offset=0&sortBy=TIMESTAMP&sortDirection=DESC
  */
 interface PolymarketActivity {
-  id: string;
   proxyWallet: string;
-  timestamp: string;
+  timestamp: number; // Unix timestamp
   conditionId: string;
   type: "TRADE" | "REDEEM" | "MERGE" | "SPLIT";
-  size: string;
-  usdcSize: string;
+  size: number;
+  usdcSize: number;
   transactionHash: string;
-  price: string;
+  price: number;
   asset: string;
-  side: "BUY" | "SELL";
+  side: "BUY" | "SELL" | "";
   outcomeIndex: number;
   title: string;
   slug: string;
@@ -36,34 +36,58 @@ interface PolymarketActivity {
 }
 
 /**
+ * Helper to convert null/empty to undefined for optional fields
+ */
+const optionalString = z
+  .string()
+  .optional()
+  .nullable()
+  .transform((val) => (val === null || val === "" ? undefined : val));
+
+const optionalNumber = z
+  .union([z.string(), z.number()])
+  .optional()
+  .nullable()
+  .transform((val) => {
+    if (val === null || val === "" || val === undefined) return undefined;
+    return Number(val);
+  });
+
+/**
  * Validation schema for query parameters
  */
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
-  limit: z.coerce.number().min(1).max(100).optional().default(50),
-  offset: z.coerce.number().min(0).optional().default(0),
-  market: z.string().optional(), // Filter by market/condition ID
+  limit: optionalNumber.pipe(
+    z.number().min(1).max(100).optional().default(100)
+  ),
+  offset: optionalNumber.pipe(z.number().min(0).optional().default(0)),
+  sortBy: optionalString.pipe(z.string().optional().default("TIMESTAMP")),
+  sortDirection: optionalString.pipe(
+    z.enum(["ASC", "DESC"]).optional().default("DESC")
+  ),
+  market: optionalString,
   type: z
     .enum(["TRADE", "REDEEM", "MERGE", "SPLIT", "ALL"])
     .optional()
-    .default("ALL"),
-  startDate: z.string().optional(), // ISO date string
-  endDate: z.string().optional(), // ISO date string
+    .nullable()
+    .transform((val) => val ?? "ALL"),
 });
 
 /**
  * GET /api/user/trades
  *
  * Fetch trade history for a user from Polymarket Data API
+ * Uses the exact endpoint format: /activity?user={address}&limit=100&offset=0&sortBy=TIMESTAMP&sortDirection=DESC
  *
  * Query Parameters:
  * - user: User's wallet address (required)
- * - limit: Number of trades to return (default: 50, max: 100)
+ * - limit: Number of trades to return (default: 100, max: 100)
  * - offset: Pagination offset (default: 0)
+ * - sortBy: Sort field (default: TIMESTAMP)
+ * - sortDirection: Sort direction ASC/DESC (default: DESC)
  * - market: Filter by market/condition ID (optional)
  * - type: Filter by activity type (TRADE, REDEEM, MERGE, SPLIT, ALL) (default: ALL)
- * - startDate: Filter trades after this date (ISO string)
- * - endDate: Filter trades before this date (ISO string)
  *
  * Response:
  * - trades: Array of trade objects with market details
@@ -79,10 +103,10 @@ export async function GET(request: NextRequest) {
       user: searchParams.get("user"),
       limit: searchParams.get("limit"),
       offset: searchParams.get("offset"),
+      sortBy: searchParams.get("sortBy"),
+      sortDirection: searchParams.get("sortDirection"),
       market: searchParams.get("market"),
       type: searchParams.get("type"),
-      startDate: searchParams.get("startDate"),
-      endDate: searchParams.get("endDate"),
     });
 
     if (!parsed.success) {
@@ -92,18 +116,20 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    const { user, limit, offset, market, type, startDate, endDate } =
+    const { user, limit, offset, sortBy, sortDirection, market, type } =
       parsed.data;
 
-    // Build query URL
+    // Build query URL using exact Polymarket format
     const queryParams = new URLSearchParams({
       user: user.toLowerCase(),
       limit: limit.toString(),
       offset: offset.toString(),
+      sortBy: sortBy,
+      sortDirection: sortDirection,
     });
 
     if (market) {
@@ -118,7 +144,7 @@ export async function GET(request: NextRequest) {
           Accept: "application/json",
         },
         next: { revalidate: 30 }, // Cache for 30 seconds
-      },
+      }
     );
 
     if (!response.ok) {
@@ -130,7 +156,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch trades from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -141,43 +167,35 @@ export async function GET(request: NextRequest) {
       data = data.filter((t) => t.type === type);
     }
 
-    // Filter by date range if specified
-    if (startDate) {
-      const start = new Date(startDate).getTime();
-      data = data.filter((t) => new Date(t.timestamp).getTime() >= start);
-    }
-
-    if (endDate) {
-      const end = new Date(endDate).getTime();
-      data = data.filter((t) => new Date(t.timestamp).getTime() <= end);
-    }
-
-    // Calculate totals
-    const totalVolume = data.reduce(
-      (sum, t) => sum + Number.parseFloat(t.usdcSize || "0"),
-      0,
-    );
+    // Calculate totals using actual number fields
+    const totalVolume = data.reduce((sum, t) => sum + (t.usdcSize || 0), 0);
 
     const buyVolume = data
       .filter((t) => t.side === "BUY")
-      .reduce((sum, t) => sum + Number.parseFloat(t.usdcSize || "0"), 0);
+      .reduce((sum, t) => sum + (t.usdcSize || 0), 0);
 
     const sellVolume = data
       .filter((t) => t.side === "SELL")
-      .reduce((sum, t) => sum + Number.parseFloat(t.usdcSize || "0"), 0);
+      .reduce((sum, t) => sum + (t.usdcSize || 0), 0);
 
     // Transform trades for frontend
     const transformedTrades = data.map((t) => ({
-      id: t.id,
-      timestamp: t.timestamp,
+      id: t.transactionHash,
+      timestamp: new Date(t.timestamp * 1000).toISOString(), // Convert Unix timestamp to ISO
+      timestampUnix: t.timestamp,
       type: t.type,
-      side: t.side,
-      size: Number.parseFloat(t.size),
-      price: Number.parseFloat(t.price),
-      usdcAmount: Number.parseFloat(t.usdcSize),
+      side: t.side || null,
+      size: t.size,
+      price: t.price,
+      usdcAmount: t.usdcSize,
       outcomeIndex: t.outcomeIndex,
       outcome: t.outcome,
       transactionHash: t.transactionHash,
+      user: {
+        name: t.name,
+        pseudonym: t.pseudonym,
+        profileImage: t.profileImage,
+      },
       market: {
         conditionId: t.conditionId,
         title: t.title,
@@ -189,18 +207,15 @@ export async function GET(request: NextRequest) {
     }));
 
     // Group by date for summary
-    const tradesByDate = transformedTrades.reduce(
-      (acc, trade) => {
-        const date = new Date(trade.timestamp).toISOString().split("T")[0];
-        if (!acc[date]) {
-          acc[date] = { count: 0, volume: 0 };
-        }
-        acc[date].count++;
-        acc[date].volume += trade.usdcAmount;
-        return acc;
-      },
-      {} as Record<string, { count: number; volume: number }>,
-    );
+    const tradesByDate = transformedTrades.reduce((acc, trade) => {
+      const date = trade.timestamp.split("T")[0];
+      if (!acc[date]) {
+        acc[date] = { count: 0, volume: 0 };
+      }
+      acc[date].count++;
+      acc[date].volume += trade.usdcAmount;
+      return acc;
+    }, {} as Record<string, { count: number; volume: number }>);
 
     return NextResponse.json({
       success: true,
@@ -228,7 +243,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

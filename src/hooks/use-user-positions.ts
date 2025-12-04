@@ -72,6 +72,8 @@ export interface UseUserPositionsOptions {
   active?: boolean;
   /** Enable/disable the query */
   enabled?: boolean;
+  /** Override the user address (e.g., use proxy wallet) */
+  userAddress?: string;
 }
 
 /**
@@ -130,21 +132,24 @@ async function fetchPositions(
  */
 export function useUserPositions(options: UseUserPositionsOptions = {}) {
   const { address, isConnected } = useAccount();
+  
+  // Use provided address or fall back to connected wallet
+  const userAddress = options.userAddress || address;
 
   return useQuery<PositionsResponse, Error>({
     queryKey: [
       "userPositions",
-      address,
+      userAddress,
       options.limit,
       options.offset,
       options.market,
       options.active,
     ],
     queryFn: () => {
-      if (!address) throw new Error("Address not available");
-      return fetchPositions(address, options);
+      if (!userAddress) throw new Error("Address not available");
+      return fetchPositions(userAddress, options);
     },
-    enabled: isConnected && !!address && options.enabled !== false,
+    enabled: isConnected && !!userAddress && options.enabled !== false,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute
   });
