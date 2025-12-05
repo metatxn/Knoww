@@ -13,20 +13,119 @@ const l1AuthSchema = z.object({
 });
 
 /**
+ * L1 Headers for Polymarket API authentication
+ */
+interface L1Headers {
+  POLY_ADDRESS: string;
+  POLY_SIGNATURE: string;
+  POLY_TIMESTAMP: string;
+  POLY_NONCE: string;
+}
+
+/**
+ * API Key response from Polymarket
+ */
+interface ApiKeyResponse {
+  error?: string;
+  apiKey?: string;
+  secret?: string;
+  passphrase?: string;
+}
+
+/**
+ * Create a new API key for a first-time user
+ * POST /auth/api-key
+ */
+async function createApiKey(
+  clobHost: string,
+  headers: L1Headers
+): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
+  console.log("[api-key] Attempting to CREATE new API key...");
+
+  const response = await fetch(`${clobHost}/auth/api-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+  });
+
+  const responseText = await response.text();
+  console.log("[api-key] Create response:", {
+    status: response.status,
+    body: responseText,
+  });
+
+  try {
+    const data = JSON.parse(responseText) as ApiKeyResponse;
+
+    if (response.ok && data.apiKey) {
+      return { success: true, data };
+    }
+
+    return { success: false, error: data.error || responseText };
+  } catch {
+    return { success: false, error: responseText };
+  }
+}
+
+/**
+ * Derive (retrieve) an existing API key
+ * GET /auth/derive-api-key
+ */
+async function deriveApiKey(
+  clobHost: string,
+  headers: L1Headers
+): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
+  console.log("[api-key] Attempting to DERIVE existing API key...");
+
+  const response = await fetch(`${clobHost}/auth/derive-api-key`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+  });
+
+  const responseText = await response.text();
+  console.log("[api-key] Derive response:", {
+    status: response.status,
+    body: responseText,
+  });
+
+  try {
+    const data = JSON.parse(responseText) as ApiKeyResponse;
+
+    if (response.ok && data.apiKey) {
+      return { success: true, data };
+    }
+
+    return { success: false, error: data.error || responseText };
+  } catch {
+    return { success: false, error: responseText };
+  }
+}
+
+/**
  * POST /api/auth/derive-api-key
  *
- * Derive API key credentials for a user using their L1 authentication.
- * This endpoint proxies the request to Polymarket's CLOB API.
+ * Create or derive API key credentials for a user using their L1 authentication.
+ * This endpoint implements the "createOrDeriveApiKey" pattern:
  *
- * The user must sign an EIP-712 message on the frontend to generate
- * the L1 authentication headers.
+ * 1. First, try to CREATE a new API key (for first-time users)
+ * 2. If creation fails (key already exists), DERIVE the existing key
+ *
+ * This ensures:
+ * - New users get their API key created
+ * - Returning users get their existing API key derived
  *
  * Flow:
  * 1. Frontend signs EIP-712 ClobAuth message
  * 2. Frontend sends signature + metadata to this endpoint
- * 3. Backend forwards to Polymarket CLOB /auth/derive-api-key
- * 4. Backend returns the derived API credentials to frontend
- * 5. Frontend stores credentials for future order submissions
+ * 3. Backend tries POST /auth/api-key (create)
+ * 4. If fails, backend tries GET /auth/derive-api-key (derive)
+ * 5. Backend returns the API credentials to frontend
+ * 6. Frontend stores credentials for future order submissions
  */
 export async function POST(request: NextRequest) {
   try {
@@ -49,9 +148,7 @@ export async function POST(request: NextRequest) {
     const clobHost =
       process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 
-    // Polymarket expects checksummed address (mixed case)
-    // The signature is generated with the checksummed address, so we must use the same
-    console.log("[derive-api-key] Request:", {
+    console.log("[api-key] Request:", {
       address,
       timestamp,
       nonce,
@@ -59,67 +156,78 @@ export async function POST(request: NextRequest) {
       clobHost,
     });
 
-    // Call Polymarket's derive-api-key endpoint with L1 headers
-    // Note: POLY_ADDRESS should match the address used in the signature (checksummed)
-    const response = await fetch(`${clobHost}/auth/derive-api-key`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        POLY_ADDRESS: address, // Keep original case (checksummed)
-        POLY_SIGNATURE: signature,
-        POLY_TIMESTAMP: timestamp,
-        POLY_NONCE: nonce,
-      },
-    });
-
-    const responseText = await response.text();
-    console.log("[derive-api-key] Polymarket response:", {
-      status: response.status,
-      statusText: response.statusText,
-      body: responseText,
-    });
-
-    let data: {
-      error?: string;
-      apiKey?: string;
-      secret?: string;
-      passphrase?: string;
+    // Build L1 headers for Polymarket authentication
+    const l1Headers: L1Headers = {
+      POLY_ADDRESS: address,
+      POLY_SIGNATURE: signature,
+      POLY_TIMESTAMP: timestamp,
+      POLY_NONCE: nonce,
     };
 
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid JSON response from Polymarket: ${responseText}`,
-        },
-        { status: 500 }
-      );
+    // Step 1: Try to CREATE a new API key (for first-time users)
+    const createResult = await createApiKey(clobHost, l1Headers);
+
+    if (createResult.success && createResult.data) {
+      console.log("[api-key] Successfully CREATED new API key");
+      return NextResponse.json({
+        success: true,
+        credentials: createResult.data,
+        method: "create",
+      });
     }
 
-    if (!response.ok) {
-      console.error("[derive-api-key] Failed:", data);
-      return NextResponse.json(
-        {
-          success: false,
-          error: data.error || `Failed to derive API key (${response.status})`,
-          details: responseText,
-        },
-        { status: response.status }
-      );
+    console.log(
+      "[api-key] Create failed, attempting derive...",
+      createResult.error
+    );
+
+    // Step 2: If create failed, try to DERIVE existing API key
+    const deriveResult = await deriveApiKey(clobHost, l1Headers);
+
+    if (deriveResult.success && deriveResult.data) {
+      console.log("[api-key] Successfully DERIVED existing API key");
+      return NextResponse.json({
+        success: true,
+        credentials: deriveResult.data,
+        method: "derive",
+      });
     }
 
-    console.log("[derive-api-key] Success - credentials received");
-
-    // Return the derived credentials
-    // Note: The frontend should securely store these
-    return NextResponse.json({
-      success: true,
-      credentials: data,
+    // Both create and derive failed
+    console.error("[api-key] Both create and derive failed:", {
+      createError: createResult.error,
+      deriveError: deriveResult.error,
     });
+
+    // Provide helpful error message
+    let errorMessage = "Failed to create or retrieve API credentials.";
+
+    if (
+      createResult.error?.includes("not enabled") ||
+      deriveResult.error?.includes("not enabled")
+    ) {
+      errorMessage =
+        "Your wallet is not enabled for trading. Please complete the wallet setup steps first (Deploy wallet & Approve USDC).";
+    } else if (
+      createResult.error?.includes("signature") ||
+      deriveResult.error?.includes("signature")
+    ) {
+      errorMessage = "Signature verification failed. Please try signing again.";
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+        details: {
+          createError: createResult.error,
+          deriveError: deriveResult.error,
+        },
+      },
+      { status: 400 }
+    );
   } catch (error) {
-    console.error("[derive-api-key] Error:", error);
+    console.error("[api-key] Error:", error);
     return NextResponse.json(
       {
         success: false,

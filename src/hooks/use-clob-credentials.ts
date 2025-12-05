@@ -184,8 +184,11 @@ export function useClobCredentials() {
   }, [address, signTypedDataAsync]);
 
   /**
-   * Derive API credentials from L1 authentication
+   * Create or derive API credentials from L1 authentication
    * This requires the user to sign an EIP-712 message
+   *
+   * For new users: Creates a new API key
+   * For returning users: Derives (retrieves) existing API key
    */
   const deriveCredentials = useCallback(async (): Promise<ApiKeyCreds> => {
     if (!address) {
