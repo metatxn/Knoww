@@ -298,9 +298,9 @@ export function TradingForm({
   const isBelowMinimum = calculations.total < MIN_ORDER_SIZE;
 
   return (
-    <Card className="sticky top-4">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
+    <Card className="sticky top-4 w-full">
+      <CardHeader className="pb-3 px-3 sm:px-6">
+        <CardTitle className="text-base sm:text-lg flex items-center gap-2">
           Trade
           {negRisk && (
             <TooltipProvider>
@@ -319,16 +319,16 @@ export function TradingForm({
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
         {/* Buy/Sell Toggle */}
         <div className="flex gap-2">
           <Button
             type="button"
             variant={side === "BUY" ? "default" : "outline"}
-            className={`flex-1 ${
+            className={`flex-1 text-sm sm:text-base ${
               side === "BUY" ? "bg-green-600 hover:bg-green-700" : ""
             }`}
-            size="lg"
+            size="default"
             onClick={() => setSide("BUY")}
           >
             Buy
@@ -336,10 +336,10 @@ export function TradingForm({
           <Button
             type="button"
             variant={side === "SELL" ? "default" : "outline"}
-            className={`flex-1 ${
+            className={`flex-1 text-sm sm:text-base ${
               side === "SELL" ? "bg-red-600 hover:bg-red-700" : ""
             }`}
-            size="lg"
+            size="default"
             onClick={() => setSide("SELL")}
           >
             Sell
@@ -351,7 +351,7 @@ export function TradingForm({
           <Button
             type="button"
             variant={orderType === "LIMIT" ? "default" : "outline"}
-            className="flex-1"
+            className="flex-1 text-xs sm:text-sm"
             size="sm"
             onClick={() => setOrderType("LIMIT")}
           >
@@ -360,7 +360,7 @@ export function TradingForm({
           <Button
             type="button"
             variant={orderType === "MARKET" ? "default" : "outline"}
-            className="flex-1"
+            className="flex-1 text-xs sm:text-sm"
             size="sm"
             onClick={() => setOrderType("MARKET")}
           >
@@ -370,7 +370,7 @@ export function TradingForm({
 
         {/* Outcome Selector */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">
+          <label className="text-xs sm:text-sm font-medium text-muted-foreground">
             Outcome
           </label>
           <div className="space-y-2">
@@ -379,7 +379,7 @@ export function TradingForm({
                 key={outcome.tokenId}
                 type="button"
                 variant={selectedOutcomeIndex === idx ? "default" : "outline"}
-                className="w-full justify-between h-auto py-3"
+                className="w-full justify-between h-auto py-2.5 sm:py-3 text-sm"
                 onClick={() => onOutcomeChange(idx)}
               >
                 <span className="font-medium text-left flex-1">
@@ -394,10 +394,12 @@ export function TradingForm({
         {/* Limit Price (only for limit orders) */}
         {orderType === "LIMIT" && (
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Limit Price</label>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+              <label className="text-xs sm:text-sm font-medium">
+                Limit Price
+              </label>
               {effectiveBalance !== undefined && (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-xs sm:text-sm text-muted-foreground">
                   Balance: ${effectiveBalance.toFixed(2)}
                 </div>
               )}
@@ -407,11 +409,11 @@ export function TradingForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
                 onClick={() => handlePriceChange(-0.01)}
                 disabled={limitPrice <= 0.01}
               >
-                <Minus className="h-4 w-4" />
+                <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <div className="flex-1">
                 <Input
@@ -426,21 +428,21 @@ export function TradingForm({
                   min={0.01}
                   max={0.99}
                   step={0.01}
-                  className="text-center text-lg font-semibold"
+                  className="text-center text-base sm:text-lg font-semibold h-9 sm:h-10"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
                 onClick={() => handlePriceChange(0.01)}
                 disabled={limitPrice >= 0.99}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
-            <div className="text-center text-sm text-muted-foreground">
+            <div className="text-center text-xs sm:text-sm text-muted-foreground">
               {formatCents(limitPrice)} per share
             </div>
           </div>
@@ -449,12 +451,14 @@ export function TradingForm({
         {/* Market Price Display (for market orders) */}
         {orderType === "MARKET" && selectedOutcome && (
           <div className="space-y-2">
-            <label className="text-sm font-medium">Market Price</label>
-            <div className="text-center py-3 bg-muted/50 rounded-lg">
-              <span className="text-2xl font-bold">
+            <label className="text-xs sm:text-sm font-medium">
+              Market Price
+            </label>
+            <div className="text-center py-2.5 sm:py-3 bg-muted/50 rounded-lg">
+              <span className="text-xl sm:text-2xl font-bold">
                 {formatCents(selectedOutcome.price)}
               </span>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 Best available price
               </p>
             </div>
@@ -464,10 +468,10 @@ export function TradingForm({
         {/* Shares Input */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Shares</label>
+            <label className="text-xs sm:text-sm font-medium">Shares</label>
             <button
               type="button"
-              className="text-sm text-primary hover:underline"
+              className="text-xs sm:text-sm text-primary hover:underline"
               onClick={() => {
                 if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
@@ -491,15 +495,15 @@ export function TradingForm({
                 }
               }}
               min={1}
-              className="text-center text-lg font-semibold"
+              className="text-center text-base sm:text-lg font-semibold h-9 sm:h-10"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
               onClick={() => handleSharesChange(-100)}
               disabled={shares <= 100}
             >
@@ -509,7 +513,7 @@ export function TradingForm({
               type="button"
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
               onClick={() => handleSharesChange(-10)}
               disabled={shares <= 10}
             >
@@ -519,7 +523,7 @@ export function TradingForm({
               type="button"
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
               onClick={() => handleSharesChange(10)}
             >
               +10
@@ -528,7 +532,7 @@ export function TradingForm({
               type="button"
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
               onClick={() => handleSharesChange(100)}
             >
               +100
@@ -578,20 +582,22 @@ export function TradingForm({
         )}
 
         {/* Totals */}
-        <div className="space-y-2 pt-2 border-t">
+        <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Total Cost</span>
-            <span className="text-xl font-bold">
+            <span className="text-xs sm:text-sm font-medium">Total Cost</span>
+            <span className="text-lg sm:text-xl font-bold">
               ${calculations.total.toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Potential Return</span>
-            <span className="text-xl font-bold text-green-500">
+            <span className="text-xs sm:text-sm font-medium">
+              Potential Return
+            </span>
+            <span className="text-lg sm:text-xl font-bold text-green-500">
               ${(calculations.total + calculations.potentialWin).toFixed(2)}
             </span>
           </div>
-          <div className="flex justify-between items-center text-sm text-muted-foreground">
+          <div className="flex justify-between items-center text-xs sm:text-sm text-muted-foreground">
             <span>Profit if {side === "BUY" ? "Yes" : "No"}</span>
             <span className="text-green-500">
               +${calculations.potentialWin.toFixed(2)} (
@@ -762,7 +768,7 @@ export function TradingForm({
         )}
 
         {/* Disclaimer */}
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
           By placing an order, you agree to the terms of service.
           {orderType === "MARKET" &&
             " Market orders execute immediately at best available price."}

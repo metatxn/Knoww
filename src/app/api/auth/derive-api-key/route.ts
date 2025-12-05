@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
     const clobHost =
       process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 
+    // Polymarket expects checksummed address (mixed case)
+    // The signature is generated with the checksummed address, so we must use the same
     console.log("[derive-api-key] Request:", {
       address,
       timestamp,
@@ -58,11 +60,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Call Polymarket's derive-api-key endpoint with L1 headers
+    // Note: POLY_ADDRESS should match the address used in the signature (checksummed)
     const response = await fetch(`${clobHost}/auth/derive-api-key`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        POLY_ADDRESS: address,
+        POLY_ADDRESS: address, // Keep original case (checksummed)
         POLY_SIGNATURE: signature,
         POLY_TIMESTAMP: timestamp,
         POLY_NONCE: nonce,

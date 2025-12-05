@@ -226,26 +226,28 @@ export function OrderBook({
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="w-full overflow-hidden">
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Order Book</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Order Book</CardTitle>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7 sm:h-8 sm:w-8"
             onClick={() => refetch()}
             disabled={isFetching}
           >
             <RefreshCw
-              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
+                isFetching ? "animate-spin" : ""
+              }`}
             />
           </Button>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         {/* Header */}
-        <div className="grid grid-cols-3 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+        <div className="grid grid-cols-3 px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-b">
           <span>Price</span>
           <span className="text-right">Size</span>
           <span className="text-right">Total</span>
@@ -266,7 +268,7 @@ export function OrderBook({
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.02 }}
-                className="relative grid grid-cols-3 px-4 py-1.5 text-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                className="relative grid grid-cols-3 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() =>
                   onPriceClick?.(Number.parseFloat(level.price), "SELL")
                 }
@@ -289,18 +291,18 @@ export function OrderBook({
         </div>
 
         {/* Spread indicator */}
-        <div className="px-4 py-3 bg-muted/30 border-y">
-          <div className="flex items-center justify-between text-sm">
+        <div className="px-3 sm:px-4 py-2 sm:py-3 bg-muted/30 border-y">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
             <span className="text-muted-foreground">Spread</span>
             <span className="font-medium">
               {formatPrice(processedData.spread)} (
               {((processedData.spread / processedData.midpoint) * 100).toFixed(
-                2,
+                2
               )}
               %)
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs mt-1">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs mt-1">
             <span className="text-muted-foreground">Midpoint</span>
             <span>{formatPrice(processedData.midpoint)}</span>
           </div>
@@ -321,7 +323,7 @@ export function OrderBook({
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.02 }}
-                className="relative grid grid-cols-3 px-4 py-1.5 text-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                className="relative grid grid-cols-3 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() =>
                   onPriceClick?.(Number.parseFloat(level.price), "BUY")
                 }

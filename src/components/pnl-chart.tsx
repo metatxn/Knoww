@@ -306,13 +306,19 @@ export function PnLChart({
   const isPositive = (data?.summary?.endPnl || 0) >= 0;
   const hasData = data?.data && data.data.length > 0;
 
+  // Responsive height
+  const chartHeight =
+    typeof window !== "undefined" && window.innerWidth < 640
+      ? Math.min(height, 160)
+      : height;
+
   return (
-    <div className="rounded-2xl bg-card border border-border overflow-hidden">
+    <div className="rounded-xl sm:rounded-2xl bg-card border border-border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <div
-            className={`p-1.5 rounded-lg ${
+            className={`p-1 sm:p-1.5 rounded-lg ${
               hasData
                 ? isPositive
                   ? "bg-emerald-500/10"
@@ -321,15 +327,15 @@ export function PnLChart({
             }`}
           >
             {isPositive ? (
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
+              <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-sm">P&L History</h3>
+            <h3 className="font-semibold text-xs sm:text-sm">P&L History</h3>
             {hasData && (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground">
                 {data.summary.dataPoints} points
               </p>
             )}
@@ -337,13 +343,13 @@ export function PnLChart({
         </div>
 
         {showIntervalSelector && (
-          <div className="flex items-center gap-0.5 p-1 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 sm:p-1 bg-muted/50 rounded-lg overflow-x-auto">
             {INTERVAL_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setInterval(opt.value)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                   interval === opt.value
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -357,55 +363,57 @@ export function PnLChart({
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         {isLoading ? (
-          <div className="space-y-4">
-            <div className="flex items-baseline gap-3">
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-6 w-24" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-baseline gap-2 sm:gap-3">
+              <Skeleton className="h-7 sm:h-9 w-24 sm:w-28" />
+              <Skeleton className="h-5 sm:h-6 w-20 sm:w-24" />
             </div>
-            <Skeleton className="w-full" style={{ height }} />
+            <Skeleton className="w-full" style={{ height: chartHeight }} />
           </div>
         ) : error ? (
           <div
-            className="flex flex-col items-center justify-center text-muted-foreground text-sm"
-            style={{ height }}
+            className="flex flex-col items-center justify-center text-muted-foreground text-xs sm:text-sm"
+            style={{ height: chartHeight }}
           >
             <p>Failed to load P&L data</p>
           </div>
         ) : !hasData ? (
           <div
             className="flex flex-col items-center justify-center text-muted-foreground"
-            style={{ height }}
+            style={{ height: chartHeight }}
           >
-            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-              <TrendingUp className="h-6 w-6 opacity-40" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-muted flex items-center justify-center mb-2 sm:mb-3">
+              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 opacity-40" />
             </div>
-            <p className="text-sm font-medium">No trading history</p>
-            <p className="text-xs opacity-60 mt-1">Start trading to see data</p>
+            <p className="text-xs sm:text-sm font-medium">No trading history</p>
+            <p className="text-[10px] sm:text-xs opacity-60 mt-1">
+              Start trading to see data
+            </p>
           </div>
         ) : (
           <div>
             {/* Summary */}
-            <div className="flex items-baseline gap-3 mb-5">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3 mb-3 sm:mb-5">
               <span
-                className={`text-3xl font-bold ${
+                className={`text-2xl sm:text-3xl font-bold ${
                   isPositive ? "text-emerald-500" : "text-red-500"
                 }`}
               >
                 {formatCurrency(data.summary.endPnl)}
               </span>
               <span
-                className={`text-sm flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+                className={`text-[10px] sm:text-sm flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 rounded-full font-medium ${
                   data.summary.change >= 0
                     ? "bg-emerald-500/10 text-emerald-500"
                     : "bg-red-500/10 text-red-500"
                 }`}
               >
                 {data.summary.change >= 0 ? (
-                  <ArrowUpRight className="h-3 w-3" />
+                  <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 ) : (
-                  <ArrowDownRight className="h-3 w-3" />
+                  <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 )}
                 {formatCurrency(Math.abs(data.summary.change))} (
                 {formatPercent(data.summary.changePercent)})
@@ -415,18 +423,18 @@ export function PnLChart({
             {/* Chart */}
             <InteractiveLineChart
               data={data.data}
-              height={height}
+              height={chartHeight}
               isPositive={isPositive}
             />
 
             {/* Footer */}
-            <div className="flex justify-between items-center text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <div className="flex justify-between items-center text-[10px] sm:text-xs text-muted-foreground mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-border">
+              <span className="flex items-center gap-1 sm:gap-1.5">
+                <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500"></span>
                 High: {formatCurrency(data.summary.high)}
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+              <span className="flex items-center gap-1 sm:gap-1.5">
+                <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-red-500"></span>
                 Low: {formatCurrency(data.summary.low)}
               </span>
             </div>

@@ -102,19 +102,19 @@ export function TradeHistory({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Filters:</span>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+          <span className="text-xs sm:text-sm font-medium">Filters:</span>
         </div>
 
         <Select
           value={filter.side}
           onValueChange={(value) => handleFilterChange("side", value)}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="w-[90px] sm:w-[120px] h-8 sm:h-9 text-xs sm:text-sm">
             <SelectValue placeholder="Side" />
           </SelectTrigger>
           <SelectContent>
@@ -128,7 +128,7 @@ export function TradeHistory({
           value={filter.type}
           onValueChange={(value) => handleFilterChange("type", value)}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="w-[90px] sm:w-[120px] h-8 sm:h-9 text-xs sm:text-sm">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +142,7 @@ export function TradeHistory({
           value={filter.dateRange}
           onValueChange={(value) => handleFilterChange("dateRange", value)}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="w-[90px] sm:w-[120px] h-8 sm:h-9 text-xs sm:text-sm">
             <SelectValue placeholder="Date" />
           </SelectTrigger>
           <SelectContent>
@@ -155,17 +155,27 @@ export function TradeHistory({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border overflow-hidden">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Market</TableHead>
-              <TableHead>Side</TableHead>
-              <TableHead className="text-right">Price</TableHead>
-              <TableHead className="text-right">Size</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="w-[50px]" />
+              <TableHead className="text-xs sm:text-sm whitespace-nowrap">
+                Date
+              </TableHead>
+              <TableHead className="text-xs sm:text-sm">Market</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden sm:table-cell">
+                Side
+              </TableHead>
+              <TableHead className="text-xs sm:text-sm text-right whitespace-nowrap">
+                Price
+              </TableHead>
+              <TableHead className="text-xs sm:text-sm text-right hidden md:table-cell">
+                Size
+              </TableHead>
+              <TableHead className="text-xs sm:text-sm text-right whitespace-nowrap">
+                Total
+              </TableHead>
+              <TableHead className="w-[40px] sm:w-[50px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -196,8 +206,10 @@ export function TradeHistory({
               ))
             ) : filteredTrades.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  <p className="text-muted-foreground">No trades found</p>
+                <TableCell colSpan={7} className="text-center py-6 sm:py-8">
+                  <p className="text-muted-foreground text-xs sm:text-sm">
+                    No trades found
+                  </p>
                 </TableCell>
               </TableRow>
             ) : (
@@ -209,13 +221,13 @@ export function TradeHistory({
                   transition={{ delay: index * 0.02 }}
                   className="border-b transition-colors hover:bg-muted/50"
                 >
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-[10px] sm:text-sm whitespace-nowrap py-2 sm:py-4">
                     {formatDate(trade.timestamp)}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
+                  <TableCell className="py-2 sm:py-4">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       {trade.market.icon && (
-                        <div className="relative w-6 h-6 shrink-0 rounded overflow-hidden">
+                        <div className="relative w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded overflow-hidden">
                           <Image
                             src={trade.market.icon}
                             alt={trade.market.title}
@@ -225,45 +237,45 @@ export function TradeHistory({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="text-sm truncate max-w-[200px]">
+                        <div className="text-[10px] sm:text-sm truncate max-w-[100px] sm:max-w-[200px]">
                           {trade.outcome}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        <div className="text-[9px] sm:text-xs text-muted-foreground truncate max-w-[100px] sm:max-w-[200px]">
                           {trade.market.title}
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell py-2 sm:py-4">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                      className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${
                         trade.side === "BUY"
                           ? "bg-green-500/20 text-green-600 dark:text-green-400"
                           : "bg-red-500/20 text-red-600 dark:text-red-400"
                       }`}
                     >
                       {trade.side === "BUY" ? (
-                        <ArrowDownLeft className="h-3 w-3" />
+                        <ArrowDownLeft className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       ) : (
-                        <ArrowUpRight className="h-3 w-3" />
+                        <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       )}
                       {trade.side}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right text-[10px] sm:text-sm py-2 sm:py-4">
                     {(trade.price * 100).toFixed(1)}¢
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right text-[10px] sm:text-sm hidden md:table-cell py-2 sm:py-4">
                     {trade.size.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-right font-medium text-[10px] sm:text-sm py-2 sm:py-4">
                     {formatCurrency(trade.usdcAmount)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-2 sm:py-4">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-6 w-6 sm:h-8 sm:w-8"
                       asChild
                     >
                       <Link
@@ -271,7 +283,7 @@ export function TradeHistory({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <ExternalLink className="h-4 w-4" />
+                        <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Link>
                     </Button>
                   </TableCell>
@@ -284,12 +296,12 @@ export function TradeHistory({
 
       {/* Summary */}
       {filteredTrades.length > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-[10px] sm:text-sm text-muted-foreground">
           <span>Showing {filteredTrades.length} trades</span>
           <span>
             Total Volume:{" "}
             {formatCurrency(
-              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0),
+              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0)
             )}
           </span>
         </div>

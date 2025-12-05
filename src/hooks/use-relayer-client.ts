@@ -351,10 +351,20 @@ export function useRelayerClient() {
       ];
 
       // The method is `execute()` not `executeSafeTransactions()`
-      const response = await client.execute(
-        approvalTxs,
-        "Approve USDC for Polymarket trading"
-      );
+      // Create a clear, informative message for the wallet signing prompt
+      const approvalMessage = [
+        "🔐 Enable USDC Trading on Polymarket",
+        "",
+        "This one-time approval allows Polymarket to:",
+        "• Execute trades using your USDC balance",
+        "• Process buy and sell orders instantly",
+        "",
+        "✅ Gasless - No fees required",
+        "✅ Secure - Funds stay in your wallet",
+        "✅ Revocable - Can be changed anytime",
+      ].join("\n");
+
+      const response = await client.execute(approvalTxs, approvalMessage);
 
       console.log("[RelayerClient] Execute response:", response);
 
@@ -477,25 +487,32 @@ export function useRelayerClient() {
           isLoading: false,
           isInitialized: true,
           hasDeployedSafe: false,
+          proxyAddress: null,
         }));
         return;
       }
 
-      // Check if the derived address has code deployed
+      // IMPORTANT: Check if the derived address actually has code deployed
+      // For new users, this will be FALSE because their Safe doesn't exist yet
       const isDeployed = await checkIsDeployed(derivedAddress);
 
       console.log(
         "[RelayerClient] Safe check:",
         derivedAddress,
         "deployed:",
+        isDeployed,
         isDeployed
+          ? "- Safe exists on-chain"
+          : "- Safe NOT deployed yet (new user)"
       );
 
       setState((prev) => ({
         ...prev,
         isLoading: false,
         isInitialized: true,
-        proxyAddress: derivedAddress,
+        // ONLY set proxyAddress if the Safe is actually deployed
+        // For new users, we don't want to show a non-existent address
+        proxyAddress: isDeployed ? derivedAddress : null,
         hasDeployedSafe: isDeployed,
       }));
     } catch (err) {

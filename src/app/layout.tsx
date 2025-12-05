@@ -35,7 +35,7 @@ export default async function RootLayout({
       >
         <ContextProvider cookies={cookies}>
           <Sidebar />
-          <div className="lg:ml-60">{children}</div>
+          <div className="lg:ml-56">{children}</div>
         </ContextProvider>
       </body>
     </html>

@@ -232,43 +232,67 @@ export function useProxyWallet() {
     try {
       // First, try to fetch the actual Polymarket wallet from Data API
       // This is the most reliable source as it shows the actual trading wallet
-      let proxyAddress = await fetchPolymarketWallet(address);
+      const existingWallet = await fetchPolymarketWallet(address);
 
-      // If no existing positions/trades, fall back to CREATE2 derivation
-      if (!proxyAddress) {
-        proxyAddress = await deriveSafeAddress(address);
+      // If we found an existing wallet from Data API, user has already traded
+      // This means their Safe is definitely deployed
+      if (existingWallet) {
+        const usdcBalance = await fetchUsdcBalance(existingWallet);
+
+        console.log("[ProxyWallet] Found existing wallet from Data API:", {
+          proxyAddress: existingWallet,
+          isDeployed: true,
+          usdcBalance,
+        });
+
+        setData({
+          proxyAddress: existingWallet,
+          isDeployed: true, // Definitely deployed since they have positions/trades
+          usdcBalance,
+          isLoading: false,
+          error: null,
+        });
+        return;
       }
 
-      if (!proxyAddress) {
+      // No existing positions/trades - derive the expected Safe address
+      // This does NOT mean the Safe is deployed!
+      const derivedAddress = await deriveSafeAddress(address);
+
+      if (!derivedAddress) {
         setData({
           proxyAddress: null,
           isDeployed: false,
           usdcBalance: 0,
           isLoading: false,
-          error: "Failed to determine Polymarket wallet address",
+          error: "Failed to derive Polymarket wallet address",
         });
         return;
       }
 
-      // Check if deployed (has code) - for EOA this will be false
-      const isDeployed = await checkIsDeployed(proxyAddress);
+      // IMPORTANT: Check if the derived address actually has code deployed
+      // For new users, this will be FALSE because their Safe doesn't exist yet
+      const isActuallyDeployed = await checkIsDeployed(derivedAddress);
 
-      // Fetch balance regardless of whether it's a contract or EOA
-      const usdcBalance = await fetchUsdcBalance(proxyAddress);
+      // Only fetch balance if deployed (otherwise it's 0 anyway)
+      const usdcBalance = isActuallyDeployed
+        ? await fetchUsdcBalance(derivedAddress)
+        : 0;
 
-      console.log("[ProxyWallet] Result:", {
-        proxyAddress,
-        isDeployed,
+      console.log("[ProxyWallet] Derived address result:", {
+        proxyAddress: derivedAddress,
+        isDeployed: isActuallyDeployed,
         usdcBalance,
-        source:
-          proxyAddress.toLowerCase() === address.toLowerCase()
-            ? "EOA"
-            : "proxy",
+        note: isActuallyDeployed
+          ? "Safe exists but no positions found"
+          : "Safe NOT deployed - user needs to create trading wallet",
       });
 
       setData({
-        proxyAddress,
-        isDeployed: true, // Mark as "deployed" if we found it from Data API (user has traded)
+        // ONLY set proxyAddress if the Safe is actually deployed
+        // For new users, we don't want to show a non-existent address
+        proxyAddress: isActuallyDeployed ? derivedAddress : null,
+        isDeployed: isActuallyDeployed, // Use the ACTUAL deployment status
         usdcBalance,
         isLoading: false,
         error: null,

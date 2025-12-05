@@ -174,7 +174,7 @@ export default function Home() {
           fetchNextAllPaginated();
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0.1 }
     );
 
     observer.observe(loadMoreRef.current);
@@ -272,28 +272,29 @@ export default function Home() {
       <Navbar />
 
       {/* Main Content */}
-      <main className="px-4 md:px-6 lg:px-8 py-8">
+      <main className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Hero Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
             Explore Prediction Markets
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
             Browse markets across all categories and make your predictions
           </p>
         </div>
 
         {/* Quick Access Categories Bar */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
             <Button
               variant={viewMode === "categories" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("categories")}
-              className="whitespace-nowrap gap-2"
+              className="whitespace-nowrap gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3"
             >
-              <BarChart3 className="h-4 w-4" />
-              All Categories
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">All Categories</span>
+              <span className="xs:hidden">All</span>
             </Button>
             {QUICK_CATEGORIES.map((category) => {
               const Icon = category.icon;
@@ -306,9 +307,9 @@ export default function Home() {
                   onClick={() =>
                     handleQuickCategoryClick(category.slug as ViewMode)
                   }
-                  className="whitespace-nowrap gap-2"
+                  className="whitespace-nowrap gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3"
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {category.label}
                 </Button>
               );
@@ -477,42 +478,50 @@ export default function Home() {
         )}
 
         {/* Features Section */}
-        <div className="border-t border-foreground/10 pt-8 mt-12">
-          <h3 className="text-xl font-semibold mb-4">Why Polycaster?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
+        <div className="border-t border-foreground/10 pt-6 sm:pt-8 mt-8 sm:mt-12">
+          <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
+            Why Polycaster?
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="space-y-1.5 sm:space-y-2">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Trophy className="h-5 w-5 text-blue-500" />
+                <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/10">
+                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                 </div>
-                <h4 className="font-semibold">Prediction Markets</h4>
+                <h4 className="font-semibold text-sm sm:text-base">
+                  Prediction Markets
+                </h4>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Trade on real-world events across sports, politics, crypto, and
                 more
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5 sm:space-y-2">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <Zap className="h-5 w-5 text-purple-500" />
+                <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                 </div>
-                <h4 className="font-semibold">Powered by Polymarket</h4>
+                <h4 className="font-semibold text-sm sm:text-base">
+                  Powered by Polymarket
+                </h4>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Built on the world's largest prediction market platform
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5 sm:space-y-2 sm:col-span-2 md:col-span-1">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <MessageSquare className="h-5 w-5 text-green-500" />
+                <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
+                  <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                 </div>
-                <h4 className="font-semibold">Farcaster Integration</h4>
+                <h4 className="font-semibold text-sm sm:text-base">
+                  Farcaster Integration
+                </h4>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Share and discuss predictions with the Farcaster community
               </p>
             </div>
@@ -521,8 +530,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t mt-12 py-8">
-        <div className="px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
+      <footer className="border-t mt-8 sm:mt-12 py-6 sm:py-8">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 text-center text-xs sm:text-sm text-muted-foreground">
           <p>Powered by Reown AppKit & Polymarket</p>
         </div>
       </footer>

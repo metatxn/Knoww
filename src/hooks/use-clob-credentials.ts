@@ -6,9 +6,12 @@ import { useAccount, useSignTypedData } from "wagmi";
 /**
  * EIP-712 Domain for CLOB Authentication (L1)
  * Used for authenticating API requests with the CLOB
- * 
+ *
  * Note: chainId should match the chain you're authenticating for
  * Polymarket uses chainId in the domain for signature verification
+ *
+ * IMPORTANT: This must match exactly what Polymarket's SDK uses
+ * See: @polymarket/clob-client/dist/signing/eip712.js
  */
 const CLOB_AUTH_DOMAIN = {
   name: "ClobAuthDomain",
@@ -19,6 +22,12 @@ const CLOB_AUTH_DOMAIN = {
 /**
  * EIP-712 Type definitions for CLOB Authentication
  * Must match exactly what Polymarket expects
+ *
+ * IMPORTANT: The order and types must match the SDK exactly:
+ * - address: address
+ * - timestamp: string (NOT number!)
+ * - nonce: uint256 (passed as number, not BigInt)
+ * - message: string
  */
 const CLOB_AUTH_TYPES = {
   ClobAuth: [
@@ -31,6 +40,7 @@ const CLOB_AUTH_TYPES = {
 
 /**
  * The message to sign for CLOB authentication
+ * Must match exactly: "This message attests that I control the given wallet"
  */
 const MSG_TO_SIGN = "This message attests that I control the given wallet";
 
@@ -55,7 +65,9 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const stored = localStorage.getItem(`${CREDS_STORAGE_KEY}_${address.toLowerCase()}`);
+    const stored = localStorage.getItem(
+      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`
+    );
     if (stored) {
       return JSON.parse(stored) as ApiKeyCreds;
     }
@@ -118,6 +130,11 @@ export function useClobCredentials() {
   /**
    * Generate L1 authentication signature
    * This creates an EIP-712 signature that Polymarket uses for authentication
+   *
+   * IMPORTANT: The signature format must match exactly what Polymarket's SDK produces:
+   * - timestamp: string representation of unix seconds
+   * - nonce: number (the SDK uses plain number, wagmi/viem accepts number for uint256)
+   * - message: exact string "This message attests that I control the given wallet"
    */
   const generateL1Signature = useCallback(async (): Promise<{
     signature: string;
@@ -137,26 +154,32 @@ export function useClobCredentials() {
       timestamp,
       nonce,
       message: MSG_TO_SIGN,
+      domain: CLOB_AUTH_DOMAIN,
     });
 
+    // Sign the EIP-712 typed data
+    // Note: wagmi's signTypedDataAsync handles uint256 as either number or bigint
     const signature = await signTypedDataAsync({
       domain: CLOB_AUTH_DOMAIN,
       types: CLOB_AUTH_TYPES,
       primaryType: "ClobAuth",
       message: {
         address: address as `0x${string}`,
-        timestamp: `${timestamp}`, // Must be string in the message
-        nonce: BigInt(nonce), // Must be BigInt for uint256
+        timestamp: `${timestamp}`, // Must be string in the message (matches SDK)
+        nonce: BigInt(nonce), // wagmi requires BigInt for uint256, but value is same
         message: MSG_TO_SIGN,
       },
     });
 
-    console.log("[ClobCredentials] Signature generated:", signature);
+    console.log("[ClobCredentials] Signature generated:", {
+      signature,
+      signatureLength: signature.length,
+    });
 
-    return { 
-      signature, 
+    return {
+      signature,
       timestamp: `${timestamp}`, // Return as string for headers
-      nonce: `${nonce}` // Return as string for headers
+      nonce: `${nonce}`, // Return as string for headers
     };
   }, [address, signTypedDataAsync]);
 
@@ -217,7 +240,20 @@ export function useClobCredentials() {
       });
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || data.details || "Failed to derive API credentials");
+        // Provide helpful error messages based on the error
+        let errorMessage =
+          data.error || data.details || "Failed to derive API credentials";
+
+        // Common error cases with user-friendly messages
+        if (errorMessage.includes("Could not derive api key")) {
+          errorMessage =
+            "Unable to create trading credentials. Please ensure you have completed all previous setup steps (Deploy wallet & Approve USDC) and try again.";
+        } else if (errorMessage.includes("Invalid signature")) {
+          errorMessage =
+            "Signature verification failed. Please try signing again.";
+        }
+
+        throw new Error(errorMessage);
       }
 
       const creds: ApiKeyCreds = {
@@ -235,7 +271,8 @@ export function useClobCredentials() {
       return creds;
     } catch (err) {
       console.error("[ClobCredentials] Error deriving credentials:", err);
-      const error = err instanceof Error ? err : new Error("Failed to derive credentials");
+      const error =
+        err instanceof Error ? err : new Error("Failed to derive credentials");
       setError(error);
       throw error;
     } finally {
@@ -272,4 +309,3 @@ export function useClobCredentials() {
     generateL1Signature,
   };
 }
-

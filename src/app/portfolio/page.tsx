@@ -102,35 +102,37 @@ function WalletCard({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl p-4 ${
+      className={`relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-4 ${
         isPrimary
           ? "bg-linear-to-br from-violet-500/20 via-purple-500/10 to-fuchsia-500/20 border border-purple-500/20"
           : "bg-card border border-border"
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1 min-w-0">
           <p
-            className={`text-xs font-medium ${
+            className={`text-[10px] sm:text-xs font-medium ${
               isPrimary ? "text-purple-400" : "text-muted-foreground"
             }`}
           >
             {label}
           </p>
-          <div className="flex items-center gap-2">
-            <code className="font-mono text-sm">{formatAddress(address)}</code>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <code className="font-mono text-xs sm:text-sm truncate">
+              {formatAddress(address)}
+            </code>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={onCopy}
-                    className="p-1 rounded-md hover:bg-white/10 transition-colors"
+                    className="p-0.5 sm:p-1 rounded-md hover:bg-white/10 transition-colors shrink-0"
                   >
                     {copied ? (
-                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-500" />
                     ) : (
-                      <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
                     )}
                   </button>
                 </TooltipTrigger>
@@ -143,27 +145,29 @@ function WalletCard({
               href={`https://polygonscan.com/address/${address}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1 rounded-md hover:bg-white/10 transition-colors"
+              className="p-0.5 sm:p-1 rounded-md hover:bg-white/10 transition-colors shrink-0"
             >
-              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
             </a>
           </div>
         </div>
         {balance !== undefined && (
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <p
-              className={`text-lg font-bold ${
+              className={`text-base sm:text-lg font-bold ${
                 isPrimary ? "text-purple-300" : ""
               }`}
             >
               ${balance.toFixed(2)}
             </p>
-            <p className="text-xs text-muted-foreground">USDC.e</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              USDC.e
+            </p>
           </div>
         )}
       </div>
       {isPrimary && (
-        <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl" />
+        <div className="absolute -bottom-8 -right-8 w-24 sm:w-32 h-24 sm:h-32 bg-purple-500/10 rounded-full blur-2xl" />
       )}
     </div>
   );
@@ -196,16 +200,20 @@ function StatPill({
       : "bg-muted";
 
   return (
-    <div className="flex flex-col gap-1 p-4 rounded-xl bg-card border border-border">
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
+    <div className="flex flex-col gap-0.5 sm:gap-1 p-2.5 sm:p-4 rounded-lg sm:rounded-xl bg-card border border-border">
+      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
+        {label}
+      </p>
       {isLoading ? (
-        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-5 sm:h-7 w-16 sm:w-20" />
       ) : (
-        <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold tracking-tight">{value}</span>
+        <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
+          <span className="text-base sm:text-xl font-bold tracking-tight">
+            {value}
+          </span>
           {change !== undefined && (
             <span
-              className={`text-xs font-medium px-1.5 py-0.5 rounded ${bgColor} ${trendColor}`}
+              className={`text-[9px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded ${bgColor} ${trendColor}`}
             >
               {change >= 0 ? "+" : ""}
               {change.toFixed(1)}%
@@ -245,67 +253,74 @@ function PositionRow({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:bg-accent/50 transition-all cursor-pointer"
+      className="group flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:bg-accent/50 transition-all cursor-pointer"
       onClick={onNavigate}
     >
-      {/* Market Icon */}
-      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0">
-        {position.market.icon ? (
-          <Image
-            src={position.market.icon}
-            alt={position.market.title}
-            fill
-            className="object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
-      </div>
+      {/* Top Row: Icon + Info */}
+      <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+        {/* Market Icon */}
+        <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden bg-muted shrink-0">
+          {position.market.icon ? (
+            <Image
+              src={position.market.icon}
+              alt={position.market.title}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+            </div>
+          )}
+        </div>
 
-      {/* Market Info */}
-      <div className="flex-1 min-w-0">
-        <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
-          {position.market.title}
-        </h4>
-        <div className="flex items-center gap-2 mt-1">
-          <span
-            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              position.outcome === "Yes"
-                ? "bg-emerald-500/20 text-emerald-500"
-                : "bg-red-500/20 text-red-500"
-            }`}
-          >
-            {position.outcome}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {position.size.toFixed(2)} shares @{" "}
-            {(position.avgPrice * 100).toFixed(0)}¢
-          </span>
+        {/* Market Info */}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
+            {position.market.title}
+          </h4>
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
+            <span
+              className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${
+                position.outcome === "Yes"
+                  ? "bg-emerald-500/20 text-emerald-500"
+                  : "bg-red-500/20 text-red-500"
+              }`}
+            >
+              {position.outcome}
+            </span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">
+              {position.size.toFixed(2)} @{" "}
+              {(position.avgPrice * 100).toFixed(0)}¢
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Value & P&L */}
-      <div className="text-right shrink-0">
-        <p className="font-semibold">{formatCurrency(position.currentValue)}</p>
-        <p
-          className={`text-sm flex items-center justify-end gap-1 ${
-            isProfit ? "text-emerald-500" : "text-red-500"
-          }`}
-        >
-          {isProfit ? (
-            <ArrowUpRight className="h-3 w-3" />
-          ) : (
-            <ArrowDownRight className="h-3 w-3" />
-          )}
-          {formatCurrency(position.unrealizedPnl)} (
-          {formatPercent(position.unrealizedPnlPercent)})
-        </p>
-      </div>
+      {/* Bottom Row (mobile) / Right Section (desktop): Value & P&L */}
+      <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0">
+        <div className="text-left sm:text-right">
+          <p className="font-semibold text-sm sm:text-base">
+            {formatCurrency(position.currentValue)}
+          </p>
+          <p
+            className={`text-xs sm:text-sm flex items-center sm:justify-end gap-0.5 sm:gap-1 ${
+              isProfit ? "text-emerald-500" : "text-red-500"
+            }`}
+          >
+            {isProfit ? (
+              <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            ) : (
+              <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            )}
+            {formatCurrency(position.unrealizedPnl)} (
+            {formatPercent(position.unrealizedPnlPercent)})
+          </p>
+        </div>
 
-      {/* Arrow */}
-      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        {/* Arrow */}
+        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+      </div>
     </motion.div>
   );
 }
@@ -484,17 +499,18 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+      className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
         active
           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
           : "text-muted-foreground hover:text-foreground hover:bg-muted"
       }`}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      <span className="hidden xs:inline">{label}</span>
+      <span className="xs:hidden">{label.slice(0, 3)}</span>
       {count !== undefined && count > 0 && (
         <span
-          className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
+          className={`ml-0.5 sm:ml-1 px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full ${
             active ? "bg-white/20" : "bg-primary/20 text-primary"
           }`}
         >
@@ -630,13 +646,13 @@ export default function PortfolioPage() {
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="container max-w-6xl mx-auto px-4 py-6 space-y-6"
+        className="container max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6"
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Portfolio</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold">Portfolio</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Track your positions and trading activity
             </p>
           </div>
@@ -644,15 +660,15 @@ export default function PortfolioPage() {
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3 shrink-0"
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
 
         {/* Wallet Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {address && (
             <WalletCard
               label="Connected Wallet"
@@ -685,7 +701,7 @@ export default function PortfolioPage() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
           <StatPill
             label="Portfolio Value"
             value={formatCurrency(portfolioValue)}
@@ -714,7 +730,7 @@ export default function PortfolioPage() {
         <PnLChart userAddress={tradingAddress || undefined} height={200} />
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-2xl w-fit">
+        <div className="flex items-center gap-1 sm:gap-2 p-0.5 sm:p-1 bg-muted/50 rounded-xl sm:rounded-2xl w-fit overflow-x-auto">
           <TabButton
             active={activeTab === "positions"}
             onClick={() => setActiveTab("positions")}

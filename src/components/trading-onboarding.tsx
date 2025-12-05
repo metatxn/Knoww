@@ -26,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 import { useClobCredentials } from "@/hooks/use-clob-credentials";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
+import { useClobClient } from "@/hooks/use-clob-client";
 
 interface OnboardingStep {
   id: string;
@@ -64,10 +65,15 @@ export function TradingOnboarding({
     refresh: refreshProxyWallet,
     proxyAddress: computedProxyAddress,
   } = useProxyWallet();
+  const { getUsdcAllowance } = useClobClient();
 
   // Use relayer state as primary source (most reliable after deployment)
   const hasProxyWallet = hasDeployedSafe || hasProxyWalletFromHook;
   const proxyAddress = relayerProxyAddress || computedProxyAddress;
+
+  // Track if USDC is already approved (for returning users)
+  const [hasUsdcApproval, setHasUsdcApproval] = useState<boolean | null>(null);
+  const [isCheckingApproval, setIsCheckingApproval] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<OnboardingStep[]>([
@@ -81,21 +87,21 @@ export function TradingOnboarding({
     {
       id: "deploy",
       title: "Create Trading Wallet",
-      description: "Create a secure Polymarket Safe wallet (gasless, no fees)",
+      description: "Deploy your secure Polymarket wallet • Free & gasless",
       icon: <Shield className="h-5 w-5" />,
       status: "pending",
     },
     {
       id: "approve",
       title: "Enable USDC Trading",
-      description: "Allow Polymarket to use your USDC.e for trades (gasless)",
+      description: "One-time approval to trade with USDC • Free & gasless",
       icon: <Zap className="h-5 w-5" />,
       status: "pending",
     },
     {
       id: "credentials",
       title: "Setup API Access",
-      description: "Sign a message to generate your trading credentials",
+      description: "Sign to generate your trading credentials",
       icon: <CheckCircle2 className="h-5 w-5" />,
       status: "pending",
     },
@@ -115,6 +121,31 @@ export function TradingOnboarding({
     },
     []
   );
+
+  /**
+   * Check if USDC is already approved for trading
+   * This is for returning users who have already completed onboarding
+   */
+  const checkUsdcApproval = useCallback(async () => {
+    if (!hasProxyWallet || isCheckingApproval) return;
+
+    setIsCheckingApproval(true);
+    try {
+      const result = await getUsdcAllowance();
+      // Consider approved if allowance is greater than 0 (any approval exists)
+      const isApproved = result && result.allowance > 0;
+      console.log("[Onboarding] USDC allowance check:", {
+        allowance: result?.allowance,
+        isApproved,
+      });
+      setHasUsdcApproval(isApproved);
+    } catch (err) {
+      console.error("[Onboarding] Failed to check USDC approval:", err);
+      setHasUsdcApproval(false);
+    } finally {
+      setIsCheckingApproval(false);
+    }
+  }, [hasProxyWallet, isCheckingApproval, getUsdcAllowance]);
 
   const handleConnectWallet = useCallback(async () => {
     updateStepStatus("connect", "in_progress");
@@ -154,6 +185,7 @@ export function TradingOnboarding({
       const result = await approveUsdcForTrading();
       if (result.success) {
         updateStepStatus("approve", "completed");
+        setHasUsdcApproval(true); // Mark as approved after successful transaction
         setCurrentStep(3);
       } else {
         updateStepStatus("approve", "error", result.error);
@@ -168,6 +200,25 @@ export function TradingOnboarding({
   }, [approveUsdcForTrading, updateStepStatus]);
 
   const handleDeriveCredentials = useCallback(async () => {
+    // Ensure previous steps are completed
+    if (!hasProxyWallet) {
+      updateStepStatus(
+        "credentials",
+        "error",
+        "Please complete the wallet deployment step first"
+      );
+      return;
+    }
+
+    if (hasUsdcApproval === false) {
+      updateStepStatus(
+        "credentials",
+        "error",
+        "Please complete the USDC approval step first"
+      );
+      return;
+    }
+
     updateStepStatus("credentials", "in_progress");
     try {
       await deriveCredentials();
@@ -180,7 +231,13 @@ export function TradingOnboarding({
         err instanceof Error ? err.message : "Failed to setup credentials"
       );
     }
-  }, [deriveCredentials, updateStepStatus, onComplete]);
+  }, [
+    deriveCredentials,
+    updateStepStatus,
+    onComplete,
+    hasProxyWallet,
+    hasUsdcApproval,
+  ]);
 
   // Update connect step when wallet connects
   useEffect(() => {
@@ -190,21 +247,42 @@ export function TradingOnboarding({
     }
   }, [isConnected, steps, updateStepStatus]);
 
-  // Update deploy and approve steps if proxy wallet is already deployed
+  // Update deploy step if proxy wallet is already deployed
+  // Also trigger USDC approval check for returning users
   useEffect(() => {
     if (hasProxyWallet) {
       if (steps[1].status !== "completed") {
         updateStepStatus("deploy", "completed");
       }
-      if (steps[2].status !== "completed") {
-        updateStepStatus("approve", "completed");
+      // Move to approve step if we're still on deploy step
+      if (currentStep < 2) {
+        setCurrentStep(2);
       }
-      // Move to credentials step if we're still on earlier steps
+      // Check if USDC is already approved (for returning users)
+      if (hasUsdcApproval === null) {
+        checkUsdcApproval();
+      }
+    }
+  }, [
+    hasProxyWallet,
+    steps,
+    currentStep,
+    updateStepStatus,
+    hasUsdcApproval,
+    checkUsdcApproval,
+  ]);
+
+  // Update approve step if USDC is already approved (for returning users only)
+  useEffect(() => {
+    if (hasUsdcApproval === true && steps[2].status !== "completed") {
+      console.log("[Onboarding] USDC already approved, marking step complete");
+      updateStepStatus("approve", "completed");
+      // Move to credentials step
       if (currentStep < 3) {
         setCurrentStep(3);
       }
     }
-  }, [hasProxyWallet, steps, currentStep, updateStepStatus]);
+  }, [hasUsdcApproval, steps, currentStep, updateStepStatus]);
 
   // Update credentials step if already has credentials (but DON'T auto-close)
   useEffect(() => {
@@ -217,7 +295,7 @@ export function TradingOnboarding({
   // Check if all steps are complete
   const allStepsComplete = steps.every((s) => s.status === "completed");
 
-  const isLoading = isRelayerLoading || isClobLoading;
+  const isLoading = isRelayerLoading || isClobLoading || isCheckingApproval;
   const completedSteps = steps.filter((s) => s.status === "completed").length;
   const progress = (completedSteps / steps.length) * 100;
 
@@ -365,11 +443,34 @@ export function TradingOnboarding({
           </motion.div>
         )}
 
-        {/* Info Box */}
+        {/* Info Box - contextual based on current step */}
         <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
           <p className="text-xs text-blue-600 dark:text-blue-400">
-            <strong>💡 Gasless Setup:</strong> All setup transactions are free!
-            Polymarket covers the gas fees through their relayer.
+            {currentStep === 1 && (
+              <>
+                <strong>🛡️ Secure Wallet:</strong> Your trading wallet is a
+                Gnosis Safe - the most trusted smart contract wallet in crypto.
+              </>
+            )}
+            {currentStep === 2 && (
+              <>
+                <strong>🔐 USDC Approval:</strong> This one-time approval lets
+                you trade instantly. Your funds stay in your wallet until you
+                place a trade.
+              </>
+            )}
+            {currentStep === 3 && (
+              <>
+                <strong>🔑 API Credentials:</strong> Sign a message to create
+                your unique trading credentials. No private keys are shared.
+              </>
+            )}
+            {(currentStep === 0 || currentStep > 3) && (
+              <>
+                <strong>💡 Gasless Setup:</strong> All setup transactions are
+                free! Polymarket covers the gas fees through their relayer.
+              </>
+            )}
           </p>
         </div>
 

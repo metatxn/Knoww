@@ -1,7 +1,15 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { ChevronDown, LogOut, Menu, Rocket, User, Wallet, X } from "lucide-react";
+import {
+  ChevronDown,
+  LogOut,
+  Menu,
+  Rocket,
+  User,
+  Wallet,
+  X,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
@@ -97,7 +105,7 @@ export function Navbar() {
                 <Button
                   onClick={() => setShowOnboarding(true)}
                   size="sm"
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  className="bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 >
                   <Rocket className="mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Setup Trading</span>
@@ -203,7 +211,7 @@ export function Navbar() {
                   setShowOnboarding(true);
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-linear-to-r from-purple-600/10 to-blue-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
               >
                 <Rocket className="inline mr-2 h-4 w-4" />
                 Setup Trading Account
