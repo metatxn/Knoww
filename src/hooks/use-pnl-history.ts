@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 
 /**
  * P&L data point
@@ -101,7 +101,7 @@ async function fetchPnLHistory(
  * ```
  */
 export function usePnLHistory(options: UsePnLHistoryOptions = {}) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
 
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;

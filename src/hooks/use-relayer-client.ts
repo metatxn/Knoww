@@ -12,7 +12,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { useConnection, useWalletClient } from "wagmi";
 
 // Contract addresses on Polygon Mainnet
 const CONTRACTS = {
@@ -52,7 +52,7 @@ interface RelayerClientState {
 }
 
 export function useRelayerClient() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const { data: walletClient } = useWalletClient();
 
   const [state, setState] = useState<RelayerClientState>({
@@ -136,10 +136,8 @@ export function useRelayerClient() {
         bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
       });
 
-      console.log("[RelayerClient] Derived Safe address:", proxyAddress);
       return proxyAddress;
-    } catch (err) {
-      console.error("[RelayerClient] Failed to derive Safe address:", err);
+    } catch {
       return null;
     }
   }, [address]);
@@ -158,27 +156,16 @@ export function useRelayerClient() {
       let response;
       try {
         response = await client.deploy();
-        console.log("[RelayerClient] Deploy response:", response);
       } catch (deployErr) {
         // Check if the error is "safe already deployed"
         const errMessage =
           deployErr instanceof Error ? deployErr.message : String(deployErr);
 
-        console.log("[RelayerClient] Error message:", errMessage);
-
         if (errMessage.toLowerCase().includes("safe already deployed")) {
-          console.log(
-            "[RelayerClient] Safe already deployed, deriving address..."
-          );
-
           // Derive the Safe address
           const derivedAddress = await deriveSafeAddress();
 
           if (derivedAddress) {
-            console.log(
-              "[RelayerClient] Derived existing Safe:",
-              derivedAddress
-            );
 
             setState((prev) => ({
               ...prev,
@@ -225,12 +212,7 @@ export function useRelayerClient() {
       const pollInterval = 2000; // 2 seconds
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        console.log(
-          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}`
-        );
-
         const txns = await client.getTransaction(transactionId);
-        console.log("[RelayerClient] Transaction status:", txns);
 
         if (txns && txns.length > 0) {
           const tx = txns[0];
@@ -243,8 +225,6 @@ export function useRelayerClient() {
             }
 
             // Any other state with a proxy address means success
-            console.log("[RelayerClient] Deploy success:", tx);
-
             setState((prev) => ({
               ...prev,
               isLoading: false,
@@ -366,8 +346,6 @@ export function useRelayerClient() {
 
       const response = await client.execute(approvalTxs, approvalMessage);
 
-      console.log("[RelayerClient] Execute response:", response);
-
       const transactionId = response.transactionID;
       if (!transactionId) {
         throw new Error("No transaction ID returned from execute");
@@ -383,14 +361,7 @@ export function useRelayerClient() {
       ];
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        console.log(
-          `[RelayerClient] Polling approval attempt ${
-            attempt + 1
-          }/${maxAttempts}`
-        );
-
         const txns = await client.getTransaction(transactionId);
-        console.log("[RelayerClient] Approval status:", txns);
 
         if (txns && txns.length > 0) {
           const tx = txns[0];
@@ -402,8 +373,6 @@ export function useRelayerClient() {
 
           // Check for success states
           if (successStates.includes(tx.state)) {
-            console.log("[RelayerClient] Approval success:", tx);
-
             setState((prev) => ({ ...prev, isLoading: false }));
             return {
               success: true,
@@ -481,7 +450,6 @@ export function useRelayerClient() {
       const derivedAddress = await deriveSafeAddress();
 
       if (!derivedAddress) {
-        console.log("[RelayerClient] Could not derive Safe address");
         setState((prev) => ({
           ...prev,
           isLoading: false,

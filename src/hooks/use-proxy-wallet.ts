@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 
 /**
  * Polymarket Proxy Wallet Hook
@@ -40,7 +40,7 @@ export interface ProxyWalletData {
 }
 
 export function useProxyWallet() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const [data, setData] = useState<ProxyWalletData>({
     proxyAddress: null,
     isDeployed: false,
@@ -50,54 +50,39 @@ export function useProxyWallet() {
   });
 
   /**
-   * Fetch the user's actual Polymarket wallet from the Data API
-   * This is the most reliable way to get the correct wallet address
-   * as it returns the proxyWallet field from existing positions/trades
+   * Check if a proxy wallet has any positions or activity on Polymarket
+   * This validates that the derived address is correct and active
    */
-  const fetchPolymarketWallet = useCallback(
-    async (userAddress: string): Promise<string | null> => {
+  const checkWalletHasData = useCallback(
+    async (proxyAddress: string): Promise<boolean> => {
       try {
-        // Try to get from positions first
+        // Check for positions using the PROXY address (not EOA)
         const positionsRes = await fetch(
-          `${DATA_API_BASE}/positions?user=${userAddress.toLowerCase()}&limit=1`
+          `${DATA_API_BASE}/positions?user=${proxyAddress.toLowerCase()}&sizeThreshold=.1&redeemable=true&limit=1`
         );
 
         if (positionsRes.ok) {
-          const positions = (await positionsRes.json()) as Array<{
-            proxyWallet?: string;
-          }>;
-          if (positions.length > 0 && positions[0]?.proxyWallet) {
-            console.log(
-              "[ProxyWallet] Found wallet from positions:",
-              positions[0].proxyWallet
-            );
-            return positions[0].proxyWallet;
+          const positions = (await positionsRes.json()) as Array<unknown>;
+          if (positions.length > 0) {
+            return true;
           }
         }
 
-        // Try to get from activity/trades
+        // Check for activity using the PROXY address (not EOA)
         const activityRes = await fetch(
-          `${DATA_API_BASE}/activity?user=${userAddress.toLowerCase()}&limit=1`
+          `${DATA_API_BASE}/activity?user=${proxyAddress.toLowerCase()}&limit=1`
         );
 
         if (activityRes.ok) {
-          const activity = (await activityRes.json()) as Array<{
-            proxyWallet?: string;
-          }>;
-          if (activity.length > 0 && activity[0]?.proxyWallet) {
-            console.log(
-              "[ProxyWallet] Found wallet from activity:",
-              activity[0].proxyWallet
-            );
-            return activity[0].proxyWallet;
+          const activity = (await activityRes.json()) as Array<unknown>;
+          if (activity.length > 0) {
+            return true;
           }
         }
 
-        console.log("[ProxyWallet] No existing positions/trades found");
-        return null;
-      } catch (err) {
-        console.error("[ProxyWallet] Failed to fetch from Data API:", err);
-        return null;
+        return false;
+      } catch {
+        return false;
       }
     },
     []
@@ -126,13 +111,8 @@ export function useProxyWallet() {
           bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
         });
 
-        console.log(
-          "[ProxyWallet] Derived Safe address (fallback):",
-          proxyAddress
-        );
         return proxyAddress;
-      } catch (err) {
-        console.error("[ProxyWallet] Failed to derive Safe address:", err);
+      } catch {
         return null;
       }
     },
@@ -158,16 +138,8 @@ export function useProxyWallet() {
         });
 
         // If code exists and is not empty, the contract is deployed
-        const isDeployed = code !== undefined && code !== "0x";
-        console.log(
-          "[ProxyWallet] Check deployed:",
-          proxyAddress,
-          "->",
-          isDeployed
-        );
-        return isDeployed;
-      } catch (err) {
-        console.error("[ProxyWallet] Failed to check deployment:", err);
+        return code !== undefined && code !== "0x";
+      } catch {
         return false;
       }
     },
@@ -204,8 +176,7 @@ export function useProxyWallet() {
         });
 
         return Number(formatUnits(balance, USDC_DECIMALS));
-      } catch (err) {
-        console.error("[ProxyWallet] Failed to fetch USDC balance:", err);
+      } catch {
         return 0;
       }
     },
@@ -214,6 +185,14 @@ export function useProxyWallet() {
 
   /**
    * Refresh proxy wallet data
+   *
+   * Strategy:
+   * 1. Always derive the Safe address first using CREATE2 (deterministic)
+   * 2. Check if the derived Safe is deployed on-chain
+   * 3. If deployed, fetch USDC balance and optionally verify it has data
+   *
+   * This avoids the chicken-and-egg problem of querying Polymarket with EOA
+   * when they only store data under proxy wallet addresses.
    */
   const refresh = useCallback(async () => {
     if (!address || !isConnected) {
@@ -230,33 +209,8 @@ export function useProxyWallet() {
     setData((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // First, try to fetch the actual Polymarket wallet from Data API
-      // This is the most reliable source as it shows the actual trading wallet
-      const existingWallet = await fetchPolymarketWallet(address);
-
-      // If we found an existing wallet from Data API, user has already traded
-      // This means their Safe is definitely deployed
-      if (existingWallet) {
-        const usdcBalance = await fetchUsdcBalance(existingWallet);
-
-        console.log("[ProxyWallet] Found existing wallet from Data API:", {
-          proxyAddress: existingWallet,
-          isDeployed: true,
-          usdcBalance,
-        });
-
-        setData({
-          proxyAddress: existingWallet,
-          isDeployed: true, // Definitely deployed since they have positions/trades
-          usdcBalance,
-          isLoading: false,
-          error: null,
-        });
-        return;
-      }
-
-      // No existing positions/trades - derive the expected Safe address
-      // This does NOT mean the Safe is deployed!
+      // Step 1: Derive the Safe address using CREATE2 formula
+      // This is deterministic - same EOA always produces same Safe address
       const derivedAddress = await deriveSafeAddress(address);
 
       if (!derivedAddress) {
@@ -270,35 +224,32 @@ export function useProxyWallet() {
         return;
       }
 
-      // IMPORTANT: Check if the derived address actually has code deployed
-      // For new users, this will be FALSE because their Safe doesn't exist yet
+      // Step 2: Check if the derived Safe is actually deployed on-chain
       const isActuallyDeployed = await checkIsDeployed(derivedAddress);
 
-      // Only fetch balance if deployed (otherwise it's 0 anyway)
-      const usdcBalance = isActuallyDeployed
-        ? await fetchUsdcBalance(derivedAddress)
-        : 0;
+      if (!isActuallyDeployed) {
+        // Safe not deployed - new user needs to create trading wallet
+        setData({
+          proxyAddress: null,
+          isDeployed: false,
+          usdcBalance: 0,
+          isLoading: false,
+          error: null,
+        });
+        return;
+      }
 
-      console.log("[ProxyWallet] Derived address result:", {
-        proxyAddress: derivedAddress,
-        isDeployed: isActuallyDeployed,
-        usdcBalance,
-        note: isActuallyDeployed
-          ? "Safe exists but no positions found"
-          : "Safe NOT deployed - user needs to create trading wallet",
-      });
+      // Step 3: Safe is deployed - fetch USDC balance
+      const usdcBalance = await fetchUsdcBalance(derivedAddress);
 
       setData({
-        // ONLY set proxyAddress if the Safe is actually deployed
-        // For new users, we don't want to show a non-existent address
-        proxyAddress: isActuallyDeployed ? derivedAddress : null,
-        isDeployed: isActuallyDeployed, // Use the ACTUAL deployment status
+        proxyAddress: derivedAddress,
+        isDeployed: true,
         usdcBalance,
         isLoading: false,
         error: null,
       });
     } catch (err) {
-      console.error("[ProxyWallet] Refresh error:", err);
       setData((prev) => ({
         ...prev,
         isLoading: false,
@@ -308,7 +259,6 @@ export function useProxyWallet() {
   }, [
     address,
     isConnected,
-    fetchPolymarketWallet,
     deriveSafeAddress,
     checkIsDeployed,
     fetchUsdcBalance,

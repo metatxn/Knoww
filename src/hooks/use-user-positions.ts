@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 
 /**
  * Position data structure
@@ -81,7 +81,7 @@ export interface UseUserPositionsOptions {
  */
 async function fetchPositions(
   userAddress: string,
-  options: UseUserPositionsOptions,
+  options: UseUserPositionsOptions
 ): Promise<PositionsResponse> {
   const params = new URLSearchParams({
     user: userAddress,
@@ -131,8 +131,8 @@ async function fetchPositions(
  * ```
  */
 export function useUserPositions(options: UseUserPositionsOptions = {}) {
-  const { address, isConnected } = useAccount();
-  
+  const { address, isConnected } = useConnection();
+
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
 
@@ -162,7 +162,7 @@ export function useUserPositions(options: UseUserPositionsOptions = {}) {
  * @returns Query result with positions for the market
  */
 export function useMarketPositions(marketId: string) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
 
   return useQuery<PositionsResponse, Error>({
     queryKey: ["marketPositions", address, marketId],

@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAccount, useDisconnect } from "wagmi";
+import { useConnection, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Button } from "@/components/ui/button";
@@ -72,8 +72,8 @@ const categories = [
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { address, isConnected } = useConnection();
+  const disconnect = useDisconnect();
   const { open } = useAppKit();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -281,7 +281,7 @@ export function Sidebar() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => disconnect()}
+                onClick={() => disconnect.mutate({})}
                 className="text-red-500 focus:text-red-500"
               >
                 <LogOut className="mr-2 h-4 w-4" />

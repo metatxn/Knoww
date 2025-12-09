@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 import { useClobCredentials } from "./use-clob-credentials";
 
 /**
@@ -47,7 +47,7 @@ export interface CreateOrderParams {
  * 4. Orders are created and posted through the SDK
  */
 export function useClobClient() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const { credentials, hasCredentials, deriveCredentials } =
     useClobCredentials();
 

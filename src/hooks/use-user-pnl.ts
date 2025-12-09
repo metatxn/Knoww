@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 
 /**
  * P&L data structure
@@ -150,7 +150,7 @@ async function fetchPnL(
  * ```
  */
 export function useUserPnL(options: UseUserPnLOptions = {}) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
@@ -186,7 +186,7 @@ export function useUserPnLWithHistory(period: PnLPeriod = "30d") {
  * @returns Query result with basic P&L summary
  */
 export function useUserPnLSummary() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
 
   return useQuery<PnLResponse, Error>({
     queryKey: ["userPnLSummary", address],

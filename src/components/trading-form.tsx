@@ -4,7 +4,7 @@ import { useAppKit } from "@reown/appkit/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, Minus, Plus, Wallet, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -104,7 +104,7 @@ export function TradingForm({
   onOrderSuccess,
   onOrderError,
 }: TradingFormProps) {
-  const { isConnected } = useAccount();
+  const { isConnected } = useConnection();
   const { open } = useAppKit();
   const {
     createOrder,

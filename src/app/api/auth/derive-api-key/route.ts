@@ -40,8 +40,6 @@ async function createApiKey(
   clobHost: string,
   headers: L1Headers
 ): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
-  console.log("[api-key] Attempting to CREATE new API key...");
-
   const response = await fetch(`${clobHost}/auth/api-key`, {
     method: "POST",
     headers: {
@@ -51,18 +49,12 @@ async function createApiKey(
   });
 
   const responseText = await response.text();
-  console.log("[api-key] Create response:", {
-    status: response.status,
-    body: responseText,
-  });
 
   try {
     const data = JSON.parse(responseText) as ApiKeyResponse;
-
     if (response.ok && data.apiKey) {
       return { success: true, data };
     }
-
     return { success: false, error: data.error || responseText };
   } catch {
     return { success: false, error: responseText };
@@ -77,8 +69,6 @@ async function deriveApiKey(
   clobHost: string,
   headers: L1Headers
 ): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
-  console.log("[api-key] Attempting to DERIVE existing API key...");
-
   const response = await fetch(`${clobHost}/auth/derive-api-key`, {
     method: "GET",
     headers: {
@@ -88,18 +78,12 @@ async function deriveApiKey(
   });
 
   const responseText = await response.text();
-  console.log("[api-key] Derive response:", {
-    status: response.status,
-    body: responseText,
-  });
 
   try {
     const data = JSON.parse(responseText) as ApiKeyResponse;
-
     if (response.ok && data.apiKey) {
       return { success: true, data };
     }
-
     return { success: false, error: data.error || responseText };
   } catch {
     return { success: false, error: responseText };
@@ -148,14 +132,6 @@ export async function POST(request: NextRequest) {
     const clobHost =
       process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 
-    console.log("[api-key] Request:", {
-      address,
-      timestamp,
-      nonce,
-      signatureLength: signature.length,
-      clobHost,
-    });
-
     // Build L1 headers for Polymarket authentication
     const l1Headers: L1Headers = {
       POLY_ADDRESS: address,
@@ -168,7 +144,6 @@ export async function POST(request: NextRequest) {
     const createResult = await createApiKey(clobHost, l1Headers);
 
     if (createResult.success && createResult.data) {
-      console.log("[api-key] Successfully CREATED new API key");
       return NextResponse.json({
         success: true,
         credentials: createResult.data,
@@ -176,16 +151,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(
-      "[api-key] Create failed, attempting derive...",
-      createResult.error
-    );
-
     // Step 2: If create failed, try to DERIVE existing API key
     const deriveResult = await deriveApiKey(clobHost, l1Headers);
 
     if (deriveResult.success && deriveResult.data) {
-      console.log("[api-key] Successfully DERIVED existing API key");
       return NextResponse.json({
         success: true,
         credentials: deriveResult.data,

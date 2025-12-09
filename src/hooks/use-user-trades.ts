@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 
 /**
  * Trade data structure
@@ -92,7 +92,7 @@ export interface UseUserTradesOptions {
  */
 async function fetchTrades(
   userAddress: string,
-  options: UseUserTradesOptions,
+  options: UseUserTradesOptions
 ): Promise<TradesResponse> {
   const params = new URLSearchParams({
     user: userAddress,
@@ -153,8 +153,8 @@ async function fetchTrades(
  * ```
  */
 export function useUserTrades(options: UseUserTradesOptions = {}) {
-  const { address, isConnected } = useAccount();
-  
+  const { address, isConnected } = useConnection();
+
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
 
@@ -186,9 +186,9 @@ export function useUserTrades(options: UseUserTradesOptions = {}) {
  * @returns Infinite query result with trades data
  */
 export function useUserTradesInfinite(
-  options: Omit<UseUserTradesOptions, "offset"> = {},
+  options: Omit<UseUserTradesOptions, "offset"> = {}
 ) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const pageSize = options.limit || 50;
 
   return useInfiniteQuery<TradesResponse, Error>({

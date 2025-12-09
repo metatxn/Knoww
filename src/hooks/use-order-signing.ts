@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useConnection, useSignTypedData } from "wagmi";
 
 /**
  * Polymarket CTF Exchange Contract Addresses (Polygon Mainnet)
@@ -181,8 +181,8 @@ function calculateAmounts(
  * which adds the necessary authentication headers.
  */
 export function useOrderSigning() {
-  const { address, isConnected } = useAccount();
-  const { signTypedDataAsync } = useSignTypedData();
+  const { address, isConnected } = useConnection();
+  const signTypedData = useSignTypedData();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -260,7 +260,7 @@ export function useOrderSigning() {
           : CTF_EXCHANGE_ADDRESS;
 
         // Sign the order using EIP-712
-        const signature = await signTypedDataAsync({
+        const signature = await signTypedData.mutateAsync({
           domain: {
             ...EXCHANGE_DOMAIN,
             verifyingContract: verifyingContract as `0x${string}`,
@@ -310,7 +310,7 @@ export function useOrderSigning() {
         setIsLoading(false);
       }
     },
-    [address, buildOrder, signTypedDataAsync]
+    [address, buildOrder, signTypedData]
   );
   /**
    * Submit a signed order to the backend API

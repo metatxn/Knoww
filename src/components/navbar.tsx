@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAccount, useBalance, useDisconnect } from "wagmi";
+import { useConnection, useBalance, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Badge } from "@/components/ui/badge";
@@ -51,8 +51,8 @@ const navLinks = [
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { address, isConnected, chain } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { address, isConnected, chain } = useConnection();
+  const disconnect = useDisconnect();
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -72,9 +72,15 @@ export function Navbar() {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const formatBalance = (bal?: string) => {
-    if (!bal) return "0.00";
-    return Number(bal).toFixed(2);
+  const formatBalance = (value: bigint, decimals: number) => {
+    const divisor = BigInt(10 ** decimals);
+    const integerPart = value / divisor;
+    const fractionalPart = value % divisor;
+    const fractionalStr = fractionalPart
+      .toString()
+      .padStart(decimals, "0")
+      .slice(0, 2);
+    return `${integerPart}.${fractionalStr}`;
   };
 
   return (
@@ -116,7 +122,8 @@ export function Navbar() {
               {/* Balance Badge */}
               {balance && (
                 <Badge variant="secondary" className="hidden sm:inline-flex">
-                  {formatBalance(balance.formatted)} {balance.symbol}
+                  {formatBalance(balance.value, balance.decimals)}{" "}
+                  {balance.symbol}
                 </Badge>
               )}
 
@@ -154,7 +161,8 @@ export function Navbar() {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Balance:</span>
                         <span className="font-medium text-xs">
-                          {formatBalance(balance.formatted)} {balance.symbol}
+                          {formatBalance(balance.value, balance.decimals)}{" "}
+                          {balance.symbol}
                         </span>
                       </div>
                     )}
@@ -168,7 +176,7 @@ export function Navbar() {
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
-                    onClick={() => disconnect()}
+                    onClick={() => disconnect.mutate({})}
                     className="text-destructive focus:text-destructive"
                   >
                     <LogOut className="mr-2 h-4 w-4" />

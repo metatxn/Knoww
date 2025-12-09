@@ -3,41 +3,45 @@
 import { useAppKit } from "@reown/appkit/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowDownRight,
   ArrowUpRight,
   BarChart3,
   Check,
-  ChevronRight,
-  Clock,
   Copy,
   ExternalLink,
   History,
   LayoutGrid,
   ListOrdered,
+  Minus,
+  Plus,
   RefreshCw,
-  TrendingDown,
-  TrendingUp,
+  Search,
+  Trash2,
   Wallet,
-  X,
+  XCircle,
+  FileText,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 import { Navbar } from "@/components/navbar";
 import { PnLChart } from "@/components/pnl-chart";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useCancelOrder, useOpenOrders } from "@/hooks/use-open-orders";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useUserDetails } from "@/hooks/use-user-details";
-import { type PnLPeriod, useUserPnL } from "@/hooks/use-user-pnl";
+import { useUserPnL } from "@/hooks/use-user-pnl";
 import { useUserPositions } from "@/hooks/use-user-positions";
 import { useUserTrades } from "@/hooks/use-user-trades";
 
@@ -45,22 +49,19 @@ import { useUserTrades } from "@/hooks/use-user-trades";
 // Utility Functions
 // ============================================================================
 
-function formatCurrency(value: number, compact = false): string {
+function formatCurrency(value: number, showSign = false): string {
   const absValue = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-
-  if (compact) {
-    if (absValue >= 1_000_000)
-      return `${sign}$${(absValue / 1_000_000).toFixed(1)}M`;
-    if (absValue >= 1000) return `${sign}$${(absValue / 1000).toFixed(1)}K`;
-  }
-
+  const sign = value < 0 ? "-" : value > 0 && showSign ? "+" : "";
   return `${sign}$${absValue.toFixed(2)}`;
 }
 
 function formatPercent(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatPrice(value: number): string {
+  return `${(value * 100).toFixed(0)}¢`;
 }
 
 function formatAddress(address: string): string {
@@ -74,384 +75,106 @@ function timeAgo(timestamp: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
+  const diffMonths = Math.floor(diffDays / 30);
 
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${diffDays} days ago`;
+  if (diffMonths < 12) return `${diffMonths} mo ago`;
   return then.toLocaleDateString();
 }
 
 // ============================================================================
-// Components
+// Tab Navigation
 // ============================================================================
 
-function WalletCard({
-  label,
-  address,
-  balance,
-  isPrimary,
-  onCopy,
-  copied,
-}: {
-  label: string;
-  address: string;
-  balance?: number;
-  isPrimary?: boolean;
-  onCopy: () => void;
-  copied: boolean;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-4 ${
-        isPrimary
-          ? "bg-linear-to-br from-violet-500/20 via-purple-500/10 to-fuchsia-500/20 border border-purple-500/20"
-          : "bg-card border border-border"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1 min-w-0">
-          <p
-            className={`text-[10px] sm:text-xs font-medium ${
-              isPrimary ? "text-purple-400" : "text-muted-foreground"
-            }`}
-          >
-            {label}
-          </p>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <code className="font-mono text-xs sm:text-sm truncate">
-              {formatAddress(address)}
-            </code>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={onCopy}
-                    className="p-0.5 sm:p-1 rounded-md hover:bg-white/10 transition-colors shrink-0"
-                  >
-                    {copied ? (
-                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{copied ? "Copied!" : "Copy address"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <a
-              href={`https://polygonscan.com/address/${address}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-0.5 sm:p-1 rounded-md hover:bg-white/10 transition-colors shrink-0"
-            >
-              <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-            </a>
-          </div>
-        </div>
-        {balance !== undefined && (
-          <div className="text-right shrink-0">
-            <p
-              className={`text-base sm:text-lg font-bold ${
-                isPrimary ? "text-purple-300" : ""
-              }`}
-            >
-              ${balance.toFixed(2)}
-            </p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">
-              USDC.e
-            </p>
-          </div>
-        )}
-      </div>
-      {isPrimary && (
-        <div className="absolute -bottom-8 -right-8 w-24 sm:w-32 h-24 sm:h-32 bg-purple-500/10 rounded-full blur-2xl" />
-      )}
-    </div>
-  );
-}
+type TabType = "positions" | "orders" | "history";
 
-function StatPill({
-  label,
-  value,
-  change,
-  trend,
-  isLoading,
+function TabNav({
+  activeTab,
+  onTabChange,
+  positionCount,
+  orderCount,
 }: {
-  label: string;
-  value: string;
-  change?: number;
-  trend?: "up" | "down" | "neutral";
-  isLoading?: boolean;
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
+  positionCount?: number;
+  orderCount?: number;
 }) {
-  const trendColor =
-    trend === "up"
-      ? "text-emerald-500"
-      : trend === "down"
-      ? "text-red-500"
-      : "text-muted-foreground";
-  const bgColor =
-    trend === "up"
-      ? "bg-emerald-500/10"
-      : trend === "down"
-      ? "bg-red-500/10"
-      : "bg-muted";
+  const tabs: { id: TabType; label: string; count?: number }[] = [
+    { id: "positions", label: "Positions", count: positionCount },
+    { id: "orders", label: "Open orders", count: orderCount },
+    { id: "history", label: "History" },
+  ];
 
   return (
-    <div className="flex flex-col gap-0.5 sm:gap-1 p-2.5 sm:p-4 rounded-lg sm:rounded-xl bg-card border border-border">
-      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-        {label}
-      </p>
-      {isLoading ? (
-        <Skeleton className="h-5 sm:h-7 w-16 sm:w-20" />
-      ) : (
-        <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
-          <span className="text-base sm:text-xl font-bold tracking-tight">
-            {value}
-          </span>
-          {change !== undefined && (
-            <span
-              className={`text-[9px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded ${bgColor} ${trendColor}`}
-            >
-              {change >= 0 ? "+" : ""}
-              {change.toFixed(1)}%
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PositionRow({
-  position,
-  onNavigate,
-}: {
-  position: {
-    id: string;
-    outcome: string;
-    size: number;
-    avgPrice: number;
-    currentPrice: number;
-    currentValue: number;
-    unrealizedPnl: number;
-    unrealizedPnlPercent: number;
-    market: {
-      title: string;
-      slug: string;
-      icon?: string;
-      endDate?: string;
-    };
-  };
-  onNavigate: () => void;
-}) {
-  const isProfit = position.unrealizedPnl >= 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="group flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:bg-accent/50 transition-all cursor-pointer"
-      onClick={onNavigate}
-    >
-      {/* Top Row: Icon + Info */}
-      <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
-        {/* Market Icon */}
-        <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden bg-muted shrink-0">
-          {position.market.icon ? (
-            <Image
-              src={position.market.icon}
-              alt={position.market.title}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-
-        {/* Market Info */}
-        <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
-            {position.market.title}
-          </h4>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
-            <span
-              className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${
-                position.outcome === "Yes"
-                  ? "bg-emerald-500/20 text-emerald-500"
-                  : "bg-red-500/20 text-red-500"
-              }`}
-            >
-              {position.outcome}
-            </span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground">
-              {position.size.toFixed(2)} @{" "}
-              {(position.avgPrice * 100).toFixed(0)}¢
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row (mobile) / Right Section (desktop): Value & P&L */}
-      <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0">
-        <div className="text-left sm:text-right">
-          <p className="font-semibold text-sm sm:text-base">
-            {formatCurrency(position.currentValue)}
-          </p>
-          <p
-            className={`text-xs sm:text-sm flex items-center sm:justify-end gap-0.5 sm:gap-1 ${
-              isProfit ? "text-emerald-500" : "text-red-500"
-            }`}
-          >
-            {isProfit ? (
-              <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-            ) : (
-              <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+    <div className="flex items-center border-b border-border">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`relative px-5 py-3.5 text-sm font-medium transition-colors ${
+            activeTab === tab.id
+              ? "text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded ${
+                  activeTab === tab.id
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {tab.count}
+              </span>
             )}
-            {formatCurrency(position.unrealizedPnl)} (
-            {formatPercent(position.unrealizedPnlPercent)})
-          </p>
-        </div>
-
-        {/* Arrow */}
-        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-      </div>
-    </motion.div>
-  );
-}
-
-function TradeRow({
-  trade,
-}: {
-  trade: {
-    id: string;
-    timestamp: string;
-    type: string;
-    side: string | null;
-    size: number;
-    price: number;
-    usdcAmount: number;
-    outcome: string;
-    transactionHash: string;
-    market: {
-      title: string;
-      slug: string;
-      icon: string;
-    };
-  };
-}) {
-  const isBuy = trade.side === "BUY";
-  const isRedeem = trade.type === "REDEEM";
-
-  return (
-    <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
-      {/* Type Badge */}
-      <div className={`w-16 shrink-0`}>
-        <span
-          className={`text-xs font-medium px-2 py-1 rounded ${
-            isRedeem
-              ? "bg-blue-500/20 text-blue-500"
-              : isBuy
-              ? "bg-emerald-500/20 text-emerald-500"
-              : "bg-red-500/20 text-red-500"
-          }`}
-        >
-          {isRedeem ? "REDEEM" : trade.side}
-        </span>
-      </div>
-
-      {/* Market Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{trade.market.title}</p>
-        <p className="text-xs text-muted-foreground">
-          {!isRedeem &&
-            `${trade.size.toFixed(2)} @ ${(trade.price * 100).toFixed(1)}¢`}
-          {isRedeem && `${trade.size.toFixed(2)} shares`}
-        </p>
-      </div>
-
-      {/* Amount & Time */}
-      <div className="text-right shrink-0">
-        <p
-          className={`font-medium ${
-            isBuy ? "text-red-500" : "text-emerald-500"
-          }`}
-        >
-          {isBuy ? "-" : "+"}${trade.usdcAmount.toFixed(2)}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {timeAgo(trade.timestamp)}
-        </p>
-      </div>
+          </span>
+          {activeTab === tab.id && (
+            <motion.div
+              layoutId="activeTab"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+            />
+          )}
+        </button>
+      ))}
     </div>
   );
 }
 
-function OrderRow({
-  order,
-  onCancel,
-  isCancelling,
+// ============================================================================
+// Search Bar
+// ============================================================================
+
+function SearchBar({
+  value,
+  onChange,
+  placeholder = "Search",
 }: {
-  order: {
-    id: string;
-    side: "BUY" | "SELL";
-    price: number;
-    remainingSize: number;
-    createdAt: string;
-    market?: { question?: string };
-    tokenId: string;
-  };
-  onCancel: () => void;
-  isCancelling: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
 }) {
-  const isBuy = order.side === "BUY";
-
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
-      {/* Side Badge */}
-      <div className="w-14 shrink-0">
-        <span
-          className={`text-xs font-medium px-2 py-1 rounded ${
-            isBuy
-              ? "bg-emerald-500/20 text-emerald-500"
-              : "bg-red-500/20 text-red-500"
-          }`}
-        >
-          {order.side}
-        </span>
-      </div>
-
-      {/* Order Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {order.market?.question || `Token ${order.tokenId.slice(0, 8)}...`}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {order.remainingSize.toFixed(2)} @ {(order.price * 100).toFixed(1)}¢
-        </p>
-      </div>
-
-      {/* Cancel Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          onCancel();
-        }}
-        disabled={isCancelling}
-        className="h-8 px-3 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+    <div className="relative max-w-sm">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="pl-9 h-10 bg-background"
+      />
     </div>
   );
 }
+
+// ============================================================================
+// Empty State
+// ============================================================================
 
 function EmptyState({
   icon: Icon,
@@ -466,15 +189,13 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <Icon className="h-8 w-8 text-muted-foreground" />
+      <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        <Icon className="h-7 w-7 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-        {description}
-      </p>
+      <h3 className="text-base font-medium mb-1">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-xs">{description}</p>
       {action && (
-        <Button asChild>
+        <Button asChild className="mt-4" size="sm">
           <Link href={action.href}>{action.label}</Link>
         </Button>
       )}
@@ -482,42 +203,600 @@ function EmptyState({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-  count,
+// ============================================================================
+// Positions Table
+// ============================================================================
+
+interface Position {
+  id: string;
+  outcome: string;
+  size: number;
+  avgPrice: number;
+  currentPrice: number;
+  currentValue: number;
+  initialValue: number;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number;
+  market: {
+    title: string;
+    slug: string;
+    icon?: string;
+    endDate?: string;
+  };
+}
+
+function PositionsTable({
+  positions,
+  isLoading,
+  searchQuery,
 }: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ElementType;
+  positions: Position[];
+  isLoading: boolean;
+  searchQuery: string;
+}) {
+  const filteredPositions = positions.filter((p) =>
+    p.market.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (filteredPositions.length === 0) {
+    return (
+      <EmptyState
+        icon={LayoutGrid}
+        title="No positions found"
+        description={
+          searchQuery
+            ? "Try a different search term"
+            : "Start trading to see your positions here"
+        }
+        action={
+          !searchQuery ? { label: "Explore Markets", href: "/" } : undefined
+        }
+      />
+    );
+  }
+
+  // Calculate totals
+  const totalBet = filteredPositions.reduce(
+    (sum, p) => sum + p.initialValue,
+    0
+  );
+  const totalToWin = filteredPositions.reduce(
+    (sum, p) => sum + p.size * (1 - p.avgPrice),
+    0
+  );
+  const totalValue = filteredPositions.reduce(
+    (sum, p) => sum + p.currentValue,
+    0
+  );
+  const totalPnl = filteredPositions.reduce(
+    (sum, p) => sum + p.unrealizedPnl,
+    0
+  );
+  const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-[40%]">Market</TableHead>
+          <TableHead className="text-center">Avg → Now</TableHead>
+          <TableHead className="text-right">Bet</TableHead>
+          <TableHead className="text-right">To Win</TableHead>
+          <TableHead className="text-right">Value</TableHead>
+          <TableHead className="w-[80px]"></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredPositions.map((position) => {
+          const isProfit = position.unrealizedPnl >= 0;
+          const toWin = position.size * (1 - position.avgPrice);
+
+          return (
+            <TableRow key={position.id} className="group">
+              <TableCell>
+                <Link
+                  href={`/events/detail/${position.market.slug}`}
+                  className="flex items-center gap-3"
+                >
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                    {position.market.icon ? (
+                      <Image
+                        src={position.market.icon}
+                        alt={position.market.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate max-w-[280px] group-hover:text-primary transition-colors">
+                      {position.market.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <span
+                        className={
+                          position.outcome === "Yes"
+                            ? "text-emerald-500"
+                            : "text-red-500"
+                        }
+                      >
+                        {position.outcome} {formatPrice(position.avgPrice)}
+                      </span>
+                      <span className="mx-1.5">·</span>
+                      {position.size.toFixed(1)} shares
+                    </p>
+                  </div>
+                </Link>
+              </TableCell>
+              <TableCell className="text-center">
+                <span className="text-muted-foreground">
+                  {formatPrice(position.avgPrice)}
+                </span>
+                <span className="mx-1 text-muted-foreground">→</span>
+                <span
+                  className={
+                    position.currentPrice > position.avgPrice
+                      ? "text-emerald-500"
+                      : position.currentPrice < position.avgPrice
+                      ? "text-red-500"
+                      : ""
+                  }
+                >
+                  {formatPrice(position.currentPrice)}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(position.initialValue)}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(toWin)}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="font-medium">
+                  {formatCurrency(position.currentValue)}
+                </div>
+                <div
+                  className={`text-xs ${
+                    isProfit ? "text-emerald-500" : "text-red-500"
+                  }`}
+                >
+                  {formatCurrency(position.unrealizedPnl, true)} (
+                  {formatPercent(position.unrealizedPnlPercent)})
+                </div>
+              </TableCell>
+              <TableCell>
+                <Button
+                  size="sm"
+                  className="bg-sky-500 hover:bg-sky-600 text-white h-8"
+                >
+                  Sell
+                </Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+      <TableFooter>
+        <TableRow>
+          <TableCell className="font-medium">Total</TableCell>
+          <TableCell></TableCell>
+          <TableCell className="text-right font-medium">
+            {formatCurrency(totalBet)}
+          </TableCell>
+          <TableCell className="text-right font-medium">
+            {formatCurrency(totalToWin)}
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="font-medium">{formatCurrency(totalValue)}</div>
+            <div
+              className={`text-xs ${
+                totalPnl >= 0 ? "text-emerald-500" : "text-red-500"
+              }`}
+            >
+              {formatCurrency(totalPnl, true)} ({formatPercent(totalPnlPercent)}
+              )
+            </div>
+          </TableCell>
+          <TableCell></TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
+  );
+}
+
+// ============================================================================
+// Orders Table
+// ============================================================================
+
+interface Order {
+  id: string;
+  side: "BUY" | "SELL";
+  price: number;
+  size: number;
+  filledSize: number;
+  remainingSize: number;
+  createdAt: string;
+  expiration: string;
+  market?: { question: string; slug: string; outcome: string };
+  tokenId: string;
+}
+
+function OrdersTable({
+  orders,
+  isLoading,
+  searchQuery,
+  onCancel,
+  cancellingOrderId,
+}: {
+  orders: Order[];
+  isLoading: boolean;
+  searchQuery: string;
+  onCancel: (orderId: string) => void;
+  cancellingOrderId?: string;
+}) {
+  const filteredOrders = orders.filter(
+    (o) =>
+      o.market?.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (filteredOrders.length === 0) {
+    return (
+      <EmptyState
+        icon={ListOrdered}
+        title="No open orders found"
+        description={
+          searchQuery
+            ? "Try a different search term"
+            : "Place limit orders to see them here"
+        }
+      />
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-[35%]">Market</TableHead>
+          <TableHead className="text-center">Side</TableHead>
+          <TableHead className="text-center">Outcome</TableHead>
+          <TableHead className="text-right">Price</TableHead>
+          <TableHead className="text-right">Filled</TableHead>
+          <TableHead className="text-right">Total</TableHead>
+          <TableHead className="text-center">Expiration</TableHead>
+          <TableHead className="w-[50px]"></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredOrders.map((order) => (
+          <TableRow key={order.id}>
+            <TableCell>
+              <p className="font-medium text-sm truncate max-w-[250px]">
+                {order.market?.question ||
+                  `Token ${order.tokenId.slice(0, 8)}...`}
+              </p>
+            </TableCell>
+            <TableCell className="text-center">
+              <span
+                className={`inline-flex text-xs font-medium px-2 py-1 rounded ${
+                  order.side === "BUY"
+                    ? "bg-emerald-500/15 text-emerald-500"
+                    : "bg-red-500/15 text-red-500"
+                }`}
+              >
+                {order.side}
+              </span>
+            </TableCell>
+            <TableCell className="text-center text-sm">
+              {order.market?.outcome || "-"}
+            </TableCell>
+            <TableCell className="text-right">
+              {formatPrice(order.price)}
+            </TableCell>
+            <TableCell className="text-right text-sm text-muted-foreground">
+              {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
+            </TableCell>
+            <TableCell className="text-right">
+              {formatCurrency(order.size * order.price)}
+            </TableCell>
+            <TableCell className="text-center text-sm text-muted-foreground">
+              {order.expiration && order.expiration !== "0"
+                ? new Date(
+                    parseInt(order.expiration) * 1000
+                  ).toLocaleDateString()
+                : "GTC"}
+            </TableCell>
+            <TableCell>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onCancel(order.id)}
+                disabled={cancellingOrderId === order.id}
+                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+// ============================================================================
+// History Table
+// ============================================================================
+
+interface Trade {
+  id: string;
+  timestamp: string;
+  type: string;
+  side: string | null;
+  size: number;
+  price: number;
+  usdcAmount: number;
+  outcome: string;
+  transactionHash: string;
+  market: {
+    title: string;
+    slug: string;
+    icon: string;
+  };
+}
+
+function getActivityInfo(
+  type: string,
+  side?: string | null,
+  pnl?: number
+): { label: string; icon: React.ElementType; color: string } {
+  if (type === "REDEEM") {
+    if (pnl && pnl > 0) {
+      return {
+        label: "Claimed",
+        icon: Check,
+        color: "text-emerald-500 bg-emerald-500/15",
+      };
+    }
+    return {
+      label: "Lost",
+      icon: XCircle,
+      color: "text-red-500 bg-red-500/15",
+    };
+  }
+  if (type === "DEPOSIT") {
+    return {
+      label: "Deposited",
+      icon: Plus,
+      color: "text-sky-500 bg-sky-500/15",
+    };
+  }
+  if (type === "WITHDRAW") {
+    return {
+      label: "Withdrew",
+      icon: Minus,
+      color: "text-orange-500 bg-orange-500/15",
+    };
+  }
+  if (side === "BUY") {
+    return {
+      label: "Bought",
+      icon: Plus,
+      color: "text-emerald-500 bg-emerald-500/15",
+    };
+  }
+  if (side === "SELL") {
+    return {
+      label: "Sold",
+      icon: Minus,
+      color: "text-muted-foreground bg-muted",
+    };
+  }
+  return {
+    label: type,
+    icon: FileText,
+    color: "text-muted-foreground bg-muted",
+  };
+}
+
+function HistoryTable({
+  trades,
+  isLoading,
+  searchQuery,
+}: {
+  trades: Trade[];
+  isLoading: boolean;
+  searchQuery: string;
+}) {
+  const filteredTrades = trades.filter((t) =>
+    t.market.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (filteredTrades.length === 0) {
+    return (
+      <EmptyState
+        icon={History}
+        title="No history found"
+        description={
+          searchQuery
+            ? "Try a different search term"
+            : "Your trading history will appear here"
+        }
+      />
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-[120px]">Activity</TableHead>
+          <TableHead>Market</TableHead>
+          <TableHead className="text-right w-[100px]">Value</TableHead>
+          <TableHead className="text-right w-[120px]">Time</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredTrades.map((trade) => {
+          const activityInfo = getActivityInfo(
+            trade.type,
+            trade.side,
+            trade.usdcAmount
+          );
+          const ActivityIcon = activityInfo.icon;
+          const isBuy = trade.side === "BUY";
+          const isRedeem = trade.type === "REDEEM";
+
+          return (
+            <TableRow key={trade.id}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${activityInfo.color}`}
+                  >
+                    <ActivityIcon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-sm font-medium">
+                    {activityInfo.label}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+                    {trade.market.icon ? (
+                      <Image
+                        src={trade.market.icon}
+                        alt={trade.market.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate max-w-[300px]">
+                      {trade.market.title}
+                    </p>
+                    {!isRedeem && (
+                      <p className="text-xs text-muted-foreground">
+                        <span
+                          className={
+                            trade.outcome === "Yes"
+                              ? "text-emerald-500"
+                              : "text-red-500"
+                          }
+                        >
+                          {trade.outcome} {formatPrice(trade.price)}
+                        </span>
+                        <span className="mx-1.5">·</span>
+                        {trade.size.toFixed(1)} shares
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <span
+                  className={`font-medium ${
+                    isBuy
+                      ? "text-red-500"
+                      : trade.usdcAmount > 0
+                      ? "text-emerald-500"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
+                  {trade.usdcAmount > 0
+                    ? formatCurrency(trade.usdcAmount)
+                    : "-"}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {timeAgo(trade.timestamp)}
+                  </span>
+                  <a
+                    href={`https://polygonscan.com/tx/${trade.transactionHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+// ============================================================================
+// Stats Card
+// ============================================================================
+
+function StatCard({
+  label,
+  value,
+  isLoading,
+  valueClassName,
+}: {
   label: string;
-  count?: number;
+  value: string;
+  isLoading?: boolean;
+  valueClassName?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-        active
-          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-      }`}
-    >
-      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-      <span className="hidden xs:inline">{label}</span>
-      <span className="xs:hidden">{label.slice(0, 3)}</span>
-      {count !== undefined && count > 0 && (
-        <span
-          className={`ml-0.5 sm:ml-1 px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full ${
-            active ? "bg-white/20" : "bg-primary/20 text-primary"
-          }`}
-        >
-          {count}
-        </span>
+    <div className="bg-card rounded-xl p-4 border border-border">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      {isLoading ? (
+        <Skeleton className="h-7 w-20" />
+      ) : (
+        <p className={`text-xl font-bold ${valueClassName || ""}`}>{value}</p>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -526,14 +805,13 @@ function TabButton({
 // ============================================================================
 
 export default function PortfolioPage() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address } = useConnection();
   const { open } = useAppKit();
-  const [activeTab, setActiveTab] = useState<"positions" | "trades" | "orders">(
-    "positions"
-  );
-  const [copied, setCopied] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("positions");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  // Polymarket proxy wallet
+  // Proxy wallet data
   const {
     proxyAddress,
     isDeployed: hasProxyWallet,
@@ -556,7 +834,7 @@ export default function PortfolioPage() {
     data: tradesData,
     isLoading: loadingTrades,
     refetch: refetchTrades,
-  } = useUserTrades({ limit: 50, userAddress: tradingAddress || undefined });
+  } = useUserTrades({ limit: 100, userAddress: tradingAddress || undefined });
 
   const {
     data: ordersData,
@@ -579,13 +857,16 @@ export default function PortfolioPage() {
     timePeriod: "all",
   });
 
-  const { mutate: cancelOrder, isPending: cancellingOrder } = useCancelOrder();
+  const { mutate: cancelOrder } = useCancelOrder();
+  const [cancellingOrderId, setCancellingOrderId] = useState<string>();
 
   // Handlers
-  const handleCopy = (addr: string, type: string) => {
-    navigator.clipboard.writeText(addr);
-    setCopied(type);
-    setTimeout(() => setCopied(null), 2000);
+  const handleCopy = () => {
+    if (proxyAddress) {
+      navigator.clipboard.writeText(proxyAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleRefresh = () => {
@@ -597,19 +878,25 @@ export default function PortfolioPage() {
     refreshProxyWallet();
   };
 
+  const handleCancelOrder = (orderId: string) => {
+    setCancellingOrderId(orderId);
+    cancelOrder(orderId, {
+      onSettled: () => setCancellingOrderId(undefined),
+    });
+  };
+
   // Computed values
+  const openPositionsValue = positionsData?.summary.totalValue ?? 0;
+  const cashBalance = proxyUsdcBalance ?? 0;
+  const portfolioValue = openPositionsValue + cashBalance;
   const totalPnl = userDetailsData?.details?.pnl || pnlData?.pnl.total || 0;
-  const totalVolume =
-    userDetailsData?.details?.volume || pnlData?.trading.totalBuyValue || 0;
-  const portfolioValue = pnlData?.portfolio.currentValue || 0;
-  const pnlTrend = totalPnl >= 0 ? "up" : "down";
 
   // Not connected state
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="container max-w-6xl mx-auto px-4 py-12">
+        <main className="container max-w-5xl mx-auto px-4 py-12">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -617,21 +904,20 @@ export default function PortfolioPage() {
           >
             <div className="relative">
               <div className="absolute inset-0 bg-linear-to-r from-violet-500 to-fuchsia-500 blur-3xl opacity-20" />
-              <div className="relative w-24 h-24 rounded-3xl bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center mb-8">
-                <Wallet className="h-12 w-12 text-white" />
+              <div className="relative w-20 h-20 rounded-2xl bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center mb-6">
+                <Wallet className="h-10 w-10 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold mb-3">Connect Your Wallet</h1>
-            <p className="text-muted-foreground mb-8 text-center max-w-md">
+            <h1 className="text-2xl font-bold mb-2">Connect Your Wallet</h1>
+            <p className="text-muted-foreground mb-6 text-center max-w-md text-sm">
               Connect your wallet to view your portfolio, track positions, and
               manage your trades.
             </p>
             <Button
-              size="lg"
               onClick={() => open()}
               className="bg-linear-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600"
             >
-              <Wallet className="mr-2 h-5 w-5" />
+              <Wallet className="mr-2 h-4 w-4" />
               Connect Wallet
             </Button>
           </motion.div>
@@ -646,310 +932,134 @@ export default function PortfolioPage() {
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="container max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6"
+        className="container max-w-5xl mx-auto px-4 py-6"
       >
         {/* Header */}
-        <div className="flex items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Portfolio</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Track your positions and trading activity
-            </p>
+            <h1 className="text-xl font-bold">Portfolio</h1>
+            {proxyAddress && (
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <code>{formatAddress(proxyAddress)}</code>
+                {copied ? (
+                  <Check className="h-3 w-3 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </button>
+            )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3 shrink-0"
-          >
-            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Refresh</span>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
         </div>
 
-        {/* Wallet Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {address && (
-            <WalletCard
-              label="Connected Wallet"
-              address={address}
-              onCopy={() => handleCopy(address, "eoa")}
-              copied={copied === "eoa"}
-            />
-          )}
-          {isProxyLoading ? (
-            <div className="rounded-2xl p-4 bg-card border border-border">
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-6 w-32" />
-            </div>
-          ) : hasProxyWallet && proxyAddress ? (
-            <WalletCard
-              label="Polymarket Trading Wallet"
-              address={proxyAddress}
-              balance={proxyUsdcBalance}
-              isPrimary
-              onCopy={() => handleCopy(proxyAddress, "proxy")}
-              copied={copied === "proxy"}
-            />
-          ) : (
-            <div className="rounded-2xl p-4 bg-card border border-dashed border-border flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                No Polymarket wallet deployed
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-          <StatPill
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <StatCard
             label="Portfolio Value"
             value={formatCurrency(portfolioValue)}
-            isLoading={loadingPnl}
+            isLoading={loadingPositions || isProxyLoading}
           />
-          <StatPill
-            label="Total P&L"
-            value={formatCurrency(totalPnl)}
-            change={pnlData?.pnl.roi}
-            trend={pnlTrend}
-            isLoading={loadingPnl || loadingUserDetails}
-          />
-          <StatPill
-            label="Volume"
-            value={formatCurrency(totalVolume, true)}
-            isLoading={loadingPnl || loadingUserDetails}
-          />
-          <StatPill
-            label="Positions"
-            value={positionsData?.summary.positionCount?.toString() || "0"}
+          <StatCard
+            label="Open Positions"
+            value={formatCurrency(openPositionsValue)}
             isLoading={loadingPositions}
+          />
+          <StatCard
+            label="Cash"
+            value={formatCurrency(cashBalance)}
+            isLoading={isProxyLoading}
+          />
+          <StatCard
+            label="Total P&L"
+            value={formatCurrency(totalPnl, true)}
+            isLoading={loadingPnl || loadingUserDetails}
+            valueClassName={totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}
           />
         </div>
 
         {/* P&L Chart */}
-        <PnLChart userAddress={tradingAddress || undefined} height={200} />
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 sm:gap-2 p-0.5 sm:p-1 bg-muted/50 rounded-xl sm:rounded-2xl w-fit overflow-x-auto">
-          <TabButton
-            active={activeTab === "positions"}
-            onClick={() => setActiveTab("positions")}
-            icon={LayoutGrid}
-            label="Positions"
-            count={positionsData?.summary.positionCount}
-          />
-          <TabButton
-            active={activeTab === "trades"}
-            onClick={() => setActiveTab("trades")}
-            icon={History}
-            label="History"
-          />
-          <TabButton
-            active={activeTab === "orders"}
-            onClick={() => setActiveTab("orders")}
-            icon={ListOrdered}
-            label="Orders"
-            count={ordersData?.count}
-          />
+        <div className="mb-6">
+          <PnLChart userAddress={tradingAddress || undefined} height={160} />
         </div>
 
-        {/* Tab Content */}
-        <AnimatePresence mode="wait">
-          {activeTab === "positions" && (
-            <motion.div
-              key="positions"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-3"
-            >
-              {loadingPositions ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border"
-                    >
-                      <Skeleton className="w-12 h-12 rounded-xl" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                      <Skeleton className="h-6 w-20" />
-                    </div>
-                  ))}
-                </div>
-              ) : !positionsData?.positions.length ? (
-                <EmptyState
-                  icon={LayoutGrid}
-                  title="No Positions"
-                  description="You don't have any open positions yet. Start trading to see your portfolio here."
-                  action={{ label: "Browse Markets", href: "/" }}
-                />
-              ) : (
-                <>
-                  {positionsData.positions.map((position) => (
-                    <PositionRow
-                      key={position.id}
-                      position={position}
-                      onNavigate={() => {
-                        window.location.href = `/markets/${position.market.slug}`;
-                      }}
-                    />
-                  ))}
+        {/* Tabs Content */}
+        <div className="bg-card rounded-xl border border-border">
+          {/* Tab Navigation */}
+          <TabNav
+            activeTab={activeTab}
+            onTabChange={(tab) => {
+              setActiveTab(tab);
+              setSearchQuery("");
+            }}
+            positionCount={positionsData?.summary.positionCount}
+            orderCount={ordersData?.count}
+          />
 
-                  {/* Summary Card */}
-                  <div className="mt-6 p-4 rounded-xl bg-linear-to-r from-violet-500/10 to-fuchsia-500/10 border border-purple-500/20">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Total Value
-                        </p>
-                        <p className="text-lg font-bold">
-                          {formatCurrency(positionsData.summary.totalValue)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Unrealized P&L
-                        </p>
-                        <p
-                          className={`text-lg font-bold ${
-                            positionsData.summary.totalUnrealizedPnl >= 0
-                              ? "text-emerald-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {formatCurrency(
-                            positionsData.summary.totalUnrealizedPnl
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Realized P&L
-                        </p>
-                        <p
-                          className={`text-lg font-bold ${
-                            positionsData.summary.totalRealizedPnl >= 0
-                              ? "text-emerald-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {formatCurrency(
-                            positionsData.summary.totalRealizedPnl
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Active Positions
-                        </p>
-                        <p className="text-lg font-bold">
-                          {positionsData.summary.positionCount}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
+          {/* Search Bar */}
+          <div className="p-4 border-b border-border">
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search"
+            />
+          </div>
 
-          {activeTab === "trades" && (
-            <motion.div
-              key="trades"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="rounded-xl bg-card border border-border overflow-hidden"
-            >
-              {loadingTrades ? (
-                <div className="p-4 space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <Skeleton className="w-14 h-6 rounded" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                      <Skeleton className="h-5 w-16" />
-                    </div>
-                  ))}
-                </div>
-              ) : !tradesData?.trades.length ? (
-                <EmptyState
-                  icon={History}
-                  title="No Trade History"
-                  description="Your trading history will appear here once you make your first trade."
-                  action={{ label: "Start Trading", href: "/" }}
+          {/* Tab Content */}
+          <AnimatePresence mode="wait">
+            {activeTab === "positions" && (
+              <motion.div
+                key="positions"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <PositionsTable
+                  positions={positionsData?.positions || []}
+                  isLoading={loadingPositions}
+                  searchQuery={searchQuery}
                 />
-              ) : (
-                <div className="divide-y divide-border">
-                  <div className="px-4 py-3 bg-muted/30">
-                    <p className="text-sm font-medium">Recent Trades</p>
-                  </div>
-                  <div className="px-4">
-                    {tradesData.trades.slice(0, 20).map((trade) => (
-                      <TradeRow key={trade.id} trade={trade} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {activeTab === "orders" && (
-            <motion.div
-              key="orders"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="rounded-xl bg-card border border-border overflow-hidden"
-            >
-              {loadingOrders ? (
-                <div className="p-4 space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <Skeleton className="w-14 h-6 rounded" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                      <Skeleton className="h-8 w-8 rounded" />
-                    </div>
-                  ))}
-                </div>
-              ) : !ordersData?.orders.length ? (
-                <EmptyState
-                  icon={ListOrdered}
-                  title="No Open Orders"
-                  description="You don't have any pending orders. Place a limit order to see it here."
-                  action={{ label: "Place Order", href: "/" }}
+            {activeTab === "orders" && (
+              <motion.div
+                key="orders"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <OrdersTable
+                  orders={ordersData?.orders || []}
+                  isLoading={loadingOrders}
+                  searchQuery={searchQuery}
+                  onCancel={handleCancelOrder}
+                  cancellingOrderId={cancellingOrderId}
                 />
-              ) : (
-                <div className="divide-y divide-border">
-                  <div className="px-4 py-3 bg-muted/30 flex items-center justify-between">
-                    <p className="text-sm font-medium">Open Orders</p>
-                    <p className="text-xs text-muted-foreground">
-                      {ordersData.count} orders
-                    </p>
-                  </div>
-                  <div className="px-4">
-                    {ordersData.orders.map((order) => (
-                      <OrderRow
-                        key={order.id}
-                        order={order}
-                        onCancel={() => cancelOrder(order.id)}
-                        isCancelling={cancellingOrder}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+
+            {activeTab === "history" && (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <HistoryTable
+                  trades={tradesData?.trades || []}
+                  isLoading={loadingTrades}
+                  searchQuery={searchQuery}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.main>
     </div>
   );

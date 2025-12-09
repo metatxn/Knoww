@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 import { useClobClient } from "./use-clob-client";
 import { useClobCredentials } from "./use-clob-credentials";
 
@@ -49,7 +49,7 @@ export interface UseOpenOrdersOptions {
  * @returns Query result with open orders
  */
 export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const { hasCredentials } = useClobCredentials();
   const { getOpenOrders } = useClobClient();
 
@@ -145,7 +145,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
  * @returns Mutation for canceling orders
  */
 export function useCancelOrder() {
-  const { address } = useAccount();
+  const { address } = useConnection();
   const { cancelOrder } = useClobClient();
   const queryClient = useQueryClient();
 
@@ -169,7 +169,7 @@ export function useCancelOrder() {
  * @returns Mutation for canceling all orders
  */
 export function useCancelAllOrders() {
-  const { address } = useAccount();
+  const { address } = useConnection();
   const { getOpenOrders, cancelOrder } = useClobClient();
   const queryClient = useQueryClient();
 

@@ -58,27 +58,14 @@ const optionalNumber = z
     return Number(val);
   });
 
-const optionalBoolean = z
-  .union([z.string(), z.boolean()])
-  .optional()
-  .nullable()
-  .transform((val) => {
-    if (val === null || val === "" || val === undefined) return undefined;
-    if (typeof val === "boolean") return val;
-    return val === "true";
-  });
-
 /**
  * Validation schema for query parameters
  */
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
-  limit: optionalNumber.pipe(
-    z.number().min(1).max(100).optional().default(100)
-  ),
+  limit: optionalNumber.pipe(z.number().min(1).max(100).optional().default(50)),
   offset: optionalNumber.pipe(z.number().min(0).optional().default(0)),
   sizeThreshold: optionalNumber.pipe(z.number().optional().default(0.1)),
-  redeemable: optionalBoolean.pipe(z.boolean().optional().default(true)),
   market: optionalString,
 });
 
@@ -86,18 +73,18 @@ const querySchema = z.object({
  * GET /api/user/positions
  *
  * Fetch current positions for a user from Polymarket Data API
- * Uses the exact endpoint format: /positions?user={address}&sizeThreshold=.1&redeemable=true&limit=100&offset=0
+ * Uses the exact endpoint format Polymarket uses:
+ * /positions?user={address}&sizeThreshold=.1&limit=50&offset=0&sortBy=CURRENT&sortDirection=DESC
  *
  * Query Parameters:
  * - user: User's wallet address (required)
- * - limit: Number of positions to return (default: 100, max: 100)
+ * - limit: Number of positions to return (default: 50, max: 100)
  * - offset: Pagination offset (default: 0)
  * - sizeThreshold: Minimum position size (default: 0.1)
- * - redeemable: Include redeemable positions (default: true)
  * - market: Filter by market/condition ID (optional)
  *
  * Response:
- * - positions: Array of position objects with market details
+ * - positions: Array of OPEN position objects (filters out resolved/lost positions)
  * - totalValue: Total value of all positions
  * - totalPnl: Total unrealized P&L
  * - count: Number of positions returned
@@ -112,7 +99,6 @@ export async function GET(request: NextRequest) {
       limit: searchParams.get("limit"),
       offset: searchParams.get("offset"),
       sizeThreshold: searchParams.get("sizeThreshold"),
-      redeemable: searchParams.get("redeemable"),
       market: searchParams.get("market"),
     });
 
@@ -127,36 +113,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { user, limit, offset, sizeThreshold, redeemable, market } =
-      parsed.data;
+    const { user, limit, offset, sizeThreshold, market } = parsed.data;
 
     // Build query URL using exact Polymarket format
+    // Polymarket uses: ?user=...&sizeThreshold=.1&limit=50&offset=0&sortBy=CURRENT&sortDirection=DESC
     const queryParams = new URLSearchParams({
       user: user.toLowerCase(),
       sizeThreshold: sizeThreshold.toString(),
-      redeemable: redeemable.toString(),
       limit: limit.toString(),
       offset: offset.toString(),
+      sortBy: "CURRENT",
+      sortDirection: "DESC",
     });
 
     if (market) {
       queryParams.set("market", market);
     }
 
+    const fullUrl = `${DATA_API_BASE}/positions?${queryParams.toString()}`;
+
     // Fetch positions from Polymarket Data API
-    const response = await fetch(
-      `${DATA_API_BASE}/positions?${queryParams.toString()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-        next: { revalidate: 30 }, // Cache for 30 seconds
-      }
-    );
+    const response = await fetch(fullUrl, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Polymarket API error:", errorText);
+      console.error("[positions] API error:", errorText);
       return NextResponse.json(
         {
           success: false,
@@ -167,7 +153,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const positions: PolymarketPosition[] = await response.json();
+    const allPositions: PolymarketPosition[] = await response.json();
+
+    // Filter to show only OPEN positions (not redeemable = market not resolved)
+    // - redeemable: false = market is still open/active (show these)
+    // - redeemable: true = market is resolved (hide unless won)
+    // - curPrice > 0 = position has value
+    // - curPrice = 0 = position is worthless (lost bet on resolved market)
+    const positions = allPositions.filter((p) => {
+      const isOpenPosition = !p.redeemable;
+      const isWinningRedeemable = p.redeemable && p.curPrice > 0;
+      return isOpenPosition || isWinningRedeemable;
+    });
 
     // Calculate totals using actual field names from API
     const totalValue = positions.reduce(

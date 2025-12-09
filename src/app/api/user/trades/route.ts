@@ -136,20 +136,19 @@ export async function GET(request: NextRequest) {
       queryParams.set("market", market);
     }
 
+    const fullUrl = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
+
     // Fetch activity from Polymarket Data API
-    const response = await fetch(
-      `${DATA_API_BASE}/activity?${queryParams.toString()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-        next: { revalidate: 30 }, // Cache for 30 seconds
-      }
-    );
+    const response = await fetch(fullUrl, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Polymarket API error:", errorText);
+      console.error("[trades] API error:", errorText);
       return NextResponse.json(
         {
           success: false,

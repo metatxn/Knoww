@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useConnection, useSignTypedData } from "wagmi";
 
 /**
  * EIP-712 Domain for CLOB Authentication (L1)
@@ -110,8 +110,8 @@ function clearStoredCredentials(address: string): void {
  * Credentials are derived by signing an EIP-712 message.
  */
 export function useClobCredentials() {
-  const { address, isConnected } = useAccount();
-  const { signTypedDataAsync } = useSignTypedData();
+  const { address, isConnected } = useConnection();
+  const signTypedData = useSignTypedData();
 
   const [credentials, setCredentials] = useState<ApiKeyCreds | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -149,31 +149,17 @@ export function useClobCredentials() {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = 0; // Default nonce is 0
 
-    console.log("[ClobCredentials] Generating L1 signature:", {
-      address,
-      timestamp,
-      nonce,
-      message: MSG_TO_SIGN,
-      domain: CLOB_AUTH_DOMAIN,
-    });
-
     // Sign the EIP-712 typed data
-    // Note: wagmi's signTypedDataAsync handles uint256 as either number or bigint
-    const signature = await signTypedDataAsync({
+    const signature = await signTypedData.mutateAsync({
       domain: CLOB_AUTH_DOMAIN,
       types: CLOB_AUTH_TYPES,
       primaryType: "ClobAuth",
       message: {
         address: address as `0x${string}`,
-        timestamp: `${timestamp}`, // Must be string in the message (matches SDK)
-        nonce: BigInt(nonce), // wagmi requires BigInt for uint256, but value is same
+        timestamp: `${timestamp}`,
+        nonce: BigInt(nonce),
         message: MSG_TO_SIGN,
       },
-    });
-
-    console.log("[ClobCredentials] Signature generated:", {
-      signature,
-      signatureLength: signature.length,
     });
 
     return {
@@ -181,7 +167,7 @@ export function useClobCredentials() {
       timestamp: `${timestamp}`, // Return as string for headers
       nonce: `${nonce}`, // Return as string for headers
     };
-  }, [address, signTypedDataAsync]);
+  }, [address, signTypedData]);
 
   /**
    * Create or derive API credentials from L1 authentication
@@ -201,13 +187,6 @@ export function useClobCredentials() {
     try {
       // Generate L1 signature
       const { signature, timestamp, nonce } = await generateL1Signature();
-
-      console.log("[ClobCredentials] Deriving credentials with:", {
-        address,
-        timestamp,
-        nonce,
-        signatureLength: signature.length,
-      });
 
       // Call our API to derive credentials
       const response = await fetch("/api/auth/derive-api-key", {
@@ -233,14 +212,6 @@ export function useClobCredentials() {
           passphrase?: string;
         };
       };
-
-      console.log("[ClobCredentials] API response:", {
-        status: response.status,
-        success: data.success,
-        error: data.error,
-        details: data.details,
-        hasCredentials: !!data.credentials,
-      });
 
       if (!response.ok || !data.success) {
         // Provide helpful error messages based on the error
@@ -269,11 +240,8 @@ export function useClobCredentials() {
       storeCredentials(address, creds);
       setCredentials(creds);
 
-      console.log("[ClobCredentials] Credentials derived successfully");
-
       return creds;
     } catch (err) {
-      console.error("[ClobCredentials] Error deriving credentials:", err);
       const error =
         err instanceof Error ? err : new Error("Failed to derive credentials");
       setError(error);

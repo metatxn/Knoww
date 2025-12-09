@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { useConnection } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +46,7 @@ export function TradingOnboarding({
   onComplete,
   onSkip,
 }: TradingOnboardingProps) {
-  const { isConnected } = useAccount();
+  const { isConnected } = useConnection();
   const { open } = useAppKit();
   const {
     deploySafe,
@@ -134,13 +134,8 @@ export function TradingOnboarding({
       const result = await getUsdcAllowance();
       // Consider approved if allowance is greater than 0 (any approval exists)
       const isApproved = result && result.allowance > 0;
-      console.log("[Onboarding] USDC allowance check:", {
-        allowance: result?.allowance,
-        isApproved,
-      });
       setHasUsdcApproval(isApproved);
-    } catch (err) {
-      console.error("[Onboarding] Failed to check USDC approval:", err);
+    } catch {
       setHasUsdcApproval(false);
     } finally {
       setIsCheckingApproval(false);
@@ -275,7 +270,6 @@ export function TradingOnboarding({
   // Update approve step if USDC is already approved (for returning users only)
   useEffect(() => {
     if (hasUsdcApproval === true && steps[2].status !== "completed") {
-      console.log("[Onboarding] USDC already approved, marking step complete");
       updateStepStatus("approve", "completed");
       // Move to credentials step
       if (currentStep < 3) {

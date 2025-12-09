@@ -19,10 +19,15 @@ interface PositionData {
   size: string;
   avgPrice: string;
   currentPrice: string;
+  curPrice: number;
   realizedPnl: string;
   unrealizedPnl: string;
   curValue: string;
   initialValue: string;
+  currentValue: number;
+  cashPnl: number;
+  percentPnl: number;
+  redeemable: boolean;
   outcome: string;
   title: string;
   slug: string;
@@ -153,9 +158,9 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Fetch current positions
+    // Fetch current positions (use same params as Polymarket)
     const positionsResponse = await fetch(
-      `${DATA_API_BASE}/positions?user=${user.toLowerCase()}&limit=100`,
+      `${DATA_API_BASE}/positions?user=${user.toLowerCase()}&sizeThreshold=.1&redeemable=true&limit=100&offset=0`,
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 60 },
@@ -166,7 +171,16 @@ export async function GET(request: NextRequest) {
       throw new Error("Failed to fetch positions");
     }
 
-    const positions: PositionData[] = await positionsResponse.json();
+    const allPositions: PositionData[] = await positionsResponse.json();
+
+    // Filter to show only OPEN positions
+    // - redeemable: false = market is still open/active
+    // - redeemable: true with curPrice > 0 = won bet, can redeem
+    const positions = allPositions.filter((p) => {
+      const isOpenPosition = !p.redeemable;
+      const isWinningRedeemable = p.redeemable && p.curPrice > 0;
+      return isOpenPosition || isWinningRedeemable;
+    });
 
     // Fetch trade history
     const tradesResponse = await fetch(
