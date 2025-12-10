@@ -295,7 +295,7 @@ export function PnLChart({
   height = 220,
   showIntervalSelector = true,
 }: PnLChartProps) {
-  const [interval, setInterval] = useState<PnLInterval>("1m");
+  const [interval, setInterval] = useState<PnLInterval>("all");
 
   const { data, isLoading, error } = usePnLHistory({
     userAddress,
