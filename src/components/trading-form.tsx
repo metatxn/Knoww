@@ -65,10 +65,58 @@ export interface TradingFormProps {
   negRisk?: boolean;
   /** User's USDC balance (optional) */
   userBalance?: number;
+  /** Market tick size (default: 0.01) */
+  tickSize?: number;
+  /** Market minimum order size in USDC (default: 1) */
+  minOrderSize?: number;
+  /** Best bid price from order book (for spread warning) */
+  bestBid?: number;
+  /** Best ask price from order book (for spread warning) */
+  bestAsk?: number;
+  /** Max slippage for market orders (default: 0.02 = 2%) */
+  maxSlippage?: number;
   /** Callback after successful order submission */
   onOrderSuccess?: (order: unknown) => void;
   /** Callback after order error */
   onOrderError?: (error: Error) => void;
+}
+
+/**
+ * Default max slippage for market orders (2%)
+ * This prevents users from accidentally eating through the entire order book
+ */
+const DEFAULT_MAX_SLIPPAGE = 0.02;
+
+/**
+ * Round price to nearest tick size
+ */
+function roundToTick(price: number, tickSize: number): number {
+  return Math.round(price / tickSize) * tickSize;
+}
+
+/**
+ * Check if price crosses the book significantly (> 5% from best price)
+ */
+function isPriceCrossingBook(
+  price: number,
+  side: "BUY" | "SELL",
+  bestBid?: number,
+  bestAsk?: number
+): { isCrossing: boolean; percentAbove?: number } {
+  if (side === "BUY" && bestAsk !== undefined) {
+    // For BUY orders, check if price is significantly above best ask
+    if (price > bestAsk) {
+      const percentAbove = ((price - bestAsk) / bestAsk) * 100;
+      return { isCrossing: percentAbove > 5, percentAbove };
+    }
+  } else if (side === "SELL" && bestBid !== undefined) {
+    // For SELL orders, check if price is significantly below best bid
+    if (price < bestBid) {
+      const percentBelow = ((bestBid - price) / bestBid) * 100;
+      return { isCrossing: percentBelow > 5, percentAbove: -percentBelow };
+    }
+  }
+  return { isCrossing: false };
 }
 
 /**
@@ -102,6 +150,11 @@ export function TradingForm({
   onOutcomeChange,
   negRisk = false,
   userBalance,
+  tickSize = 0.01,
+  minOrderSize = 1,
+  bestBid,
+  bestAsk,
+  maxSlippage = DEFAULT_MAX_SLIPPAGE,
   onOrderSuccess,
   onOrderError,
 }: TradingFormProps) {
@@ -148,10 +201,29 @@ export function TradingForm({
     }
   }, [selectedOutcome]);
 
+  // Calculate market order price with slippage protection
+  // For "market buy": use best ask + maxSlippage (but cap at 0.99)
+  // For "market sell": use best bid - maxSlippage (but floor at 0.01)
+  // This creates an aggressive limit order that crosses the spread but doesn't eat the entire book
+  const marketOrderPrice = useMemo(() => {
+    if (side === "BUY") {
+      // Use best ask + slippage, or fallback to outcome price + slippage
+      const basePrice = bestAsk ?? selectedOutcome?.price ?? 0.5;
+      const priceWithSlippage = basePrice + maxSlippage;
+      return Math.min(0.99, roundToTick(priceWithSlippage, tickSize));
+    } else {
+      // Use best bid - slippage, or fallback to outcome price - slippage
+      const basePrice = bestBid ?? selectedOutcome?.price ?? 0.5;
+      const priceWithSlippage = basePrice - maxSlippage;
+      return Math.max(0.01, roundToTick(priceWithSlippage, tickSize));
+    }
+  }, [side, bestAsk, bestBid, selectedOutcome?.price, maxSlippage, tickSize]);
+
   // Calculate costs and potential returns
   const calculations = useMemo(() => {
-    const price =
-      orderType === "MARKET" ? selectedOutcome?.price || 0.5 : limitPrice;
+    // For market orders, use the calculated market price with slippage
+    // For limit orders, use the user-specified limit price
+    const price = orderType === "MARKET" ? marketOrderPrice : limitPrice;
     const orderSide = side === "BUY" ? OrderSide.BUY : OrderSide.SELL;
     const pnl = calculatePotentialPnL(price, shares, orderSide);
 
@@ -163,7 +235,7 @@ export function TradingForm({
       returnPercent:
         pnl.cost > 0 ? ((pnl.potentialWin / pnl.cost) * 100).toFixed(1) : "0",
     };
-  }, [side, orderType, limitPrice, shares, selectedOutcome]);
+  }, [side, orderType, limitPrice, marketOrderPrice, shares]);
 
   // Fetch USDC balance from the PROXY WALLET (not EOA)
   // Trading funds are held in the proxy wallet, so we need to check that balance
@@ -210,13 +282,18 @@ export function TradingForm({
     }
   }, [updateAllowance, refetchBalance, refetchAllowance, onOrderError]);
 
-  // Handle price change with bounds
-  const handlePriceChange = useCallback((delta: number) => {
-    setLimitPrice((prev) => {
-      const newPrice = Math.round((prev + delta) * 100) / 100;
-      return Math.max(0.01, Math.min(0.99, newPrice));
-    });
-  }, []);
+  // Handle price change with bounds and tick size
+  const handlePriceChange = useCallback(
+    (delta: number) => {
+      setLimitPrice((prev) => {
+        // Use tick size for delta (default 0.01)
+        const actualDelta = delta > 0 ? tickSize : -tickSize;
+        const newPrice = roundToTick(prev + actualDelta, tickSize);
+        return Math.max(tickSize, Math.min(1 - tickSize, newPrice));
+      });
+    },
+    [tickSize]
+  );
 
   // Handle shares change with bounds
   const handleSharesChange = useCallback((delta: number) => {
@@ -240,13 +317,23 @@ export function TradingForm({
 
     try {
       // Determine order type and expiration
-      // - GTC (Good Till Cancelled): expiration = 0
-      // - FOK (Fill Or Kill): expiration = 0
-      // - GTD (Good Till Date): expiration = timestamp
-      const isGTD = useExpiration;
+      // Polymarket only supports limit orders, but we simulate "market" orders
+      // by using aggressive limit prices with FOK (Fill Or Kill)
+      //
+      // Order Types:
+      // - GTC (Good Till Cancelled): limit order that stays until filled/cancelled
+      // - GTD (Good Till Date): limit order with expiration timestamp
+      // - FOK (Fill Or Kill): must fill immediately or cancel (used for "market" orders)
+      //
+      // For "market" orders:
+      // - BUY: use best ask + maxSlippage as limit price
+      // - SELL: use best bid - maxSlippage as limit price
+      // This creates an aggressive limit order that should fill immediately
+      // but won't eat through the entire order book
+      const isGTD = useExpiration && orderType === "LIMIT";
       const clobOrderType =
         orderType === "MARKET"
-          ? ClobOrderType.FOK
+          ? ClobOrderType.FOK // Market orders use FOK for immediate execution
           : isGTD
           ? ClobOrderType.GTD
           : ClobOrderType.GTC;
@@ -256,9 +343,12 @@ export function TradingForm({
         ? Math.floor(Date.now() / 1000) + expirationHours * 60 * 60
         : 0;
 
+      // Use the calculated price (includes slippage for market orders)
+      const orderPrice = orderType === "MARKET" ? marketOrderPrice : limitPrice;
+
       const result = await createOrder({
         tokenId: selectedOutcome.tokenId,
-        price: orderType === "MARKET" ? selectedOutcome.price : limitPrice,
+        price: orderPrice,
         size: shares,
         side: side === "BUY" ? Side.BUY : Side.SELL,
         orderType: clobOrderType,
@@ -283,6 +373,7 @@ export function TradingForm({
     side,
     orderType,
     limitPrice,
+    marketOrderPrice,
     shares,
     useExpiration,
     expirationHours,
@@ -299,9 +390,14 @@ export function TradingForm({
   const hasInsufficientBalance =
     effectiveBalance !== undefined && calculations.total > effectiveBalance;
 
-  // Polymarket minimum order size is $1
-  const MIN_ORDER_SIZE = 1;
-  const isBelowMinimum = calculations.total < MIN_ORDER_SIZE;
+  // Check minimum order size (use prop or default to $1)
+  const isBelowMinimum = calculations.total < minOrderSize;
+
+  // Check if price crosses the book significantly
+  const spreadWarning = useMemo(() => {
+    if (orderType === "MARKET") return null; // Market orders always cross
+    return isPriceCrossingBook(limitPrice, side, bestBid, bestAsk);
+  }, [orderType, limitPrice, side, bestBid, bestAsk]);
 
   return (
     <Card className="sticky top-4 w-full">
@@ -416,8 +512,8 @@ export function TradingForm({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
-                onClick={() => handlePriceChange(-0.01)}
-                disabled={limitPrice <= 0.01}
+                onClick={() => handlePriceChange(-1)}
+                disabled={limitPrice <= tickSize}
               >
                 <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
@@ -428,12 +524,16 @@ export function TradingForm({
                   onChange={(e) => {
                     const val = Number.parseFloat(e.target.value);
                     if (!Number.isNaN(val)) {
-                      setLimitPrice(Math.max(0.01, Math.min(0.99, val)));
+                      // Round to nearest tick and clamp to valid range
+                      const rounded = roundToTick(val, tickSize);
+                      setLimitPrice(
+                        Math.max(tickSize, Math.min(1 - tickSize, rounded))
+                      );
                     }
                   }}
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
+                  min={tickSize}
+                  max={1 - tickSize}
+                  step={tickSize}
                   className="text-center text-base sm:text-lg font-semibold h-9 sm:h-10"
                 />
               </div>
@@ -442,8 +542,8 @@ export function TradingForm({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
-                onClick={() => handlePriceChange(0.01)}
-                disabled={limitPrice >= 0.99}
+                onClick={() => handlePriceChange(1)}
+                disabled={limitPrice >= 1 - tickSize}
               >
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
@@ -457,15 +557,30 @@ export function TradingForm({
         {/* Market Price Display (for market orders) */}
         {orderType === "MARKET" && selectedOutcome && (
           <div className="space-y-2">
-            <label className="text-xs sm:text-sm font-medium">
-              Market Price
-            </label>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+              <label className="text-xs sm:text-sm font-medium">
+                Market Price
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {(maxSlippage * 100).toFixed(0)}% max slippage
+              </span>
+            </div>
             <div className="text-center py-2.5 sm:py-3 bg-muted/50 rounded-lg">
               <span className="text-xl sm:text-2xl font-bold">
-                {formatCents(selectedOutcome.price)}
+                {formatCents(marketOrderPrice)}
               </span>
               <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                Best available price
+                {side === "BUY" ? (
+                  <>
+                    Best ask: {bestAsk ? formatCents(bestAsk) : "N/A"} +
+                    slippage
+                  </>
+                ) : (
+                  <>
+                    Best bid: {bestBid ? formatCents(bestBid) : "N/A"} -
+                    slippage
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -546,11 +661,22 @@ export function TradingForm({
           </div>
         </div>
 
-        {/* Expiration Toggle (only for limit orders) */}
+        {/* Order Duration (only for limit orders) */}
         {orderType === "LIMIT" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Set Expiration</span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  {useExpiration
+                    ? "Good Till Date (GTD)"
+                    : "Good Till Cancelled (GTC)"}
+                </span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                  {useExpiration
+                    ? "Order expires after set time"
+                    : "Order stays until filled or cancelled"}
+                </span>
+              </div>
               <button
                 type="button"
                 className={`relative h-6 w-11 rounded-full transition-colors ${
@@ -584,6 +710,14 @@ export function TradingForm({
                 </SelectContent>
               </Select>
             )}
+          </div>
+        )}
+
+        {/* Market Order Info */}
+        {orderType === "MARKET" && (
+          <div className="text-[10px] sm:text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+            <strong>Fill or Kill (FOK):</strong> Order must fill immediately at
+            the shown price or better, otherwise it will be cancelled.
           </div>
         )}
 
@@ -635,10 +769,12 @@ export function TradingForm({
             <div className="flex flex-col gap-1">
               <span>
                 Insufficient USDC.e balance. You need $
-                {(calculations.total - (effectiveBalance || 0)).toFixed(2)} more.
+                {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
+                more.
               </span>
               <span className="text-xs opacity-75">
-                Deposit USDC.e (bridged USDC) to your trading wallet to continue.
+                Deposit USDC.e (bridged USDC) to your trading wallet to
+                continue.
               </span>
             </div>
           </motion.div>
@@ -680,6 +816,26 @@ export function TradingForm({
             </motion.div>
           )}
 
+        {/* Spread Warning - Price crossing the book */}
+        {spreadWarning?.isCrossing && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-sm"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              {side === "BUY"
+                ? `You're paying ${Math.abs(
+                    spreadWarning.percentAbove || 0
+                  ).toFixed(1)}% above the best ask price.`
+                : `You're selling ${Math.abs(
+                    spreadWarning.percentAbove || 0
+                  ).toFixed(1)}% below the best bid price.`}
+            </span>
+          </motion.div>
+        )}
+
         {/* Minimum Order Size Warning */}
         {isBelowMinimum && !hasInsufficientBalance && (
           <motion.div
@@ -689,7 +845,7 @@ export function TradingForm({
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>
-              Minimum order size is $1. Current order: $
+              Minimum order size is ${minOrderSize}. Current order: $
               {calculations.total.toFixed(2)}
             </span>
           </motion.div>
