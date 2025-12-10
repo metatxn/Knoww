@@ -190,45 +190,53 @@ export default function EventDetailPage() {
     refetchInterval: 5000,
   });
 
-  // Extract best bid, ask, tick_size, and min_order_size from order book
-  const { bestBid, bestAsk, tickSize, minOrderSize } = useMemo(() => {
-    if (!orderBookData?.orderBook) {
+  // Extract best bid, ask, tick_size, min_order_size, and full order book for slippage
+  const { bestBid, bestAsk, tickSize, minOrderSize, orderBook } =
+    useMemo(() => {
+      if (!orderBookData?.orderBook) {
+        return {
+          bestBid: undefined,
+          bestAsk: undefined,
+          tickSize: 0.01,
+          minOrderSize: 1,
+          orderBook: undefined,
+        };
+      }
+
+      const ob = orderBookData.orderBook;
+      const bids = ob.bids || [];
+      const asks = ob.asks || [];
+
+      const sortedBids = [...bids].sort(
+        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
+      );
+      const sortedAsks = [...asks].sort(
+        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
+      );
+
+      const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
+      const bestAskLevel = sortedAsks.length > 0 ? sortedAsks[0] : null;
+
+      const tickSizeValue = ob.tick_size
+        ? Number.parseFloat(ob.tick_size)
+        : 0.01;
+      const minOrderSizeValue = ob.min_order_size
+        ? Number.parseFloat(ob.min_order_size)
+        : 1;
+
       return {
-        bestBid: undefined,
-        bestAsk: undefined,
-        tickSize: 0.01,
-        minOrderSize: 1,
+        bestBid: bestBidLevel
+          ? Number.parseFloat(bestBidLevel.price)
+          : undefined,
+        bestAsk: bestAskLevel
+          ? Number.parseFloat(bestAskLevel.price)
+          : undefined,
+        tickSize: tickSizeValue,
+        minOrderSize: minOrderSizeValue,
+        // Pass the full order book for slippage calculation
+        orderBook: { bids, asks },
       };
-    }
-
-    const orderBook = orderBookData.orderBook;
-    const bids = orderBook.bids || [];
-    const asks = orderBook.asks || [];
-
-    const sortedBids = [...bids].sort(
-      (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
-    );
-    const sortedAsks = [...asks].sort(
-      (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
-    );
-
-    const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
-    const bestAskLevel = sortedAsks.length > 0 ? sortedAsks[0] : null;
-
-    const tickSizeValue = orderBook.tick_size
-      ? Number.parseFloat(orderBook.tick_size)
-      : 0.01;
-    const minOrderSizeValue = orderBook.min_order_size
-      ? Number.parseFloat(orderBook.min_order_size)
-      : 1;
-
-    return {
-      bestBid: bestBidLevel ? Number.parseFloat(bestBidLevel.price) : undefined,
-      bestAsk: bestAskLevel ? Number.parseFloat(bestAskLevel.price) : undefined,
-      tickSize: tickSizeValue,
-      minOrderSize: minOrderSizeValue,
-    };
-  }, [orderBookData]);
+    }, [orderBookData]);
 
   // Loading state - AFTER all hooks
   if (loading) {
@@ -727,6 +735,8 @@ export default function EventDetailPage() {
                 minOrderSize={minOrderSize}
                 bestBid={bestBid}
                 bestAsk={bestAsk}
+                orderBook={orderBook}
+                maxSlippagePercent={2}
                 onOrderSuccess={handleOrderSuccess}
                 onOrderError={handleOrderError}
               />

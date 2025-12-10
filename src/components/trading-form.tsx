@@ -36,6 +36,14 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { TradingOnboarding } from "@/components/trading-onboarding";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
+import {
+  calculateSlippage,
+  formatSlippageDisplay,
+  roundUpToTick,
+  roundDownToTick,
+  type OrderBook,
+  type SlippageResult,
+} from "@/lib/slippage";
 
 /**
  * Outcome data for the trading form
@@ -73,8 +81,10 @@ export interface TradingFormProps {
   bestBid?: number;
   /** Best ask price from order book (for spread warning) */
   bestAsk?: number;
-  /** Max slippage for market orders (default: 0.02 = 2%) */
-  maxSlippage?: number;
+  /** Full order book for slippage calculation */
+  orderBook?: OrderBook;
+  /** Max slippage percentage for market orders (default: 2 = 2%) */
+  maxSlippagePercent?: number;
   /** Callback after successful order submission */
   onOrderSuccess?: (order: unknown) => void;
   /** Callback after order error */
@@ -83,9 +93,8 @@ export interface TradingFormProps {
 
 /**
  * Default max slippage for market orders (2%)
- * This prevents users from accidentally eating through the entire order book
  */
-const DEFAULT_MAX_SLIPPAGE = 0.02;
+const DEFAULT_MAX_SLIPPAGE_PERCENT = 2;
 
 /**
  * Round price to nearest tick size
@@ -154,7 +163,8 @@ export function TradingForm({
   minOrderSize = 1,
   bestBid,
   bestAsk,
-  maxSlippage = DEFAULT_MAX_SLIPPAGE,
+  orderBook,
+  maxSlippagePercent = DEFAULT_MAX_SLIPPAGE_PERCENT,
   onOrderSuccess,
   onOrderError,
 }: TradingFormProps) {
@@ -177,7 +187,7 @@ export function TradingForm({
 
   // Form state
   const [side, setSide] = useState<TradingSide>("BUY");
-  const [orderType, setOrderType] = useState<OrderTypeSelection>("LIMIT");
+  const [orderType, setOrderType] = useState<OrderTypeSelection>("MARKET");
   const [limitPrice, setLimitPrice] = useState<number>(0.5);
   const [shares, setShares] = useState<number>(10);
   const [useExpiration, setUseExpiration] = useState<boolean>(false);
@@ -201,23 +211,69 @@ export function TradingForm({
     }
   }, [selectedOutcome]);
 
-  // Calculate market order price with slippage protection
-  // For "market buy": use best ask + maxSlippage (but cap at 0.99)
-  // For "market sell": use best bid - maxSlippage (but floor at 0.01)
-  // This creates an aggressive limit order that crosses the spread but doesn't eat the entire book
-  const marketOrderPrice = useMemo(() => {
-    if (side === "BUY") {
-      // Use best ask + slippage, or fallback to outcome price + slippage
-      const basePrice = bestAsk ?? selectedOutcome?.price ?? 0.5;
-      const priceWithSlippage = basePrice + maxSlippage;
-      return Math.min(0.99, roundToTick(priceWithSlippage, tickSize));
-    } else {
-      // Use best bid - slippage, or fallback to outcome price - slippage
-      const basePrice = bestBid ?? selectedOutcome?.price ?? 0.5;
-      const priceWithSlippage = basePrice - maxSlippage;
-      return Math.max(0.01, roundToTick(priceWithSlippage, tickSize));
+  // Calculate slippage by walking the order book based on order size
+  // Only calculate for market orders with valid share count
+  const slippageResult: SlippageResult | null = useMemo(() => {
+    if (!orderBook || orderType !== "MARKET" || shares <= 0) return null;
+    try {
+      return calculateSlippage(orderBook, side, shares);
+    } catch {
+      return null;
     }
-  }, [side, bestAsk, bestBid, selectedOutcome?.price, maxSlippage, tickSize]);
+  }, [orderBook, orderType, side, shares]);
+
+  // Check if order can be fully filled (for market orders)
+  const canFullyFill = slippageResult?.canFill ?? true;
+
+  // Calculate market order price based on actual order book depth
+  // Uses direction-aware rounding: roundUp for BUY, roundDown for SELL
+  const marketOrderPrice = useMemo(() => {
+    if (slippageResult && slippageResult.canFill) {
+      // Use the worst price from the slippage calculation + buffer
+      // Direction-aware rounding ensures we stay within user intent
+      if (side === "BUY") {
+        const priceWithBuffer = slippageResult.worstPrice * 1.005; // 0.5% buffer
+        // Round UP for BUY to ensure we bid high enough
+        return Math.min(0.99, roundUpToTick(priceWithBuffer, tickSize));
+      } else {
+        const priceWithBuffer = slippageResult.worstPrice * 0.995; // 0.5% buffer
+        // Round DOWN for SELL to ensure we don't sell too cheap
+        return Math.max(0.01, roundDownToTick(priceWithBuffer, tickSize));
+      }
+    }
+
+    // Fallback: use best bid/ask with percentage-based slippage
+    const maxSlippageFraction = maxSlippagePercent / 100;
+    if (side === "BUY") {
+      const basePrice = bestAsk ?? selectedOutcome?.price ?? 0.5;
+      const priceWithSlippage = basePrice * (1 + maxSlippageFraction);
+      return Math.min(0.99, roundUpToTick(priceWithSlippage, tickSize));
+    } else {
+      const basePrice = bestBid ?? selectedOutcome?.price ?? 0.5;
+      const priceWithSlippage = basePrice * (1 - maxSlippageFraction);
+      return Math.max(0.01, roundDownToTick(priceWithSlippage, tickSize));
+    }
+  }, [
+    slippageResult,
+    side,
+    tickSize,
+    maxSlippagePercent,
+    bestAsk,
+    bestBid,
+    selectedOutcome?.price,
+  ]);
+
+  // Format slippage for display
+  const slippageDisplay = useMemo(() => {
+    if (!slippageResult) return null;
+    return formatSlippageDisplay(slippageResult, side);
+  }, [slippageResult, side]);
+
+  // Check if slippage exceeds max tolerance
+  const slippageExceedsMax = useMemo(() => {
+    if (!slippageResult) return false;
+    return slippageResult.slippagePercent > maxSlippagePercent;
+  }, [slippageResult, maxSlippagePercent]);
 
   // Calculate costs and potential returns
   const calculations = useMemo(() => {
@@ -227,15 +283,21 @@ export function TradingForm({
     const orderSide = side === "BUY" ? OrderSide.BUY : OrderSide.SELL;
     const pnl = calculatePotentialPnL(price, shares, orderSide);
 
+    // For market orders with slippage calculation, use the actual total notional
+    const total =
+      orderType === "MARKET" && slippageResult
+        ? slippageResult.totalNotional
+        : pnl.cost;
+
     return {
       price,
-      total: pnl.cost,
+      total,
       potentialWin: pnl.potentialWin,
       potentialLoss: pnl.potentialLoss,
       returnPercent:
-        pnl.cost > 0 ? ((pnl.potentialWin / pnl.cost) * 100).toFixed(1) : "0",
+        total > 0 ? ((pnl.potentialWin / total) * 100).toFixed(1) : "0",
     };
-  }, [side, orderType, limitPrice, marketOrderPrice, shares]);
+  }, [side, orderType, limitPrice, marketOrderPrice, shares, slippageResult]);
 
   // Fetch USDC balance from the PROXY WALLET (not EOA)
   // Trading funds are held in the proxy wallet, so we need to check that balance
@@ -452,21 +514,21 @@ export function TradingForm({
         <div className="flex gap-2">
           <Button
             type="button"
-            variant={orderType === "LIMIT" ? "default" : "outline"}
-            className="flex-1 text-xs sm:text-sm"
-            size="sm"
-            onClick={() => setOrderType("LIMIT")}
-          >
-            Limit
-          </Button>
-          <Button
-            type="button"
             variant={orderType === "MARKET" ? "default" : "outline"}
             className="flex-1 text-xs sm:text-sm"
             size="sm"
             onClick={() => setOrderType("MARKET")}
           >
             Market
+          </Button>
+          <Button
+            type="button"
+            variant={orderType === "LIMIT" ? "default" : "outline"}
+            className="flex-1 text-xs sm:text-sm"
+            size="sm"
+            onClick={() => setOrderType("LIMIT")}
+          >
+            Limit
           </Button>
         </div>
 
@@ -559,30 +621,75 @@ export function TradingForm({
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
               <label className="text-xs sm:text-sm font-medium">
-                Market Price
+                Estimated Execution
               </label>
-              <span className="text-xs text-muted-foreground">
-                {(maxSlippage * 100).toFixed(0)}% max slippage
-              </span>
+              {slippageDisplay && (
+                <span
+                  className={`text-xs ${
+                    slippageExceedsMax
+                      ? "text-amber-500"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {slippageDisplay.slippagePercent} slippage
+                </span>
+              )}
             </div>
-            <div className="text-center py-2.5 sm:py-3 bg-muted/50 rounded-lg">
-              <span className="text-xl sm:text-2xl font-bold">
-                {formatCents(marketOrderPrice)}
-              </span>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                {side === "BUY" ? (
-                  <>
-                    Best ask: {bestAsk ? formatCents(bestAsk) : "N/A"} +
-                    slippage
-                  </>
-                ) : (
-                  <>
-                    Best bid: {bestBid ? formatCents(bestBid) : "N/A"} -
-                    slippage
-                  </>
+
+            {/* Slippage breakdown */}
+            {slippageResult && slippageResult.canFill ? (
+              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">
+                    Avg Fill Price
+                  </span>
+                  <span className="text-lg font-bold">
+                    {slippageDisplay?.avgPrice}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">
+                    Best {side === "BUY" ? "Ask" : "Bid"}
+                  </span>
+                  <span>{slippageDisplay?.bestPrice}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Worst Price</span>
+                  <span>{slippageDisplay?.worstPrice}</span>
+                </div>
+                {slippageResult.fills.length > 1 && (
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-[10px] text-muted-foreground mb-1">
+                      Fill breakdown:
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {slippageDisplay?.fillsDescription}
+                    </p>
+                  </div>
                 )}
-              </p>
-            </div>
+              </div>
+            ) : slippageResult && !slippageResult.canFill ? (
+              <div className="bg-amber-500/10 rounded-lg p-3">
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⚠️ Insufficient liquidity. Only{" "}
+                  {(shares - slippageResult.unfilledSize).toFixed(0)} of{" "}
+                  {shares} shares can be filled.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-2.5 sm:py-3 bg-muted/50 rounded-lg">
+                <span className="text-xl sm:text-2xl font-bold">
+                  {formatCents(marketOrderPrice)}
+                </span>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                  {side === "BUY" ? (
+                    <>Best ask: {bestAsk ? formatCents(bestAsk) : "N/A"}</>
+                  ) : (
+                    <>Best bid: {bestBid ? formatCents(bestBid) : "N/A"}</>
+                  )}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -724,7 +831,9 @@ export function TradingForm({
         {/* Totals */}
         <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
           <div className="flex justify-between items-center">
-            <span className="text-xs sm:text-sm font-medium">Total Cost</span>
+            <span className="text-xs sm:text-sm font-medium">
+              {side === "SELL" ? "Total Proceeds" : "Total Cost"}
+            </span>
             <span className="text-lg sm:text-xl font-bold">
               ${calculations.total.toFixed(2)}
             </span>
@@ -755,6 +864,22 @@ export function TradingForm({
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error.message}</span>
+          </motion.div>
+        )}
+
+        {/* High Slippage Warning */}
+        {orderType === "MARKET" && slippageExceedsMax && slippageResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-sm"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              High slippage warning: {slippageResult.slippagePercent.toFixed(2)}
+              % exceeds {maxSlippagePercent}% tolerance. Consider reducing order
+              size or using a limit order.
+            </span>
           </motion.div>
         )}
 
@@ -899,7 +1024,8 @@ export function TradingForm({
               hasNoAllowance ||
               isBelowMinimum ||
               !selectedOutcome ||
-              !hasValidTokenId
+              !hasValidTokenId ||
+              (orderType === "MARKET" && !canFullyFill)
             }
           >
             {isLoading ? (
@@ -909,8 +1035,10 @@ export function TradingForm({
               </>
             ) : !hasValidTokenId ? (
               <>Trading not available</>
+            ) : orderType === "MARKET" && !canFullyFill ? (
+              <>Insufficient liquidity</>
             ) : isBelowMinimum ? (
-              <>Minimum order: $1</>
+              <>Minimum order: ${minOrderSize}</>
             ) : (
               <>
                 {side === "BUY" ? "Buy" : "Sell"}{" "}

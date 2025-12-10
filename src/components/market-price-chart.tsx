@@ -334,8 +334,61 @@ export function MarketPriceChart({
     }
   };
 
-  // Fixed Y-axis ticks: 0, 20, 40, 60, 80, 100
-  const yAxisTicks = [0, 20, 40, 60, 80, 100];
+  // Calculate dynamic Y-axis range based on data
+  // Min is always 0, max is rounded up from highest data value + padding
+  const { yAxisMin, yAxisMax, yAxisTicks } = useMemo(() => {
+    if (!chartData || chartData.length === 0) {
+      return {
+        yAxisMin: 0,
+        yAxisMax: 100,
+        yAxisTicks: [0, 20, 40, 60, 80, 100],
+      };
+    }
+
+    // Find max value across all outcomes
+    let maxValue = -Infinity;
+
+    chartData.forEach((point) => {
+      Object.keys(point).forEach((key) => {
+        if (key.startsWith("outcome")) {
+          const value = point[key] as number;
+          if (typeof value === "number" && !isNaN(value)) {
+            maxValue = Math.max(maxValue, value);
+          }
+        }
+      });
+    });
+
+    // If no valid data found, use defaults
+    if (maxValue === -Infinity) {
+      return {
+        yAxisMin: 0,
+        yAxisMax: 100,
+        yAxisTicks: [0, 20, 40, 60, 80, 100],
+      };
+    }
+
+    // Min is always 0
+    const yMin = 0;
+
+    // Add padding to max (round up to nearest 10)
+    // e.g., 35% -> 40%, 72% -> 80%, 68% -> 70%
+    let yMax = Math.ceil((maxValue + 5) / 10) * 10;
+
+    // Ensure max is at least 10 and at most 100
+    yMax = Math.max(10, Math.min(100, yMax));
+
+    // Generate equal distribution ticks from 0 to max
+    // Use interval of 10 for most cases
+    const tickInterval = 10;
+    const ticks: number[] = [];
+    for (let tick = yMin; tick <= yMax; tick += tickInterval) {
+      ticks.push(tick);
+    }
+
+    return { yAxisMin: yMin, yAxisMax: yMax, yAxisTicks: ticks };
+  }, [chartData]);
+
   const timeRanges: TimeRange[] = ["1H", "6H", "1D", "1W", "1M", "ALL"];
 
   return (
@@ -378,7 +431,7 @@ export function MarketPriceChart({
               axisLine={false}
               tickMargin={4}
               tickFormatter={(value) => `${value}%`}
-              domain={[0, 100]}
+              domain={[yAxisMin, yAxisMax]}
               ticks={yAxisTicks}
               width={45}
             />
