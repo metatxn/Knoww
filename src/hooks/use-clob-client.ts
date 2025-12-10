@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { useClobCredentials } from "./use-clob-credentials";
+import { useProxyWallet } from "./use-proxy-wallet";
 
 /**
  * Order side enum
@@ -45,11 +46,15 @@ export interface CreateOrderParams {
  * 2. User derives API credentials (L1 signature → L2 creds)
  * 3. ClobClient is initialized with user's wallet + creds + builder config
  * 4. Orders are created and posted through the SDK
+ *
+ * IMPORTANT: Orders are placed from the user's PROXY WALLET (Gnosis Safe),
+ * not their EOA. The proxy wallet holds the USDC and has the allowance set.
  */
 export function useClobClient() {
   const { address, isConnected } = useConnection();
   const { credentials, hasCredentials, deriveCredentials } =
     useClobCredentials();
+  const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -63,15 +68,18 @@ export function useClobClient() {
 
   /**
    * Check if the client can be used
+   * Requires: connected wallet, credentials, proxy wallet deployed
    */
   const canTrade = useMemo(() => {
     return (
       isConnected &&
       hasCredentials &&
+      hasProxyWallet &&
+      !!proxyAddress &&
       typeof window !== "undefined" &&
       !!window.ethereum
     );
-  }, [isConnected, hasCredentials]);
+  }, [isConnected, hasCredentials, hasProxyWallet, proxyAddress]);
 
   /**
    * Create and post an order
@@ -100,6 +108,12 @@ export function useClobClient() {
 
       if (!builderSigningServerUrl) {
         throw new Error("Builder signing server URL not configured");
+      }
+
+      if (!proxyAddress || !hasProxyWallet) {
+        throw new Error(
+          "Proxy wallet not deployed. Please complete trading setup first."
+        );
       }
 
       setIsLoading(true);
@@ -144,16 +158,21 @@ export function useClobClient() {
         // 0 = EOA (Externally Owned Account - regular MetaMask)
         // 1 = POLY_PROXY (Polymarket Proxy Wallet)
         // 2 = POLY_GNOSIS_SAFE (Gnosis Safe)
-        const SIGNATURE_TYPE_EOA = 0;
+        //
+        // IMPORTANT: We use POLY_GNOSIS_SAFE (2) because users trade via their
+        // proxy wallet (Gnosis Safe), NOT their EOA. The proxy wallet holds
+        // the USDC and has the allowance set for the CTF Exchange.
+        const SIGNATURE_TYPE_POLY_GNOSIS_SAFE = 2;
 
         // Initialize ClobClient with user's wallet, credentials, and builder config
+        // The funderAddress is the proxy wallet address where funds are held
         const client = new ClobClient(
           clobHost,
           chainId,
           signer,
           creds,
-          SIGNATURE_TYPE_EOA, // Use EOA for regular wallets (MetaMask, etc.)
-          undefined, // funderAddress
+          SIGNATURE_TYPE_POLY_GNOSIS_SAFE, // Use Gnosis Safe for proxy wallet trading
+          proxyAddress, // funderAddress - the proxy wallet that holds the funds
           undefined, // marketOrderDelay
           false, // enableAutoMargin
           builderConfig
@@ -186,7 +205,15 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [address, credentials, clobHost, chainId, builderSigningServerUrl]
+    [
+      address,
+      credentials,
+      clobHost,
+      chainId,
+      builderSigningServerUrl,
+      proxyAddress,
+      hasProxyWallet,
+    ]
   );
 
   /**
@@ -489,125 +516,139 @@ export function useClobClient() {
    * USDC.e on Polygon: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
    * Native USDC on Polygon: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359 (NOT used by Polymarket)
    * Note: USDC.e has 6 decimals
+   *
+   * @param walletAddress - Optional address to check balance for (defaults to EOA, but should be proxy wallet for trading)
    */
-  const getUsdcBalance = useCallback(async () => {
-    if (!address) {
-      throw new Error("Wallet not connected");
-    }
+  const getUsdcBalance = useCallback(
+    async (walletAddress?: string) => {
+      const targetAddress = walletAddress || address;
+      if (!targetAddress) {
+        throw new Error("Wallet not connected");
+      }
 
-    try {
-      const { createPublicClient, http, formatUnits } = await import("viem");
-      const { polygon } = await import("viem/chains");
+      try {
+        const { createPublicClient, http, formatUnits } = await import("viem");
+        const { polygon } = await import("viem/chains");
 
-      // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
-      const USDC_ADDRESS =
-        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
-      const USDC_DECIMALS = 6;
+        // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
+        const USDC_ADDRESS =
+          "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
+        const USDC_DECIMALS = 6;
 
-      // ERC20 ABI for balanceOf function
-      const ERC20_ABI = [
-        {
-          inputs: [{ name: "owner", type: "address" }],
-          name: "balanceOf",
-          outputs: [{ name: "", type: "uint256" }],
-          stateMutability: "view",
-          type: "function",
-        },
-      ] as const;
+        // ERC20 ABI for balanceOf function
+        const ERC20_ABI = [
+          {
+            inputs: [{ name: "owner", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ] as const;
 
-      // Create a public client for Polygon
-      const client = createPublicClient({
-        chain: polygon,
-        transport: http(),
-      });
+        // Create a public client for Polygon
+        const client = createPublicClient({
+          chain: polygon,
+          transport: http(),
+        });
 
-      // Get balance
-      const balance = await client.readContract({
-        address: USDC_ADDRESS,
-        abi: ERC20_ABI,
-        functionName: "balanceOf",
-        args: [address],
-      });
+        // Get balance for the target address (proxy wallet or EOA)
+        const balance = await client.readContract({
+          address: USDC_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [targetAddress as `0x${string}`],
+        });
 
-      // Convert to human-readable format
-      const balanceFormatted = Number(formatUnits(balance, USDC_DECIMALS));
+        // Convert to human-readable format
+        const balanceFormatted = Number(formatUnits(balance, USDC_DECIMALS));
 
-      return {
-        balance: balanceFormatted,
-        balanceRaw: balance.toString(),
-        decimals: USDC_DECIMALS,
-      };
-    } catch (err) {
-      console.error("Failed to get USDC balance:", err);
-      throw err;
-    }
-  }, [address]);
+        return {
+          balance: balanceFormatted,
+          balanceRaw: balance.toString(),
+          decimals: USDC_DECIMALS,
+        };
+      } catch (err) {
+        console.error("Failed to get USDC balance:", err);
+        throw err;
+      }
+    },
+    [address]
+  );
 
   /**
    * Get USDC.e allowance directly from the Polygon chain using viem
    * This fetches the actual on-chain allowance for the CTF Exchange
    *
    * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
+   *
+   * @param walletAddress - Optional address to check allowance for (defaults to EOA, but should be proxy wallet for trading)
    */
-  const getUsdcAllowance = useCallback(async () => {
-    if (!address) {
-      throw new Error("Wallet not connected");
-    }
+  const getUsdcAllowance = useCallback(
+    async (walletAddress?: string) => {
+      const targetAddress = walletAddress || address;
+      if (!targetAddress) {
+        throw new Error("Wallet not connected");
+      }
 
-    try {
-      const { createPublicClient, http, formatUnits } = await import("viem");
-      const { polygon } = await import("viem/chains");
+      try {
+        const { createPublicClient, http, formatUnits } = await import("viem");
+        const { polygon } = await import("viem/chains");
 
-      // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
-      const USDC_ADDRESS =
-        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
-      const USDC_DECIMALS = 6;
+        // USDC.e (bridged USDC) contract address on Polygon - used by Polymarket
+        const USDC_ADDRESS =
+          "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
+        const USDC_DECIMALS = 6;
 
-      // Polymarket CTF Exchange contract on Polygon mainnet
-      const CTF_EXCHANGE_ADDRESS =
-        "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E" as const;
+        // Polymarket CTF Exchange contract on Polygon mainnet
+        const CTF_EXCHANGE_ADDRESS =
+          "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E" as const;
 
-      // ERC20 ABI for allowance function
-      const ERC20_ABI = [
-        {
-          inputs: [
-            { name: "owner", type: "address" },
-            { name: "spender", type: "address" },
-          ],
-          name: "allowance",
-          outputs: [{ name: "", type: "uint256" }],
-          stateMutability: "view",
-          type: "function",
-        },
-      ] as const;
+        // ERC20 ABI for allowance function
+        const ERC20_ABI = [
+          {
+            inputs: [
+              { name: "owner", type: "address" },
+              { name: "spender", type: "address" },
+            ],
+            name: "allowance",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ] as const;
 
-      // Create a public client for Polygon
-      const client = createPublicClient({
-        chain: polygon,
-        transport: http(),
-      });
+        // Create a public client for Polygon
+        const client = createPublicClient({
+          chain: polygon,
+          transport: http(),
+        });
 
-      // Get allowance
-      const allowance = await client.readContract({
-        address: USDC_ADDRESS,
-        abi: ERC20_ABI,
-        functionName: "allowance",
-        args: [address, CTF_EXCHANGE_ADDRESS],
-      });
+        // Get allowance for the target address (proxy wallet or EOA)
+        const allowance = await client.readContract({
+          address: USDC_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: "allowance",
+          args: [targetAddress as `0x${string}`, CTF_EXCHANGE_ADDRESS],
+        });
 
-      // Convert to human-readable format
-      const allowanceFormatted = Number(formatUnits(allowance, USDC_DECIMALS));
+        // Convert to human-readable format
+        const allowanceFormatted = Number(
+          formatUnits(allowance, USDC_DECIMALS)
+        );
 
-      return {
-        allowance: allowanceFormatted,
-        allowanceRaw: allowance.toString(),
-        decimals: USDC_DECIMALS,
-      };
-    } catch (err) {
-      console.error("Failed to get USDC allowance:", err);
-      throw err;
-    }
-  }, [address]);
+        return {
+          allowance: allowanceFormatted,
+          allowanceRaw: allowance.toString(),
+          decimals: USDC_DECIMALS,
+        };
+      } catch (err) {
+        console.error("Failed to get USDC allowance:", err);
+        throw err;
+      }
+    },
+    [address]
+  );
 
   return {
     // State

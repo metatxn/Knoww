@@ -166,7 +166,6 @@ export function useRelayerClient() {
           const derivedAddress = await deriveSafeAddress();
 
           if (derivedAddress) {
-
             setState((prev) => ({
               ...prev,
               isLoading: false,

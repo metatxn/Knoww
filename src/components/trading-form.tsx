@@ -35,6 +35,7 @@ import {
 } from "@/hooks/use-clob-client";
 import { useQuery } from "@tanstack/react-query";
 import { TradingOnboarding } from "@/components/trading-onboarding";
+import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 
 /**
  * Outcome data for the trading form
@@ -118,6 +119,9 @@ export function TradingForm({
     getUsdcAllowance,
   } = useClobClient();
 
+  // Get proxy wallet address for balance/allowance checks
+  const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
+
   // Form state
   const [side, setSide] = useState<TradingSide>("BUY");
   const [orderType, setOrderType] = useState<OrderTypeSelection>("LIMIT");
@@ -161,20 +165,22 @@ export function TradingForm({
     };
   }, [side, orderType, limitPrice, shares, selectedOutcome]);
 
-  // Fetch USDC balance directly from Polygon chain
+  // Fetch USDC balance from the PROXY WALLET (not EOA)
+  // Trading funds are held in the proxy wallet, so we need to check that balance
   const { data: onChainBalance, refetch: refetchBalance } = useQuery({
-    queryKey: ["usdcBalance", isConnected],
-    queryFn: () => getUsdcBalance(),
-    enabled: isConnected,
+    queryKey: ["usdcBalance", proxyAddress, hasProxyWallet],
+    queryFn: () => getUsdcBalance(proxyAddress || undefined),
+    enabled: isConnected && hasProxyWallet && !!proxyAddress,
     staleTime: 15_000, // 15 seconds
     refetchInterval: 30_000, // Refetch every 30 seconds
   });
 
-  // Fetch USDC allowance directly from Polygon chain
+  // Fetch USDC allowance from the PROXY WALLET (not EOA)
+  // Allowance is set on the proxy wallet for the CTF Exchange
   const { data: onChainAllowance, refetch: refetchAllowance } = useQuery({
-    queryKey: ["usdcAllowance", isConnected],
-    queryFn: () => getUsdcAllowance(),
-    enabled: isConnected,
+    queryKey: ["usdcAllowance", proxyAddress, hasProxyWallet],
+    queryFn: () => getUsdcAllowance(proxyAddress || undefined),
+    enabled: isConnected && hasProxyWallet && !!proxyAddress,
     staleTime: 15_000, // 15 seconds
     refetchInterval: 30_000, // Refetch every 30 seconds
   });
@@ -626,10 +632,15 @@ export function TradingForm({
             className="flex items-center gap-2 p-3 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-lg text-sm"
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              Insufficient USDC balance. You need $
-              {(calculations.total - (effectiveBalance || 0)).toFixed(2)} more.
-            </span>
+            <div className="flex flex-col gap-1">
+              <span>
+                Insufficient USDC.e balance. You need $
+                {(calculations.total - (effectiveBalance || 0)).toFixed(2)} more.
+              </span>
+              <span className="text-xs opacity-75">
+                Deposit USDC.e (bridged USDC) to your trading wallet to continue.
+              </span>
+            </div>
           </motion.div>
         )}
 
@@ -645,7 +656,7 @@ export function TradingForm({
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>
                   {hasNoAllowance
-                    ? "You need to approve USDC spending before trading."
+                    ? "You need to approve USDC.e spending before trading."
                     : `Insufficient allowance. Current: $${
                         allowance?.toFixed(2) || 0
                       }, needed: $${calculations.total.toFixed(2)}`}
@@ -663,7 +674,7 @@ export function TradingForm({
                     Approving...
                   </>
                 ) : (
-                  <>Approve USDC Spending</>
+                  <>Approve USDC.e Spending</>
                 )}
               </Button>
             </motion.div>
