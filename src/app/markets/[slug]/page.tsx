@@ -34,6 +34,8 @@ export default function MarketDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [selectedOutcome, setSelectedOutcome] = useState(0);
+  // Track if order book is shown (only when user clicks on an outcome)
+  const [showOrderBook, setShowOrderBook] = useState(false);
 
   const slug = params?.slug as string;
 
@@ -41,21 +43,21 @@ export default function MarketDetailPage() {
   const { data: market, isLoading: loading, error } = useMarketDetail(slug);
 
   // Handle order success - must be at top level before any early returns
-  const handleOrderSuccess = useCallback((order: unknown) => {
-    console.log("Order placed successfully:", order);
+  const handleOrderSuccess = useCallback((_order: unknown) => {
+    // console.log("Order placed successfully:", order);
     // Could add toast notification here
   }, []);
 
   // Handle order error
-  const handleOrderError = useCallback((err: Error) => {
-    console.error("Order failed:", err);
+  const handleOrderError = useCallback((_err: Error) => {
+    // console.error("Order failed:", err);
     // Could add toast notification here
   }, []);
 
   // Handle price click from order book
-  const handlePriceClick = useCallback((price: number) => {
+  const handlePriceClick = useCallback((_price: number) => {
     // This could be used to set the price in the trading form
-    console.log("Price clicked:", price);
+    // console.log("Price clicked:", price);
   }, []);
 
   if (loading) {
@@ -576,8 +578,19 @@ export default function MarketDetailPage() {
                         <Button
                           type="button"
                           size="lg"
-                          className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
-                          disabled
+                          className={`bg-green-600 hover:bg-green-700 text-white min-w-[120px] transition-all ${
+                            showOrderBook && selectedOutcome === idx
+                              ? "ring-2 ring-green-400 ring-offset-2 ring-offset-background"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            if (showOrderBook && selectedOutcome === idx) {
+                              setShowOrderBook(false);
+                            } else {
+                              setSelectedOutcome(idx);
+                              setShowOrderBook(true);
+                            }
+                          }}
                         >
                           Buy Yes {formatPrice(prices[idx] || "0")}¢
                         </Button>
@@ -585,8 +598,19 @@ export default function MarketDetailPage() {
                           type="button"
                           size="lg"
                           variant="destructive"
-                          className="min-w-[120px]"
-                          disabled
+                          className={`min-w-[120px] transition-all ${
+                            showOrderBook && selectedOutcome === idx
+                              ? "ring-2 ring-red-400 ring-offset-2 ring-offset-background"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            if (showOrderBook && selectedOutcome === idx) {
+                              setShowOrderBook(false);
+                            } else {
+                              setSelectedOutcome(idx);
+                              setShowOrderBook(true);
+                            }
+                          }}
                         >
                           Buy No{" "}
                           {formatPrice(
@@ -598,6 +622,30 @@ export default function MarketDetailPage() {
                         </Button>
                       </div>
                     </div>
+
+                    {/* Order Book - Shown below this outcome when clicked */}
+                    {showOrderBook && selectedOutcome === idx && tradingOutcomes.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="mt-4 pt-4 border-t border-border"
+                      >
+                        <OrderBook
+                          outcomes={tradingOutcomes.map((o) => ({
+                            name: o.name,
+                            tokenId: o.tokenId,
+                            price: o.price,
+                          }))}
+                          defaultOutcomeIndex={selectedOutcome}
+                          maxLevels={4}
+                          onPriceClick={handlePriceClick}
+                          onOutcomeChange={(index) => setSelectedOutcome(index)}
+                          defaultCollapsed={false}
+                        />
+                      </motion.div>
+                    )}
                   </CardContent>
                 </Card>
               ),
@@ -609,15 +657,6 @@ export default function MarketDetailPage() {
             Trading functionality coming soon. Connect your wallet to get
             started.
           </p>
-
-          {/* Order Book - Below Outcomes List */}
-          {tradingOutcomes[selectedOutcome]?.tokenId && (
-            <OrderBook
-              tokenId={tradingOutcomes[selectedOutcome].tokenId}
-              maxLevels={10}
-              onPriceClick={handlePriceClick}
-            />
-          )}
         </div>
 
         {/* Related Markets Section */}

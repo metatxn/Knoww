@@ -149,14 +149,14 @@ export default function Home() {
   } = useBreakingEvents(12);
 
   // Debug: Log tags data
-  useEffect(() => {
-    if (tags) {
-      console.log("Tags data:", tags);
-    }
-    if (tagsError) {
-      console.error("Tags error:", tagsError);
-    }
-  }, [tags, tagsError]);
+  // useEffect(() => {
+  //   if (tags) {
+  //     console.log("Tags data:", tags);
+  //   }
+  //   if (tagsError) {
+  //     console.error("Tags error:", tagsError);
+  //   }
+  // }, [tags, tagsError]);
 
   // Infinite scroll: auto-load more when reaching bottom (only for "categories" view)
   useEffect(() => {

@@ -6,6 +6,7 @@ import {
   AlertCircle,
   Loader2,
   Wallet,
+  Wifi,
   Zap,
   TrendingUp,
   TrendingDown,
@@ -93,6 +94,8 @@ export interface TradingFormProps {
   marketImage?: string;
   /** Yes probability for header display */
   yesProbability?: number;
+  /** Whether order book data is from live WebSocket */
+  isLiveData?: boolean;
 }
 
 /**
@@ -174,6 +177,7 @@ export function TradingForm({
   onOrderError,
   marketImage,
   yesProbability,
+  isLiveData = false,
 }: TradingFormProps) {
   const { isConnected } = useConnection();
   const { open } = useAppKit();
@@ -498,7 +502,16 @@ export function TradingForm({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm truncate">{marketTitle}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm truncate">{marketTitle}</h3>
+              {/* Live data indicator */}
+              {isLiveData && (
+                <div className="flex items-center gap-1">
+                  <Wifi className="h-3 w-3 text-emerald-500" />
+                  <span className="text-[10px] text-emerald-500">Live</span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {negRisk && (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">

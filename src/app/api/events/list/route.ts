@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
       queryParams.set("_tag", parsed.data.tag);
     }
 
-    console.log(
-      `hello world: ${POLYMARKET_API.GAMMA.EVENTS}?${queryParams.toString()}`,
-    );
+    // console.log(
+    //   `hello world: ${POLYMARKET_API.GAMMA.EVENTS}?${queryParams.toString()}`,
+    // );
     const response = await fetch(
       `${POLYMARKET_API.GAMMA.EVENTS}?${queryParams.toString()}`,
       {

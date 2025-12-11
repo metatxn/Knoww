@@ -15,6 +15,28 @@ export const POLYMARKET_API = {
   CLOB: {
     BASE: "https://clob.polymarket.com",
   },
+  WSS: {
+    /** WebSocket endpoint for market data (order books, price changes, trades) */
+    MARKET: "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+    /** WebSocket endpoint for user-specific data (requires authentication) */
+    USER: "wss://ws-subscriptions-clob.polymarket.com/ws/user",
+  },
+} as const;
+
+// WebSocket configuration
+export const WEBSOCKET_CONFIG = {
+  /** Initial reconnection delay in milliseconds */
+  RECONNECT_DELAY_MS: 1000,
+  /** Maximum reconnection delay in milliseconds */
+  MAX_RECONNECT_DELAY_MS: 30000,
+  /** Reconnection backoff multiplier */
+  RECONNECT_BACKOFF: 2,
+  /** Maximum number of markets to subscribe per connection */
+  MAX_SUBSCRIPTIONS_PER_CONNECTION: 50,
+  /** Heartbeat interval in milliseconds */
+  HEARTBEAT_INTERVAL_MS: 30000,
+  /** Connection timeout in milliseconds */
+  CONNECTION_TIMEOUT_MS: 10000,
 } as const;
 
 // Default pagination values

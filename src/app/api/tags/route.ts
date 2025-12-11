@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       ? `${POLYMARKET_API.GAMMA.BASE}/tags?${queryParams.toString()}`
       : `${POLYMARKET_API.GAMMA.BASE}/tags?order=updatedAt`;
 
-    console.log("Fetching tags from:", url);
+    // console.log("Fetching tags from:", url);
 
     const response = await fetch(url, {
       headers: {

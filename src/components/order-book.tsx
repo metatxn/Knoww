@@ -1,12 +1,38 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { RefreshCw } from "lucide-react";
-import { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  ChevronUp,
+  ChevronDown,
+  HelpCircle,
+} from "lucide-react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import {
+  useOrderBook as useOrderBookStore,
+  useOrderBookStore as useStore,
+} from "@/hooks/use-orderbook-store";
+import {
+  useOrderBookWebSocket,
+  type ConnectionState,
+} from "@/hooks/use-shared-websocket";
 
 /**
  * Order book level representing a price point with size
@@ -27,33 +53,84 @@ interface OrderBookData {
 }
 
 /**
+ * Outcome data for tabs
+ */
+export interface OutcomeTab {
+  name: string;
+  tokenId: string;
+  price?: number;
+}
+
+/**
  * Props for the OrderBook component
  */
 export interface OrderBookProps {
-  /** Token ID for fetching order book data */
-  tokenId: string;
+  /** Outcomes to display tabs for (Yes/No) */
+  outcomes: OutcomeTab[];
+  /** Initially selected outcome index */
+  defaultOutcomeIndex?: number;
   /** Maximum number of levels to display on each side */
   maxLevels?: number;
   /** Callback when a price level is clicked */
   onPriceClick?: (price: number, side: "BUY" | "SELL") => void;
-  /** Polling interval in milliseconds (default: 5000) */
+  /** Whether to use WebSocket for real-time updates */
+  useWebSocket?: boolean;
+  /** Fallback polling interval when WebSocket is unavailable */
   pollingInterval?: number;
+  /** Last trade price */
+  lastTradePrice?: number;
+  /** Whether the component starts collapsed */
+  defaultCollapsed?: boolean;
+  /** Callback when outcome tab changes */
+  onOutcomeChange?: (index: number, outcome: OutcomeTab) => void;
+  /** Embedded mode - no wrapper, header, or collapsible (for use in OutcomeDetails) */
+  embedded?: boolean;
+  /** Hide the outcome tabs (when parent handles tab switching) */
+  hideOutcomeTabs?: boolean;
 }
 
 /**
- * Fetch order book data from the API
+ * Polymarket CLOB API response structure
+ */
+interface ClobOrderBookResponse {
+  market: string;
+  asset_id: string;
+  hash: string;
+  timestamp: string;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+}
+
+/**
+ * Fetch order book directly from Polymarket CLOB API
+ * This is faster than going through our Next.js API route
+ * CLOB API is public and allows CORS
  */
 async function fetchOrderBook(tokenId: string): Promise<OrderBookData> {
-  const response = await fetch(`/api/markets/orderbook/${tokenId}`);
+  // Direct call to Polymarket CLOB API (no proxy needed)
+  const response = await fetch(
+    `https://clob.polymarket.com/book?token_id=${tokenId}`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    }
+  );
+
   if (!response.ok) {
-    throw new Error("Failed to fetch order book");
+    throw new Error(`Failed to fetch order book: ${response.status}`);
   }
-  const data: OrderBookData = await response.json();
-  return data;
+
+  const data: ClobOrderBookResponse = await response.json();
+
+  return {
+    bids: data.bids || [],
+    asks: data.asks || [],
+  };
 }
 
 /**
- * Format price as percentage
+ * Format price as cents
  */
 function formatPrice(price: string | number): string {
   const num = typeof price === "string" ? Number.parseFloat(price) : price;
@@ -61,13 +138,27 @@ function formatPrice(price: string | number): string {
 }
 
 /**
- * Format size with K/M suffixes
+ * Format size with commas
  */
 function formatSize(size: string | number): string {
   const num = typeof size === "string" ? Number.parseFloat(size) : size;
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-  return num.toFixed(0);
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Format total value
+ */
+function formatTotal(price: string | number, size: string | number): string {
+  const priceNum = typeof price === "string" ? Number.parseFloat(price) : price;
+  const sizeNum = typeof size === "string" ? Number.parseFloat(size) : size;
+  const total = priceNum * sizeNum;
+  return `$${total.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 /**
@@ -78,54 +169,144 @@ function calculateMaxSize(levels: OrderBookLevel[]): number {
 }
 
 /**
- * OrderBook Component
+ * Connection status indicator
+ */
+function ConnectionStatus({
+  state,
+  className,
+}: {
+  state: ConnectionState;
+  className?: string;
+}) {
+  const isConnected = state === "connected";
+  const isConnecting = state === "connecting" || state === "reconnecting";
+
+  return (
+    <div className={cn("flex items-center gap-1.5", className)}>
+      {isConnected ? (
+        <>
+          <Wifi className="h-3 w-3 text-emerald-500" />
+          <span className="text-[10px] text-emerald-500">Live</span>
+        </>
+      ) : isConnecting ? (
+        <>
+          <Wifi className="h-3 w-3 text-amber-500 animate-pulse" />
+          <span className="text-[10px] text-amber-500">Connecting</span>
+        </>
+      ) : (
+        <>
+          <WifiOff className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">Offline</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * OrderBook Component - Polymarket Style
  *
- * Displays the current bid/ask order book for a market.
  * Features:
- * - Real-time updates via polling
- * - Depth visualization with bar charts
- * - Click-to-fill price functionality
- * - Spread and midpoint display
+ * - Trade Yes / Trade No tabs to switch outcomes
+ * - Visual depth bars showing liquidity
+ * - Asks on top (red), Bids on bottom (green)
+ * - Last price and spread in the middle
+ * - Price, Shares, Total columns
+ * - Collapsible design
  */
 export function OrderBook({
-  tokenId,
-  maxLevels = 10,
+  outcomes,
+  defaultOutcomeIndex = 0,
+  maxLevels = 4,
   onPriceClick,
+  useWebSocket = true,
   pollingInterval = 5000,
+  lastTradePrice,
+  defaultCollapsed = false,
+  onOutcomeChange,
+  embedded = false,
+  hideOutcomeTabs = false,
 }: OrderBookProps) {
-  // Check if tokenId is a valid CLOB token ID (should be a long numeric string)
+  const [selectedOutcome, setSelectedOutcome] = useState(defaultOutcomeIndex);
+  const [isOpen, setIsOpen] = useState(!defaultCollapsed);
+
+  // Sync internal state with parent's defaultOutcomeIndex when it changes
+  // This allows parent to control which outcome (Yes/No) is displayed
+  useEffect(() => {
+    setSelectedOutcome(defaultOutcomeIndex);
+  }, [defaultOutcomeIndex]);
+
+  const currentOutcome = outcomes[selectedOutcome];
+  const tokenId = currentOutcome?.tokenId || "";
   const isValidTokenId = Boolean(tokenId && tokenId.length > 10);
 
-  // Fetch order book data with polling
+  // Handle outcome tab change
+  const handleOutcomeChange = useCallback(
+    (index: number) => {
+      setSelectedOutcome(index);
+      onOutcomeChange?.(index, outcomes[index]);
+    },
+    [outcomes, onOutcomeChange]
+  );
+
+  // Get order book store action for seeding from REST
+  const { setOrderBookFromRest } = useStore();
+
+  // Read any existing order book from the store (may have been preloaded)
+  const storeOrderBook = useOrderBookStore(tokenId);
+
+  // STEP 1: Fetch initial order book snapshot via REST (always enabled)
+  // This provides immediate data while WebSocket connects
   const {
-    data: orderBook,
-    isLoading,
-    error,
+    data: restOrderBook,
+    isLoading: isRestLoading,
+    error: restError,
     refetch,
     isFetching,
   } = useQuery<OrderBookData>({
     queryKey: ["orderBook", tokenId],
     queryFn: () => fetchOrderBook(tokenId),
-    refetchInterval: pollingInterval,
-    staleTime: pollingInterval / 2,
-    enabled: isValidTokenId,
+    staleTime: 30000, // Consider data fresh for 30s
+    gcTime: 60000, // Keep in cache for 60s (prevents refetch on tab switch)
+    enabled: isValidTokenId, // Always fetch if token is valid
   });
 
-  // Show message if token ID is not valid
-  if (!isValidTokenId) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Order Book</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            Order book not available for this market
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // STEP 2: Seed the store with REST data when it arrives
+  // This ensures we have data to show immediately
+  useEffect(() => {
+    if (restOrderBook && isValidTokenId) {
+      setOrderBookFromRest(
+        tokenId,
+        restOrderBook.bids || [],
+        restOrderBook.asks || []
+      );
+    }
+  }, [restOrderBook, tokenId, isValidTokenId, setOrderBookFromRest]);
+
+  // STEP 3: Connect to shared WebSocket for real-time incremental updates
+  // Uses singleton manager - only ONE connection shared across all OrderBook components
+  const assetIds = useMemo(
+    () => (isValidTokenId && useWebSocket ? [tokenId] : []),
+    [isValidTokenId, useWebSocket, tokenId]
+  );
+  const { connectionState, isConnected } = useOrderBookWebSocket(assetIds);
+
+  // Use store data (which has REST + WebSocket updates merged)
+  // Fall back to raw REST data if store is empty
+  const orderBook = useMemo(() => {
+    if (storeOrderBook) {
+      return {
+        bids: storeOrderBook.bids,
+        asks: storeOrderBook.asks,
+        spread: storeOrderBook.spread,
+        midpoint: storeOrderBook.midpoint,
+      };
+    }
+    return restOrderBook;
+  }, [storeOrderBook, restOrderBook]);
+
+  const isLoading = !storeOrderBook && isRestLoading;
+  const error = !storeOrderBook && restError;
 
   // Process order book data
   const processedData = useMemo(() => {
@@ -147,212 +328,376 @@ export function OrderBook({
     const midpoint = (bestBid + bestAsk) / 2;
 
     // Calculate max sizes for depth visualization
-    const maxBidSize = calculateMaxSize(bids);
-    const maxAskSize = calculateMaxSize(asks);
+    const allLevels = [...bids, ...asks];
+    const maxSize = calculateMaxSize(allLevels);
 
     return {
       bids,
-      asks,
+      asks: asks.reverse(), // Reverse asks so highest is at bottom (closest to spread)
       spread,
       midpoint,
-      maxBidSize,
-      maxAskSize,
+      maxSize,
       bestBid,
       bestAsk,
     };
   }, [orderBook, maxLevels]);
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Order Book</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {Array.from({ length: maxLevels }).map((_, i) => (
-              <Skeleton key={`ask-skeleton-${i}`} className="h-6 w-full" />
-            ))}
-            <Skeleton className="h-8 w-full my-2" />
-            {Array.from({ length: maxLevels }).map((_, i) => (
-              <Skeleton key={`bid-skeleton-${i}`} className="h-6 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
+  // Calculate last trade price display
+  const displayLastPrice = useMemo(() => {
+    if (lastTradePrice) return lastTradePrice;
+    if (processedData?.midpoint) return processedData.midpoint;
+    return null;
+  }, [lastTradePrice, processedData?.midpoint]);
+
+  // No outcomes provided
+  if (outcomes.length === 0) {
+    return null;
   }
 
-  // Error state
-  if (error) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Order Book</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Failed to load order book</p>
+  // Render the order book content (shared between embedded and standalone modes)
+  const renderOrderBookContent = () => (
+    <>
+      {/* Outcome Tabs - only show if not hidden */}
+      {!hideOutcomeTabs && !embedded && (
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border">
+          <div className="flex gap-4">
+            {outcomes.map((outcome, index) => (
+              <button
+                key={outcome.tokenId || index}
+                type="button"
+                onClick={() => handleOutcomeChange(index)}
+                className={cn(
+                  "text-sm font-medium transition-colors pb-1",
+                  selectedOutcome === index
+                    ? "text-foreground border-b-2 border-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Trade {outcome.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Rewards</span>
             <Button
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={() => refetch()}
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                refetch();
+              }}
+              disabled={isFetching}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
+              <RefreshCw
+                className={cn("h-3 w-3", isFetching && "animate-spin")}
+              />
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
+        </div>
+      )}
 
-  // No data state
-  if (!processedData) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Order Book</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            No order book data available
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+      {/* Trade Yes/No selector for embedded mode */}
+      {/* Trade Yes/No selector for embedded mode */}
+      {embedded && (
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-muted/20">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            Trade {currentOutcome?.name}
+          </span>
+          <div className="flex-1" />
+          {outcomes.map((outcome, index) => (
+            <button
+              key={outcome.tokenId || index}
+              type="button"
+              onClick={() => handleOutcomeChange(index)}
+              className={cn(
+                "text-xs font-medium px-3 py-1 rounded transition-colors",
+                selectedOutcome === index
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              {outcome.name}
+            </button>
+          ))}
+        </div>
+      )}
 
-  return (
-    <Card className="w-full overflow-hidden">
-      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg">Order Book</CardTitle>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="px-4 py-4 space-y-2">
+          {Array.from({ length: maxLevels }).map((_, i) => (
+            <Skeleton key={`ask-skeleton-${i}`} className="h-7 w-full" />
+          ))}
+          <Skeleton className="h-10 w-full my-2" />
+          {Array.from({ length: maxLevels }).map((_, i) => (
+            <Skeleton key={`bid-skeleton-${i}`} className="h-7 w-full" />
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-8 text-muted-foreground">
+          <p className="text-sm">Failed to load order book</p>
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 sm:h-8 sm:w-8"
+            variant="outline"
+            size="sm"
+            className="mt-2"
             onClick={() => refetch()}
-            disabled={isFetching}
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
-                isFetching ? "animate-spin" : ""
-              }`}
-            />
+            <RefreshCw className="h-3 w-3 mr-2" />
+            Retry
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
+      )}
+
+      {/* No Token ID */}
+      {!isValidTokenId && !isLoading && !error && (
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          Select an outcome to view order book
+        </div>
+      )}
+
+      {/* Order Book Content */}
+      {processedData && !isLoading && !error && (
+        <>
+          {/* Column Headers */}
+          <div className={embedded ? "" : "border-t border-border"}>
+            <table className="w-full">
+              <thead>
+                <tr className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="text-left px-4 py-2 w-16">
+                    Trade {currentOutcome?.name}
+                  </th>
+                  <th className="text-right px-4 py-2">Price</th>
+                  <th className="text-right px-4 py-2">Shares</th>
+                  <th className="text-right px-4 py-2">Total</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+
+          {/* Asks (Sells) - Red */}
+          <div className="relative">
+            <table className="w-full">
+              <tbody>
+                {processedData.asks.map((level, index) => {
+                  const size = Number.parseFloat(level.size);
+                  const depthPercent = (size / processedData.maxSize) * 100;
+
+                  return (
+                    <tr
+                      key={`ask-${level.price}`}
+                      className="relative cursor-pointer hover:bg-muted/30 transition-colors group"
+                      onClick={() =>
+                        onPriceClick?.(Number.parseFloat(level.price), "SELL")
+                      }
+                    >
+                      {/* Label column */}
+                      <td className="relative px-4 py-1.5 w-16">
+                        {/* Depth bar */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 bg-red-500/20 transition-all duration-300"
+                          style={{
+                            width: `${Math.min(depthPercent * 2, 100)}%`,
+                          }}
+                        />
+                        {index === processedData.asks.length - 1 && (
+                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                            Asks
+                          </span>
+                        )}
+                      </td>
+                      {/* Price */}
+                      <td className="text-right px-4 py-1.5 text-red-400 font-medium text-sm">
+                        {formatPrice(level.price)}
+                      </td>
+                      {/* Shares */}
+                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                        {formatSize(size)}
+                      </td>
+                      {/* Total */}
+                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                        {formatTotal(level.price, level.size)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Empty asks placeholder */}
+            {processedData.asks.length === 0 && (
+              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+                No asks available
+              </div>
+            )}
+          </div>
+
+          {/* Spread Divider */}
+          <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border-y border-border">
+            <div className="text-xs text-muted-foreground">
+              Last:{" "}
+              <span className="text-foreground font-medium">
+                {displayLastPrice ? formatPrice(displayLastPrice) : "—"}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Spread:{" "}
+              <span className="text-foreground font-medium">
+                {formatPrice(processedData.spread)}
+              </span>
+            </div>
+          </div>
+
+          {/* Bids (Buys) - Green */}
+          <div className="relative">
+            <table className="w-full">
+              <tbody>
+                {processedData.bids.map((level, index) => {
+                  const size = Number.parseFloat(level.size);
+                  const depthPercent = (size / processedData.maxSize) * 100;
+
+                  return (
+                    <tr
+                      key={`bid-${level.price}`}
+                      className="relative cursor-pointer hover:bg-muted/30 transition-colors group"
+                      onClick={() =>
+                        onPriceClick?.(Number.parseFloat(level.price), "BUY")
+                      }
+                    >
+                      {/* Label column */}
+                      <td className="relative px-4 py-1.5 w-16">
+                        {/* Depth bar */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 bg-green-500/20 transition-all duration-300"
+                          style={{
+                            width: `${Math.min(depthPercent * 2, 100)}%`,
+                          }}
+                        />
+                        {index === 0 && (
+                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
+                            Bids
+                          </span>
+                        )}
+                      </td>
+                      {/* Price */}
+                      <td className="text-right px-4 py-1.5 text-green-400 font-medium text-sm">
+                        {formatPrice(level.price)}
+                      </td>
+                      {/* Shares */}
+                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                        {formatSize(size)}
+                      </td>
+                      {/* Total */}
+                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                        {formatTotal(level.price, level.size)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Empty bids placeholder */}
+            {processedData.bids.length === 0 && (
+              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+                No bids available
+              </div>
+            )}
+          </div>
+
+          {/* Bottom padding */}
+          <div className="h-2" />
+        </>
+      )}
+    </>
+  );
+
+  // Embedded mode - just return the content without wrapper
+  if (embedded) {
+    return renderOrderBookContent();
+  }
+
+  // Standalone mode - with collapsible wrapper
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-3 px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-b">
-          <span>Price</span>
-          <span className="text-right">Size</span>
-          <span className="text-right">Total</span>
-        </div>
-
-        {/* Asks (Sells) - displayed in reverse order */}
-        <div className="divide-y divide-border/50">
-          {[...processedData.asks].reverse().map((level, index) => {
-            const size = Number.parseFloat(level.size);
-            const depthPercent = (size / processedData.maxAskSize) * 100;
-            const cumulativeSize = processedData.asks
-              .slice(0, processedData.asks.length - index)
-              .reduce((sum, l) => sum + Number.parseFloat(l.size), 0);
-
-            return (
-              <motion.div
-                key={`ask-${level.price}`}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.02 }}
-                className="relative grid grid-cols-3 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() =>
-                  onPriceClick?.(Number.parseFloat(level.price), "SELL")
-                }
-              >
-                {/* Depth bar */}
-                <div
-                  className="absolute right-0 top-0 bottom-0 bg-red-500/10"
-                  style={{ width: `${depthPercent}%` }}
-                />
-                <span className="relative text-red-500 font-medium">
-                  {formatPrice(level.price)}
-                </span>
-                <span className="relative text-right">{formatSize(size)}</span>
-                <span className="relative text-right text-muted-foreground">
-                  {formatSize(cumulativeSize)}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Spread indicator */}
-        <div className="px-3 sm:px-4 py-2 sm:py-3 bg-muted/30 border-y">
-          <div className="flex items-center justify-between text-xs sm:text-sm">
-            <span className="text-muted-foreground">Spread</span>
-            <span className="font-medium">
-              {formatPrice(processedData.spread)} (
-              {((processedData.spread / processedData.midpoint) * 100).toFixed(
-                2
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm">Order Book</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">
+                      Live order book showing buy and sell orders
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex items-center gap-2">
+              {useWebSocket && <ConnectionStatus state={connectionState} />}
+              {isOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
-              %)
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-[10px] sm:text-xs mt-1">
-            <span className="text-muted-foreground">Midpoint</span>
-            <span>{formatPrice(processedData.midpoint)}</span>
-          </div>
-        </div>
+            </div>
+          </button>
+        </CollapsibleTrigger>
 
-        {/* Bids (Buys) */}
-        <div className="divide-y divide-border/50">
-          {processedData.bids.map((level, index) => {
-            const size = Number.parseFloat(level.size);
-            const depthPercent = (size / processedData.maxBidSize) * 100;
-            const cumulativeSize = processedData.bids
-              .slice(0, index + 1)
-              .reduce((sum, l) => sum + Number.parseFloat(l.size), 0);
+        <CollapsibleContent>
+          <AnimatePresence mode="wait">
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderOrderBookContent()}
+            </motion.div>
+          </AnimatePresence>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
 
-            return (
-              <motion.div
-                key={`bid-${level.price}`}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.02 }}
-                className="relative grid grid-cols-3 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() =>
-                  onPriceClick?.(Number.parseFloat(level.price), "BUY")
-                }
-              >
-                {/* Depth bar */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 bg-green-500/10"
-                  style={{ width: `${depthPercent}%` }}
-                />
-                <span className="relative text-green-500 font-medium">
-                  {formatPrice(level.price)}
-                </span>
-                <span className="relative text-right">{formatSize(size)}</span>
-                <span className="relative text-right text-muted-foreground">
-                  {formatSize(cumulativeSize)}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Empty state for sides */}
-        {processedData.bids.length === 0 && processedData.asks.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No orders in the book
-          </div>
-        )}
-      </CardContent>
-    </Card>
+/**
+ * Legacy OrderBook component for backwards compatibility
+ * Wraps the new component with single token ID support
+ */
+export function OrderBookLegacy({
+  tokenId,
+  maxLevels = 10,
+  onPriceClick,
+  useWebSocket = true,
+  pollingInterval = 5000,
+}: {
+  tokenId: string;
+  maxLevels?: number;
+  onPriceClick?: (price: number, side: "BUY" | "SELL") => void;
+  useWebSocket?: boolean;
+  pollingInterval?: number;
+}) {
+  return (
+    <OrderBook
+      outcomes={[{ name: "Yes", tokenId }]}
+      maxLevels={maxLevels}
+      onPriceClick={onPriceClick}
+      useWebSocket={useWebSocket}
+      pollingInterval={pollingInterval}
+    />
   );
 }
 
@@ -362,17 +707,35 @@ export function OrderBook({
 export function OrderBookCompact({
   tokenId,
   onPriceClick,
+  useWebSocket = true,
 }: {
   tokenId: string;
   onPriceClick?: (price: number, side: "BUY" | "SELL") => void;
+  useWebSocket?: boolean;
 }) {
-  const { data: orderBook, isLoading } = useQuery<OrderBookData>({
+  const isValidTokenId = Boolean(tokenId && tokenId.length > 10);
+
+  // WebSocket connection (uses shared singleton manager)
+  const assetIds = useMemo(
+    () => (isValidTokenId && useWebSocket ? [tokenId] : []),
+    [isValidTokenId, useWebSocket, tokenId]
+  );
+  const { isConnected } = useOrderBookWebSocket(assetIds);
+
+  // Get order book from store (seeded by REST, updated by WebSocket)
+  const wsOrderBook = useOrderBookStore(tokenId);
+
+  // REST API fallback
+  const { data: restOrderBook, isLoading } = useQuery<OrderBookData>({
     queryKey: ["orderBook", tokenId],
     queryFn: () => fetchOrderBook(tokenId),
-    refetchInterval: 10000,
+    refetchInterval: !isConnected ? 10000 : false,
     staleTime: 5000,
-    enabled: !!tokenId,
+    enabled: isValidTokenId && (!useWebSocket || !isConnected),
   });
+
+  // Use WebSocket data if available
+  const orderBook = wsOrderBook && isConnected ? wsOrderBook : restOrderBook;
 
   if (isLoading || !orderBook) {
     return (
@@ -415,6 +778,17 @@ export function OrderBookCompact({
             {formatPrice(bestBid.price)}
           </span>
         </button>
+      )}
+      {/* Connection indicator */}
+      {useWebSocket && (
+        <div className="flex justify-center pt-1">
+          <div
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              isConnected ? "bg-emerald-500" : "bg-muted-foreground"
+            )}
+          />
+        </div>
       )}
     </div>
   );

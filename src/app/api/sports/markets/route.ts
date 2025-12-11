@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       queryParams.set("_tag", tag); // Use _tag for filtering
     }
 
-    console.log("Fetching markets with params:", queryParams.toString());
+    // console.log("Fetching markets with params:", queryParams.toString());
 
     const response = await fetch(
       `${POLYMARKET_API.GAMMA.MARKETS}?${queryParams.toString()}`,

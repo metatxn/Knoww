@@ -282,15 +282,15 @@ export function MarketPriceChart({
       });
     } else {
       // Fallback to outcomes
-      outcomes.forEach((outcome, idx) => {
-        config[`outcome${idx}`] = {
-          label: outcome,
+    outcomes.forEach((outcome, idx) => {
+      config[`outcome${idx}`] = {
+        label: outcome,
           color: defaultColors[idx % defaultColors.length],
-        };
-      });
+      };
+    });
 
       // Default config if nothing provided
-      if (outcomes.length === 0) {
+    if (outcomes.length === 0) {
         config.outcome0 = { label: "Yes", color: defaultColors[0] };
         config.outcome1 = { label: "No", color: defaultColors[1] };
       }
@@ -407,30 +407,30 @@ export function MarketPriceChart({
             Failed to load price history
           </div>
         ) : (
-          <LineChart
-            accessibilityLayer
-            data={chartData}
-            margin={{
-              left: 0,
-              right: 12,
-              top: 12,
-              bottom: 12,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tickFormatter={formatXAxis}
-              minTickGap={50}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickMargin={4}
-              tickFormatter={(value) => `${value}%`}
+        <LineChart
+          accessibilityLayer
+          data={chartData}
+          margin={{
+            left: 0,
+            right: 12,
+            top: 12,
+            bottom: 12,
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={formatXAxis}
+            minTickGap={50}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={4}
+            tickFormatter={(value) => `${value}%`}
               domain={[yAxisMin, yAxisMax]}
               ticks={yAxisTicks}
               width={45}
@@ -499,20 +499,21 @@ export function MarketPriceChart({
                   </div>
                 );
               }}
-            />
-            {Object.keys(chartConfig).map((key) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={chartConfig[key as keyof typeof chartConfig]?.color}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
+          />
+          {Object.keys(chartConfig).map((key) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              stroke={chartConfig[key as keyof typeof chartConfig]?.color}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
                 connectNulls={true}
-              />
-            ))}
-          </LineChart>
+                isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
         )}
       </ChartContainer>
 

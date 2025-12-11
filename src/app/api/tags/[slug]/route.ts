@@ -32,10 +32,10 @@ export async function GET(
       );
     }
 
-    console.log(`Fetching tag details for slug: ${slug}`);
-    console.log(
-      `hello api-tags-slug: ${POLYMARKET_API.GAMMA.BASE}/tags/slug/${slug}`,
-    );
+    // console.log(`Fetching tag details for slug: ${slug}`);
+    // console.log(
+    //   `hello api-tags-slug: ${POLYMARKET_API.GAMMA.BASE}/tags/slug/${slug}`,
+    // );
 
     // Fetch tag details from Gamma API
     const response = await fetch(

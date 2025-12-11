@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     queryParams.set("limit", limit);
     queryParams.set("offset", offset);
 
-    console.log(`Fetching markets for tag_id: ${tag_id}`);
+    // console.log(`Fetching markets for tag_id: ${tag_id}`);
 
     const response = await fetch(
       `${POLYMARKET_API.GAMMA.MARKETS}?${queryParams.toString()}`,
