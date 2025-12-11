@@ -220,6 +220,8 @@ interface Position {
   market: {
     title: string;
     slug: string;
+    eventSlug: string;
+    eventId?: string;
     icon?: string;
     endDate?: string;
   };
@@ -305,7 +307,7 @@ function PositionsTable({
             <TableRow key={position.id} className="group">
               <TableCell>
                 <Link
-                  href={`/events/detail/${position.market.slug}`}
+                  href={`/events/detail/${position.market.eventSlug}`}
                   className="flex items-center gap-3"
                 >
                   <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">

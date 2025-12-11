@@ -3,12 +3,25 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { CACHE_DURATION, POLYMARKET_API } from "@/lib/constants";
 
 /**
+ * Check if the identifier is a numeric event ID or a slug
+ * Event IDs are numeric (e.g., 35908)
+ * Slugs contain letters and hyphens (e.g., who-will-trump-nominate-as-fed-chair)
+ */
+function isNumericId(str: string): boolean {
+  return /^\d+$/.test(str);
+}
+
+/**
  * GET /api/events/:id
- * Get event details by ID including all associated markets (closed=false by default)
+ * Get event details by ID or slug including all associated markets (closed=false by default)
+ *
+ * Supports both:
+ * - Numeric ID (e.g., 35908): Uses https://gamma-api.polymarket.com/events/{id}
+ * - Event slug: Uses https://gamma-api.polymarket.com/events/slug/{slug}
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Apply rate limiting: 100 requests per minute
   const rateLimitResponse = checkRateLimit(request, {
@@ -25,16 +38,22 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          error: "Event ID is required",
+          error: "Event ID or slug is required",
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    console.log(`hello api-events-id: ${POLYMARKET_API.GAMMA.EVENTS}/${id}`);
+    // Determine the correct API endpoint based on whether it's a numeric ID or slug
+    // - Numeric ID (e.g., 35908): /events/{id}
+    // - Slug (e.g., who-will-trump-win): /events/slug/{slug}
+    const isEventId = isNumericId(id);
+    const eventUrl = isEventId
+      ? `${POLYMARKET_API.GAMMA.EVENTS}/${id}`
+      : `${POLYMARKET_API.GAMMA.EVENTS}/slug/${id}`;
 
     // Fetch event details from Gamma API
-    const eventResponse = await fetch(`${POLYMARKET_API.GAMMA.EVENTS}/${id}`, {
+    const eventResponse = await fetch(eventUrl, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -48,10 +67,13 @@ export async function GET(
             success: false,
             error: "Event not found",
           },
-          { status: 404 },
+          { status: 404 }
         );
       }
-      throw new Error(`Gamma API error: ${eventResponse.statusText}`);
+      const errorText = await eventResponse.text();
+      throw new Error(
+        `Gamma API error: ${eventResponse.status} ${eventResponse.statusText} - ${errorText}`
+      );
     }
 
     const event = (await eventResponse.json()) as Record<string, unknown>;
@@ -62,7 +84,7 @@ export async function GET(
           success: false,
           error: "Event not found",
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -75,24 +97,22 @@ export async function GET(
       markets = event.markets;
     } else {
       // Otherwise, fetch markets by event slug or ID (always filter closed=false)
+      const marketsUrl = `${POLYMARKET_API.GAMMA.MARKETS}?events_slug=${
+        event.slug || id
+      }&closed=false`;
+
       try {
-        const marketsResponse = await fetch(
-          `${POLYMARKET_API.GAMMA.MARKETS}?events_slug=${
-            event.slug || id
-          }&closed=false`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            next: { revalidate: CACHE_DURATION.MARKETS },
+        const marketsResponse = await fetch(marketsUrl, {
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
+          next: { revalidate: CACHE_DURATION.MARKETS },
+        });
 
         if (marketsResponse.ok) {
           markets = (await marketsResponse.json()) as Record<string, unknown>[];
         }
-      } catch (err) {
-        console.error("Error fetching markets for event:", err);
+      } catch {
         // Continue with empty markets array
       }
     }
@@ -106,13 +126,12 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Error fetching event details:", error);
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

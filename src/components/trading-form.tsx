@@ -2,18 +2,24 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle, Loader2, Minus, Plus, Wallet, X } from "lucide-react";
+import {
+  AlertCircle,
+  Loader2,
+  Wallet,
+  Zap,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,12 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { calculatePotentialPnL, OrderSide } from "@/hooks/use-order-signing";
 import {
   useClobClient,
@@ -89,6 +89,10 @@ export interface TradingFormProps {
   onOrderSuccess?: (order: unknown) => void;
   /** Callback after order error */
   onOrderError?: (error: Error) => void;
+  /** Market image URL for header */
+  marketImage?: string;
+  /** Yes probability for header display */
+  yesProbability?: number;
 }
 
 /**
@@ -154,6 +158,7 @@ type OrderTypeSelection = "LIMIT" | "MARKET";
  * - Wallet connection integration
  */
 export function TradingForm({
+  marketTitle,
   outcomes,
   selectedOutcomeIndex,
   onOutcomeChange,
@@ -167,6 +172,8 @@ export function TradingForm({
   maxSlippagePercent = DEFAULT_MAX_SLIPPAGE_PERCENT,
   onOrderSuccess,
   onOrderError,
+  marketImage,
+  yesProbability,
 }: TradingFormProps) {
   const { isConnected } = useConnection();
   const { open } = useAppKit();
@@ -461,245 +468,196 @@ export function TradingForm({
     return isPriceCrossingBook(limitPrice, side, bestBid, bestAsk);
   }, [orderType, limitPrice, side, bestBid, bestAsk]);
 
-  return (
-    <Card className="sticky top-4 w-full">
-      <CardHeader className="pb-3 px-3 sm:px-6">
-        <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-          Trade
-          {negRisk && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <span className="px-2 py-0.5 text-xs bg-rose-500/20 text-rose-500 rounded-full">
-                    Neg Risk
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>This market uses negative risk pricing</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </CardTitle>
-      </CardHeader>
+  // Calculate balance progress for visual indicator
+  const balanceProgress = useMemo(() => {
+    if (!effectiveBalance || calculations.total <= 0) return 100;
+    return Math.min(100, (effectiveBalance / calculations.total) * 100);
+  }, [effectiveBalance, calculations.total]);
 
-      <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
-        {/* Buy/Sell Toggle */}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={side === "BUY" ? "default" : "outline"}
-            className={`flex-1 text-sm sm:text-base ${
-              side === "BUY" ? "bg-green-600 hover:bg-green-700" : ""
-            }`}
-            size="default"
-            onClick={() => setSide("BUY")}
-          >
-            Buy
-          </Button>
-          <Button
-            type="button"
-            variant={side === "SELL" ? "default" : "outline"}
-            className={`flex-1 text-sm sm:text-base ${
-              side === "SELL" ? "bg-red-600 hover:bg-red-700" : ""
-            }`}
-            size="default"
-            onClick={() => setSide("SELL")}
-          >
-            Sell
-          </Button>
+  // Calculate profit percentage for display
+  const profitPercent = useMemo(() => {
+    if (calculations.total <= 0) return 0;
+    return ((calculations.potentialWin / calculations.total) * 100).toFixed(1);
+  }, [calculations.potentialWin, calculations.total]);
+
+  return (
+    <div className="sticky top-4 w-full">
+      {/* Single Card Container */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+        {/* Market Header - Merged into card */}
+        <div className="flex items-center gap-3 p-4 border-b border-border">
+          {marketImage && (
+            <div className="relative w-10 h-10 shrink-0">
+              <Image
+                src={marketImage}
+                alt={marketTitle || "Market"}
+                fill
+                sizes="40px"
+                className="rounded-full object-cover"
+              />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm truncate">{marketTitle}</h3>
+            <div className="flex items-center gap-2">
+              {negRisk && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">
+                  Neg Risk
+                </span>
+              )}
+              <span className="text-xs text-emerald-500 font-medium">
+                {yesProbability ??
+                  Math.round((selectedOutcome?.price ?? 0) * 100)}
+                % Yes
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Order Type Toggle */}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={orderType === "MARKET" ? "default" : "outline"}
-            className="flex-1 text-xs sm:text-sm"
-            size="sm"
-            onClick={() => setOrderType("MARKET")}
-          >
-            Market
-          </Button>
-          <Button
-            type="button"
-            variant={orderType === "LIMIT" ? "default" : "outline"}
-            className="flex-1 text-xs sm:text-sm"
-            size="sm"
-            onClick={() => setOrderType("LIMIT")}
-          >
-            Limit
-          </Button>
+        <div className="p-4 pb-3">
+          <div className="flex rounded-xl bg-muted p-1">
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                orderType === "MARKET"
+                  ? "bg-background text-foreground shadow-md border border-border/50"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setOrderType("MARKET")}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Market
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                orderType === "LIMIT"
+                  ? "bg-background text-foreground shadow-md border border-border/50"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setOrderType("LIMIT")}
+            >
+              Limit
+            </button>
+          </div>
+        </div>
+
+        {/* Buy/Sell Toggle */}
+        <div className="px-4 pb-3">
+          <div className="flex rounded-xl border border-border p-1">
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                side === "BUY"
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setSide("BUY")}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Buy
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                side === "SELL"
+                  ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setSide("SELL")}
+            >
+              <TrendingDown className="h-3.5 w-3.5" />
+              Sell
+            </button>
+          </div>
         </div>
 
         {/* Outcome Selector */}
-        <div className="space-y-2">
-          <label className="text-xs sm:text-sm font-medium text-muted-foreground">
-            Outcome
-          </label>
-          <div className="space-y-2">
+        <div className="px-4 pb-3">
+          <div className="flex gap-2">
             {outcomes.map((outcome, idx) => (
-              <Button
+              <button
                 key={outcome.tokenId}
                 type="button"
-                variant={selectedOutcomeIndex === idx ? "default" : "outline"}
-                className="w-full justify-between h-auto py-2.5 sm:py-3 text-sm"
+                className={`flex-1 relative px-4 py-3 rounded-xl border-2 transition-all ${
+                  selectedOutcomeIndex === idx
+                    ? outcome.name === "Yes"
+                      ? "border-emerald-500 bg-emerald-500/5"
+                      : "border-red-500 bg-red-500/5"
+                    : "border-border hover:border-muted-foreground/50 bg-secondary/30"
+                }`}
                 onClick={() => onOutcomeChange(idx)}
               >
-                <span className="font-medium text-left flex-1">
+                {/* Active indicator dot */}
+                {selectedOutcomeIndex === idx && (
+                  <span
+                    className={`absolute top-2 right-2 h-2 w-2 rounded-full ${
+                      outcome.name === "Yes" ? "bg-emerald-500" : "bg-red-500"
+                    }`}
+                  />
+                )}
+                <span
+                  className={`block text-sm font-medium ${
+                    outcome.name === "Yes"
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : outcome.name === "No"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-foreground"
+                  }`}
+                >
                   {outcome.name}
                 </span>
-                <span className="font-bold">{formatCents(outcome.price)}</span>
-              </Button>
+                <span className="block text-lg font-semibold font-mono text-foreground mt-0.5">
+                  {(outcome.price * 100).toFixed(1)}¢
+                </span>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Limit Price (only for limit orders) */}
-        {orderType === "LIMIT" && (
-          <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-              <label className="text-xs sm:text-sm font-medium">
-                Limit Price
-              </label>
-              {effectiveBalance !== undefined && (
-                <div className="text-xs sm:text-sm text-muted-foreground">
-                  Balance: ${effectiveBalance.toFixed(2)}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
-                onClick={() => handlePriceChange(-1)}
-                disabled={limitPrice <= tickSize}
+        {/* Execution Info */}
+        <div className="px-4 pb-3">
+          <div className="rounded-xl bg-secondary/30 p-3 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Est. Execution</span>
+              <span
+                className={`font-medium ${
+                  slippageExceedsMax
+                    ? "text-amber-500"
+                    : "text-muted-foreground"
+                }`}
               >
-                <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-              <div className="flex-1">
-                <Input
-                  type="number"
-                  value={limitPrice}
-                  onChange={(e) => {
-                    const val = Number.parseFloat(e.target.value);
-                    if (!Number.isNaN(val)) {
-                      // Round to nearest tick and clamp to valid range
-                      const rounded = roundToTick(val, tickSize);
-                      setLimitPrice(
-                        Math.max(tickSize, Math.min(1 - tickSize, rounded))
-                      );
-                    }
-                  }}
-                  min={tickSize}
-                  max={1 - tickSize}
-                  step={tickSize}
-                  className="text-center text-base sm:text-lg font-semibold h-9 sm:h-10"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0"
-                onClick={() => handlePriceChange(1)}
-                disabled={limitPrice >= 1 - tickSize}
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
+                {slippageDisplay?.slippagePercent || "0.00%"} slippage
+              </span>
+              <span className="text-muted-foreground">Avg Fill</span>
+              <span className="font-mono font-medium text-foreground">
+                {slippageDisplay?.avgPrice || formatCents(calculations.price)}
+              </span>
             </div>
-            <div className="text-center text-xs sm:text-sm text-muted-foreground">
-              {formatCents(limitPrice)} per share
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Best {side === "BUY" ? "Ask" : "Bid"}
+              </span>
+              <span className="font-mono text-foreground">
+                {slippageDisplay?.bestPrice ||
+                  formatCents(side === "BUY" ? bestAsk || 0 : bestBid || 0)}
+              </span>
+              <span className="text-muted-foreground">Worst Price</span>
+              <span className="font-mono text-foreground">
+                {slippageDisplay?.worstPrice || formatCents(calculations.price)}
+              </span>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Market Price Display (for market orders) */}
-        {orderType === "MARKET" && selectedOutcome && (
-          <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-              <label className="text-xs sm:text-sm font-medium">
-                Estimated Execution
-              </label>
-              {slippageDisplay && (
-                <span
-                  className={`text-xs ${
-                    slippageExceedsMax
-                      ? "text-amber-500"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {slippageDisplay.slippagePercent} slippage
-                </span>
-              )}
-            </div>
-
-            {/* Slippage breakdown */}
-            {slippageResult && slippageResult.canFill ? (
-              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">
-                    Avg Fill Price
-                  </span>
-                  <span className="text-lg font-bold">
-                    {slippageDisplay?.avgPrice}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">
-                    Best {side === "BUY" ? "Ask" : "Bid"}
-                  </span>
-                  <span>{slippageDisplay?.bestPrice}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">Worst Price</span>
-                  <span>{slippageDisplay?.worstPrice}</span>
-                </div>
-                {slippageResult.fills.length > 1 && (
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">
-                      Fill breakdown:
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {slippageDisplay?.fillsDescription}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : slippageResult && !slippageResult.canFill ? (
-              <div className="bg-amber-500/10 rounded-lg p-3">
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  ⚠️ Insufficient liquidity. Only{" "}
-                  {(shares - slippageResult.unfilledSize).toFixed(0)} of{" "}
-                  {shares} shares can be filled.
-                </p>
-              </div>
-            ) : (
-              <div className="text-center py-2.5 sm:py-3 bg-muted/50 rounded-lg">
-                <span className="text-xl sm:text-2xl font-bold">
-                  {formatCents(marketOrderPrice)}
-                </span>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                  {side === "BUY" ? (
-                    <>Best ask: {bestAsk ? formatCents(bestAsk) : "N/A"}</>
-                  ) : (
-                    <>Best bid: {bestBid ? formatCents(bestBid) : "N/A"}</>
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Shares Input */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-xs sm:text-sm font-medium">Shares</label>
+        {/* Shares Section */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-foreground">Shares</span>
             <button
               type="button"
-              className="text-xs sm:text-sm text-primary hover:underline"
+              className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium"
               onClick={() => {
                 if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
@@ -712,8 +670,31 @@ export function TradingForm({
               Max
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <Input
+
+          {/* Shares Input with flanking buttons */}
+          <div className="flex items-stretch gap-2">
+            {/* Left decrement buttons */}
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => handleSharesChange(-10)}
+                disabled={shares <= 10}
+              >
+                -10
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => handleSharesChange(-1)}
+                disabled={shares <= 1}
+              >
+                -1
+              </button>
+            </div>
+
+            {/* Center input */}
+            <input
               type="number"
               value={shares}
               onChange={(e) => {
@@ -723,352 +704,243 @@ export function TradingForm({
                 }
               }}
               min={1}
-              className="text-center text-base sm:text-lg font-semibold h-9 sm:h-10"
+              className="flex-1 bg-secondary/30 border border-border rounded-xl px-4 py-3 text-center text-lg font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
-              onClick={() => handleSharesChange(-100)}
-              disabled={shares <= 100}
-            >
-              -100
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
-              onClick={() => handleSharesChange(-10)}
-              disabled={shares <= 10}
-            >
-              -10
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
-              onClick={() => handleSharesChange(10)}
-            >
-              +10
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm h-8 sm:h-9 px-1 sm:px-3"
-              onClick={() => handleSharesChange(100)}
-            >
-              +100
-            </Button>
-          </div>
-        </div>
 
-        {/* Order Duration (only for limit orders) */}
-        {orderType === "LIMIT" && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">
-                  {useExpiration
-                    ? "Good Till Date (GTD)"
-                    : "Good Till Cancelled (GTC)"}
-                </span>
-                <span className="text-[10px] sm:text-xs text-muted-foreground">
-                  {useExpiration
-                    ? "Order expires after set time"
-                    : "Order stays until filled or cancelled"}
-                </span>
-              </div>
+            {/* Right increment buttons */}
+            <div className="flex gap-1">
               <button
                 type="button"
-                className={`relative h-6 w-11 rounded-full transition-colors ${
-                  useExpiration ? "bg-primary" : "bg-muted"
-                }`}
-                onClick={() => setUseExpiration(!useExpiration)}
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors"
+                onClick={() => handleSharesChange(1)}
               >
-                <div
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${
-                    useExpiration ? "translate-x-5" : "translate-x-0.5"
-                  }`}
-                />
+                +1
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors"
+                onClick={() => handleSharesChange(10)}
+              >
+                +10
               </button>
             </div>
-            {useExpiration && (
-              <Select
-                value={expirationHours.toString()}
-                onValueChange={(val) =>
-                  setExpirationHours(Number.parseInt(val, 10))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select expiration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 hour</SelectItem>
-                  <SelectItem value="6">6 hours</SelectItem>
-                  <SelectItem value="24">24 hours</SelectItem>
-                  <SelectItem value="72">3 days</SelectItem>
-                  <SelectItem value="168">1 week</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
           </div>
-        )}
 
-        {/* Market Order Info */}
-        {orderType === "MARKET" && (
-          <div className="text-[10px] sm:text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-            <strong>Fill or Kill (FOK):</strong> Order must fill immediately at
-            the shown price or better, otherwise it will be cancelled.
-          </div>
-        )}
+          {/* FOK Notice */}
+          {orderType === "MARKET" && (
+            <p className="text-[11px] text-muted-foreground leading-relaxed mt-2">
+              <span className="font-medium">FOK:</span> Order fills immediately
+              or cancels
+            </p>
+          )}
+        </div>
 
-        {/* Totals */}
-        <div className="space-y-1.5 sm:space-y-2 pt-2 border-t">
-          <div className="flex justify-between items-center">
-            <span className="text-xs sm:text-sm font-medium">
-              {side === "SELL" ? "Total Proceeds" : "Total Cost"}
-            </span>
-            <span className="text-lg sm:text-xl font-bold">
-              ${calculations.total.toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs sm:text-sm font-medium">
-              Potential Return
-            </span>
-            <span className="text-lg sm:text-xl font-bold text-green-500">
-              ${(calculations.total + calculations.potentialWin).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-xs sm:text-sm text-muted-foreground">
-            <span>Profit if {side === "BUY" ? "Yes" : "No"}</span>
-            <span className="text-green-500">
-              +${calculations.potentialWin.toFixed(2)} (
-              {calculations.returnPercent}%)
-            </span>
+        {/* Totals Section */}
+        <div className="px-4 pb-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Total Cost</span>
+              <span className="text-lg font-semibold text-foreground">
+                ${calculations.total.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Potential Return
+              </span>
+              <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                ${(calculations.total + calculations.potentialWin).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Profit if {selectedOutcome?.name || "Yes"}
+              </span>
+              <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                +${calculations.potentialWin.toFixed(2)} ({profitPercent}%)
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Error Display */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error.message}</span>
-          </motion.div>
-        )}
-
-        {/* High Slippage Warning */}
-        {orderType === "MARKET" && slippageExceedsMax && slippageResult && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-sm"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              High slippage warning: {slippageResult.slippagePercent.toFixed(2)}
-              % exceeds {maxSlippagePercent}% tolerance. Consider reducing order
-              size or using a limit order.
-            </span>
-          </motion.div>
-        )}
-
-        {/* Insufficient Balance Warning */}
-        {hasInsufficientBalance && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-lg text-sm"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <div className="flex flex-col gap-1">
-              <span>
-                Insufficient USDC.e balance. You need $
-                {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
-                more.
-              </span>
-              <span className="text-xs opacity-75">
-                Deposit USDC.e (bridged USDC) to your trading wallet to
-                continue.
-              </span>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Insufficient Allowance Warning */}
-        {(hasNoAllowance || hasInsufficientAllowance) &&
-          !hasInsufficientBalance && (
+        <AnimatePresence>
+          {error && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="px-4 pb-3"
             >
-              <div className="flex items-center gap-2 p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg text-sm">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>
-                  {hasNoAllowance
-                    ? "You need to approve USDC.e spending before trading."
-                    : `Insufficient allowance. Current: $${
-                        allowance?.toFixed(2) || 0
-                      }, needed: $${calculations.total.toFixed(2)}`}
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-xl">
+                <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                <span className="text-sm text-destructive">
+                  {error.message}
                 </span>
               </div>
-              <Button
-                type="button"
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                onClick={handleSetAllowance}
-                disabled={isUpdatingAllowance}
-              >
-                {isUpdatingAllowance ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Approving...
-                  </>
-                ) : (
-                  <>Approve USDC.e Spending</>
-                )}
-              </Button>
             </motion.div>
           )}
+        </AnimatePresence>
 
-        {/* Spread Warning - Price crossing the book */}
-        {spreadWarning?.isCrossing && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-sm"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              {side === "BUY"
-                ? `You're paying ${Math.abs(
-                    spreadWarning.percentAbove || 0
-                  ).toFixed(1)}% above the best ask price.`
-                : `You're selling ${Math.abs(
-                    spreadWarning.percentAbove || 0
-                  ).toFixed(1)}% below the best bid price.`}
-            </span>
-          </motion.div>
-        )}
+        {/* Insufficient Balance Warning with Progress Bar */}
+        <AnimatePresence>
+          {hasInsufficientBalance && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="px-4 pb-3"
+            >
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                    Insufficient balance. Need $
+                    {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
+                    more.
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="h-1.5 bg-amber-500/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                    style={{ width: `${balanceProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+                  ${effectiveBalance?.toFixed(2) || "0.00"} / $
+                  {calculations.total.toFixed(2)} USDC.e
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Minimum Order Size Warning */}
-        {isBelowMinimum && !hasInsufficientBalance && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-lg text-sm"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              Minimum order size is ${minOrderSize}. Current order: $
-              {calculations.total.toFixed(2)}
-            </span>
-          </motion.div>
-        )}
+        {/* Insufficient Allowance Warning */}
+        <AnimatePresence>
+          {(hasNoAllowance || hasInsufficientAllowance) &&
+            !hasInsufficientBalance && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-4 pb-3 space-y-3"
+              >
+                <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400">
+                    {hasNoAllowance
+                      ? "Approve USDC.e spending to trade"
+                      : `Increase allowance to $${calculations.total.toFixed(
+                          2
+                        )}`}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl"
+                  onClick={handleSetAllowance}
+                  disabled={isUpdatingAllowance}
+                >
+                  {isUpdatingAllowance ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Approving...
+                    </>
+                  ) : (
+                    "Approve USDC.e"
+                  )}
+                </Button>
+              </motion.div>
+            )}
+        </AnimatePresence>
 
         {/* Submit Button */}
-        {!isConnected ? (
-          <Button
-            type="button"
-            className="w-full"
-            size="lg"
-            onClick={() => open()}
-          >
-            <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet to Trade
-          </Button>
-        ) : !hasCredentials ? (
-          <Button
-            type="button"
-            className="w-full bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-            size="lg"
-            onClick={() => setShowOnboarding(true)}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Setting up...
-              </>
-            ) : (
-              <>
-                <Wallet className="mr-2 h-4 w-4" />
-                Setup Trading Account
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            className={`w-full ${
-              side === "BUY"
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-red-600 hover:bg-red-700"
-            }`}
-            size="lg"
-            onClick={handleSubmit}
-            disabled={
-              isLoading ||
-              hasInsufficientBalance ||
-              hasInsufficientAllowance ||
-              hasNoAllowance ||
-              isBelowMinimum ||
-              !selectedOutcome ||
-              !hasValidTokenId ||
-              (orderType === "MARKET" && !canFullyFill)
-            }
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Placing Order...
-              </>
-            ) : !hasValidTokenId ? (
-              <>Trading not available</>
-            ) : orderType === "MARKET" && !canFullyFill ? (
-              <>Insufficient liquidity</>
-            ) : isBelowMinimum ? (
-              <>Minimum order: ${minOrderSize}</>
-            ) : (
-              <>
-                {side === "BUY" ? "Buy" : "Sell"}{" "}
-                {selectedOutcome?.name || "Outcome"}
-              </>
-            )}
-          </Button>
-        )}
-
-        {/* Warning for unavailable trading */}
-        {isConnected && !hasValidTokenId && selectedOutcome && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-600 dark:text-amber-400"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              Trading is not available for this market. Token IDs are missing.
-            </span>
-          </motion.div>
-        )}
+        <div className="p-4 pt-1">
+          {!isConnected ? (
+            <button
+              type="button"
+              className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+              onClick={() => open()}
+            >
+              <Wallet className="h-4 w-4" />
+              Connect Wallet to Trade
+            </button>
+          ) : !hasCredentials ? (
+            <button
+              type="button"
+              className="w-full h-12 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-purple-600/20"
+              onClick={() => setShowOnboarding(true)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-4 w-4" />
+                  Setup Trading Account
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`w-full h-12 font-medium rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                hasInsufficientBalance || isBelowMinimum
+                  ? "bg-muted text-muted-foreground"
+                  : side === "BUY"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                  : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
+              }`}
+              onClick={handleSubmit}
+              disabled={
+                isLoading ||
+                hasInsufficientBalance ||
+                hasInsufficientAllowance ||
+                hasNoAllowance ||
+                isBelowMinimum ||
+                !selectedOutcome ||
+                !hasValidTokenId ||
+                (orderType === "MARKET" && !canFullyFill)
+              }
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Placing Order...
+                </>
+              ) : !hasValidTokenId ? (
+                "Trading not available"
+              ) : orderType === "MARKET" && !canFullyFill ? (
+                "Insufficient liquidity"
+              ) : hasInsufficientBalance ? (
+                "Insufficient Balance"
+              ) : isBelowMinimum ? (
+                `Minimum order: $${minOrderSize}`
+              ) : (
+                <>
+                  {side === "BUY" ? (
+                    <TrendingUp className="h-4 w-4" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4" />
+                  )}
+                  {side === "BUY" ? "Buy" : "Sell"} {shares} Shares
+                </>
+              )}
+            </button>
+          )}
+        </div>
 
         {/* Disclaimer */}
-        <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-          By placing an order, you agree to the terms of service.
-          {orderType === "MARKET" &&
-            " Market orders execute immediately at best available price."}
-        </p>
-      </CardContent>
+        <div className="px-4 pb-4">
+          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+            By placing an order, you agree to the terms of service.
+          </p>
+        </div>
+      </div>
 
       {/* Onboarding Dialog */}
       <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
@@ -1082,6 +954,6 @@ export function TradingForm({
           />
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

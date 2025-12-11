@@ -491,8 +491,8 @@ export default function MarketDetailPage() {
           </div>
 
           {/* Trading Panel - Right Side (1/3 width) */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Trading Form */}
+          <div className="lg:col-span-1">
+            {/* Trading Form with Merged Header */}
             <TradingForm
               marketTitle={market.question}
               tokenId={tradingOutcomes[selectedOutcome]?.tokenId || ""}
@@ -502,6 +502,8 @@ export default function MarketDetailPage() {
               negRisk={market.negRisk}
               onOrderSuccess={handleOrderSuccess}
               onOrderError={handleOrderError}
+              marketImage={market.image}
+              yesProbability={market.bestAsk ? Math.round(market.bestAsk * 100) : undefined}
             />
           </div>
         </div>

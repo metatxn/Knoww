@@ -692,37 +692,8 @@ export default function EventDetailPage() {
           </div>
 
           {/* Trading Panel */}
-          <div className="lg:col-span-1 space-y-3 sm:space-y-4">
-            {/* Selected Market Header */}
-            {selectedMarket && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    {selectedMarket.image && (
-                      <div className="relative w-10 h-10 shrink-0">
-                        <Image
-                          src={selectedMarket.image}
-                          alt={selectedMarket.groupItemTitle || "Market"}
-                          fill
-                          sizes="40px"
-                          className="rounded object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm truncate">
-                        {selectedMarket.groupItemTitle || "Select a market"}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedMarket.yesProbability}% Yes
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            )}
-
-            {/* Trading Form */}
+          <div className="lg:col-span-1">
+            {/* Trading Form with Merged Header */}
             {selectedMarket && tradingOutcomes.length > 0 && (
               <TradingForm
                 marketTitle={selectedMarket.groupItemTitle || event.title}
@@ -739,6 +710,8 @@ export default function EventDetailPage() {
                 maxSlippagePercent={2}
                 onOrderSuccess={handleOrderSuccess}
                 onOrderError={handleOrderError}
+                marketImage={selectedMarket.image}
+                yesProbability={selectedMarket.yesProbability}
               />
             )}
           </div>
