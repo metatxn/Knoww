@@ -916,10 +916,10 @@ export default function EventDetailPage() {
                             }
                           }}
                         >
-                          {/* Mobile & Desktop Layout */}
-                          <div className="flex flex-col md:flex-row md:items-center gap-3">
-                            {/* Top Row (Mobile) / Left Section (Desktop): Image + Market Title + Percentage */}
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Mobile Layout */}
+                          <div className="flex flex-col gap-3 md:hidden">
+                            {/* Top Row: Image + Title + Percentage */}
+                            <div className="flex items-center gap-3">
                               {market.image && (
                                 <div className="relative w-10 h-10 shrink-0">
                                   <Image
@@ -932,14 +932,13 @@ export default function EventDetailPage() {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm md:text-base truncate">
+                                <h3 className="font-semibold text-sm truncate">
                                   {market.groupItemTitle}
                                 </h3>
-                                <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground mt-0.5">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                   <span>
                                     {formatVolume(market.volume)} Vol.
                                   </span>
-                                  {/* Inline order book prices */}
                                   {market.yesTokenId && (
                                     <OrderBookInline
                                       tokenId={market.yesTokenId}
@@ -949,10 +948,8 @@ export default function EventDetailPage() {
                                   )}
                                 </div>
                               </div>
-
-                              {/* Percentage (visible on mobile, positioned here) */}
-                              <div className="md:hidden flex items-center gap-2">
-                                <span className="text-lg font-bold">
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-lg font-bold tabular-nums">
                                   {market.yesProbability}%
                                 </span>
                                 <div
@@ -967,45 +964,20 @@ export default function EventDetailPage() {
                                       market.change < 0 ? "rotate-180" : ""
                                     }`}
                                   />
-                                  <span>
+                                  <span className="tabular-nums">
                                     {market.change >= 0 ? "+" : ""}
                                     {market.change}%
                                   </span>
                                 </div>
                               </div>
                             </div>
-
-                            {/* Desktop Percentage + Change (hidden on mobile) */}
-                            <div className="hidden md:flex items-center gap-2 px-4">
-                              <span className="text-xl font-bold">
-                                {market.yesProbability}%
-                              </span>
-                              <div
-                                className={`flex items-center gap-1 text-sm ${
-                                  market.change >= 0
-                                    ? "text-green-500"
-                                    : "text-red-500"
-                                }`}
-                              >
-                                <TrendingUp
-                                  className={`h-4 w-4 ${
-                                    market.change < 0 ? "rotate-180" : ""
-                                  }`}
-                                />
-                                <span>
-                                  {market.change >= 0 ? "+" : ""}
-                                  {market.change}%
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Bottom Row (Mobile) / Right Section (Desktop): Yes/No Buttons */}
-                            <div className="flex items-center gap-3 w-full md:w-auto">
+                            {/* Bottom Row: Yes/No Buttons */}
+                            <div className="flex items-center gap-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 className={cn(
-                                  "flex-1 md:flex-initial md:min-w-[100px] text-xs md:text-sm bg-green-600 hover:bg-green-700 text-white",
+                                  "flex-1 h-9 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 0 &&
                                     "ring-2 ring-green-400"
@@ -1014,11 +986,10 @@ export default function EventDetailPage() {
                                   e.stopPropagation();
                                   setExpandedOrderBookMarketId(market.id);
                                   setSelectedMarketId(market.id);
-                                  setSelectedOutcomeIndex(0); // Yes
+                                  setSelectedOutcomeIndex(0);
                                   void preloadOrderBook(market.yesTokenId);
                                 }}
                               >
-                                <span className="hidden sm:inline">Buy </span>
                                 Yes {formatPrice(market.yesPrice)}¢
                               </Button>
                               <Button
@@ -1026,7 +997,7 @@ export default function EventDetailPage() {
                                 size="sm"
                                 variant="destructive"
                                 className={cn(
-                                  "flex-1 md:flex-initial md:min-w-[100px] text-xs md:text-sm",
+                                  "flex-1 h-9 text-xs font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 1 &&
                                     "ring-2 ring-red-400"
@@ -1035,12 +1006,112 @@ export default function EventDetailPage() {
                                   e.stopPropagation();
                                   setExpandedOrderBookMarketId(market.id);
                                   setSelectedMarketId(market.id);
-                                  setSelectedOutcomeIndex(1); // No
+                                  setSelectedOutcomeIndex(1);
                                   void preloadOrderBook(market.noTokenId);
                                 }}
                               >
-                                <span className="hidden sm:inline">Buy </span>No{" "}
-                                {formatPrice(market.noPrice)}¢
+                                No {formatPrice(market.noPrice)}¢
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout - Grid for proper alignment */}
+                          <div className="hidden md:grid md:grid-cols-[1fr_120px_240px] md:items-center md:gap-4">
+                            {/* Column 1: Image + Title + Volume */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              {market.image && (
+                                <div className="relative w-10 h-10 shrink-0">
+                                  <Image
+                                    src={market.image}
+                                    alt={market.groupItemTitle || "Market"}
+                                    fill
+                                    sizes="40px"
+                                    className="rounded object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-base truncate">
+                                  {market.groupItemTitle}
+                                </h3>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                                  <span>
+                                    {formatVolume(market.volume)} Vol.
+                                  </span>
+                                  {market.yesTokenId && (
+                                    <OrderBookInline
+                                      tokenId={market.yesTokenId}
+                                      connectionState={connectionState}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Column 2: Percentage + Change - Fixed width for alignment */}
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-xl font-bold tabular-nums">
+                                {market.yesProbability}%
+                              </span>
+                              <div
+                                className={`flex items-center gap-1 text-sm min-w-[60px] ${
+                                  market.change >= 0
+                                    ? "text-green-500"
+                                    : "text-red-500"
+                                }`}
+                              >
+                                <TrendingUp
+                                  className={`h-4 w-4 shrink-0 ${
+                                    market.change < 0 ? "rotate-180" : ""
+                                  }`}
+                                />
+                                <span className="tabular-nums">
+                                  {market.change >= 0 ? "+" : ""}
+                                  {market.change}%
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Column 3: Yes/No Buttons - Fixed width for alignment */}
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className={cn(
+                                  "w-[110px] h-9 text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
+                                  isExpanded &&
+                                    selectedOutcomeIndex === 0 &&
+                                    "ring-2 ring-green-400"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedOrderBookMarketId(market.id);
+                                  setSelectedMarketId(market.id);
+                                  setSelectedOutcomeIndex(0);
+                                  void preloadOrderBook(market.yesTokenId);
+                                }}
+                              >
+                                Buy Yes {formatPrice(market.yesPrice)}¢
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className={cn(
+                                  "w-[110px] h-9 text-sm font-medium",
+                                  isExpanded &&
+                                    selectedOutcomeIndex === 1 &&
+                                    "ring-2 ring-red-400"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedOrderBookMarketId(market.id);
+                                  setSelectedMarketId(market.id);
+                                  setSelectedOutcomeIndex(1);
+                                  void preloadOrderBook(market.noTokenId);
+                                }}
+                              >
+                                Buy No {formatPrice(market.noPrice)}¢
                               </Button>
                             </div>
                           </div>
@@ -1106,31 +1177,27 @@ export default function EventDetailPage() {
                                 />
                               </TabsContent>
 
-                              {/* Graph Tab */}
+                              {/* Graph Tab - Price history for Yes and No */}
                               <TabsContent value="graph" className="m-0 p-4">
-                                <div className="space-y-4">
-                                  <div className="h-48 bg-muted/30 rounded-lg flex items-center justify-center">
-                                    <div className="text-center text-muted-foreground">
-                                      <p className="text-sm font-medium">
-                                        Price History Chart
-                                      </p>
-                                      <p className="text-xs mt-1">
-                                        Shows Yes and No price movements over
-                                        time
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-center gap-6 text-xs">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                                      <span>Yes</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                                      <span>No</span>
-                                    </div>
-                                  </div>
-                                </div>
+                                <MarketPriceChart
+                                  tokens={[
+                                    {
+                                      tokenId: market.yesTokenId,
+                                      name: "Yes",
+                                      color: "hsl(142, 76%, 36%)", // green-600
+                                    },
+                                    {
+                                      tokenId: market.noTokenId,
+                                      name: "No",
+                                      color: "hsl(0, 84%, 60%)", // red-500
+                                    },
+                                  ]}
+                                  outcomes={["Yes", "No"]}
+                                  outcomePrices={[
+                                    market.yesPrice,
+                                    market.noPrice,
+                                  ]}
+                                />
                               </TabsContent>
 
                               {/* Resolution Tab */}
@@ -1350,20 +1417,30 @@ export default function EventDetailPage() {
                                         </div>
                                       </TabsContent>
 
+                                      {/* Graph Tab - Price history for closed market */}
                                       <TabsContent
                                         value="graph"
                                         className="m-0 p-4"
                                       >
-                                        <div className="h-48 bg-muted/30 rounded-lg flex items-center justify-center">
-                                          <div className="text-center text-muted-foreground">
-                                            <p className="text-sm font-medium">
-                                              Price History Chart
-                                            </p>
-                                            <p className="text-xs mt-1">
-                                              (Coming soon)
-                                            </p>
-                                          </div>
-                                        </div>
+                                        <MarketPriceChart
+                                          tokens={[
+                                            {
+                                              tokenId: market.yesTokenId,
+                                              name: "Yes",
+                                              color: "hsl(142, 76%, 36%)", // green-600
+                                            },
+                                            {
+                                              tokenId: market.noTokenId,
+                                              name: "No",
+                                              color: "hsl(0, 84%, 60%)", // red-500
+                                            },
+                                          ]}
+                                          outcomes={["Yes", "No"]}
+                                          outcomePrices={[
+                                            market.yesPrice,
+                                            market.noPrice,
+                                          ]}
+                                        />
                                       </TabsContent>
 
                                       <TabsContent
