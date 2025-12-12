@@ -1136,12 +1136,15 @@ export default function EventDetailPage() {
                                   >
                                     Order Book
                                   </TabsTrigger>
-                                  <TabsTrigger
-                                    value="graph"
-                                    className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
-                                  >
-                                    Graph
-                                  </TabsTrigger>
+                                  {/* Only show Graph tab for multi-market events - single market events already show the chart above */}
+                                  {!isSingleMarketEvent && (
+                                    <TabsTrigger
+                                      value="graph"
+                                      className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                    >
+                                      Graph
+                                    </TabsTrigger>
+                                  )}
                                   <TabsTrigger
                                     value="resolution"
                                     className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
@@ -1177,28 +1180,30 @@ export default function EventDetailPage() {
                                 />
                               </TabsContent>
 
-                              {/* Graph Tab - Price history for Yes and No */}
-                              <TabsContent value="graph" className="m-0 p-4">
-                                <MarketPriceChart
-                                  tokens={[
-                                    {
-                                      tokenId: market.yesTokenId,
-                                      name: "Yes",
-                                      color: "hsl(142, 76%, 36%)", // green-600
-                                    },
-                                    {
-                                      tokenId: market.noTokenId,
-                                      name: "No",
-                                      color: "hsl(0, 84%, 60%)", // red-500
-                                    },
-                                  ]}
-                                  outcomes={["Yes", "No"]}
-                                  outcomePrices={[
-                                    market.yesPrice,
-                                    market.noPrice,
-                                  ]}
-                                />
-                              </TabsContent>
+                              {/* Graph Tab - Price history for Yes and No (only for multi-market events) */}
+                              {!isSingleMarketEvent && (
+                                <TabsContent value="graph" className="m-0 p-4">
+                                  <MarketPriceChart
+                                    tokens={[
+                                      {
+                                        tokenId: market.yesTokenId,
+                                        name: "Yes",
+                                        color: "hsl(142, 76%, 36%)", // green-600
+                                      },
+                                      {
+                                        tokenId: market.noTokenId,
+                                        name: "No",
+                                        color: "hsl(0, 84%, 60%)", // red-500
+                                      },
+                                    ]}
+                                    outcomes={["Yes", "No"]}
+                                    outcomePrices={[
+                                      market.yesPrice,
+                                      market.noPrice,
+                                    ]}
+                                  />
+                                </TabsContent>
+                              )}
 
                               {/* Resolution Tab */}
                               <TabsContent
