@@ -4,7 +4,8 @@ import { POLYMARKET_API } from "@/lib/constants";
 
 /**
  * GET /api/events/new
- * Get new events created today (closed=false enforced)
+ * Get newest events sorted by startDate (newest first)
+ * Uses the same API pattern as Polymarket's homepage
  */
 export async function GET(request: NextRequest) {
   // Apply rate limiting: 100 requests per minute
@@ -18,24 +19,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = request.nextUrl.searchParams;
-    const limit = searchParams.get("limit") || "12";
+    const limit = searchParams.get("limit") || "15";
+    const offset = searchParams.get("offset") || "0";
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split("T")[0];
-
+    // Build query params matching Polymarket's pattern
     const queryParams = new URLSearchParams();
-    queryParams.set("start_date_min", today);
-    queryParams.set("closed", "false"); // Always enforce closed=false
     queryParams.set("limit", limit);
+    queryParams.set("offset", offset);
+    queryParams.set("active", "true");
+    queryParams.set("archived", "false");
+    queryParams.set("closed", "false");
+    queryParams.set("order", "startDate"); // Sort by start date
+    queryParams.set("ascending", "false"); // Newest first
+    // Exclude crypto up/down spam markets (tag IDs from Polymarket)
+    queryParams.append("exclude_tag_id", "100639");
+    queryParams.append("exclude_tag_id", "102169");
 
     const response = await fetch(
-      `${POLYMARKET_API.GAMMA.EVENTS}?${queryParams.toString()}`,
+      `${POLYMARKET_API.GAMMA.EVENTS_PAGINATION}?${queryParams.toString()}`,
       {
         headers: {
           "Content-Type": "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      },
+      }
     );
 
     if (!response.ok) {
@@ -44,10 +51,10 @@ export async function GET(request: NextRequest) {
 
     const data = (await response.json()) as Record<string, unknown>;
 
+    // Return the same structure as /api/events/paginated
     return NextResponse.json({
       success: true,
-      count: Array.isArray(data) ? data.length : 0,
-      events: Array.isArray(data) ? data : [],
+      ...data,
     });
   } catch (error) {
     console.error("Error fetching new events:", error);
@@ -56,7 +63,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

@@ -4,7 +4,8 @@ import { POLYMARKET_API } from "@/lib/constants";
 
 /**
  * GET /api/events/breaking
- * Get breaking events with high volume in the last 7 days (closed=false enforced)
+ * Get breaking events - high activity markets sorted by 24hr volume
+ * Uses the pagination endpoint for infinite scroll support
  */
 export async function GET(request: NextRequest) {
   // Apply rate limiting: 100 requests per minute
@@ -18,28 +19,29 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = request.nextUrl.searchParams;
-    const limit = searchParams.get("limit") || "12";
-
-    // Get date 7 days ago in YYYY-MM-DD format
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const minDate = sevenDaysAgo.toISOString().split("T")[0];
+    const limit = searchParams.get("limit") || "15";
+    const offset = searchParams.get("offset") || "0";
 
     const queryParams = new URLSearchParams();
-    queryParams.set("order", "volume");
-    queryParams.set("ascending", "false");
-    queryParams.set("closed", "false"); // Always enforce closed=false
-    queryParams.set("start_date_min", minDate);
     queryParams.set("limit", limit);
+    queryParams.set("offset", offset);
+    queryParams.set("active", "true");
+    queryParams.set("archived", "false");
+    queryParams.set("closed", "false");
+    queryParams.set("order", "volume24hr"); // Sort by 24hr volume (breaking/hot)
+    queryParams.set("ascending", "false"); // Highest 24hr volume first
+    // Exclude crypto up/down spam markets
+    queryParams.append("exclude_tag_id", "100639");
+    queryParams.append("exclude_tag_id", "102169");
 
     const response = await fetch(
-      `${POLYMARKET_API.GAMMA.EVENTS}?${queryParams.toString()}`,
+      `${POLYMARKET_API.GAMMA.EVENTS_PAGINATION}?${queryParams.toString()}`,
       {
         headers: {
           "Content-Type": "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      },
+      }
     );
 
     if (!response.ok) {
@@ -48,10 +50,10 @@ export async function GET(request: NextRequest) {
 
     const data = (await response.json()) as Record<string, unknown>;
 
+    // Return the same structure as /api/events/paginated
     return NextResponse.json({
       success: true,
-      count: Array.isArray(data) ? data.length : 0,
-      events: Array.isArray(data) ? data : [],
+      ...data,
     });
   } catch (error) {
     console.error("Error fetching breaking events:", error);
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

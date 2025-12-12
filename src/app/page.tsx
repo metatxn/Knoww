@@ -131,22 +131,31 @@ export default function Home() {
     ascending: false,
   });
 
-  // Fetch trending, new, and breaking events
+  // Fetch trending, new, and breaking events (all with pagination)
   const {
-    data: trendingData,
+    data: trendingPaginatedData,
     isLoading: loadingTrending,
     error: trendingError,
-  } = useTrendingEvents(12);
+    hasNextPage: hasNextTrending,
+    fetchNextPage: fetchNextTrending,
+    isFetchingNextPage: isFetchingNextTrending,
+  } = useTrendingEvents(15);
   const {
-    data: newData,
+    data: newPaginatedData,
     isLoading: loadingNew,
     error: newError,
-  } = useNewEvents(12);
+    hasNextPage: hasNextNew,
+    fetchNextPage: fetchNextNew,
+    isFetchingNextPage: isFetchingNextNew,
+  } = useNewEvents(15);
   const {
-    data: breakingData,
+    data: breakingPaginatedData,
     isLoading: loadingBreaking,
     error: breakingError,
-  } = useBreakingEvents(12);
+    hasNextPage: hasNextBreaking,
+    fetchNextPage: fetchNextBreaking,
+    isFetchingNextPage: isFetchingNextBreaking,
+  } = useBreakingEvents(15);
 
   // Debug: Log tags data
   // useEffect(() => {
@@ -158,23 +167,50 @@ export default function Home() {
   //   }
   // }, [tags, tagsError]);
 
-  // Infinite scroll: auto-load more when reaching bottom (only for "categories" view)
+  // Infinite scroll: auto-load more when reaching bottom (for all paginated views)
   useEffect(() => {
-    if (viewMode !== "categories") return;
-    if (
-      !loadMoreRef.current ||
-      !hasNextAllPaginated ||
-      isFetchingNextAllPaginated
-    )
-      return;
+    // Get the appropriate pagination state based on view mode
+    let hasMore = false;
+    let isFetching = false;
+    let fetchMore: () => void = () => {};
+
+    switch (viewMode) {
+      case "categories":
+        hasMore = hasNextAllPaginated ?? false;
+        isFetching = isFetchingNextAllPaginated;
+        fetchMore = fetchNextAllPaginated;
+        break;
+      case "trending":
+        hasMore = hasNextTrending ?? false;
+        isFetching = isFetchingNextTrending;
+        fetchMore = fetchNextTrending;
+        break;
+      case "new":
+        hasMore = hasNextNew ?? false;
+        isFetching = isFetchingNextNew;
+        fetchMore = fetchNextNew;
+        break;
+      case "breaking":
+        hasMore = hasNextBreaking ?? false;
+        isFetching = isFetchingNextBreaking;
+        fetchMore = fetchNextBreaking;
+        break;
+      default:
+        return;
+    }
+
+    if (!loadMoreRef.current || !hasMore || isFetching) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          fetchNextAllPaginated();
+          fetchMore();
         }
       },
-      { threshold: 0.1 }
+      {
+        threshold: 0.1,
+        rootMargin: "200px", // trigger early to avoid missing the sentinel
+      }
     );
 
     observer.observe(loadMoreRef.current);
@@ -185,6 +221,15 @@ export default function Home() {
     hasNextAllPaginated,
     isFetchingNextAllPaginated,
     fetchNextAllPaginated,
+    hasNextTrending,
+    isFetchingNextTrending,
+    fetchNextTrending,
+    hasNextNew,
+    isFetchingNextNew,
+    fetchNextNew,
+    hasNextBreaking,
+    isFetchingNextBreaking,
+    fetchNextBreaking,
   ]);
 
   const _getIcon = (slug: string) => {
@@ -226,33 +271,59 @@ export default function Home() {
           isFetchingMore: isFetchingNextAllPaginated,
         };
       }
-      case "trending":
+      case "trending": {
+        // Flatten all pages of paginated trending events
+        const trendingEvents =
+          trendingPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const totalTrending =
+          trendingPaginatedData?.pages[0]?.totalResults ?? 0;
+        const hasMoreTrending =
+          (hasNextTrending ?? false) ||
+          (totalTrending > 0 && trendingEvents.length < totalTrending);
         return {
-          events: trendingData?.events || [],
+          events: trendingEvents,
           isLoading: loadingTrending,
           error: trendingError,
-          hasMore: false,
-          fetchMore: () => {},
-          isFetchingMore: false,
+          hasMore: hasMoreTrending,
+          fetchMore: fetchNextTrending,
+          isFetchingMore: isFetchingNextTrending,
         };
-      case "new":
+      }
+      case "new": {
+        // Flatten all pages of paginated new events
+        const newEvents =
+          newPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const totalNew = newPaginatedData?.pages[0]?.totalResults ?? 0;
+        const hasMoreNew =
+          (hasNextNew ?? false) ||
+          (totalNew > 0 && newEvents.length < totalNew);
         return {
-          events: newData?.events || [],
+          events: newEvents,
           isLoading: loadingNew,
           error: newError,
-          hasMore: false,
-          fetchMore: () => {},
-          isFetchingMore: false,
+          hasMore: hasMoreNew,
+          fetchMore: fetchNextNew,
+          isFetchingMore: isFetchingNextNew,
         };
-      case "breaking":
+      }
+      case "breaking": {
+        // Flatten all pages of paginated breaking events
+        const breakingEvents =
+          breakingPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const totalBreaking =
+          breakingPaginatedData?.pages[0]?.totalResults ?? 0;
+        const hasMoreBreaking =
+          (hasNextBreaking ?? false) ||
+          (totalBreaking > 0 && breakingEvents.length < totalBreaking);
         return {
-          events: breakingData?.events || [],
+          events: breakingEvents,
           isLoading: loadingBreaking,
           error: breakingError,
-          hasMore: false,
-          fetchMore: () => {},
-          isFetchingMore: false,
+          hasMore: hasMoreBreaking,
+          fetchMore: fetchNextBreaking,
+          isFetchingMore: isFetchingNextBreaking,
         };
+      }
       default:
         return {
           events: [],
@@ -357,11 +428,64 @@ export default function Home() {
 
             {/* Events Grid */}
             {!currentData.isLoading && currentData.events.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                {currentData.events.map((event, index) => (
-                  <EventCard key={event.id} event={event} index={index} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                  {currentData.events.map((event, index) => (
+                    <EventCard key={event.id} event={event} index={index} />
+                  ))}
+                </div>
+
+                {/* Loading skeleton for next page */}
+                {currentData.isFetchingMore && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mt-6">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={`loading-skeleton-${i}`}
+                        className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                      >
+                        <Skeleton className="aspect-16/10 w-full" />
+                        <div className="p-4 space-y-3">
+                          <Skeleton className="h-5 w-3/4" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-2/3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Infinite scroll trigger */}
+                {currentData.hasMore && (
+                  <>
+                    {!currentData.isFetchingMore && (
+                      <div ref={loadMoreRef} className="h-10 w-full" />
+                    )}
+                    {/* Skeleton shimmer while loading more */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mt-6"
+                    >
+                      {[...Array(5)].map((_, i) => (
+                        <motion.div
+                          key={`scroll-skeleton-${i}`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                        >
+                          <Skeleton className="aspect-16/10 w-full" />
+                          <div className="p-4 space-y-3">
+                            <Skeleton className="h-5 w-3/4" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-2/3" />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </>
             )}
 
             {/* Empty State */}
@@ -456,9 +580,36 @@ export default function Home() {
                   </motion.div>
                 )}
 
-                {/* Invisible trigger for infinite scroll */}
-                {currentData.hasMore && !currentData.isFetchingMore && (
-                  <div ref={loadMoreRef} className="h-10 w-full" />
+                {/* Infinite scroll trigger */}
+                {currentData.hasMore && (
+                  <>
+                    {!currentData.isFetchingMore && (
+                      <div ref={loadMoreRef} className="h-10 w-full" />
+                    )}
+                    {/* Skeleton shimmer while loading more */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mt-6"
+                    >
+                      {[...Array(5)].map((_, i) => (
+                        <motion.div
+                          key={`cat-scroll-skeleton-${i}`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="rounded-2xl bg-card border border-border/50 overflow-hidden"
+                        >
+                          <Skeleton className="aspect-16/10 w-full" />
+                          <div className="p-4 space-y-3">
+                            <Skeleton className="h-5 w-3/4" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-2/3" />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </>
                 )}
               </>
             )}
