@@ -16,12 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,7 +29,7 @@ import {
   OrderType as ClobOrderType,
 } from "@/hooks/use-clob-client";
 import { useQuery } from "@tanstack/react-query";
-import { TradingOnboarding } from "@/components/trading-onboarding";
+import { useOnboarding } from "@/context/onboarding-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import {
   calculateSlippage,
@@ -196,6 +190,9 @@ export function TradingForm({
   // Get proxy wallet address for balance/allowance checks
   const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
 
+  // Use the global onboarding context
+  const { setShowOnboarding } = useOnboarding();
+
   // Form state
   const [side, setSide] = useState<TradingSide>("BUY");
   const [orderType, setOrderType] = useState<OrderTypeSelection>("MARKET");
@@ -204,7 +201,6 @@ export function TradingForm({
   const [useExpiration, setUseExpiration] = useState<boolean>(false);
   const [expirationHours, setExpirationHours] = useState<number>(24);
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Get selected outcome
   const selectedOutcome = outcomes[selectedOutcomeIndex];
@@ -954,19 +950,6 @@ export function TradingForm({
           </p>
         </div>
       </div>
-
-      {/* Onboarding Dialog */}
-      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Setup Trading Account</DialogTitle>
-          </DialogHeader>
-          <TradingOnboarding
-            onComplete={() => setShowOnboarding(false)}
-            onSkip={() => setShowOnboarding(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

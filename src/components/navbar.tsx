@@ -14,15 +14,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useConnection, useBalance, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useClobCredentials } from "@/hooks/use-clob-credentials";
+import { useOnboarding } from "@/context/onboarding-context";
 
 const navLinks = [
   { label: "Politics", href: "/events/politics" },
@@ -56,11 +49,9 @@ export function Navbar() {
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { hasCredentials } = useClobCredentials();
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Determine if user needs to complete trading setup
-  const needsTradingSetup = isConnected && !hasCredentials;
+  // Use the global onboarding context
+  const { setShowOnboarding, needsTradingSetup } = useOnboarding();
 
   // Close mobile menu when route changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname dependency is intentional to close menu on navigation
@@ -264,18 +255,6 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Onboarding Dialog */}
-      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Setup Trading Account</DialogTitle>
-          </DialogHeader>
-          <TradingOnboarding
-            onComplete={() => setShowOnboarding(false)}
-            onSkip={() => setShowOnboarding(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </nav>
   );
 }

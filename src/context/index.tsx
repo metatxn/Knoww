@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { type Config, cookieToInitialState, WagmiProvider } from "wagmi";
 import { networks, projectId, wagmiAdapter } from "@/config";
+import { OnboardingProvider } from "@/context/onboarding-context";
 
 // Set up queryClient with default options
 const queryClient = new QueryClient({
@@ -71,7 +72,9 @@ function ContextProvider({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <OnboardingProvider>
+            {children}
+          </OnboardingProvider>
           <ReactQueryDevtools initialIsOpen={false} />
         </ThemeProvider>
       </QueryClientProvider>

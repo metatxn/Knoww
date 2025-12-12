@@ -28,14 +28,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConnection, useDisconnect } from "wagmi";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { TradingOnboarding } from "@/components/trading-onboarding";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useClobCredentials } from "@/hooks/use-clob-credentials";
+import { useOnboarding } from "@/context/onboarding-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 
@@ -75,31 +68,24 @@ export function Sidebar() {
   const { address, isConnected } = useConnection();
   const disconnect = useDisconnect();
   const { open } = useAppKit();
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Use the global onboarding context
+  const { setShowOnboarding, needsTradingSetup } = useOnboarding();
 
   const {
     proxyAddress: proxyWalletAddress,
     isDeployed: hasProxyWalletFromHook,
     usdcBalance: proxyUsdcBalance,
-    isLoading: isProxyLoading,
   } = useProxyWallet();
 
   const {
     proxyAddress: relayerProxyAddress,
     hasDeployedSafe: hasDeployedSafeFromRelayer,
-    isLoading: isRelayerLoading,
   } = useRelayerClient();
-
-  const { hasCredentials, isLoading: isCredentialsLoading } =
-    useClobCredentials();
 
   const proxyAddress = relayerProxyAddress || proxyWalletAddress;
   const hasProxyWallet = hasDeployedSafeFromRelayer || hasProxyWalletFromHook;
-  const isFullySetUp = hasCredentials && hasProxyWallet;
-  const isStillLoading =
-    isCredentialsLoading || isProxyLoading || isRelayerLoading;
-  const needsTradingSetup = isConnected && !isStillLoading && !isFullySetUp;
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -302,19 +288,6 @@ export function Sidebar() {
           <ThemeToggle />
         </div>
       </div>
-
-      {/* Onboarding Dialog */}
-      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Setup Trading Account</DialogTitle>
-          </DialogHeader>
-          <TradingOnboarding
-            onComplete={() => setShowOnboarding(false)}
-            onSkip={() => setShowOnboarding(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </aside>
   );
 }

@@ -7,11 +7,13 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
+  PartyPopper,
   Shield,
+  Sparkles,
   Wallet,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { Button } from "@/components/ui/button";
@@ -75,6 +77,11 @@ export function TradingOnboarding({
   const [hasUsdcApproval, setHasUsdcApproval] = useState<boolean | null>(null);
   const [isCheckingApproval, setIsCheckingApproval] = useState(false);
 
+  // Celebration state - only show when user actively completes the final step
+  const [showCelebration, setShowCelebration] = useState(false);
+  // Track the previous allStepsComplete state to detect transition from incomplete -> complete
+  const prevAllCompleteRef = useRef<boolean | null>(null);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<OnboardingStep[]>([
     {
@@ -125,22 +132,30 @@ export function TradingOnboarding({
   /**
    * Check if USDC is already approved for trading
    * This is for returning users who have already completed onboarding
+   * IMPORTANT: Must check the PROXY WALLET's allowance, not the EOA's
    */
   const checkUsdcApproval = useCallback(async () => {
-    if (!hasProxyWallet || isCheckingApproval) return;
+    if (!hasProxyWallet || !proxyAddress || isCheckingApproval) return;
 
     setIsCheckingApproval(true);
     try {
-      const result = await getUsdcAllowance();
+      // Pass the proxy wallet address to check its allowance
+      const result = await getUsdcAllowance(proxyAddress);
       // Consider approved if allowance is greater than 0 (any approval exists)
       const isApproved = result && result.allowance > 0;
+      console.log("[TradingOnboarding] USDC allowance check:", {
+        proxyAddress,
+        allowance: result?.allowance,
+        isApproved,
+      });
       setHasUsdcApproval(isApproved);
-    } catch {
+    } catch (err) {
+      console.error("[TradingOnboarding] Failed to check USDC allowance:", err);
       setHasUsdcApproval(false);
     } finally {
       setIsCheckingApproval(false);
     }
-  }, [hasProxyWallet, isCheckingApproval, getUsdcAllowance]);
+  }, [hasProxyWallet, proxyAddress, isCheckingApproval, getUsdcAllowance]);
 
   const handleConnectWallet = useCallback(async () => {
     updateStepStatus("connect", "in_progress");
@@ -289,6 +304,34 @@ export function TradingOnboarding({
   // Check if all steps are complete
   const allStepsComplete = steps.every((s) => s.status === "completed");
 
+  // Trigger celebration ONLY when user actively completes the final step
+  // (transition from not-all-complete to all-complete)
+  // Don't show for returning users who already had everything complete
+  useEffect(() => {
+    // On first render, just record the initial state without triggering celebration
+    if (prevAllCompleteRef.current === null) {
+      prevAllCompleteRef.current = allStepsComplete;
+      return;
+    }
+
+    // Only trigger celebration on transition from incomplete -> complete
+    const wasIncomplete = prevAllCompleteRef.current === false;
+    const nowComplete = allStepsComplete === true;
+
+    if (wasIncomplete && nowComplete) {
+      console.log(
+        "[TradingOnboarding] All steps completed! Showing celebration"
+      );
+      setShowCelebration(true);
+      // Auto-hide celebration after 3 seconds
+      const timer = setTimeout(() => setShowCelebration(false), 3000);
+      prevAllCompleteRef.current = allStepsComplete;
+      return () => clearTimeout(timer);
+    }
+
+    prevAllCompleteRef.current = allStepsComplete;
+  }, [allStepsComplete]);
+
   const isLoading = isRelayerLoading || isClobLoading || isCheckingApproval;
   const completedSteps = steps.filter((s) => s.status === "completed").length;
   const progress = (completedSteps / steps.length) * 100;
@@ -301,7 +344,17 @@ export function TradingOnboarding({
     }
 
     if (step.status === "in_progress") {
-      return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
+      return (
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {step.id === "deploy" && "Deploying..."}
+            {step.id === "approve" && "Approving..."}
+            {step.id === "credentials" && "Setting up..."}
+            {step.id === "connect" && "Connecting..."}
+          </span>
+        </div>
+      );
     }
 
     if (step.status === "error") {
@@ -348,11 +401,106 @@ export function TradingOnboarding({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto relative overflow-hidden">
+      {/* Celebration Animation Overlay */}
+      <AnimatePresence>
+        {showCelebration && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="text-center"
+            >
+              {/* Confetti particles */}
+              <div className="relative">
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{
+                      x: 0,
+                      y: 0,
+                      scale: 0,
+                      rotate: 0,
+                    }}
+                    animate={{
+                      x: Math.cos((i * 30 * Math.PI) / 180) * 80,
+                      y: Math.sin((i * 30 * Math.PI) / 180) * 80 - 20,
+                      scale: [0, 1, 0.8],
+                      rotate: Math.random() * 360,
+                    }}
+                    transition={{
+                      duration: 0.8,
+                      delay: i * 0.05,
+                      ease: "easeOut",
+                    }}
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                  >
+                    <Sparkles
+                      className={`h-4 w-4 ${
+                        i % 4 === 0
+                          ? "text-yellow-400"
+                          : i % 4 === 1
+                          ? "text-green-400"
+                          : i % 4 === 2
+                          ? "text-purple-400"
+                          : "text-blue-400"
+                      }`}
+                    />
+                  </motion.div>
+                ))}
+
+                {/* Center icon */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 10, -10, 0],
+                  }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: 2,
+                    repeatType: "reverse",
+                  }}
+                >
+                  <PartyPopper className="h-16 w-16 text-yellow-500 mx-auto" />
+                </motion.div>
+              </div>
+
+              <motion.h3
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-2xl font-bold mt-4 bg-linear-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent"
+              >
+                You&apos;re All Set! 🎉
+              </motion.h3>
+              <motion.p
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="text-muted-foreground mt-2"
+              >
+                Ready to start trading on Polymarket
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <CardHeader className="space-y-1">
-        <CardTitle className="text-xl">Setup Trading</CardTitle>
+        <CardTitle className="text-xl">
+          {allStepsComplete ? "🎉 Setup Complete!" : "Setup Trading"}
+        </CardTitle>
         <CardDescription>
-          Complete these steps to start trading on Polymarket
+          {allStepsComplete
+            ? "Your trading account is ready to go!"
+            : "Complete these steps to start trading on Polymarket"}
         </CardDescription>
         <Progress value={progress} className="h-2 mt-2" />
       </CardHeader>
@@ -399,13 +547,26 @@ export function TradingOnboarding({
                       ? "text-green-600 dark:text-green-400"
                       : step.status === "error"
                       ? "text-destructive"
+                      : step.status === "in_progress"
+                      ? "text-primary"
                       : ""
                   }`}
                 >
                   {step.title}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {step.errorMessage || step.description}
+                  {step.errorMessage ||
+                    (step.status === "in_progress"
+                      ? step.id === "deploy"
+                        ? "Creating your secure wallet... This may take 10-30 seconds"
+                        : step.id === "approve"
+                        ? "Approving USDC... This may take 10-30 seconds"
+                        : step.id === "credentials"
+                        ? "Generating your trading credentials..."
+                        : step.id === "connect"
+                        ? "Waiting for wallet connection..."
+                        : step.description
+                      : step.description)}
                 </p>
               </div>
 
@@ -438,28 +599,43 @@ export function TradingOnboarding({
         )}
 
         {/* Info Box - contextual based on current step */}
-        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-          <p className="text-xs text-blue-600 dark:text-blue-400">
-            {currentStep === 1 && (
+        <div
+          className={`p-3 rounded-lg border ${
+            allStepsComplete
+              ? "bg-green-500/10 border-green-500/20"
+              : "bg-blue-500/10 border-blue-500/20"
+          }`}
+        >
+          <p
+            className={`text-xs ${
+              allStepsComplete
+                ? "text-green-600 dark:text-green-400"
+                : "text-blue-600 dark:text-blue-400"
+            }`}
+          >
+            {allStepsComplete ? (
+              <>
+                <strong>🚀 Ready to Trade:</strong> Your account is fully set
+                up! Click the button below to close this dialog and start
+                exploring markets.
+              </>
+            ) : currentStep === 1 ? (
               <>
                 <strong>🛡️ Secure Wallet:</strong> Your trading wallet is a
                 Gnosis Safe - the most trusted smart contract wallet in crypto.
               </>
-            )}
-            {currentStep === 2 && (
+            ) : currentStep === 2 ? (
               <>
                 <strong>🔐 USDC Approval:</strong> This one-time approval lets
                 you trade instantly. Your funds stay in your wallet until you
                 place a trade.
               </>
-            )}
-            {currentStep === 3 && (
+            ) : currentStep === 3 ? (
               <>
                 <strong>🔑 API Credentials:</strong> Sign a message to create
                 your unique trading credentials. No private keys are shared.
               </>
-            )}
-            {(currentStep === 0 || currentStep > 3) && (
+            ) : (
               <>
                 <strong>💡 Gasless Setup:</strong> All setup transactions are
                 free! Polymarket covers the gas fees through their relayer.
@@ -468,15 +644,22 @@ export function TradingOnboarding({
           </p>
         </div>
 
-        {/* Done Button - show when all steps complete */}
+        {/* Finish Button - show when all steps complete */}
         {allStepsComplete && (
-          <Button
-            className="w-full bg-green-600 hover:bg-green-700"
-            onClick={onComplete}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            Done - Start Trading!
-          </Button>
+            <Button
+              className="w-full bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25"
+              onClick={onComplete}
+              size="lg"
+            >
+              <PartyPopper className="mr-2 h-5 w-5" />
+              Start Trading
+            </Button>
+          </motion.div>
         )}
 
         {/* Skip Option - only show if not all complete */}

@@ -80,6 +80,13 @@ export function useRelayerClient() {
       throw new Error("Builder signing server URL not configured");
     }
 
+    console.log("[RelayerClient] Initializing with:", {
+      relayerUrl: POLYMARKET_RELAYER_URL,
+      chainId: CHAIN_ID,
+      builderServerUrl: builderSigningServerUrl,
+      walletAddress: address,
+    });
+
     // Dynamic import to avoid SSR issues
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
@@ -201,59 +208,35 @@ export function useRelayerClient() {
         throw deployErr;
       }
 
-      const transactionId = response.transactionID;
-      if (!transactionId) {
-        throw new Error("No transaction ID returned from deploy");
-      }
-
-      // Poll for the transaction result - simple polling loop
-      const maxAttempts = 15;
-      const pollInterval = 2000; // 2 seconds
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const txns = await client.getTransaction(transactionId);
-
-        if (txns && txns.length > 0) {
-          const tx = txns[0];
-
-          // Check if we have a proxy address (deployment success)
-          if (tx.proxyAddress) {
-            // Check for success or failure states
-            if (tx.state === "STATE_FAILED" || tx.state === "STATE_INVALID") {
-              throw new Error(`Deployment failed with state: ${tx.state}`);
-            }
-
-            // Any other state with a proxy address means success
-            setState((prev) => ({
-              ...prev,
-              isLoading: false,
-              proxyAddress: tx.proxyAddress,
-              hasDeployedSafe: true,
-            }));
-
-            return {
-              success: true,
-              transactionHash: tx.transactionHash,
-              proxyAddress: tx.proxyAddress,
-            };
-          }
-
-          // If state is failed, exit early
-          if (tx.state === "STATE_FAILED" || tx.state === "STATE_INVALID") {
-            throw new Error(`Deployment failed with state: ${tx.state}`);
-          }
-        }
-
-        // Wait before next poll
-        if (attempt < maxAttempts - 1) {
-          await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        }
-      }
-
-      // If we get here, polling timed out
-      throw new Error(
-        "Deployment timed out - please check your wallet for the transaction status"
+      // Use SDK's built-in wait() method as per documentation
+      // https://docs.polymarket.com/developers/builders/relayer-client#deploying-safe-wallets
+      console.log(
+        "[RelayerClient] Waiting for Safe deployment confirmation..."
       );
+      const result = await response.wait();
+
+      if (result) {
+        console.log("[RelayerClient] Safe deployed successfully:", {
+          transactionHash: result.transactionHash,
+          proxyAddress: result.proxyAddress,
+          state: result.state,
+        });
+
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          proxyAddress: result.proxyAddress,
+          hasDeployedSafe: true,
+        }));
+
+        return {
+          success: true,
+          transactionHash: result.transactionHash,
+          proxyAddress: result.proxyAddress,
+        };
+      } else {
+        throw new Error("Safe deployment failed or timed out");
+      }
     } catch (err) {
       console.error("[RelayerClient] Deploy error:", err);
       const errorMessage =
@@ -278,6 +261,26 @@ export function useRelayerClient() {
       const client = await getClient();
       const { encodeFunctionData, maxUint256 } = await import("viem");
 
+      // First, verify the Safe is deployed
+      const expectedSafe = await deriveSafeAddress();
+      if (!expectedSafe) {
+        throw new Error(
+          "Could not derive Safe address. Please ensure your wallet is connected."
+        );
+      }
+
+      const isDeployed = await client.getDeployed(expectedSafe);
+      console.log("[RelayerClient] Safe deployment check:", {
+        expectedSafe,
+        isDeployed,
+      });
+
+      if (!isDeployed) {
+        throw new Error(
+          "Your trading wallet is not deployed yet. Please complete the 'Create Trading Wallet' step first."
+        );
+      }
+
       // ERC20 approve ABI
       const erc20ApproveAbi = [
         {
@@ -292,12 +295,12 @@ export function useRelayerClient() {
       ] as const;
 
       // Create approval transactions for both exchanges
-      // Using OperationType.Call = 0
+      // The SDK's execute() method expects Transaction objects with: to, data, value
+      // It internally converts these to SafeTransactions with operation: Call
       const approvalTxs = [
         // Approve CTF Exchange
         {
           to: CONTRACTS.USDC,
-          operation: 0 as const, // Call
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -308,7 +311,6 @@ export function useRelayerClient() {
         // Approve Neg Risk CTF Exchange
         {
           to: CONTRACTS.USDC,
-          operation: 0 as const, // Call
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -319,7 +321,6 @@ export function useRelayerClient() {
         // Approve CTF contract itself (for split/merge operations)
         {
           to: CONTRACTS.USDC,
-          operation: 0 as const, // Call
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -329,21 +330,77 @@ export function useRelayerClient() {
         },
       ];
 
-      // The method is `execute()` not `executeSafeTransactions()`
-      // Create a clear, informative message for the wallet signing prompt
-      const approvalMessage = [
-        "🔐 Enable USDC Trading on Polymarket",
-        "",
-        "This one-time approval allows Polymarket to:",
-        "• Execute trades using your USDC balance",
-        "• Process buy and sell orders instantly",
-        "",
-        "✅ Gasless - No fees required",
-        "✅ Secure - Funds stay in your wallet",
-        "✅ Revocable - Can be changed anytime",
-      ].join("\n");
+      console.log("[RelayerClient] Submitting USDC approval transactions...");
+      console.log("[RelayerClient] Approval targets:", {
+        CTF_EXCHANGE: CONTRACTS.CTF_EXCHANGE,
+        NEG_RISK_CTF_EXCHANGE: CONTRACTS.NEG_RISK_CTF_EXCHANGE,
+        CTF: CONTRACTS.CTF,
+      });
 
-      const response = await client.execute(approvalTxs, approvalMessage);
+      // Execute the approval transactions with retry logic
+      // The Polymarket relayer can sometimes return STATE_FAILED intermittently
+      const maxRetries = 3;
+      let lastError: Error | null = null;
+      let response: Awaited<ReturnType<typeof client.execute>> | null = null;
+
+      for (let retry = 0; retry < maxRetries; retry++) {
+        try {
+          if (retry > 0) {
+            console.log(
+              `[RelayerClient] Retry attempt ${retry + 1}/${maxRetries}...`
+            );
+            // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * Math.pow(2, retry - 1))
+            );
+          }
+
+          response = await client.execute(approvalTxs);
+
+          console.log("[RelayerClient] Approval response:", {
+            transactionID: response.transactionID,
+            state: response.state,
+            hash: response.transactionHash,
+            retry,
+          });
+
+          // Check if the initial response already indicates failure
+          if (
+            response.state === "STATE_FAILED" ||
+            response.state === "STATE_INVALID"
+          ) {
+            console.warn(
+              `[RelayerClient] Approval failed with state: ${response.state}, will retry...`
+            );
+            lastError = new Error(
+              `Approval failed with state: ${response.state}`
+            );
+            continue; // Try again
+          }
+
+          // Success - break out of retry loop
+          break;
+        } catch (executeErr) {
+          console.error(
+            `[RelayerClient] Execute error on attempt ${retry + 1}:`,
+            executeErr
+          );
+          lastError =
+            executeErr instanceof Error
+              ? executeErr
+              : new Error(String(executeErr));
+          // Continue to next retry
+        }
+      }
+
+      // If all retries failed, throw the last error
+      if (
+        !response ||
+        response.state === "STATE_FAILED" ||
+        response.state === "STATE_INVALID"
+      ) {
+        throw lastError || new Error("Approval failed after all retries");
+      }
 
       const transactionId = response.transactionID;
       if (!transactionId) {
@@ -360,18 +417,30 @@ export function useRelayerClient() {
       ];
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        console.log(
+          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}...`
+        );
         const txns = await client.getTransaction(transactionId);
 
         if (txns && txns.length > 0) {
           const tx = txns[0];
+          console.log(`[RelayerClient] Transaction state: ${tx.state}`);
 
           // Check for failure states
           if (tx.state === "STATE_FAILED" || tx.state === "STATE_INVALID") {
-            throw new Error(`Approval failed with state: ${tx.state}`);
+            console.error("[RelayerClient] Transaction failed:", tx);
+            throw new Error(
+              `Approval failed with state: ${tx.state}. ` +
+                `Transaction hash: ${tx.transactionHash || "none"}`
+            );
           }
 
           // Check for success states
           if (successStates.includes(tx.state)) {
+            console.log(
+              "[RelayerClient] Approval successful:",
+              tx.transactionHash
+            );
             setState((prev) => ({ ...prev, isLoading: false }));
             return {
               success: true,
@@ -397,6 +466,7 @@ export function useRelayerClient() {
         transactionHash: response.transactionHash || transactionId,
       };
     } catch (err) {
+      console.error("[RelayerClient] Approval error:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Failed to approve USDC";
       setState((prev) => ({
@@ -406,7 +476,7 @@ export function useRelayerClient() {
       }));
       return { success: false, error: errorMessage };
     }
-  }, [getClient]);
+  }, [getClient, deriveSafeAddress]);
 
   /**
    * Check if an address has deployed code (is a contract)

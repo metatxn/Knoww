@@ -262,6 +262,17 @@ export function useClobCredentials() {
   }, [address]);
 
   /**
+   * Refresh credentials from storage
+   * Useful after completing onboarding to ensure state is up to date
+   */
+  const refresh = useCallback(() => {
+    if (address) {
+      const stored = getStoredCredentials(address);
+      setCredentials(stored);
+    }
+  }, [address]);
+
+  /**
    * Check if credentials exist and are valid
    */
   const hasCredentials = credentials !== null;
@@ -278,5 +289,6 @@ export function useClobCredentials() {
     deriveCredentials,
     clearCredentials,
     generateL1Signature,
+    refresh,
   };
 }
