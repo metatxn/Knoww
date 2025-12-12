@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
-import { Sidebar } from "@/components/sidebar";
+import { SidebarDesktopNoSSR } from "@/components/sidebar-desktop";
 import ContextProvider from "@/context";
 import "./globals.css";
 
@@ -34,8 +34,10 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ContextProvider cookies={cookies}>
-          <Sidebar />
-          <div className="lg:ml-56">{children}</div>
+          {/* Desktop sidebar (client-only to avoid rendering on mobile SSR) */}
+          <SidebarDesktopNoSSR />
+          {/* Main content; margin-left only on desktops (>=1280px) */}
+          <div className="xl:ml-56">{children}</div>
         </ContextProvider>
       </body>
     </html>

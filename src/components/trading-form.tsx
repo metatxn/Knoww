@@ -685,12 +685,12 @@ export function TradingForm({
           </div>
 
           {/* Shares Input with flanking buttons */}
-          <div className="flex items-stretch gap-2">
+          <div className="flex flex-wrap md:flex-nowrap items-stretch gap-2">
             {/* Left decrement buttons */}
-            <div className="flex gap-1">
+            <div className="flex gap-1 w-full md:w-auto">
               <button
                 type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-1 md:flex-none"
                 onClick={() => handleSharesChange(-10)}
                 disabled={shares <= 10}
               >
@@ -717,21 +717,21 @@ export function TradingForm({
                 }
               }}
               min={1}
-              className="flex-1 bg-secondary/30 border border-border rounded-xl px-4 py-3 text-center text-lg font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+              className="flex-1 min-w-[140px] bg-secondary/30 border border-border rounded-xl px-3 py-3 text-center text-base sm:text-lg font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
 
             {/* Right increment buttons */}
-            <div className="flex gap-1">
+            <div className="flex gap-1 w-full md:w-auto">
               <button
                 type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors flex-1 md:flex-none"
                 onClick={() => handleSharesChange(1)}
               >
                 +1
               </button>
               <button
                 type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors"
+                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors flex-1 md:flex-none"
                 onClick={() => handleSharesChange(10)}
               >
                 +10

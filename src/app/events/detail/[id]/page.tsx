@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Clock,
   Copy,
+  ChevronDown,
   Share2,
   TrendingUp,
   Trophy,
@@ -23,6 +24,11 @@ import { OrderBookInline } from "@/components/order-book-summary";
 import { type OutcomeData, TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEventDetail } from "@/hooks/use-event-detail";
@@ -63,6 +69,7 @@ export default function EventDetailPage() {
   const [expandedOrderBookMarketId, setExpandedOrderBookMarketId] = useState<
     string | null
   >(null);
+  const [showClosedMarkets, setShowClosedMarkets] = useState(false);
 
   // Order book store action for preloading from REST
   const { setOrderBookFromRest } = useOrderBookStore();
@@ -70,7 +77,7 @@ export default function EventDetailPage() {
   // Helper to quickly seed order book from REST (direct Polymarket call) for a token
   const preloadOrderBook = useCallback(
     async (tokenId: string | undefined) => {
-      if (!tokenId || tokenId.length < 10) return;
+      if (!tokenId) return;
       try {
         const res = await fetch(
           `https://clob.polymarket.com/book?token_id=${tokenId}`,
@@ -108,17 +115,96 @@ export default function EventDetailPage() {
   }, []);
 
   // Compute markets safely (even when event is null/undefined)
-  const markets = useMemo(() => {
+  const allMarkets = useMemo(() => {
     if (!event?.markets) return [];
-    return event.markets.filter(
-      (market) => market.active !== false && market.closed !== true
-    );
+    // Keep inactive markets hidden from UI
+    return event.markets.filter((market) => market.active !== false);
   }, [event?.markets]);
+
+  const openMarkets = useMemo(
+    () => allMarkets.filter((m) => m.closed !== true),
+    [allMarkets]
+  );
+
+  const closedMarkets = useMemo(
+    () => allMarkets.filter((m) => m.closed === true),
+    [allMarkets]
+  );
+
+  // Closed market rows (precomputed; used later in the dropdown)
+  const closedMarketData = useMemo(() => {
+    return closedMarkets
+      .map((market, idx) => {
+        const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
+        const prices = market.outcomePrices
+          ? JSON.parse(market.outcomePrices)
+          : [];
+        const tokens = market.tokens || [];
+        const clobTokenIds = market.clobTokenIds
+          ? JSON.parse(market.clobTokenIds)
+          : [];
+
+        const yesIndex = outcomes.findIndex((o: string) =>
+          o.toLowerCase().includes("yes")
+        );
+        const noIndex = outcomes.findIndex((o: string) =>
+          o.toLowerCase().includes("no")
+        );
+
+        const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
+        const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
+
+        let yesTokenId = "";
+        let noTokenId = "";
+
+        if (tokens.length > 0) {
+          const yesToken = tokens.find(
+            (t) => t.outcome?.toLowerCase() === "yes"
+          );
+          const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
+          yesTokenId = yesToken?.token_id || "";
+          noTokenId = noToken?.token_id || "";
+        } else if (clobTokenIds.length > 0) {
+          yesTokenId =
+            yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
+          noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
+        }
+
+        const yesProbability = yesPrice
+          ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
+          : 0;
+        const change = ((Math.random() - 0.5) * 10).toFixed(1);
+        const colors = ["orange", "blue", "purple", "green"];
+
+        return {
+          id: market.id,
+          question: market.question,
+          groupItemTitle: market.groupItemTitle || market.question,
+          yesProbability,
+          yesPrice: yesPrice || "0",
+          noPrice: noPrice || "0",
+          yesTokenId: yesTokenId || "",
+          noTokenId: noTokenId || "",
+          negRisk: market.negRisk || false,
+          change: Number.parseFloat(change),
+          volume: market.volume || "0",
+          color: colors[idx % colors.length],
+          image: market.image,
+          closed: true,
+        };
+      })
+      .sort((a, b) => b.yesProbability - a.yesProbability);
+  }, [closedMarkets]);
+
+  // "Single outcome" in this UI means: the event only has ONE market.
+  // If there are multiple markets under the event, we only show order books when a user expands a specific market row.
+  const totalMarketsCount = event?.markets?.length ?? 0;
+  const isSingleMarketEvent = totalMarketsCount === 1;
 
   // Compute selected market and trading outcomes
   const { selectedMarket, tradingOutcomes, currentTokenId, allTokenIds } =
     useMemo(() => {
-      if (!event || markets.length === 0) {
+      if (!event || openMarkets.length === 0) {
         return {
           selectedMarket: null,
           tradingOutcomes: [] as OutcomeData[],
@@ -128,7 +214,7 @@ export default function EventDetailPage() {
       }
 
       // Build market data
-      const marketData = markets.map((market, idx) => {
+      const marketData = openMarkets.map((market, idx) => {
         const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
         const prices = market.outcomePrices
           ? JSON.parse(market.outcomePrices)
@@ -218,7 +304,7 @@ export default function EventDetailPage() {
       // Collect all valid token IDs for WebSocket subscription
       const tokenIds = marketData
         .flatMap((m) => [m.yesTokenId, m.noTokenId])
-        .filter((id) => id && id.length > 10);
+        .filter(Boolean);
 
       return {
         selectedMarket: selected,
@@ -226,7 +312,23 @@ export default function EventDetailPage() {
         currentTokenId: tokenId,
         allTokenIds: tokenIds,
       };
-    }, [event, markets, selectedMarketId, selectedOutcomeIndex]);
+    }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
+
+  // Auto-expand the order book upfront when the event has exactly one market.
+  useEffect(() => {
+    if (!isSingleMarketEvent) return;
+    const onlyMarketId = openMarkets[0]?.id;
+    if (!onlyMarketId) return;
+
+    setSelectedMarketId((prev) => prev || onlyMarketId);
+    setExpandedOrderBookMarketId((prev) => prev ?? onlyMarketId);
+
+    // Preload both sides so the order book renders immediately once expanded.
+    if (selectedMarket) {
+      void preloadOrderBook(selectedMarket.yesTokenId);
+      void preloadOrderBook(selectedMarket.noTokenId);
+    }
+  }, [isSingleMarketEvent, openMarkets, preloadOrderBook, selectedMarket]);
 
   // ARCHITECTURE: REST first, then WebSocket for real-time updates
   // This is how Binance, Coinbase, and Polymarket work
@@ -236,7 +338,7 @@ export default function EventDetailPage() {
   const { data: orderBookData } = useQuery<OrderBookResponse | null>({
     queryKey: ["orderBook", currentTokenId],
     queryFn: async (): Promise<OrderBookResponse | null> => {
-      if (!currentTokenId || currentTokenId.length < 10) return null;
+      if (!currentTokenId) return null;
       // Direct call to Polymarket CLOB API (public, allows CORS)
       const response = await fetch(
         `https://clob.polymarket.com/book?token_id=${currentTokenId}`,
@@ -271,7 +373,7 @@ export default function EventDetailPage() {
         },
       };
     },
-    enabled: !!currentTokenId && currentTokenId.length > 10,
+    enabled: !!currentTokenId,
     staleTime: 30000, // Consider fresh for 30s (WebSocket will update)
   });
 
@@ -419,7 +521,7 @@ export default function EventDetailPage() {
   };
 
   // Build market data for display (reuse the computed markets)
-  const marketData = markets.map((market, idx) => {
+  const marketData = openMarkets.map((market, idx) => {
     const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
     const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
     const tokens = market.tokens || [];
@@ -477,28 +579,54 @@ export default function EventDetailPage() {
     (a, b) => b.yesProbability - a.yesProbability
   );
 
-  // Get top 4 markets for the chart
-  const top4Markets = sortedMarketData.slice(0, 4);
+  // Chart behavior:
+  // - If the event has ONE market, show BOTH Yes + No on the main chart.
+  // - If the event has multiple markets, show top 4 markets (Yes) like before.
+  const topMarketsForChart = isSingleMarketEvent
+    ? sortedMarketData.slice(0, 1)
+    : sortedMarketData.slice(0, 4);
 
-  // Extract market groupItemTitles and yes prices for the chart (top 4 only)
-  const marketTitles = top4Markets.map((m) => m.groupItemTitle);
-  const yesProb = top4Markets.map((m) => m.yesPrice);
+  const singleMarketForChart = topMarketsForChart[0];
 
-  // Prepare token info for the chart (uses Yes token IDs)
   const chartColors = [
     "hsl(25, 95%, 53%)", // Orange
     "hsl(221, 83%, 53%)", // Blue
     "hsl(280, 100%, 70%)", // Purple/Pink
     "hsl(142, 76%, 36%)", // Green
   ];
-  const chartTokens = top4Markets.map((m, idx) => ({
-    tokenId: m.yesTokenId,
-    name: m.groupItemTitle,
-    color: chartColors[idx % chartColors.length],
-  }));
+
+  const marketTitles = isSingleMarketEvent
+    ? ["Yes", "No"]
+    : topMarketsForChart.map((m) => m.groupItemTitle);
+
+  const yesProb = isSingleMarketEvent
+    ? [
+        singleMarketForChart?.yesPrice || "0",
+        singleMarketForChart?.noPrice || "0",
+      ]
+    : topMarketsForChart.map((m) => m.yesPrice);
+
+  const chartTokens = isSingleMarketEvent
+    ? [
+        {
+          tokenId: singleMarketForChart?.yesTokenId || "",
+          name: "Yes",
+          color: "hsl(142, 76%, 36%)", // Green
+        },
+        {
+          tokenId: singleMarketForChart?.noTokenId || "",
+          name: "No",
+          color: "hsl(0, 84%, 60%)", // Red
+        },
+      ]
+    : topMarketsForChart.map((m, idx) => ({
+        tokenId: m.yesTokenId,
+        name: m.groupItemTitle,
+        color: chartColors[idx % chartColors.length],
+      }));
 
   // Find the earliest createdAt from all markets or use event createdAt
-  const earliestCreatedAt = markets.reduce<string | undefined>(
+  const earliestCreatedAt = openMarkets.reduce<string | undefined>(
     (earliest, market) => {
       if (!market.createdAt) return earliest;
       if (!earliest) return market.createdAt;
@@ -577,8 +705,17 @@ export default function EventDetailPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                  <span className="font-medium">{markets.length} markets</span>
+                  <span className="font-medium">
+                    {totalMarketsCount} markets
+                  </span>
                 </div>
+                {closedMarkets.length > 0 && (
+                  <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
+                    <span className="font-medium">
+                      {openMarkets.length} open • {closedMarkets.length} closed
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -624,27 +761,49 @@ export default function EventDetailPage() {
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap gap-2 md:gap-4">
-                  {top4Markets.map((market, idx) => (
-                    <div
-                      key={market.id}
-                      className="flex items-center gap-1.5 md:gap-2"
-                    >
+                  {isSingleMarketEvent && singleMarketForChart ? (
+                    <>
+                      <div className="flex items-center gap-1.5 md:gap-2">
+                        <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0 bg-green-500" />
+                        <span className="text-xs md:text-sm">
+                          Yes {singleMarketForChart.yesProbability}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 md:gap-2">
+                        <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0 bg-red-500" />
+                        <span className="text-xs md:text-sm">
+                          No{" "}
+                          {Math.max(
+                            0,
+                            100 - singleMarketForChart.yesProbability
+                          )}
+                          %
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    topMarketsForChart.map((market, idx) => (
                       <div
-                        className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0 ${
-                          idx === 0
-                            ? "bg-orange-500"
-                            : idx === 1
-                            ? "bg-blue-500"
-                            : idx === 2
-                            ? "bg-purple-400"
-                            : "bg-green-500"
-                        }`}
-                      />
-                      <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
-                        {market.groupItemTitle} {market.yesProbability}%
-                      </span>
-                    </div>
-                  ))}
+                        key={market.id}
+                        className="flex items-center gap-1.5 md:gap-2"
+                      >
+                        <div
+                          className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0 ${
+                            idx === 0
+                              ? "bg-orange-500"
+                              : idx === 1
+                              ? "bg-blue-500"
+                              : idx === 2
+                              ? "bg-purple-400"
+                              : "bg-green-500"
+                          }`}
+                        />
+                        <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
+                          {market.groupItemTitle} {market.yesProbability}%
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -700,6 +859,7 @@ export default function EventDetailPage() {
               <CardContent>
                 <div className="space-y-0">
                   {sortedMarketData.map((market) => {
+                    const isMarketClosed = false;
                     // Build outcomes for this specific market
                     const marketOutcomes = [
                       {
@@ -735,7 +895,10 @@ export default function EventDetailPage() {
                               setExpandedOrderBookMarketId(null);
                             } else {
                               setExpandedOrderBookMarketId(market.id);
-                              setSelectedMarketId(market.id);
+                              // Only open markets can drive the trading panel selection
+                              if (!isMarketClosed) {
+                                setSelectedMarketId(market.id);
+                              }
                               // Preload both Yes and No order books for this market
                               void preloadOrderBook(market.yesTokenId);
                               void preloadOrderBook(market.noTokenId);
@@ -1004,6 +1167,224 @@ export default function EventDetailPage() {
                     );
                   })}
                 </div>
+
+                {/* Closed markets dropdown (only render when user expands) */}
+                {closedMarketData.length > 0 && (
+                  <div className="pt-2">
+                    <Collapsible
+                      open={showClosedMarkets}
+                      onOpenChange={setShowClosedMarkets}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors"
+                          )}
+                        >
+                          <span>
+                            Closed markets ({closedMarketData.length})
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              showClosedMarkets && "rotate-180"
+                            )}
+                          />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="space-y-0">
+                          {closedMarketData.map((market) => {
+                            const marketOutcomes = [
+                              {
+                                name: "Yes",
+                                tokenId: market.yesTokenId,
+                                price:
+                                  Number.parseFloat(market.yesPrice) || 0.5,
+                              },
+                              {
+                                name: "No",
+                                tokenId: market.noTokenId,
+                                price: Number.parseFloat(market.noPrice) || 0.5,
+                              },
+                            ];
+                            const isExpanded =
+                              expandedOrderBookMarketId === market.id;
+
+                            return (
+                              <div key={`closed-${market.id}`}>
+                                {/* Closed Market Row */}
+                                {/* biome-ignore lint/a11y/useSemanticElements: Contains interactive buttons */}
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  className={cn(
+                                    "w-full text-left p-3 md:p-4 border-t border-border transition-all cursor-pointer",
+                                    "hover:bg-accent/30",
+                                    isExpanded && "bg-muted/30"
+                                  )}
+                                  onClick={() => {
+                                    if (isExpanded) {
+                                      setExpandedOrderBookMarketId(null);
+                                    } else {
+                                      setExpandedOrderBookMarketId(market.id);
+                                      // Market is closed — do not fetch order book snapshots.
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      if (isExpanded) {
+                                        setExpandedOrderBookMarketId(null);
+                                      } else {
+                                        setExpandedOrderBookMarketId(market.id);
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <div className="flex flex-col md:flex-row md:items-center gap-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      {market.image && (
+                                        <div className="relative w-10 h-10 shrink-0 opacity-70">
+                                          <Image
+                                            src={market.image}
+                                            alt={
+                                              market.groupItemTitle || "Market"
+                                            }
+                                            fill
+                                            sizes="40px"
+                                            className="rounded object-cover"
+                                          />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <h3 className="font-semibold text-sm md:text-base truncate">
+                                            {market.groupItemTitle}
+                                          </h3>
+                                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                            Closed
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground mt-0.5">
+                                          <span>
+                                            {formatVolume(market.volume)} Vol.
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled
+                                        className="flex-1 md:flex-initial md:min-w-[100px] text-xs md:text-sm bg-green-600/50 text-white cursor-not-allowed"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Yes {formatPrice(market.yesPrice)}¢
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="destructive"
+                                        disabled
+                                        className="flex-1 md:flex-initial md:min-w-[100px] text-xs md:text-sm opacity-60 cursor-not-allowed"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        No {formatPrice(market.noPrice)}¢
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Expanded Content - allow viewing order book even if market is closed */}
+                                <div
+                                  className={cn(
+                                    "grid transition-all duration-300 ease-in-out border-t border-border bg-muted/10",
+                                    isExpanded
+                                      ? "grid-rows-[1fr] opacity-100"
+                                      : "grid-rows-[0fr] opacity-0"
+                                  )}
+                                >
+                                  <div className="overflow-hidden">
+                                    <Tabs
+                                      defaultValue="orderbook"
+                                      className="w-full"
+                                    >
+                                      <div className="flex items-center justify-between px-4 border-b border-border">
+                                        <TabsList className="h-auto p-0 bg-transparent gap-0">
+                                          <TabsTrigger
+                                            value="orderbook"
+                                            className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                          >
+                                            Order Book
+                                          </TabsTrigger>
+                                          <TabsTrigger
+                                            value="graph"
+                                            className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                          >
+                                            Graph
+                                          </TabsTrigger>
+                                          <TabsTrigger
+                                            value="resolution"
+                                            className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                          >
+                                            Resolution
+                                          </TabsTrigger>
+                                        </TabsList>
+                                        <div className="text-xs text-muted-foreground">
+                                          Closed market
+                                        </div>
+                                      </div>
+
+                                      <TabsContent
+                                        value="orderbook"
+                                        className="m-0 data-[state=inactive]:hidden"
+                                        forceMount
+                                      >
+                                        <div className="p-4 text-sm text-muted-foreground">
+                                          This market is closed. Order book data
+                                          is not fetched.
+                                        </div>
+                                      </TabsContent>
+
+                                      <TabsContent
+                                        value="graph"
+                                        className="m-0 p-4"
+                                      >
+                                        <div className="h-48 bg-muted/30 rounded-lg flex items-center justify-center">
+                                          <div className="text-center text-muted-foreground">
+                                            <p className="text-sm font-medium">
+                                              Price History Chart
+                                            </p>
+                                            <p className="text-xs mt-1">
+                                              (Coming soon)
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </TabsContent>
+
+                                      <TabsContent
+                                        value="resolution"
+                                        className="m-0 p-4"
+                                      >
+                                        <div className="text-sm text-muted-foreground">
+                                          This market is closed.
+                                        </div>
+                                      </TabsContent>
+                                    </Tabs>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

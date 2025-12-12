@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { AlertCircle, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -36,12 +37,11 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
     return `$${num.toFixed(0)}`;
   };
 
-  const handleViewEvent = () => {
-    if (event.id) {
-      router.push(`/events/detail/${event.id}`);
-    }
-  };
-
+  const href = event.id
+    ? `/events/detail/${event.id}`
+    : event.slug
+    ? `/events/detail/${event.slug}`
+    : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
 
@@ -54,10 +54,9 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
       whileTap={{ scale: 0.98 }}
       className="h-full"
     >
-      <button
-        type="button"
-        className="group relative h-full w-full text-left cursor-pointer rounded-2xl bg-card border border-border/50 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
-        onClick={handleViewEvent}
+      <Link
+        href={href}
+        className="group relative block h-full w-full text-left cursor-pointer rounded-2xl bg-card border border-border/50 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {/* Image Section with Overlay */}
         <div className="relative aspect-[16/10] w-full overflow-hidden">
@@ -121,11 +120,11 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
 
         {/* Content Section */}
         <div className="p-3 sm:p-4 space-y-1.5 sm:space-y-2">
-          <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+          <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2 group-hover:text-primary transition-colors break-words">
             {event.title || "Untitled Event"}
           </h3>
           {event.description && (
-            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed break-words">
               {event.description}
             </p>
           )}
@@ -133,7 +132,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
 
         {/* Hover Indicator */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-      </button>
+      </Link>
     </motion.div>
   );
 }

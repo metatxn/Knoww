@@ -396,7 +396,7 @@ export function MarketPriceChart({
       {/* Chart */}
       <ChartContainer
         config={chartConfig}
-        className="h-[400px] w-full min-h-[300px]"
+        className="w-full min-h-[200px] h-[220px] sm:h-[300px] md:h-[360px] lg:h-[400px] max-h-[60vh]"
       >
         {isLoading ? (
           <div className="flex items-center justify-center h-full">

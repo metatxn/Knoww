@@ -238,7 +238,9 @@ export function OrderBook({
 
   const currentOutcome = outcomes[selectedOutcome];
   const tokenId = currentOutcome?.tokenId || "";
-  const isValidTokenId = Boolean(tokenId && tokenId.length > 10);
+  // Polymarket `token_id` values are commonly numeric strings and may be short.
+  // Any non-empty tokenId is valid for REST + WS subscriptions.
+  const isValidTokenId = Boolean(tokenId);
 
   // Handle outcome tab change
   const handleOutcomeChange = useCallback(
@@ -464,7 +466,13 @@ export function OrderBook({
         <>
           {/* Column Headers */}
           <div className={embedded ? "" : "border-t border-border"}>
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "32%" }} />
+              </colgroup>
               <thead>
                 <tr className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   <th className="text-left px-4 py-2 w-16">
@@ -480,7 +488,13 @@ export function OrderBook({
 
           {/* Asks (Sells) - Red */}
           <div className="relative">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "32%" }} />
+              </colgroup>
               <tbody>
                 {processedData.asks.map((level, index) => {
                   const size = Number.parseFloat(level.size);
@@ -553,7 +567,13 @@ export function OrderBook({
 
           {/* Bids (Buys) - Green */}
           <div className="relative">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "32%" }} />
+              </colgroup>
               <tbody>
                 {processedData.bids.map((level, index) => {
                   const size = Number.parseFloat(level.size);

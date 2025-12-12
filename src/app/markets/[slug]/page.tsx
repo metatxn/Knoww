@@ -34,7 +34,7 @@ export default function MarketDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [selectedOutcome, setSelectedOutcome] = useState(0);
-  // Track if order book is shown (only when user clicks on an outcome)
+  // Track if order book is shown (only used when > 1 outcome)
   const [showOrderBook, setShowOrderBook] = useState(false);
 
   const slug = params?.slug as string;
@@ -270,10 +270,10 @@ export default function MarketDetailPage() {
         idx === 0
           ? "orange"
           : idx === 1
-            ? "blue"
-            : idx === 2
-              ? "purple"
-              : "green",
+          ? "blue"
+          : idx === 2
+          ? "purple"
+          : "green",
     };
   });
 
@@ -336,7 +336,7 @@ export default function MarketDetailPage() {
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <button
-          type="button"
+            type="button"
             onClick={() => router.push("/")}
             className="flex items-center gap-1 hover:text-foreground transition-colors"
           >
@@ -351,60 +351,60 @@ export default function MarketDetailPage() {
 
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div className="flex items-start gap-4 flex-1">
-                {market.image && (
+          <div className="flex items-start gap-4 flex-1">
+            {market.image && (
               <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
                 <Image
-                    src={market.image}
-                    alt={market.question}
+                  src={market.image}
+                  alt={market.question}
                   fill
                   sizes="80px"
                   className="rounded-xl object-cover"
-                  />
+                />
               </div>
-                )}
+            )}
 
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                    {market.question}
-                  </h1>
+                {market.question}
+              </h1>
 
-                  {/* Metadata */}
+              {/* Metadata */}
               <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                      <Trophy className="h-4 w-4" />
-                      <span className="font-medium">
-                        {formatVolume(market.volumeNum || market.volume)} Vol.
-                      </span>
-                    </div>
-                    {market.end_date_iso && (
+                  <Trophy className="h-4 w-4" />
+                  <span className="font-medium">
+                    {formatVolume(market.volumeNum || market.volume)} Vol.
+                  </span>
+                </div>
+                {market.end_date_iso && (
                   <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {new Date(market.end_date_iso).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
-                        </span>
-                      </div>
-                    )}
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {new Date(market.end_date_iso).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
                   <span className="font-medium">
                     {outcomes.length} outcomes
                   </span>
                 </div>
-                  </div>
-                </div>
               </div>
+            </div>
+          </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  type="button"
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
               variant="outline"
               size="sm"
               className="gap-2"
@@ -412,9 +412,9 @@ export default function MarketDetailPage() {
                 if (typeof window !== "undefined" && navigator.share) {
                   try {
                     await navigator.share({
-                        title: market.question,
-                        url: window.location.href,
-                      });
+                      title: market.question,
+                      url: window.location.href,
+                    });
                   } catch (err) {
                     // User cancelled or share failed - ignore
                     if ((err as Error).name !== "AbortError") {
@@ -426,61 +426,61 @@ export default function MarketDetailPage() {
             >
               <Share2 className="h-4 w-4" />
               <span className="hidden sm:inline">Share</span>
-                </Button>
+            </Button>
             <Button type="button" variant="outline" size="sm" className="gap-2">
               <Bookmark className="h-4 w-4" />
               <span className="hidden sm:inline">Save</span>
-                </Button>
-              </div>
-            </div>
+            </Button>
+          </div>
+        </div>
 
-            {/* Date Selection Pills - Mock for now */}
+        {/* Date Selection Pills - Mock for now */}
         <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div className="flex gap-2 overflow-x-auto">
-                <Badge variant="default" className="shrink-0">
-                  Dec 10
-                </Badge>
-                <Badge variant="outline" className="shrink-0">
-                  Jan 28, 2026
-                </Badge>
-                <Badge variant="outline" className="shrink-0">
-                  Mar 18, 2026
-                </Badge>
-              </div>
-            </div>
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <div className="flex gap-2 overflow-x-auto">
+            <Badge variant="default" className="shrink-0">
+              Dec 10
+            </Badge>
+            <Badge variant="outline" className="shrink-0">
+              Jan 28, 2026
+            </Badge>
+            <Badge variant="outline" className="shrink-0">
+              Mar 18, 2026
+            </Badge>
+          </div>
+        </div>
 
-            {/* Probability Legend */}
+        {/* Probability Legend */}
         <div className="flex flex-wrap gap-4">
-              {outcomeData.map(
-                (
-                  outcome: { name: string; probability: number; color: string },
-                  idx: number,
-                ) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div
-                      className={`w-3 h-3 rounded-full ${
-                        outcome.color === "orange"
-                          ? "bg-orange-500"
-                          : outcome.color === "blue"
-                            ? "bg-blue-500"
-                            : outcome.color === "purple"
-                              ? "bg-purple-400"
-                              : "bg-green-500"
-                      }`}
-                    />
-                    <span className="text-sm">
-                      {outcome.name} {outcome.probability}%
-                    </span>
-                  </div>
-                ),
-              )}
-            </div>
+          {outcomeData.map(
+            (
+              outcome: { name: string; probability: number; color: string },
+              idx: number
+            ) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    outcome.color === "orange"
+                      ? "bg-orange-500"
+                      : outcome.color === "blue"
+                      ? "bg-blue-500"
+                      : outcome.color === "purple"
+                      ? "bg-purple-400"
+                      : "bg-green-500"
+                  }`}
+                />
+                <span className="text-sm">
+                  {outcome.name} {outcome.probability}%
+                </span>
+              </div>
+            )
+          )}
+        </div>
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Chart Section - Left Side (2/3 width) */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="pt-6">
                 <MarketPriceChart
@@ -490,6 +490,22 @@ export default function MarketDetailPage() {
                 />
               </CardContent>
             </Card>
+
+            {/* Order Book - Always visible only for single outcome markets */}
+            {tradingOutcomes.length === 1 && (
+              <OrderBook
+                outcomes={tradingOutcomes.map((o) => ({
+                  name: o.name,
+                  tokenId: o.tokenId,
+                  price: o.price,
+                }))}
+                defaultOutcomeIndex={selectedOutcome}
+                maxLevels={5}
+                onPriceClick={handlePriceClick}
+                onOutcomeChange={(index) => setSelectedOutcome(index)}
+                defaultCollapsed={false}
+              />
+            )}
           </div>
 
           {/* Trading Panel - Right Side (1/3 width) */}
@@ -505,7 +521,9 @@ export default function MarketDetailPage() {
               onOrderSuccess={handleOrderSuccess}
               onOrderError={handleOrderError}
               marketImage={market.image}
-              yesProbability={market.bestAsk ? Math.round(market.bestAsk * 100) : undefined}
+              yesProbability={
+                market.bestAsk ? Math.round(market.bestAsk * 100) : undefined
+              }
             />
           </div>
         </div>
@@ -523,7 +541,7 @@ export default function MarketDetailPage() {
                   change: number;
                   color: string;
                 },
-                idx: number,
+                idx: number
               ) => (
                 <Card key={idx}>
                   <CardContent className="p-4">
@@ -616,39 +634,44 @@ export default function MarketDetailPage() {
                           {formatPrice(
                             (
                               1 - Number.parseFloat(prices[idx] || "0")
-                            ).toString(),
+                            ).toString()
                           )}
                           ¢
                         </Button>
                       </div>
                     </div>
 
-                    {/* Order Book - Shown below this outcome when clicked */}
-                    {showOrderBook && selectedOutcome === idx && tradingOutcomes.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="mt-4 pt-4 border-t border-border"
-                      >
-                        <OrderBook
-                          outcomes={tradingOutcomes.map((o) => ({
-                            name: o.name,
-                            tokenId: o.tokenId,
-                            price: o.price,
-                          }))}
-                          defaultOutcomeIndex={selectedOutcome}
-                          maxLevels={4}
-                          onPriceClick={handlePriceClick}
-                          onOutcomeChange={(index) => setSelectedOutcome(index)}
-                          defaultCollapsed={false}
-                        />
-                      </motion.div>
-                    )}
+                    {/* Order Book - Shown below this outcome when clicked (only for > 1 outcomes) */}
+                    {showOrderBook &&
+                      selectedOutcome === idx &&
+                      tradingOutcomes.length > 1 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="mt-4 pt-4 border-t border-border"
+                        >
+                          <OrderBook
+                            outcomes={tradingOutcomes.map((o) => ({
+                              name: o.name,
+                              tokenId: o.tokenId,
+                              price: o.price,
+                            }))}
+                            defaultOutcomeIndex={selectedOutcome}
+                            maxLevels={4}
+                            onPriceClick={handlePriceClick}
+                            onOutcomeChange={(index) =>
+                              setSelectedOutcome(index)
+                            }
+                            defaultCollapsed={false}
+                            embedded
+                          />
+                        </motion.div>
+                      )}
                   </CardContent>
                 </Card>
-              ),
+              )
             )}
           </div>
 
@@ -719,12 +742,12 @@ export default function MarketDetailPage() {
                           {relatedMarket.image && (
                             <div className="relative w-12 h-12 shrink-0">
                               <Image
-                              src={relatedMarket.image}
-                              alt={relatedMarket.title}
+                                src={relatedMarket.image}
+                                alt={relatedMarket.title}
                                 fill
                                 sizes="48px"
                                 className="rounded object-cover"
-                            />
+                              />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
@@ -782,12 +805,12 @@ export default function MarketDetailPage() {
                           {relatedMarket.image && (
                             <div className="relative w-12 h-12 shrink-0">
                               <Image
-                              src={relatedMarket.image}
-                              alt={relatedMarket.title}
+                                src={relatedMarket.image}
+                                alt={relatedMarket.title}
                                 fill
                                 sizes="48px"
                                 className="rounded object-cover"
-                            />
+                              />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
