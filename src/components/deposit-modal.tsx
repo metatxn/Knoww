@@ -241,6 +241,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setIsProcessing(true);
       setDepositError(null);
       setBridgeAddress(""); // Reset bridge address
+      let resolvedDepositAddress = "";
 
       try {
         console.log(
@@ -272,10 +273,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
           );
 
           if (matching) {
-            setBridgeAddress(matching.depositAddress);
+            resolvedDepositAddress = matching.depositAddress;
             console.log("[DepositModal] Found exact match for token:", {
               token: token.symbol,
-              depositAddress: matching.depositAddress,
+              depositAddress: resolvedDepositAddress,
             });
           } else {
             // If no exact match, try to find any Polygon deposit address (for USDC)
@@ -285,10 +286,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                 addr.tokenSymbol.toUpperCase() === "USDC"
             );
             if (polygonUsdc) {
-              setBridgeAddress(polygonUsdc.depositAddress);
+              resolvedDepositAddress = polygonUsdc.depositAddress;
               console.log(
                 "[DepositModal] Using Polygon USDC deposit address:",
-                polygonUsdc.depositAddress
+                resolvedDepositAddress
               );
             } else {
               // Last resort: any Polygon address
@@ -296,10 +297,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                 (addr) => addr.chainId === "137"
               );
               if (polygonAddr) {
-                setBridgeAddress(polygonAddr.depositAddress);
+                resolvedDepositAddress = polygonAddr.depositAddress;
                 console.log(
                   "[DepositModal] Using any Polygon deposit address:",
-                  polygonAddr.depositAddress
+                  resolvedDepositAddress
                 );
               } else {
                 console.error(
@@ -328,6 +329,11 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         setIsProcessing(false);
       }
 
+      // Only advance if we successfully resolved a deposit address.
+      // Otherwise we keep the user on token selection (broken flow if we proceed without it).
+      if (!resolvedDepositAddress) return;
+
+      setBridgeAddress(resolvedDepositAddress);
       setStep("amount");
     },
     [createDepositAddresses, proxyAddress]

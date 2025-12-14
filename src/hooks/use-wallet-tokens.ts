@@ -120,6 +120,7 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
   const [error, setError] = useState<string | null>(null);
   const [nativeBalance, setNativeBalance] = useState<number>(0);
   const lastFetchRef = useRef<number>(0);
+  const inFlightRef = useRef<Promise<void> | null>(null);
 
   /**
    * Create a viem client with fallback RPC support
@@ -172,9 +173,18 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
       return;
     }
 
+    // If a fetch is already in-flight, don't start another one.
+    // This prevents concurrent calls from creating extra RPC traffic and avoids UI loading edge-cases.
+    if (inFlightRef.current) {
+      return await inFlightRef.current;
+    }
+
     // Debounce: prevent fetching more than once per second
     const now = Date.now();
     if (now - lastFetchRef.current < 1000) {
+      // If we're debouncing and no fetch is running, ensure the UI doesn't get stuck in a loading state
+      // (e.g. if a previous request was interrupted by component lifecycle).
+      setIsLoading(false);
       return;
     }
     lastFetchRef.current = now;
@@ -182,92 +192,99 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const { formatUnits } = await import("viem");
-      const client = await getClient();
+    inFlightRef.current = (async () => {
+      try {
+        const { formatUnits } = await import("viem");
+        const client = await getClient();
 
-      // Use multicall to batch all balance requests into a single RPC call
-      // This dramatically reduces the number of requests and avoids rate limiting
-      const multicallContracts = POLYGON_TOKENS.map((token) => ({
-        address: token.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "balanceOf" as const,
-        args: [address as `0x${string}`],
-      }));
+        // Use multicall to batch all balance requests into a single RPC call
+        // This dramatically reduces the number of requests and avoids rate limiting
+        const multicallContracts = POLYGON_TOKENS.map((token) => ({
+          address: token.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "balanceOf" as const,
+          args: [address as `0x${string}`],
+        }));
 
-      // Execute multicall - all balance requests in ONE RPC call
-      const [nativeBal, multicallResults] = await Promise.all([
-        client.getBalance({ address: address as `0x${string}` }),
-        client.multicall({
-          contracts: multicallContracts,
-          allowFailure: true, // Don't fail if one token fails
-        }),
-      ]);
+        // Execute multicall - all balance requests in ONE RPC call
+        const [nativeBal, multicallResults] = await Promise.all([
+          client.getBalance({ address: address as `0x${string}` }),
+          client.multicall({
+            contracts: multicallContracts,
+            allowFailure: true, // Don't fail if one token fails
+          }),
+        ]);
 
-      const nativeBalFormatted = Number(formatUnits(nativeBal, 18));
-      setNativeBalance(nativeBalFormatted);
+        const nativeBalFormatted = Number(formatUnits(nativeBal, 18));
+        setNativeBalance(nativeBalFormatted);
 
-      // Process multicall results
-      const tokenBalances: TokenBalance[] = [];
+        // Process multicall results
+        const tokenBalances: TokenBalance[] = [];
 
-      multicallResults.forEach((result, index) => {
-        const token = POLYGON_TOKENS[index];
+        multicallResults.forEach((result, index) => {
+          const token = POLYGON_TOKENS[index];
 
-        if (result.status === "success" && result.result !== undefined) {
-          const balance = result.result as bigint;
-          const balanceFormatted = Number(formatUnits(balance, token.decimals));
+          if (result.status === "success" && result.result !== undefined) {
+            const balance = result.result as bigint;
+            const balanceFormatted = Number(
+              formatUnits(balance, token.decimals)
+            );
 
-          if (balanceFormatted > 0.000001) {
-            // Simple USD value estimation (1:1 for stablecoins, approximate for others)
-            let usdValue = balanceFormatted;
-            if (token.symbol === "WETH") {
-              usdValue = balanceFormatted * 3500; // Approximate ETH price
-            } else if (token.symbol === "WMATIC") {
-              usdValue = balanceFormatted * 0.5; // Approximate MATIC price
-            } else if (token.symbol === "WBTC") {
-              usdValue = balanceFormatted * 100000; // Approximate BTC price
+            if (balanceFormatted > 0.000001) {
+              // Simple USD value estimation (1:1 for stablecoins, approximate for others)
+              let usdValue = balanceFormatted;
+              if (token.symbol === "WETH") {
+                usdValue = balanceFormatted * 3500; // Approximate ETH price
+              } else if (token.symbol === "WMATIC") {
+                usdValue = balanceFormatted * 0.5; // Approximate MATIC price
+              } else if (token.symbol === "WBTC") {
+                usdValue = balanceFormatted * 100000; // Approximate BTC price
+              }
+
+              tokenBalances.push({
+                symbol: token.symbol,
+                name: token.name,
+                address: token.address,
+                decimals: token.decimals,
+                balance: balanceFormatted,
+                balanceRaw: balance.toString(),
+                usdValue,
+                logoUrl: token.logoUrl,
+              });
             }
-
-            tokenBalances.push({
-              symbol: token.symbol,
-              name: token.name,
-              address: token.address,
-              decimals: token.decimals,
-              balance: balanceFormatted,
-              balanceRaw: balance.toString(),
-              usdValue,
-              logoUrl: token.logoUrl,
-            });
           }
-        }
-      });
-
-      // Add native POL if balance > 0
-      if (nativeBalFormatted > 0.000001) {
-        tokenBalances.push({
-          symbol: "POL",
-          name: "Polygon",
-          address: "0x0000000000000000000000000000000000000000",
-          decimals: 18,
-          balance: nativeBalFormatted,
-          balanceRaw: nativeBal.toString(),
-          usdValue: nativeBalFormatted * 0.5, // Approximate
-          logoUrl: "https://cryptologos.cc/logos/polygon-matic-logo.png",
         });
+
+        // Add native POL if balance > 0
+        if (nativeBalFormatted > 0.000001) {
+          tokenBalances.push({
+            symbol: "POL",
+            name: "Polygon",
+            address: "0x0000000000000000000000000000000000000000",
+            decimals: 18,
+            balance: nativeBalFormatted,
+            balanceRaw: nativeBal.toString(),
+            usdValue: nativeBalFormatted * 0.5, // Approximate
+            logoUrl: "https://cryptologos.cc/logos/polygon-matic-logo.png",
+          });
+        }
+
+        // Sort by USD value descending
+        tokenBalances.sort((a, b) => b.usdValue - a.usdValue);
+
+        setTokens(tokenBalances);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch token balances";
+        setError(errorMessage);
+        console.error("[WalletTokens] Failed to fetch balances:", err);
+      } finally {
+        setIsLoading(false);
+        inFlightRef.current = null;
       }
+    })();
 
-      // Sort by USD value descending
-      tokenBalances.sort((a, b) => b.usdValue - a.usdValue);
-
-      setTokens(tokenBalances);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch token balances";
-      setError(errorMessage);
-      console.error("[WalletTokens] Failed to fetch balances:", err);
-    } finally {
-      setIsLoading(false);
-    }
+    return await inFlightRef.current;
   }, [address, isConnected, enabled, getClient]);
 
   // Fetch balances when address changes
