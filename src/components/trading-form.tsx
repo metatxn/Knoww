@@ -4,6 +4,7 @@ import { useAppKit } from "@reown/appkit/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
+  ArrowDownToLine,
   Loader2,
   Wallet,
   Wifi,
@@ -14,6 +15,7 @@ import {
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
+import { DepositModal } from "@/components/deposit-modal";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -200,7 +202,9 @@ export function TradingForm({
   const [shares, setShares] = useState<number>(10);
   const [useExpiration, setUseExpiration] = useState<boolean>(false);
   const [expirationHours, setExpirationHours] = useState<number>(24);
+  const [allowPartialFill, setAllowPartialFill] = useState<boolean>(true); // FAK vs FOK for market orders
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Get selected outcome
   const selectedOutcome = outcomes[selectedOutcomeIndex];
@@ -392,17 +396,26 @@ export function TradingForm({
       // Order Types:
       // - GTC (Good Till Cancelled): limit order that stays until filled/cancelled
       // - GTD (Good Till Date): limit order with expiration timestamp
-      // - FOK (Fill Or Kill): must fill immediately or cancel (used for "market" orders)
+      // Order types:
+      // - GTC (Good Till Cancelled): Limit order active until fulfilled or cancelled
+      // - GTD (Good Till Date): Limit order active until specified expiration date
+      // - FOK (Fill Or Kill): Must fill entirely or cancel completely
+      // - FAK (Fill And Kill): Fills as much as possible immediately, cancels the rest
       //
       // For "market" orders:
+      // - FAK (default): Fills as many shares as available, cancels unfilled portion
+      // - FOK: Must fill entire order or cancel completely (user preference)
+      //
+      // For "market" order pricing:
       // - BUY: use best ask + maxSlippage as limit price
       // - SELL: use best bid - maxSlippage as limit price
       // This creates an aggressive limit order that should fill immediately
-      // but won't eat through the entire order book
       const isGTD = useExpiration && orderType === "LIMIT";
       const clobOrderType =
         orderType === "MARKET"
-          ? ClobOrderType.FOK // Market orders use FOK for immediate execution
+          ? allowPartialFill
+            ? ClobOrderType.FAK // Partial fill allowed
+            : ClobOrderType.FOK // Must fill entirely
           : isGTD
           ? ClobOrderType.GTD
           : ClobOrderType.GTC;
@@ -446,6 +459,7 @@ export function TradingForm({
     shares,
     useExpiration,
     expirationHours,
+    allowPartialFill,
     createOrder,
     onOrderSuccess,
     onOrderError,
@@ -735,12 +749,37 @@ export function TradingForm({
             </div>
           </div>
 
-          {/* FOK Notice */}
+          {/* Partial Fill Toggle - Only for market orders */}
           {orderType === "MARKET" && (
-            <p className="text-[11px] text-muted-foreground leading-relaxed mt-2">
-              <span className="font-medium">FOK:</span> Order fills immediately
-              or cancels
-            </p>
+            <div className="mt-3 p-3 rounded-lg bg-secondary/30 border border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-3">
+                  <span className="text-sm font-medium text-foreground">
+                    Allow partial fill
+                  </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {allowPartialFill
+                      ? "Fills available shares, cancels rest (FAK)"
+                      : "Must fill entirely or cancel (FOK)"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAllowPartialFill(!allowPartialFill)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    allowPartialFill ? "bg-emerald-500" : "bg-muted"
+                  }`}
+                  role="switch"
+                  aria-checked={allowPartialFill}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      allowPartialFill ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -800,14 +839,25 @@ export function TradingForm({
               exit={{ opacity: 0, height: 0 }}
               className="px-4 pb-3"
             >
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                    Insufficient balance. Need $
-                    {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
-                    more.
-                  </span>
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                      Need $
+                      {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
+                      more
+                    </span>
+                  </div>
+                  {/* Quick Deposit Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDepositModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white transition-all shadow-sm shadow-emerald-500/25"
+                  >
+                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                    Deposit
+                  </button>
                 </div>
                 {/* Progress bar */}
                 <div className="h-1.5 bg-amber-500/20 rounded-full overflow-hidden">
@@ -950,6 +1000,12 @@ export function TradingForm({
           </p>
         </div>
       </div>
+
+      {/* Deposit Modal */}
+      <DepositModal
+        open={showDepositModal}
+        onOpenChange={setShowDepositModal}
+      />
     </div>
   );
 }

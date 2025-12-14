@@ -15,11 +15,14 @@ export enum Side {
 
 /**
  * Order type enum
+ *
+ * @see https://docs.polymarket.com/developers/CLOB/orders/create-order
  */
 export enum OrderType {
-  GTC = "GTC", // Good Till Cancelled
-  FOK = "FOK", // Fill Or Kill
-  GTD = "GTD", // Good Till Date
+  GTC = "GTC", // Good Till Cancelled - Limit order active until fulfilled or cancelled
+  GTD = "GTD", // Good Till Date - Limit order active until specified date
+  FOK = "FOK", // Fill Or Kill - Market order that must execute entirely or cancel
+  FAK = "FAK", // Fill And Kill - Market order that fills as much as possible, cancels rest
 }
 
 /**
@@ -178,6 +181,10 @@ export function useClobClient() {
           builderConfig
         );
 
+        // Fetch the fee rate for this token
+        // See: https://docs.polymarket.com/developers/CLOB/clients/methods-public#getfeeratebps
+        const feeRateBps = await client.getFeeRateBps(params.tokenId);
+
         // Create the order (SDK handles signing)
         // Note: expiration should be 0 for GTC/FOK orders, only set for GTD
         const order = await client.createOrder({
@@ -185,6 +192,7 @@ export function useClobClient() {
           price: params.price,
           size: params.size,
           side: params.side,
+          feeRateBps, // Pass the fetched fee rate
           expiration:
             params.orderType === OrderType.GTD ? params.expiration : 0,
         });
@@ -241,15 +249,30 @@ export function useClobClient() {
 
   /**
    * Get open orders for the connected user
-   * Requires credentials
+   * Requires credentials and proxy wallet
+   *
+   * IMPORTANT: Uses POLY_GNOSIS_SAFE signature type since orders are placed
+   * from the proxy wallet, not the EOA.
+   *
+   * Returns empty array if prerequisites aren't met (graceful degradation)
    */
   const getOpenOrders = useCallback(async () => {
+    // Gracefully return empty if prerequisites aren't met
     if (!address || !credentials) {
-      throw new Error("Wallet not connected or credentials not available");
+      console.debug(
+        "[getOpenOrders] Skipping: wallet not connected or no credentials"
+      );
+      return [];
     }
 
-    if (!window.ethereum) {
-      throw new Error("No wallet provider found. Please install MetaMask.");
+    if (typeof window === "undefined" || !window.ethereum) {
+      console.debug("[getOpenOrders] Skipping: no wallet provider");
+      return [];
+    }
+
+    if (!proxyAddress || !hasProxyWallet) {
+      console.debug("[getOpenOrders] Skipping: proxy wallet not deployed");
+      return [];
     }
 
     try {
@@ -263,7 +286,8 @@ export function useClobClient() {
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
 
-      const SIGNATURE_TYPE_EOA = 0;
+      // SignatureType 2 = POLY_GNOSIS_SAFE (orders are placed from proxy wallet)
+      const SIGNATURE_TYPE_POLY_GNOSIS_SAFE = 2;
       const creds = {
         key: credentials.apiKey,
         secret: credentials.apiSecret,
@@ -275,20 +299,27 @@ export function useClobClient() {
         chainId,
         signer,
         creds,
-        SIGNATURE_TYPE_EOA
+        SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
+        proxyAddress // funderAddress - the proxy wallet that holds the funds
       );
 
       const orders = await client.getOpenOrders();
       return orders || [];
     } catch (err) {
       console.error("Failed to get open orders:", err);
-      throw err;
+      // Return empty array instead of throwing for graceful degradation
+      return [];
     }
-  }, [address, credentials, clobHost, chainId]);
+  }, [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet]);
 
   /**
    * Get balance and allowance for the connected user
    * Returns USDC balance and current allowance for trading
+   *
+   * IMPORTANT: Uses POLY_GNOSIS_SAFE signature type since trading happens
+   * from the proxy wallet, not the EOA.
+   *
+   * Returns default values if prerequisites aren't met (graceful degradation)
    *
    * @param assetType - "COLLATERAL" for USDC, "CONDITIONAL" for outcome tokens
    * @param tokenId - Optional token ID for conditional tokens
@@ -298,12 +329,24 @@ export function useClobClient() {
       assetType: "COLLATERAL" | "CONDITIONAL" = "COLLATERAL",
       tokenId?: string
     ) => {
+      // Gracefully return defaults if prerequisites aren't met
       if (!address || !credentials) {
-        throw new Error("Wallet not connected or credentials not available");
+        console.debug(
+          "[getBalanceAllowance] Skipping: wallet not connected or no credentials"
+        );
+        return { balance: "0", allowance: "0" };
       }
 
-      if (!window.ethereum) {
-        throw new Error("No wallet provider found. Please install MetaMask.");
+      if (typeof window === "undefined" || !window.ethereum) {
+        console.debug("[getBalanceAllowance] Skipping: no wallet provider");
+        return { balance: "0", allowance: "0" };
+      }
+
+      if (!proxyAddress || !hasProxyWallet) {
+        console.debug(
+          "[getBalanceAllowance] Skipping: proxy wallet not deployed"
+        );
+        return { balance: "0", allowance: "0" };
       }
 
       try {
@@ -319,7 +362,8 @@ export function useClobClient() {
         await provider.send("eth_requestAccounts", []);
         const signer = provider.getSigner();
 
-        const SIGNATURE_TYPE_EOA = 0;
+        // SignatureType 2 = POLY_GNOSIS_SAFE (trading happens from proxy wallet)
+        const SIGNATURE_TYPE_POLY_GNOSIS_SAFE = 2;
         const creds = {
           key: credentials.apiKey,
           secret: credentials.apiSecret,
@@ -331,7 +375,8 @@ export function useClobClient() {
           chainId,
           signer,
           creds,
-          SIGNATURE_TYPE_EOA
+          SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
+          proxyAddress // funderAddress - the proxy wallet that holds the funds
         );
 
         // Get balance and allowance
@@ -353,7 +398,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address, credentials, clobHost, chainId]
+    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet]
   );
 
   /**
@@ -449,6 +494,9 @@ export function useClobClient() {
 
   /**
    * Cancel an order
+   *
+   * IMPORTANT: Uses POLY_GNOSIS_SAFE signature type since orders are placed
+   * from the proxy wallet, not the EOA.
    */
   const cancelOrder = useCallback(
     async (orderId: string) => {
@@ -458,6 +506,12 @@ export function useClobClient() {
 
       if (!window.ethereum) {
         throw new Error("No wallet provider found. Please install MetaMask.");
+      }
+
+      if (!proxyAddress || !hasProxyWallet) {
+        throw new Error(
+          "Proxy wallet not deployed. Please complete trading setup first."
+        );
       }
 
       setIsLoading(true);
@@ -475,7 +529,8 @@ export function useClobClient() {
         await provider.send("eth_requestAccounts", []);
         const signer = provider.getSigner();
 
-        const SIGNATURE_TYPE_EOA = 0;
+        // SignatureType 2 = POLY_GNOSIS_SAFE (orders are placed from proxy wallet)
+        const SIGNATURE_TYPE_POLY_GNOSIS_SAFE = 2;
         const creds = {
           key: credentials.apiKey,
           secret: credentials.apiSecret,
@@ -487,7 +542,8 @@ export function useClobClient() {
           chainId,
           signer,
           creds,
-          SIGNATURE_TYPE_EOA
+          SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
+          proxyAddress // funderAddress - the proxy wallet that holds the funds
         );
 
         const response = await client.cancelOrder({ orderID: orderId });
@@ -505,7 +561,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [address, credentials, clobHost, chainId]
+    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet]
   );
 
   /**
@@ -574,6 +630,30 @@ export function useClobClient() {
       }
     },
     [address]
+  );
+
+  /**
+   * Get the fee rate in basis points for a specific token
+   * This should be called before creating orders to ensure accurate fee calculation
+   *
+   * @see https://docs.polymarket.com/developers/CLOB/clients/methods-public#getfeeratebps
+   */
+  const getFeeRateBps = useCallback(
+    async (tokenId: string): Promise<number> => {
+      try {
+        const { ClobClient } = await import("@polymarket/clob-client");
+
+        // Public client (no signer needed for read-only operations)
+        const client = new ClobClient(clobHost, chainId);
+
+        const feeRate = await client.getFeeRateBps(tokenId);
+        return feeRate;
+      } catch (err) {
+        console.error("Failed to get fee rate:", err);
+        throw err;
+      }
+    },
+    [clobHost, chainId]
   );
 
   /**
@@ -655,6 +735,8 @@ export function useClobClient() {
     isConnected,
     canTrade,
     hasCredentials,
+    hasProxyWallet,
+    proxyAddress,
     isLoading,
     error,
 
@@ -668,5 +750,6 @@ export function useClobClient() {
     updateAllowance,
     getUsdcBalance,
     getUsdcAllowance,
+    getFeeRateBps,
   };
 }

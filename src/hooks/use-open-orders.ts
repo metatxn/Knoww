@@ -43,7 +43,7 @@ export interface UseOpenOrdersOptions {
  * Hook to fetch user's open orders using the CLOB client
  *
  * Uses the ClobClient's getOpenOrders() method which requires
- * wallet authentication (L2 credentials).
+ * wallet authentication (L2 credentials) and a deployed proxy wallet.
  *
  * @param options - Query options
  * @returns Query result with open orders
@@ -51,7 +51,7 @@ export interface UseOpenOrdersOptions {
 export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
   const { address, isConnected } = useConnection();
   const { hasCredentials } = useClobCredentials();
-  const { getOpenOrders } = useClobClient();
+  const { getOpenOrders, hasProxyWallet, proxyAddress } = useClobClient();
 
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
@@ -59,7 +59,15 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
   return useQuery({
     queryKey: ["openOrders", userAddress, options.market],
     queryFn: async () => {
-      if (!userAddress) throw new Error("Address not available");
+      if (!userAddress) {
+        return {
+          success: false,
+          userAddress: null,
+          count: 0,
+          orders: [],
+          error: "Address not available",
+        };
+      }
 
       try {
         const orders = await getOpenOrders();
@@ -126,10 +134,13 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
         };
       }
     },
+    // Only enable when all prerequisites are met
     enabled:
       isConnected &&
       !!userAddress &&
       hasCredentials &&
+      hasProxyWallet &&
+      !!proxyAddress &&
       options.enabled !== false,
     staleTime: 10 * 1000, // 10 seconds (orders can change quickly)
     refetchInterval: 15 * 1000, // Refetch every 15 seconds

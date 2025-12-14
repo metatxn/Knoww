@@ -2,6 +2,7 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import {
+  ArrowDownToLine,
   ChevronDown,
   LogOut,
   Menu,
@@ -13,6 +14,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useConnection, useBalance, useDisconnect } from "wagmi";
+import { DepositModal } from "@/components/deposit-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useOnboarding } from "@/context/onboarding-context";
+import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 
 const navLinks = [
   { label: "Politics", href: "/events/politics" },
@@ -49,9 +52,13 @@ export function Navbar() {
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Use the global onboarding context
   const { setShowOnboarding, needsTradingSetup } = useOnboarding();
+
+  // Proxy wallet for deposit functionality
+  const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
 
   // Close mobile menu when route changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname dependency is intentional to close menu on navigation
@@ -107,6 +114,18 @@ export function Navbar() {
                   <Rocket className="mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Setup Trading</span>
                   <span className="sm:hidden">Setup</span>
+                </Button>
+              )}
+
+              {/* Deposit Button - Eye-catching for users with proxy wallet */}
+              {hasProxyWallet && proxyAddress && !needsTradingSetup && (
+                <Button
+                  onClick={() => setShowDepositModal(true)}
+                  size="sm"
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
+                >
+                  <ArrowDownToLine className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Deposit</span>
                 </Button>
               )}
 
@@ -217,6 +236,21 @@ export function Navbar() {
               </button>
             )}
 
+            {/* Deposit Funds - Mobile */}
+            {hasProxyWallet && proxyAddress && !needsTradingSetup && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDepositModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+              >
+                <ArrowDownToLine className="inline mr-2 h-4 w-4" />
+                Deposit Funds
+              </button>
+            )}
+
             {/* Home link */}
             <button
               type="button"
@@ -255,6 +289,11 @@ export function Navbar() {
         </div>
       )}
 
+      {/* Deposit Modal */}
+      <DepositModal
+        open={showDepositModal}
+        onOpenChange={setShowDepositModal}
+      />
     </nav>
   );
 }

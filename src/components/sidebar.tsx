@@ -2,6 +2,7 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import {
+  ArrowDownToLine,
   BarChart3,
   Bitcoin,
   Briefcase,
@@ -16,8 +17,10 @@ import {
   LogOut,
   MessageSquare,
   Newspaper,
+  Plus,
   Rocket,
   Settings,
+  Sparkles,
   Trophy,
   User,
   Vote,
@@ -27,6 +30,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConnection, useDisconnect } from "wagmi";
+import { DepositModal } from "@/components/deposit-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,6 +73,7 @@ export function Sidebar() {
   const disconnect = useDisconnect();
   const { open } = useAppKit();
   const [copied, setCopied] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Use the global onboarding context
   const { setShowOnboarding, needsTradingSetup } = useOnboarding();
@@ -209,23 +214,64 @@ export function Sidebar() {
             <p className="text-xl font-bold text-violet-400">
               ${proxyUsdcBalance.toFixed(2)}
             </p>
-            <div className="flex items-center gap-1 mt-1">
-              <code className="text-[10px] text-muted-foreground font-mono">
-                {formatAddress(proxyAddress)}
-              </code>
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-1">
+                <code className="text-[10px] text-muted-foreground font-mono">
+                  {formatAddress(proxyAddress)}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(proxyAddress)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {copied ? (
+                    <span className="text-[10px] text-green-500">✓</span>
+                  ) : (
+                    <Copy className="h-2.5 w-2.5" />
+                  )}
+                </button>
+              </div>
+              {/* Deposit Button - Small but eye-catching */}
               <button
                 type="button"
-                onClick={() => handleCopy(proxyAddress)}
-                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setShowDepositModal(true)}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white transition-all shadow-sm shadow-emerald-500/25 hover:shadow-emerald-500/40"
               >
-                {copied ? (
-                  <span className="text-[10px] text-green-500">✓</span>
-                ) : (
-                  <Copy className="h-2.5 w-2.5" />
-                )}
+                <Plus className="h-3 w-3" />
+                Add
               </button>
             </div>
           </div>
+        )}
+
+        {/* Prominent Deposit CTA - Shows when wallet is set up but balance is low */}
+        {isConnected && hasProxyWallet && proxyAddress && proxyUsdcBalance < 10 && (
+          <button
+            type="button"
+            onClick={() => setShowDepositModal(true)}
+            className="group relative w-full overflow-hidden rounded-xl p-3 transition-all duration-300 hover:scale-[1.02]"
+          >
+            {/* Animated gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-90" />
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            
+            {/* Shimmer effect */}
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            
+            {/* Content */}
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <ArrowDownToLine className="h-4 w-4 text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-white">Deposit Funds</p>
+                  <p className="text-[10px] text-white/80">Start trading now</p>
+                </div>
+              </div>
+              <Sparkles className="h-4 w-4 text-white/80 group-hover:text-white transition-colors" />
+            </div>
+          </button>
         )}
 
         {/* Setup CTA */}
@@ -288,6 +334,12 @@ export function Sidebar() {
           <ThemeToggle />
         </div>
       </div>
+
+      {/* Deposit Modal */}
+      <DepositModal
+        open={showDepositModal}
+        onOpenChange={setShowDepositModal}
+      />
     </aside>
   );
 }
