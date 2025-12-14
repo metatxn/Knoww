@@ -96,8 +96,9 @@ export default function EventDetailPage() {
     [setOrderBookFromRest]
   );
 
-  const eventId = params?.id as string;
-  const { data: event, isLoading: loading, error } = useEventDetail(eventId);
+  // Use slug from URL params - API handles both slugs and numeric IDs
+  const eventSlugOrId = params?.slug as string;
+  const { data: event, isLoading: loading, error } = useEventDetail(eventSlugOrId);
 
   // Handle order success
   const handleOrderSuccess = useCallback((_order: unknown) => {

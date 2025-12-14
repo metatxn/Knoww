@@ -61,12 +61,13 @@ interface EventDetailResponse {
 }
 
 /**
- * Fetch event details by ID including all associated markets
+ * Fetch event details by slug or ID including all associated markets
+ * The API automatically handles both formats (slug preferred, ID as fallback)
  */
-async function fetchEventDetail(id: string | undefined): Promise<Event | null> {
-  if (!id) return null;
+async function fetchEventDetail(slugOrId: string | undefined): Promise<Event | null> {
+  if (!slugOrId) return null;
 
-  const response = await fetch(`/api/events/${id}`);
+  const response = await fetch(`/api/events/${slugOrId}`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -85,16 +86,16 @@ async function fetchEventDetail(id: string | undefined): Promise<Event | null> {
 }
 
 /**
- * Hook to fetch event details by ID
+ * Hook to fetch event details by slug or ID
  *
- * @param id - Event ID
+ * @param slugOrId - Event slug (preferred) or numeric ID (fallback)
  * @returns TanStack Query result with event data including markets
  */
-export function useEventDetail(id: string | undefined) {
+export function useEventDetail(slugOrId: string | undefined) {
   return useQuery({
-    queryKey: ["events", "detail", id],
-    queryFn: () => fetchEventDetail(id),
-    enabled: !!id,
+    queryKey: ["events", "detail", slugOrId],
+    queryFn: () => fetchEventDetail(slugOrId),
+    enabled: !!slugOrId,
     staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
   });

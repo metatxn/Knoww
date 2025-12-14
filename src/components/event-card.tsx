@@ -37,10 +37,11 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
     return `$${num.toFixed(0)}`;
   };
 
-  const href = event.id
-    ? `/events/detail/${event.id}`
-    : event.slug
+  // Prefer slug for SEO-friendly URLs, fallback to ID
+  const href = event.slug
     ? `/events/detail/${event.slug}`
+    : event.id
+    ? `/events/detail/${event.id}`
     : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
