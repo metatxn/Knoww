@@ -19,6 +19,8 @@ interface EventCardProps {
     description?: string;
     image?: string;
     volume?: string;
+    volume24hr?: number | string;
+    volume1wk?: number | string;
     active?: boolean;
     closed?: boolean;
     negRisk?: boolean;
@@ -48,13 +50,22 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
     : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
-  const volume = parseFloat(event.volume || "0");
 
-  // HOT badge calculation:
-  // - Shows "HOT" when 24h volume exceeds $500,000
-  // - Shows lightning bolt (⚡) on volume pill when volume > $100,000
-  const isHighVolume = volume > 100000; // > $100K shows lightning bolt
-  const isHot = volume > 500000; // > $500K shows HOT badge
+  // Parse volume values
+  const volume24hr =
+    typeof event.volume24hr === "string"
+      ? Number.parseFloat(event.volume24hr)
+      : event.volume24hr || 0;
+  const volume1wk =
+    typeof event.volume1wk === "string"
+      ? Number.parseFloat(event.volume1wk)
+      : event.volume1wk || 0;
+
+  // Badge calculations based on volume thresholds:
+  // - Lightning bolt (⚡): 24hr volume > $1M (high activity)
+  // - HOT badge: weekly volume > $5M (trending market)
+  const isHighVolume = volume24hr > 1_000_000; // > $1M 24hr shows lightning
+  const isHot = volume1wk > 5_000_000; // > $5M weekly shows HOT badge
 
   return (
     <motion.div

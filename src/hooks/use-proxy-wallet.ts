@@ -53,7 +53,7 @@ export function useProxyWallet() {
    * Check if a proxy wallet has any positions or activity on Polymarket
    * This validates that the derived address is correct and active
    */
-  const checkWalletHasData = useCallback(
+  const _checkWalletHasData = useCallback(
     async (proxyAddress: string): Promise<boolean> => {
       try {
         // Check for positions using the PROXY address (not EOA)

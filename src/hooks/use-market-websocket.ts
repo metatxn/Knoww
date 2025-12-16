@@ -558,7 +558,7 @@ export function useMarketWebSocket(
       disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [assetIds.filter, assetIds.length, autoConnect, connect, disconnect]);
 
   // Handle asset ID changes
   useEffect(() => {

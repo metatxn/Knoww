@@ -18,13 +18,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useOnboarding } from "@/context/onboarding-context";
 import {
   OrderType as ClobOrderType,
@@ -200,8 +193,8 @@ export function TradingForm({
   const [orderType, setOrderType] = useState<OrderTypeSelection>("MARKET");
   const [limitPrice, setLimitPrice] = useState<number>(0.5);
   const [shares, setShares] = useState<number>(10);
-  const [useExpiration, setUseExpiration] = useState<boolean>(false);
-  const [expirationHours, setExpirationHours] = useState<number>(24);
+  const [useExpiration, _setUseExpiration] = useState<boolean>(false);
+  const [expirationHours, _setExpirationHours] = useState<number>(24);
   const [allowPartialFill, setAllowPartialFill] = useState<boolean>(true); // FAK vs FOK for market orders
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -239,7 +232,7 @@ export function TradingForm({
   // Calculate market order price based on actual order book depth
   // Uses direction-aware rounding: roundUp for BUY, roundDown for SELL
   const marketOrderPrice = useMemo(() => {
-    if (slippageResult && slippageResult.canFill) {
+    if (slippageResult?.canFill) {
       // Use the worst price from the slippage calculation + buffer
       // Direction-aware rounding ensures we stay within user intent
       if (side === "BUY") {
@@ -356,7 +349,7 @@ export function TradingForm({
   }, [updateAllowance, refetchBalance, refetchAllowance, onOrderError]);
 
   // Handle price change with bounds and tick size
-  const handlePriceChange = useCallback(
+  const _handlePriceChange = useCallback(
     (delta: number) => {
       setLimitPrice((prev) => {
         // Use tick size for delta (default 0.01)
@@ -374,7 +367,7 @@ export function TradingForm({
   }, []);
 
   // Handle deriving credentials (one-time setup)
-  const handleDeriveCredentials = useCallback(async () => {
+  const _handleDeriveCredentials = useCallback(async () => {
     try {
       await deriveCredentials();
     } catch (err) {
@@ -477,7 +470,7 @@ export function TradingForm({
   const isBelowMinimum = calculations.total < minOrderSize;
 
   // Check if price crosses the book significantly
-  const spreadWarning = useMemo(() => {
+  const _spreadWarning = useMemo(() => {
     if (orderType === "MARKET") return null; // Market orders always cross
     return isPriceCrossingBook(limitPrice, side, bestBid, bestAsk);
   }, [orderType, limitPrice, side, bestBid, bestAsk]);

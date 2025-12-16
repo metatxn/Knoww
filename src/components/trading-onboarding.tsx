@@ -543,7 +543,7 @@ export function TradingOnboarding({
                           ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30"
                           : isCurrent
                             ? "bg-white dark:bg-gray-900 border-emerald-500 text-emerald-500 shadow-md"
-                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500"
+                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500",
                       )}
                     >
                       {isCompleted ? (
@@ -576,7 +576,7 @@ export function TradingOnboarding({
                       ? "text-emerald-600 dark:text-emerald-400"
                       : isCurrent
                         ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-gray-400 dark:text-gray-500"
+                        : "text-gray-400 dark:text-gray-500",
                   )}
                 >
                   {step.id === "connect"

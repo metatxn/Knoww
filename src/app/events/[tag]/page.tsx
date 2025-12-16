@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { EventCard } from "@/components/event-card";
 import { Navbar } from "@/components/navbar";
+import { PageBackground } from "@/components/page-background";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -90,18 +91,8 @@ export default function TagEventsPage() {
       : "Markets";
 
   return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* Subtle Grid Pattern */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-      </div>
-
-      {/* Animated Background Orbs */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8 animate-pulse" />
-        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
-      </div>
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+      <PageBackground />
 
       <Navbar />
 

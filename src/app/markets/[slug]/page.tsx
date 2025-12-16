@@ -16,6 +16,7 @@ import { useCallback, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { OrderBook } from "@/components/order-book";
+import { PageBackground } from "@/components/page-background";
 import { type OutcomeData, TradingForm } from "@/components/trading-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,8 @@ export default function MarketDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+        <PageBackground />
         <Navbar />
         <main className="px-4 md:px-6 lg:px-8 py-8 space-y-8">
           {/* Back Button Skeleton */}
@@ -198,7 +200,8 @@ export default function MarketDetailPage() {
 
   if (error || !market) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+        <PageBackground />
         <Navbar />
         <main className="px-4 md:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
@@ -324,14 +327,15 @@ export default function MarketDetailPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+      <PageBackground />
       <Navbar />
       <motion.main
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="px-4 md:px-6 lg:px-8 py-6 space-y-6"
+        className="relative z-10 px-4 md:px-6 lg:px-8 py-6 space-y-6"
       >
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

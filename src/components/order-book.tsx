@@ -220,7 +220,7 @@ export function OrderBook({
   maxLevels = 4,
   onPriceClick,
   useWebSocket = true,
-  pollingInterval = 5000,
+  pollingInterval: _pollingInterval = 5000,
   lastTradePrice,
   defaultCollapsed = false,
   onOutcomeChange,
@@ -291,7 +291,7 @@ export function OrderBook({
     () => (isValidTokenId && useWebSocket ? [tokenId] : []),
     [isValidTokenId, useWebSocket, tokenId],
   );
-  const { connectionState, isConnected } = useOrderBookWebSocket(assetIds);
+  const { connectionState } = useOrderBookWebSocket(assetIds);
 
   // Use store data (which has REST + WebSocket updates merged)
   // Fall back to raw REST data if store is empty

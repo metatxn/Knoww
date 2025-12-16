@@ -78,7 +78,7 @@ function InteractiveLineChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Calculate chart bounds and points
-  const { points, minPnl, maxPnl } = useMemo(() => {
+  const { points } = useMemo(() => {
     if (data.length === 0) return { points: [], minPnl: 0, maxPnl: 0 };
 
     const pnlValues = data.map((d) => d.pnl);
@@ -156,6 +156,8 @@ function InteractiveLineChart({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ height }}
+      role="img"
+      aria-label="P&L chart visualization"
     >
       <svg
         width="100%"
@@ -163,6 +165,7 @@ function InteractiveLineChart({
         viewBox={`0 0 100 ${height}`}
         preserveAspectRatio="none"
         className="overflow-visible"
+        aria-hidden="true"
       >
         <defs>
           <linearGradient

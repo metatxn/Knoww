@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useConnection } from "wagmi";
 import { Navbar } from "@/components/navbar";
+import { PageBackground } from "@/components/page-background";
 import { PnLChart } from "@/components/pnl-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,6 +111,7 @@ function TabNav({
     <div className="flex items-center border-b border-border">
       {tabs.map((tab) => (
         <button
+          type="button"
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
           className={`relative px-5 py-3.5 text-sm font-medium transition-colors ${
@@ -286,136 +288,140 @@ function PositionsTable({
   const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="w-[40%]">Market</TableHead>
-          <TableHead className="text-center">Avg → Now</TableHead>
-          <TableHead className="text-right">Bet</TableHead>
-          <TableHead className="text-right">To Win</TableHead>
-          <TableHead className="text-right">Value</TableHead>
-          <TableHead className="w-[80px]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredPositions.map((position) => {
-          const isProfit = position.unrealizedPnl >= 0;
-          const toWin = position.size * (1 - position.avgPrice);
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[40%] min-w-[200px]">Market</TableHead>
+            <TableHead className="text-center min-w-[100px]">
+              Avg → Now
+            </TableHead>
+            <TableHead className="text-right min-w-[80px]">Bet</TableHead>
+            <TableHead className="text-right min-w-[80px]">To Win</TableHead>
+            <TableHead className="text-right min-w-[100px]">Value</TableHead>
+            <TableHead className="w-[80px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredPositions.map((position) => {
+            const isProfit = position.unrealizedPnl >= 0;
+            const toWin = position.size * (1 - position.avgPrice);
 
-          return (
-            <TableRow key={position.id} className="group">
-              <TableCell>
-                <Link
-                  href={`/events/detail/${position.market.eventSlug}`}
-                  className="flex items-center gap-3"
-                >
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
-                    {position.market.icon ? (
-                      <Image
-                        src={position.market.icon}
-                        alt={position.market.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+            return (
+              <TableRow key={position.id} className="group">
+                <TableCell>
+                  <Link
+                    href={`/events/detail/${position.market.eventSlug}`}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                      {position.market.icon ? (
+                        <Image
+                          src={position.market.icon}
+                          alt={position.market.title}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate max-w-[280px] group-hover:text-primary transition-colors">
+                        {position.market.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <span
+                          className={
+                            position.outcome === "Yes"
+                              ? "text-emerald-500"
+                              : "text-red-500"
+                          }
+                        >
+                          {position.outcome} {formatPrice(position.avgPrice)}
+                        </span>
+                        <span className="mx-1.5">·</span>
+                        {position.size.toFixed(1)} shares
+                      </p>
+                    </div>
+                  </Link>
+                </TableCell>
+                <TableCell className="text-center">
+                  <span className="text-muted-foreground">
+                    {formatPrice(position.avgPrice)}
+                  </span>
+                  <span className="mx-1 text-muted-foreground">→</span>
+                  <span
+                    className={
+                      position.currentPrice > position.avgPrice
+                        ? "text-emerald-500"
+                        : position.currentPrice < position.avgPrice
+                          ? "text-red-500"
+                          : ""
+                    }
+                  >
+                    {formatPrice(position.currentPrice)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatCurrency(position.initialValue)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatCurrency(toWin)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="font-medium">
+                    {formatCurrency(position.currentValue)}
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate max-w-[280px] group-hover:text-primary transition-colors">
-                      {position.market.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <span
-                        className={
-                          position.outcome === "Yes"
-                            ? "text-emerald-500"
-                            : "text-red-500"
-                        }
-                      >
-                        {position.outcome} {formatPrice(position.avgPrice)}
-                      </span>
-                      <span className="mx-1.5">·</span>
-                      {position.size.toFixed(1)} shares
-                    </p>
+                  <div
+                    className={`text-xs ${
+                      isProfit ? "text-emerald-500" : "text-red-500"
+                    }`}
+                  >
+                    {formatCurrency(position.unrealizedPnl, true)} (
+                    {formatPercent(position.unrealizedPnlPercent)})
                   </div>
-                </Link>
-              </TableCell>
-              <TableCell className="text-center">
-                <span className="text-muted-foreground">
-                  {formatPrice(position.avgPrice)}
-                </span>
-                <span className="mx-1 text-muted-foreground">→</span>
-                <span
-                  className={
-                    position.currentPrice > position.avgPrice
-                      ? "text-emerald-500"
-                      : position.currentPrice < position.avgPrice
-                        ? "text-red-500"
-                        : ""
-                  }
-                >
-                  {formatPrice(position.currentPrice)}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                {formatCurrency(position.initialValue)}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatCurrency(toWin)}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="font-medium">
-                  {formatCurrency(position.currentValue)}
-                </div>
-                <div
-                  className={`text-xs ${
-                    isProfit ? "text-emerald-500" : "text-red-500"
-                  }`}
-                >
-                  {formatCurrency(position.unrealizedPnl, true)} (
-                  {formatPercent(position.unrealizedPnlPercent)})
-                </div>
-              </TableCell>
-              <TableCell>
-                <Button
-                  size="sm"
-                  className="bg-sky-500 hover:bg-sky-600 text-white h-8"
-                >
-                  Sell
-                </Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-      <TableFooter>
-        <TableRow>
-          <TableCell className="font-medium">Total</TableCell>
-          <TableCell></TableCell>
-          <TableCell className="text-right font-medium">
-            {formatCurrency(totalBet)}
-          </TableCell>
-          <TableCell className="text-right font-medium">
-            {formatCurrency(totalToWin)}
-          </TableCell>
-          <TableCell className="text-right">
-            <div className="font-medium">{formatCurrency(totalValue)}</div>
-            <div
-              className={`text-xs ${
-                totalPnl >= 0 ? "text-emerald-500" : "text-red-500"
-              }`}
-            >
-              {formatCurrency(totalPnl, true)} ({formatPercent(totalPnlPercent)}
-              )
-            </div>
-          </TableCell>
-          <TableCell></TableCell>
-        </TableRow>
-      </TableFooter>
-    </Table>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    size="sm"
+                    className="bg-sky-500 hover:bg-sky-600 text-white h-8"
+                  >
+                    Sell
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell className="font-medium">Total</TableCell>
+            <TableCell></TableCell>
+            <TableCell className="text-right font-medium">
+              {formatCurrency(totalBet)}
+            </TableCell>
+            <TableCell className="text-right font-medium">
+              {formatCurrency(totalToWin)}
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="font-medium">{formatCurrency(totalValue)}</div>
+              <div
+                className={`text-xs ${
+                  totalPnl >= 0 ? "text-emerald-500" : "text-red-500"
+                }`}
+              >
+                {formatCurrency(totalPnl, true)} (
+                {formatPercent(totalPnlPercent)})
+              </div>
+            </TableCell>
+            <TableCell></TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
   );
 }
 
@@ -480,73 +486,77 @@ function OrdersTable({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="w-[35%]">Market</TableHead>
-          <TableHead className="text-center">Side</TableHead>
-          <TableHead className="text-center">Outcome</TableHead>
-          <TableHead className="text-right">Price</TableHead>
-          <TableHead className="text-right">Filled</TableHead>
-          <TableHead className="text-right">Total</TableHead>
-          <TableHead className="text-center">Expiration</TableHead>
-          <TableHead className="w-[50px]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredOrders.map((order) => (
-          <TableRow key={order.id}>
-            <TableCell>
-              <p className="font-medium text-sm truncate max-w-[250px]">
-                {order.market?.question ||
-                  `Token ${order.tokenId.slice(0, 8)}...`}
-              </p>
-            </TableCell>
-            <TableCell className="text-center">
-              <span
-                className={`inline-flex text-xs font-medium px-2 py-1 rounded ${
-                  order.side === "BUY"
-                    ? "bg-emerald-500/15 text-emerald-500"
-                    : "bg-red-500/15 text-red-500"
-                }`}
-              >
-                {order.side}
-              </span>
-            </TableCell>
-            <TableCell className="text-center text-sm">
-              {order.market?.outcome || "-"}
-            </TableCell>
-            <TableCell className="text-right">
-              {formatPrice(order.price)}
-            </TableCell>
-            <TableCell className="text-right text-sm text-muted-foreground">
-              {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
-            </TableCell>
-            <TableCell className="text-right">
-              {formatCurrency(order.size * order.price)}
-            </TableCell>
-            <TableCell className="text-center text-sm text-muted-foreground">
-              {order.expiration && order.expiration !== "0"
-                ? new Date(
-                    parseInt(order.expiration, 10) * 1000,
-                  ).toLocaleDateString()
-                : "GTC"}
-            </TableCell>
-            <TableCell>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onCancel(order.id)}
-                disabled={cancellingOrderId === order.id}
-                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[35%] min-w-[180px]">Market</TableHead>
+            <TableHead className="text-center min-w-[60px]">Side</TableHead>
+            <TableHead className="text-center min-w-[80px]">Outcome</TableHead>
+            <TableHead className="text-right min-w-[70px]">Price</TableHead>
+            <TableHead className="text-right min-w-[90px]">Filled</TableHead>
+            <TableHead className="text-right min-w-[70px]">Total</TableHead>
+            <TableHead className="text-center min-w-[100px]">
+              Expiration
+            </TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {filteredOrders.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell>
+                <p className="font-medium text-sm truncate max-w-[250px]">
+                  {order.market?.question ||
+                    `Token ${order.tokenId.slice(0, 8)}...`}
+                </p>
+              </TableCell>
+              <TableCell className="text-center">
+                <span
+                  className={`inline-flex text-xs font-medium px-2 py-1 rounded ${
+                    order.side === "BUY"
+                      ? "bg-emerald-500/15 text-emerald-500"
+                      : "bg-red-500/15 text-red-500"
+                  }`}
+                >
+                  {order.side}
+                </span>
+              </TableCell>
+              <TableCell className="text-center text-sm">
+                {order.market?.outcome || "-"}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatPrice(order.price)}
+              </TableCell>
+              <TableCell className="text-right text-sm text-muted-foreground">
+                {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(order.size * order.price)}
+              </TableCell>
+              <TableCell className="text-center text-sm text-muted-foreground">
+                {order.expiration && order.expiration !== "0"
+                  ? new Date(
+                      parseInt(order.expiration, 10) * 1000,
+                    ).toLocaleDateString()
+                  : "GTC"}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onCancel(order.id)}
+                  disabled={cancellingOrderId === order.id}
+                  className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -663,114 +673,120 @@ function HistoryTable({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="w-[120px]">Activity</TableHead>
-          <TableHead>Market</TableHead>
-          <TableHead className="text-right w-[100px]">Value</TableHead>
-          <TableHead className="text-right w-[120px]">Time</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredTrades.map((trade) => {
-          const activityInfo = getActivityInfo(
-            trade.type,
-            trade.side,
-            trade.usdcAmount,
-          );
-          const ActivityIcon = activityInfo.icon;
-          const isBuy = trade.side === "BUY";
-          const isRedeem = trade.type === "REDEEM";
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-[120px] min-w-[100px]">Activity</TableHead>
+            <TableHead className="min-w-[200px]">Market</TableHead>
+            <TableHead className="text-right w-[100px] min-w-[80px]">
+              Value
+            </TableHead>
+            <TableHead className="text-right w-[120px] min-w-[100px]">
+              Time
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredTrades.map((trade) => {
+            const activityInfo = getActivityInfo(
+              trade.type,
+              trade.side,
+              trade.usdcAmount,
+            );
+            const ActivityIcon = activityInfo.icon;
+            const isBuy = trade.side === "BUY";
+            const isRedeem = trade.type === "REDEEM";
 
-          return (
-            <TableRow key={trade.id}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${activityInfo.color}`}
-                  >
-                    <ActivityIcon className="h-3.5 w-3.5" />
+            return (
+              <TableRow key={trade.id}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${activityInfo.color}`}
+                    >
+                      <ActivityIcon className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-sm font-medium">
+                      {activityInfo.label}
+                    </span>
                   </div>
-                  <span className="text-sm font-medium">
-                    {activityInfo.label}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
-                    {trade.market.icon ? (
-                      <Image
-                        src={trade.market.icon}
-                        alt={trade.market.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate max-w-[300px]">
-                      {trade.market.title}
-                    </p>
-                    {!isRedeem && (
-                      <p className="text-xs text-muted-foreground">
-                        <span
-                          className={
-                            trade.outcome === "Yes"
-                              ? "text-emerald-500"
-                              : "text-red-500"
-                          }
-                        >
-                          {trade.outcome} {formatPrice(trade.price)}
-                        </span>
-                        <span className="mx-1.5">·</span>
-                        {trade.size.toFixed(1)} shares
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+                      {trade.market.icon ? (
+                        <Image
+                          src={trade.market.icon}
+                          alt={trade.market.title}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate max-w-[300px]">
+                        {trade.market.title}
                       </p>
-                    )}
+                      {!isRedeem && (
+                        <p className="text-xs text-muted-foreground">
+                          <span
+                            className={
+                              trade.outcome === "Yes"
+                                ? "text-emerald-500"
+                                : "text-red-500"
+                            }
+                          >
+                            {trade.outcome} {formatPrice(trade.price)}
+                          </span>
+                          <span className="mx-1.5">·</span>
+                          {trade.size.toFixed(1)} shares
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <span
-                  className={`font-medium ${
-                    isBuy
-                      ? "text-red-500"
-                      : trade.usdcAmount > 0
-                        ? "text-emerald-500"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
-                  {trade.usdcAmount > 0
-                    ? formatCurrency(trade.usdcAmount)
-                    : "-"}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {timeAgo(trade.timestamp)}
-                  </span>
-                  <a
-                    href={`https://polygonscan.com/tx/${trade.transactionHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                </TableCell>
+                <TableCell className="text-right">
+                  <span
+                    className={`font-medium ${
+                      isBuy
+                        ? "text-red-500"
+                        : trade.usdcAmount > 0
+                          ? "text-emerald-500"
+                          : "text-muted-foreground"
+                    }`}
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+                    {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
+                    {trade.usdcAmount > 0
+                      ? formatCurrency(trade.usdcAmount)
+                      : "-"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {timeAgo(trade.timestamp)}
+                    </span>
+                    <a
+                      href={`https://polygonscan.com/tx/${trade.transactionHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -895,18 +911,8 @@ export default function PortfolioPage() {
   // Not connected state
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-background relative overflow-x-hidden">
-        {/* Subtle Grid Pattern */}
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-        </div>
-
-        {/* Animated Background Orbs */}
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
-          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-          <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
-        </div>
+      <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+        <PageBackground />
 
         <Navbar />
         <main className="relative z-10 container max-w-5xl mx-auto px-4 py-12">
@@ -940,18 +946,8 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* Subtle Grid Pattern */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-      </div>
-
-      {/* Animated Background Orbs */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
-        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
-      </div>
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+      <PageBackground />
 
       <Navbar />
       <motion.main
@@ -965,6 +961,7 @@ export default function PortfolioPage() {
             <h1 className="text-xl font-bold">Portfolio</h1>
             {proxyAddress && (
               <button
+                type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >

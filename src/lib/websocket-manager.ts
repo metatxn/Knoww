@@ -421,12 +421,8 @@ class WebSocketManager {
     this.stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        // Send a ping (empty message or specific ping format if required)
-        try {
-          // Polymarket may not require explicit pings, but this keeps the connection alive
-        } catch (err) {
-          console.error("[WSManager] Heartbeat error:", err);
-        }
+        // Polymarket may not require explicit pings, but this keeps the connection alive
+        // The interval itself serves to check connection status periodically
       }
     }, 30000); // 30 seconds
   }

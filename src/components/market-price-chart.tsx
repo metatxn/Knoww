@@ -182,7 +182,9 @@ export function MarketPriceChart({
     // Find all unique timestamps across all tokens
     const timestampSet = new Set<number>();
     priceHistories.forEach((ph) => {
-      ph.history.forEach((point) => timestampSet.add(point.t));
+      ph.history.forEach((point) => {
+        timestampSet.add(point.t);
+      });
     });
 
     // Sort timestamps
@@ -199,7 +201,7 @@ export function MarketPriceChart({
     ): number | null => {
       // Direct match
       if (tokenData.priceMap.has(timestamp)) {
-        return tokenData.priceMap.get(timestamp)!;
+        return tokenData.priceMap.get(timestamp) ?? null;
       }
 
       const sortedTs = tokenData.sortedTimestamps;
@@ -221,20 +223,21 @@ export function MarketPriceChart({
 
       // If timestamp is before all data, use first value
       if (lowerIdx === -1 && upperIdx !== -1) {
-        return tokenData.priceMap.get(sortedTs[upperIdx])!;
+        return tokenData.priceMap.get(sortedTs[upperIdx]) ?? null;
       }
 
       // If timestamp is after all data, use last value
       if (lowerIdx !== -1 && upperIdx === -1) {
-        return tokenData.priceMap.get(sortedTs[lowerIdx])!;
+        return tokenData.priceMap.get(sortedTs[lowerIdx]) ?? null;
       }
 
       // If we have both bounds, use the closest one (or interpolate)
       if (lowerIdx !== -1 && upperIdx !== -1) {
         const lowerTs = sortedTs[lowerIdx];
         const upperTs = sortedTs[upperIdx];
-        const lowerPrice = tokenData.priceMap.get(lowerTs)!;
-        const upperPrice = tokenData.priceMap.get(upperTs)!;
+        const lowerPrice = tokenData.priceMap.get(lowerTs);
+        const upperPrice = tokenData.priceMap.get(upperTs);
+        if (lowerPrice === undefined || upperPrice === undefined) return null;
 
         // Linear interpolation
         if (upperTs === lowerTs) return lowerPrice;
@@ -352,7 +355,7 @@ export function MarketPriceChart({
       Object.keys(point).forEach((key) => {
         if (key.startsWith("outcome")) {
           const value = point[key] as number;
-          if (typeof value === "number" && !isNaN(value)) {
+          if (typeof value === "number" && !Number.isNaN(value)) {
             maxValue = Math.max(maxValue, value);
           }
         }
@@ -540,7 +543,7 @@ export function MarketPriceChart({
  * Generate mock data when real price history is not available
  */
 function generateMockData(
-  outcomes: string[],
+  _outcomes: string[],
   outcomePrices: string[],
   timeRange: TimeRange,
 ): Record<string, number | string>[] {

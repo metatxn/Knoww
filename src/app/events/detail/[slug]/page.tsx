@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronLeft,
   Clock,
-  Copy,
   Share2,
   TrendingUp,
   Trophy,
@@ -21,6 +20,7 @@ import { Navbar } from "@/components/navbar";
 import { NegRiskBadge } from "@/components/neg-risk-badge";
 import { OrderBook } from "@/components/order-book";
 import { OrderBookInline } from "@/components/order-book-summary";
+import { PageBackground } from "@/components/page-background";
 import { type OutcomeData, TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,10 +37,7 @@ import {
   useOrderBook as useOrderBookFromStore,
   useOrderBookStore,
 } from "@/hooks/use-orderbook-store";
-import {
-  type ConnectionState,
-  useOrderBookWebSocket,
-} from "@/hooks/use-shared-websocket";
+import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { cn } from "@/lib/utils";
 
 // Order book response type - defined outside component to avoid hook order issues
@@ -399,7 +396,7 @@ export default function EventDetailPage() {
 
   // Get order book from store (seeded by REST, updated by WebSocket)
   const storeOrderBook = useOrderBookFromStore(currentTokenId);
-  const wsBestPrices = useBestPrices(currentTokenId);
+  const _wsBestPrices = useBestPrices(currentTokenId);
 
   // Extract best bid, ask, tick_size, min_order_size, and full order book for slippage
   // Store has merged REST + WebSocket data
@@ -467,15 +464,8 @@ export default function EventDetailPage() {
   // Loading state - AFTER all hooks
   if (loading) {
     return (
-      <div className="min-h-screen bg-background relative overflow-x-hidden">
-        {/* Background Elements */}
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-        </div>
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
-          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-        </div>
+      <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+        <PageBackground />
 
         <Navbar />
         <main className="relative z-10 px-4 md:px-6 lg:px-8 py-8 space-y-8">
@@ -490,15 +480,8 @@ export default function EventDetailPage() {
   // Error state - AFTER all hooks
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-background relative overflow-x-hidden">
-        {/* Background Elements */}
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-        </div>
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
-          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-        </div>
+      <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+        <PageBackground />
 
         <Navbar />
         <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
@@ -539,7 +522,7 @@ export default function EventDetailPage() {
     return (num * 100).toFixed(1);
   };
 
-  const copyToClipboard = (text: string) => {
+  const _copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
 
@@ -661,18 +644,8 @@ export default function EventDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* Subtle Grid Pattern */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
-      </div>
-
-      {/* Animated Background Orbs */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
-        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
-        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
-      </div>
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+      <PageBackground />
 
       <Navbar />
       <motion.main
@@ -1303,7 +1276,7 @@ export default function EventDetailPage() {
                       <CollapsibleContent>
                         <div className="space-y-0">
                           {closedMarketData.map((market) => {
-                            const marketOutcomes = [
+                            const _marketOutcomes = [
                               {
                                 name: "Yes",
                                 tokenId: market.yesTokenId,

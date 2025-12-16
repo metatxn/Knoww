@@ -45,7 +45,7 @@ interface UsePortfolioValueOptions {
  * @returns Query result with portfolio value data
  */
 export function usePortfolioValue(options: UsePortfolioValueOptions = {}) {
-  const { address: eoaAddress } = useConnection();
+  useConnection(); // Used to trigger re-renders when connection changes
   const { proxyAddress, isDeployed } = useProxyWallet();
 
   // Use provided address or fall back to proxy wallet (which is what Polymarket uses)

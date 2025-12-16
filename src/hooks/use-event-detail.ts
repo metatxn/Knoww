@@ -65,7 +65,7 @@ interface EventDetailResponse {
  * The API automatically handles both formats (slug preferred, ID as fallback)
  */
 async function fetchEventDetail(
-  slugOrId: string | undefined
+  slugOrId: string | undefined,
 ): Promise<Event | null> {
   if (!slugOrId) return null;
 

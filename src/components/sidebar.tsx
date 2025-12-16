@@ -111,7 +111,7 @@ export function Sidebar() {
       <aside
         className={cn(
           "hidden lg:flex fixed left-0 top-0 z-40 h-screen flex-col border-r border-gray-200 dark:border-border/40 bg-linear-to-b from-white via-slate-50/50 to-slate-100/50 dark:from-background dark:via-background dark:to-muted/10 transition-all duration-300",
-          isCollapsed ? "w-16" : "w-56"
+          isCollapsed ? "w-16" : "w-56",
         )}
       >
         {/* Subtle gradient overlay */}
@@ -127,7 +127,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative flex h-14 items-center border-b border-border/40",
-            isCollapsed ? "justify-center px-2" : "px-4"
+            isCollapsed ? "justify-center px-2" : "px-4",
           )}
         >
           <button
@@ -148,7 +148,7 @@ export function Sidebar() {
         <nav
           className={cn(
             "relative flex-1 overflow-y-auto py-4 scrollbar-hide",
-            isCollapsed ? "px-1.5" : "px-2"
+            isCollapsed ? "px-1.5" : "px-2",
           )}
         >
           {/* Main Nav */}
@@ -164,7 +164,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/"
                         ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
                     )}
                   >
                     <Target
@@ -173,7 +173,7 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/" ? "text-white" : ""
+                        pathname === "/" ? "text-white" : "",
                       )}
                     />
                     {!isCollapsed && (
@@ -207,7 +207,7 @@ export function Sidebar() {
                         isCollapsed ? "justify-center px-2" : "px-3",
                         pathname === "/portfolio"
                           ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
                       )}
                     >
                       <FolderOpen
@@ -216,7 +216,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          pathname === "/portfolio" ? "text-white" : ""
+                          pathname === "/portfolio" ? "text-white" : "",
                         )}
                       />
                       {!isCollapsed && (
@@ -268,8 +268,8 @@ export function Sidebar() {
                         "group w-full flex items-center gap-2.5 py-2 text-sm rounded-xl transition-all duration-200",
                         isCollapsed ? "justify-center px-2" : "px-3",
                         isActive
-                          ? "text-foreground font-semibold bg-muted/80 dark:bg-muted/60 border border-border/60 shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30"
+                          ? "bg-linear-to-r from-violet-500 to-purple-500 text-white font-semibold shadow-lg shadow-violet-500/20"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30",
                       )}
                     >
                       <cat.icon
@@ -278,9 +278,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          isActive
-                            ? "text-violet-600 dark:text-purple-400"
-                            : "text-muted-foreground group-hover:text-foreground"
+                          isActive ? "text-white" : "",
                         )}
                       />
                       {!isCollapsed && (
@@ -289,7 +287,7 @@ export function Sidebar() {
                             {cat.label}
                           </span>
                           {isActive && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 dark:bg-purple-400" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                           )}
                         </>
                       )}
@@ -310,7 +308,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative border-t border-border/40 p-2",
-            isCollapsed ? "flex justify-center" : ""
+            isCollapsed ? "flex justify-center" : "",
           )}
         >
           <Tooltip>
@@ -320,7 +318,7 @@ export function Sidebar() {
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className={cn(
                   "flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all",
-                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2"
+                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2",
                 )}
               >
                 {isCollapsed ? (

@@ -9,13 +9,10 @@ import {
   Clock,
   Copy,
   CreditCard,
-  ExternalLink,
   Info,
   Loader2,
   RefreshCw,
   Search,
-  Wallet,
-  X,
   Zap,
 } from "lucide-react";
 import Image from "next/image";
@@ -93,7 +90,6 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   } = useBridge();
 
   // Transaction state (using viem directly instead of deprecated wagmi hooks)
-  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -127,7 +123,6 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setSearchQuery("");
       setIsProcessing(false);
       setDepositError(null);
-      setTxHash(null);
       setIsPending(false);
       setIsConfirming(false);
       setIsConfirmed(false);
@@ -407,7 +402,6 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
     setDepositError(null);
     setIsProcessing(true);
     setIsPending(true);
-    setTxHash(null);
     setTxError(null);
     setIsConfirmed(false);
 
@@ -418,9 +412,9 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       const amountInWei = parseUnits(amount, selectedToken.decimals);
 
       // Create wallet client for sending transactions
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const walletClient = createWalletClient({
         chain: polygon,
+        // biome-ignore lint/suspicious/noExplicitAny: window.ethereum type is not strictly typed
         transport: custom(window.ethereum as any),
       });
 
@@ -478,7 +472,6 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         });
       }
 
-      setTxHash(hash);
       setIsPending(false);
       setIsConfirming(true);
 
@@ -1269,9 +1262,9 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                     {/* Terms */}
                     <p className="text-xs text-muted-foreground/70 text-center">
                       By clicking Confirm Order, you agree to our{" "}
-                      <a href="#" className="text-primary hover:underline">
+                      <span className="text-primary cursor-pointer hover:underline">
                         terms
-                      </a>
+                      </span>
                       .
                     </p>
 

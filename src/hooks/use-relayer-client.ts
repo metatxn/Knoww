@@ -34,14 +34,14 @@ const SAFE_INIT_CODE_HASH =
 const POLYMARKET_RELAYER_URL = "https://relayer-v2.polymarket.com/";
 const CHAIN_ID = 137; // Polygon mainnet
 
-// Transaction states from the relayer
-type TransactionState =
-  | "STATE_NEW"
-  | "STATE_EXECUTED"
-  | "STATE_MINED"
-  | "STATE_CONFIRMED"
-  | "STATE_FAILED"
-  | "STATE_INVALID";
+// Transaction states from the relayer (kept for documentation purposes)
+// type TransactionState =
+//   | "STATE_NEW"
+//   | "STATE_EXECUTED"
+//   | "STATE_MINED"
+//   | "STATE_CONFIRMED"
+//   | "STATE_FAILED"
+//   | "STATE_INVALID";
 
 interface RelayerClientState {
   isInitialized: boolean;
@@ -160,7 +160,7 @@ export function useRelayerClient() {
     try {
       const client = await getClient();
 
-      let response;
+      let response: Awaited<ReturnType<typeof client.deploy>> | undefined;
       try {
         response = await client.deploy();
       } catch (deployErr) {
