@@ -64,7 +64,9 @@ interface EventDetailResponse {
  * Fetch event details by slug or ID including all associated markets
  * The API automatically handles both formats (slug preferred, ID as fallback)
  */
-async function fetchEventDetail(slugOrId: string | undefined): Promise<Event | null> {
+async function fetchEventDetail(
+  slugOrId: string | undefined
+): Promise<Event | null> {
   if (!slugOrId) return null;
 
   const response = await fetch(`/api/events/${slugOrId}`);

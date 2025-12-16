@@ -66,7 +66,7 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
 
   try {
     const stored = localStorage.getItem(
-      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`
+      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`,
     );
     if (stored) {
       return JSON.parse(stored) as ApiKeyCreds;
@@ -85,7 +85,7 @@ function storeCredentials(address: string, creds: ApiKeyCreds): void {
 
   localStorage.setItem(
     `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`,
-    JSON.stringify(creds)
+    JSON.stringify(creds),
   );
 }
 

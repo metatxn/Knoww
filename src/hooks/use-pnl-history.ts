@@ -67,7 +67,7 @@ export interface UsePnLHistoryOptions {
  */
 async function fetchPnLHistory(
   userAddress: string,
-  options: UsePnLHistoryOptions
+  options: UsePnLHistoryOptions,
 ): Promise<PnLHistoryResponse> {
   const params = new URLSearchParams({
     user: userAddress,
@@ -107,12 +107,7 @@ export function usePnLHistory(options: UsePnLHistoryOptions = {}) {
   const userAddress = options.userAddress || address;
 
   return useQuery<PnLHistoryResponse, Error>({
-    queryKey: [
-      "pnlHistory",
-      userAddress,
-      options.interval,
-      options.fidelity,
-    ],
+    queryKey: ["pnlHistory", userAddress, options.interval, options.fidelity],
     queryFn: () => {
       if (!userAddress) throw new Error("Address not available");
       return fetchPnLHistory(userAddress, options);
@@ -122,4 +117,3 @@ export function usePnLHistory(options: UsePnLHistoryOptions = {}) {
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 }
-

@@ -1,16 +1,17 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowDownToLine,
   Loader2,
+  TrendingDown,
+  TrendingUp,
   Wallet,
   Wifi,
   Zap,
-  TrendingUp,
-  TrendingDown,
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,21 +25,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calculatePotentialPnL, OrderSide } from "@/hooks/use-order-signing";
-import {
-  useClobClient,
-  Side,
-  OrderType as ClobOrderType,
-} from "@/hooks/use-clob-client";
-import { useQuery } from "@tanstack/react-query";
 import { useOnboarding } from "@/context/onboarding-context";
+import {
+  OrderType as ClobOrderType,
+  Side,
+  useClobClient,
+} from "@/hooks/use-clob-client";
+import { calculatePotentialPnL, OrderSide } from "@/hooks/use-order-signing";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import {
   calculateSlippage,
   formatSlippageDisplay,
-  roundUpToTick,
-  roundDownToTick,
   type OrderBook,
+  roundDownToTick,
+  roundUpToTick,
   type SlippageResult,
 } from "@/lib/slippage";
 
@@ -113,7 +113,7 @@ function isPriceCrossingBook(
   price: number,
   side: "BUY" | "SELL",
   bestBid?: number,
-  bestAsk?: number
+  bestAsk?: number,
 ): { isCrossing: boolean; percentAbove?: number } {
   if (side === "BUY" && bestAsk !== undefined) {
     // For BUY orders, check if price is significantly above best ask
@@ -212,7 +212,7 @@ export function TradingForm({
   // Check if the selected outcome has a valid CLOB token ID
   // CLOB token IDs are long numeric strings (typically 70+ characters)
   const hasValidTokenId = Boolean(
-    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10
+    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10,
   );
 
   // Update limit price when outcome changes
@@ -365,7 +365,7 @@ export function TradingForm({
         return Math.max(tickSize, Math.min(1 - tickSize, newPrice));
       });
     },
-    [tickSize]
+    [tickSize],
   );
 
   // Handle shares change with bounds
@@ -417,8 +417,8 @@ export function TradingForm({
             ? ClobOrderType.FAK // Partial fill allowed
             : ClobOrderType.FOK // Must fill entirely
           : isGTD
-          ? ClobOrderType.GTD
-          : ClobOrderType.GTC;
+            ? ClobOrderType.GTD
+            : ClobOrderType.GTC;
 
       // Only set expiration for GTD orders, otherwise use 0
       const expiration = isGTD
@@ -625,8 +625,8 @@ export function TradingForm({
                     outcome.name === "Yes"
                       ? "text-emerald-600 dark:text-emerald-400"
                       : outcome.name === "No"
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-foreground"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-foreground"
                   }`}
                 >
                   {outcome.name}
@@ -684,7 +684,7 @@ export function TradingForm({
               onClick={() => {
                 if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
-                    effectiveBalance / calculations.price
+                    effectiveBalance / calculations.price,
                   );
                   setShares(Math.max(1, maxShares));
                 }
@@ -845,7 +845,9 @@ export function TradingForm({
                     <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                       Need $
-                      {(calculations.total - (effectiveBalance || 0)).toFixed(2)}{" "}
+                      {(calculations.total - (effectiveBalance || 0)).toFixed(
+                        2,
+                      )}{" "}
                       more
                     </span>
                   </div>
@@ -853,7 +855,7 @@ export function TradingForm({
                   <button
                     type="button"
                     onClick={() => setShowDepositModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white transition-all shadow-sm shadow-emerald-500/25"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white transition-all shadow-sm shadow-emerald-500/25"
                   >
                     <ArrowDownToLine className="h-3.5 w-3.5" />
                     Deposit
@@ -891,7 +893,7 @@ export function TradingForm({
                     {hasNoAllowance
                       ? "Approve USDC.e spending to trade"
                       : `Increase allowance to $${calculations.total.toFixed(
-                          2
+                          2,
                         )}`}
                   </span>
                 </div>
@@ -951,8 +953,8 @@ export function TradingForm({
                 hasInsufficientBalance || isBelowMinimum
                   ? "bg-muted text-muted-foreground"
                   : side === "BUY"
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
-                  : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                    : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
               }`}
               onClick={handleSubmit}
               disabled={

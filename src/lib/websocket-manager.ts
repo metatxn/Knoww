@@ -299,7 +299,7 @@ class WebSocketManager {
 
       this.ws.onclose = (event) => {
         console.log(
-          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`
+          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`,
         );
         this.stopHeartbeat();
 
@@ -350,7 +350,7 @@ class WebSocketManager {
 
   private sendSubscription(
     type: "subscribe" | "unsubscribe",
-    assetIds: string[]
+    assetIds: string[],
   ): void {
     if (
       !this.ws ||
@@ -395,12 +395,12 @@ class WebSocketManager {
     this.reconnectAttempt++;
     const delay = Math.min(
       WEBSOCKET_CONFIG.RECONNECT_DELAY_MS *
-        Math.pow(WEBSOCKET_CONFIG.RECONNECT_BACKOFF, this.reconnectAttempt - 1),
-      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS
+        WEBSOCKET_CONFIG.RECONNECT_BACKOFF ** (this.reconnectAttempt - 1),
+      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS,
     );
 
     console.log(
-      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`
+      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`,
     );
     this.updateConnectionState("reconnecting");
 

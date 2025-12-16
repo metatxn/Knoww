@@ -270,10 +270,10 @@ export default function MarketDetailPage() {
         idx === 0
           ? "orange"
           : idx === 1
-          ? "blue"
-          : idx === 2
-          ? "purple"
-          : "green",
+            ? "blue"
+            : idx === 2
+              ? "purple"
+              : "green",
     };
   });
 
@@ -293,7 +293,7 @@ export default function MarketDetailPage() {
       let tokenId = "";
       if (tokens.length > 0) {
         const token = tokens.find(
-          (t) => t.outcome?.toLowerCase() === outcome.toLowerCase()
+          (t) => t.outcome?.toLowerCase() === outcome.toLowerCase(),
         );
         tokenId = token?.token_id || "";
       }
@@ -387,7 +387,7 @@ export default function MarketDetailPage() {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
-                        }
+                        },
                       )}
                     </span>
                   </div>
@@ -455,7 +455,7 @@ export default function MarketDetailPage() {
           {outcomeData.map(
             (
               outcome: { name: string; probability: number; color: string },
-              idx: number
+              idx: number,
             ) => (
               <div key={idx} className="flex items-center gap-2">
                 <div
@@ -463,17 +463,17 @@ export default function MarketDetailPage() {
                     outcome.color === "orange"
                       ? "bg-orange-500"
                       : outcome.color === "blue"
-                      ? "bg-blue-500"
-                      : outcome.color === "purple"
-                      ? "bg-purple-400"
-                      : "bg-green-500"
+                        ? "bg-blue-500"
+                        : outcome.color === "purple"
+                          ? "bg-purple-400"
+                          : "bg-green-500"
                   }`}
                 />
                 <span className="text-sm">
                   {outcome.name} {outcome.probability}%
                 </span>
               </div>
-            )
+            ),
           )}
         </div>
 
@@ -541,7 +541,7 @@ export default function MarketDetailPage() {
                   change: number;
                   color: string;
                 },
-                idx: number
+                idx: number,
               ) => (
                 <Card key={idx}>
                   <CardContent className="p-4">
@@ -634,7 +634,7 @@ export default function MarketDetailPage() {
                           {formatPrice(
                             (
                               1 - Number.parseFloat(prices[idx] || "0")
-                            ).toString()
+                            ).toString(),
                           )}
                           ¢
                         </Button>
@@ -671,7 +671,7 @@ export default function MarketDetailPage() {
                       )}
                   </CardContent>
                 </Card>
-              )
+              ),
             )}
           </div>
 

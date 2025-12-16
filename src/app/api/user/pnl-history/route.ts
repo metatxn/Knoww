@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           Accept: "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      }
+      },
     );
 
     if (!response.ok) {
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch P&L history from Polymarket",
           details: response.status,
         },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -134,7 +134,8 @@ export async function GET(request: NextRequest) {
     const startPnl = pnlValues[0] || 0;
     const endPnl = pnlValues[pnlValues.length - 1] || 0;
     const change = endPnl - startPnl;
-    const changePercent = startPnl !== 0 ? (change / Math.abs(startPnl)) * 100 : 0;
+    const changePercent =
+      startPnl !== 0 ? (change / Math.abs(startPnl)) * 100 : 0;
     const high = Math.max(...pnlValues);
     const low = Math.min(...pnlValues);
 
@@ -162,8 +163,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

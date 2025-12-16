@@ -62,7 +62,7 @@ const MARKET_BUFFER = 0.005;
  * Returns null if the level is invalid (NaN or non-positive size)
  */
 function parseLevel(
-  level: OrderBookLevel
+  level: OrderBookLevel,
 ): { price: number; size: number } | null {
   const price = parseFloat(level.price);
   const size = parseFloat(level.size);
@@ -128,7 +128,7 @@ function createEmptyResult(size: number): SlippageResult {
  */
 export function calculateBuySlippage(
   orderBook: OrderBook,
-  size: number
+  size: number,
 ): SlippageResult {
   // Validate order size
   if (size <= 0) {
@@ -202,7 +202,7 @@ export function calculateBuySlippage(
  */
 export function calculateSellSlippage(
   orderBook: OrderBook,
-  size: number
+  size: number,
 ): SlippageResult {
   // Validate order size
   if (size <= 0) {
@@ -277,7 +277,7 @@ export function calculateSellSlippage(
 export function calculateSlippage(
   orderBook: OrderBook,
   side: "BUY" | "SELL",
-  size: number
+  size: number,
 ): SlippageResult {
   if (side === "BUY") {
     return calculateBuySlippage(orderBook, size);
@@ -318,7 +318,7 @@ export function calculateMarketOrderPrice(
   size: number,
   maxSlippagePercent: number = 2,
   tickSize: number = 0.01,
-  requireFullFill: boolean = true
+  requireFullFill: boolean = true,
 ): MarketOrderPriceResult | null {
   // Validate inputs
   if (size <= 0) {
@@ -403,7 +403,7 @@ export function calculateMarketOrderPrice(
  */
 export function formatSlippageDisplay(
   slippage: SlippageResult,
-  side?: "BUY" | "SELL"
+  side?: "BUY" | "SELL",
 ): {
   avgPrice: string;
   bestPrice: string;

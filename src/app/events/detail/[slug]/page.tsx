@@ -1,12 +1,13 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Bookmark,
+  ChevronDown,
   ChevronLeft,
   Clock,
   Copy,
-  ChevronDown,
   Share2,
   TrendingUp,
   Trophy,
@@ -14,8 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { NegRiskBadge } from "@/components/neg-risk-badge";
@@ -33,14 +33,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEventDetail } from "@/hooks/use-event-detail";
 import {
-  useOrderBookWebSocket,
-  type ConnectionState,
-} from "@/hooks/use-shared-websocket";
-import {
-  useOrderBookStore,
-  useOrderBook as useOrderBookFromStore,
   useBestPrices,
+  useOrderBook as useOrderBookFromStore,
+  useOrderBookStore,
 } from "@/hooks/use-orderbook-store";
+import {
+  type ConnectionState,
+  useOrderBookWebSocket,
+} from "@/hooks/use-shared-websocket";
 import { cn } from "@/lib/utils";
 
 // Order book response type - defined outside component to avoid hook order issues
@@ -81,7 +81,7 @@ export default function EventDetailPage() {
       try {
         const res = await fetch(
           `https://clob.polymarket.com/book?token_id=${tokenId}`,
-          { headers: { Accept: "application/json" } }
+          { headers: { Accept: "application/json" } },
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -93,12 +93,16 @@ export default function EventDetailPage() {
         console.error("Preload order book failed", err);
       }
     },
-    [setOrderBookFromRest]
+    [setOrderBookFromRest],
   );
 
   // Use slug from URL params - API handles both slugs and numeric IDs
   const eventSlugOrId = params?.slug as string;
-  const { data: event, isLoading: loading, error } = useEventDetail(eventSlugOrId);
+  const {
+    data: event,
+    isLoading: loading,
+    error,
+  } = useEventDetail(eventSlugOrId);
 
   // Handle order success
   const handleOrderSuccess = useCallback((_order: unknown) => {
@@ -124,12 +128,12 @@ export default function EventDetailPage() {
 
   const openMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed !== true),
-    [allMarkets]
+    [allMarkets],
   );
 
   const closedMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed === true),
-    [allMarkets]
+    [allMarkets],
   );
 
   // Closed market rows (precomputed; used later in the dropdown)
@@ -146,10 +150,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes")
+          o.toLowerCase().includes("yes"),
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no")
+          o.toLowerCase().includes("no"),
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -160,7 +164,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes"
+            (t) => t.outcome?.toLowerCase() === "yes",
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -226,10 +230,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes")
+          o.toLowerCase().includes("yes"),
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no")
+          o.toLowerCase().includes("no"),
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -240,7 +244,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes"
+            (t) => t.outcome?.toLowerCase() === "yes",
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -275,7 +279,7 @@ export default function EventDetailPage() {
       });
 
       const sortedMarketData = [...marketData].sort(
-        (a, b) => b.yesProbability - a.yesProbability
+        (a, b) => b.yesProbability - a.yesProbability,
       );
 
       const selected =
@@ -343,7 +347,7 @@ export default function EventDetailPage() {
       // Direct call to Polymarket CLOB API (public, allows CORS)
       const response = await fetch(
         `https://clob.polymarket.com/book?token_id=${currentTokenId}`,
-        { headers: { Accept: "application/json" } }
+        { headers: { Accept: "application/json" } },
       );
       if (!response.ok) return null;
       const data = (await response.json()) as {
@@ -384,7 +388,7 @@ export default function EventDetailPage() {
       setOrderBookFromRest(
         currentTokenId,
         orderBookData.orderBook.bids || [],
-        orderBookData.orderBook.asks || []
+        orderBookData.orderBook.asks || [],
       );
     }
   }, [orderBookData, currentTokenId, setOrderBookFromRest]);
@@ -431,10 +435,10 @@ export default function EventDetailPage() {
       const asks = ob.asks || [];
 
       const sortedBids = [...bids].sort(
-        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
+        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
       );
       const sortedAsks = [...asks].sort(
-        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
+        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
       );
 
       const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
@@ -463,9 +467,18 @@ export default function EventDetailPage() {
   // Loading state - AFTER all hooks
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative overflow-x-hidden">
+        {/* Background Elements */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+        </div>
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
+          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+        </div>
+
         <Navbar />
-        <main className="px-4 md:px-6 lg:px-8 py-8 space-y-8">
+        <main className="relative z-10 px-4 md:px-6 lg:px-8 py-8 space-y-8">
           <Skeleton className="h-10 w-32" />
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-96 w-full" />
@@ -477,9 +490,18 @@ export default function EventDetailPage() {
   // Error state - AFTER all hooks
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative overflow-x-hidden">
+        {/* Background Elements */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+        </div>
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
+          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+        </div>
+
         <Navbar />
-        <main className="px-4 md:px-6 lg:px-8 py-6">
+        <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
             <button
               type="button"
@@ -531,10 +553,10 @@ export default function EventDetailPage() {
       : [];
 
     const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes")
+      o.toLowerCase().includes("yes"),
     );
     const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no")
+      o.toLowerCase().includes("no"),
     );
 
     const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -577,7 +599,7 @@ export default function EventDetailPage() {
   });
 
   const sortedMarketData = [...marketData].sort(
-    (a, b) => b.yesProbability - a.yesProbability
+    (a, b) => b.yesProbability - a.yesProbability,
   );
 
   // Chart behavior:
@@ -635,17 +657,29 @@ export default function EventDetailPage() {
         ? market.createdAt
         : earliest;
     },
-    event.createdAt
+    event.createdAt,
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Subtle Grid Pattern */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+      </div>
+
+      {/* Animated Background Orbs */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
+        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
+      </div>
+
       <Navbar />
       <motion.main
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="px-4 md:px-6 lg:px-8 py-6 space-y-6"
+        className="relative z-10 px-4 md:px-6 lg:px-8 py-6 space-y-6"
       >
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -776,7 +810,7 @@ export default function EventDetailPage() {
                           No{" "}
                           {Math.max(
                             0,
-                            100 - singleMarketForChart.yesProbability
+                            100 - singleMarketForChart.yesProbability,
                           )}
                           %
                         </span>
@@ -793,10 +827,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -830,9 +864,9 @@ export default function EventDetailPage() {
                         isConnected
                           ? "text-emerald-500"
                           : connectionState === "connecting" ||
-                            connectionState === "reconnecting"
-                          ? "text-amber-500 animate-pulse"
-                          : "text-muted-foreground"
+                              connectionState === "reconnecting"
+                            ? "text-amber-500 animate-pulse"
+                            : "text-muted-foreground",
                       )}
                     />
                     <span
@@ -841,18 +875,18 @@ export default function EventDetailPage() {
                         isConnected
                           ? "text-emerald-500"
                           : connectionState === "connecting" ||
-                            connectionState === "reconnecting"
-                          ? "text-amber-500"
-                          : "text-muted-foreground"
+                              connectionState === "reconnecting"
+                            ? "text-amber-500"
+                            : "text-muted-foreground",
                       )}
                     >
                       {isConnected
                         ? "Live"
                         : connectionState === "connecting"
-                        ? "Connecting..."
-                        : connectionState === "reconnecting"
-                        ? "Reconnecting..."
-                        : "Offline"}
+                          ? "Connecting..."
+                          : connectionState === "reconnecting"
+                            ? "Reconnecting..."
+                            : "Offline"}
                     </span>
                   </div>
                 </div>
@@ -888,7 +922,7 @@ export default function EventDetailPage() {
                             selectedMarket?.id === market.id
                               ? "bg-primary/5"
                               : "hover:bg-accent/30",
-                            isExpanded && "bg-muted/30"
+                            isExpanded && "bg-muted/30",
                           )}
                           onClick={() => {
                             // Toggle order book expansion
@@ -981,7 +1015,7 @@ export default function EventDetailPage() {
                                   "flex-1 h-9 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 0 &&
-                                    "ring-2 ring-green-400"
+                                    "ring-2 ring-green-400",
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1001,7 +1035,7 @@ export default function EventDetailPage() {
                                   "flex-1 h-9 text-xs font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 1 &&
-                                    "ring-2 ring-red-400"
+                                    "ring-2 ring-red-400",
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1082,7 +1116,7 @@ export default function EventDetailPage() {
                                   "w-[110px] h-9 text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 0 &&
-                                    "ring-2 ring-green-400"
+                                    "ring-2 ring-green-400",
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1102,7 +1136,7 @@ export default function EventDetailPage() {
                                   "w-[110px] h-9 text-sm font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 1 &&
-                                    "ring-2 ring-red-400"
+                                    "ring-2 ring-red-400",
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1124,7 +1158,7 @@ export default function EventDetailPage() {
                             "grid transition-all duration-300 ease-in-out border-b border-border bg-muted/10",
                             isExpanded
                               ? "grid-rows-[1fr] opacity-100"
-                              : "grid-rows-[0fr] opacity-0"
+                              : "grid-rows-[0fr] opacity-0",
                           )}
                         >
                           <div className="overflow-hidden">
@@ -1252,7 +1286,7 @@ export default function EventDetailPage() {
                         <button
                           type="button"
                           className={cn(
-                            "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors"
+                            "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors",
                           )}
                         >
                           <span>
@@ -1261,7 +1295,7 @@ export default function EventDetailPage() {
                           <ChevronDown
                             className={cn(
                               "h-4 w-4 transition-transform",
-                              showClosedMarkets && "rotate-180"
+                              showClosedMarkets && "rotate-180",
                             )}
                           />
                         </button>
@@ -1295,7 +1329,7 @@ export default function EventDetailPage() {
                                   className={cn(
                                     "w-full text-left p-3 md:p-4 border-t border-border transition-all cursor-pointer",
                                     "hover:bg-accent/30",
-                                    isExpanded && "bg-muted/30"
+                                    isExpanded && "bg-muted/30",
                                   )}
                                   onClick={() => {
                                     if (isExpanded) {
@@ -1378,7 +1412,7 @@ export default function EventDetailPage() {
                                     "grid transition-all duration-300 ease-in-out border-t border-border bg-muted/10",
                                     isExpanded
                                       ? "grid-rows-[1fr] opacity-100"
-                                      : "grid-rows-[0fr] opacity-0"
+                                      : "grid-rows-[0fr] opacity-0",
                                   )}
                                 >
                                   <div className="overflow-hidden">

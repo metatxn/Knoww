@@ -33,5 +33,5 @@ export function SidebarDesktop() {
 // Export a dynamic, ssr-disabled version for server components (like layout)
 export const SidebarDesktopNoSSR = dynamic(
   () => Promise.resolve(SidebarDesktop),
-  { ssr: false }
+  { ssr: false },
 );

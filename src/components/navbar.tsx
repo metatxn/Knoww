@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useConnection, useBalance, useDisconnect } from "wagmi";
+import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +122,7 @@ export function Navbar() {
                 <Button
                   onClick={() => setShowDepositModal(true)}
                   size="sm"
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
+                  className="bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
                 >
                   <ArrowDownToLine className="mr-1 h-4 w-4" />
                   <span className="hidden sm:inline">Deposit</span>
@@ -244,7 +244,7 @@ export function Navbar() {
                   setShowDepositModal(true);
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-linear-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
               >
                 <ArrowDownToLine className="inline mr-2 h-4 w-4" />
                 Deposit Funds

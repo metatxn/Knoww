@@ -90,10 +90,22 @@ export default function TagEventsPage() {
       : "Markets";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Subtle Grid Pattern */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+      </div>
+
+      {/* Animated Background Orbs */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8 animate-pulse" />
+        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
+      </div>
+
       <Navbar />
 
-      <main className="px-4 md:px-6 lg:px-8 py-6">
+      <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <button
@@ -110,8 +122,21 @@ export default function TagEventsPage() {
 
         {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-          <div className="space-y-1">
-            <h1 className="text-3xl md:text-4xl font-bold">{tagLabel}</h1>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                  Live
+                </span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                {tagLabel}
+              </h1>
+            </div>
             <p className="text-muted-foreground">
               Browse live prediction markets for {tagLabel.toLowerCase()}
             </p>
@@ -143,9 +168,11 @@ export default function TagEventsPage() {
 
         {/* Stats Bar */}
         {!isLoading && !error && events.length > 0 && (
-          <div className="flex items-center gap-4 py-3 px-4 rounded-lg bg-muted/30 mb-6">
+          <div className="flex items-center gap-4 py-3 px-4 rounded-xl bg-card/60 dark:bg-card/40 backdrop-blur-sm border border-border/40 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{events.length}</span>
+              <span className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-violet-600 to-purple-600 dark:from-violet-400 dark:to-purple-400">
+                {events.length}
+              </span>
               <span className="text-sm text-muted-foreground">
                 active market{events.length !== 1 ? "s" : ""}
               </span>

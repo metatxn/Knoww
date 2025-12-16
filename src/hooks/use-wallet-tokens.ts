@@ -137,13 +137,13 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
           // Keep retries low. If an endpoint is down, retries multiply very quickly.
           retryCount: 1,
           retryDelay: 250,
-        })
+        }),
       ),
       {
         // Ranking triggers extra probe requests (and can loop when endpoints fail).
         // We'll use fixed ordering + fallback instead.
         rank: false,
-      }
+      },
     );
 
     return createPublicClient({
@@ -227,7 +227,7 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
           if (result.status === "success" && result.result !== undefined) {
             const balance = result.result as bigint;
             const balanceFormatted = Number(
-              formatUnits(balance, token.decimals)
+              formatUnits(balance, token.decimals),
             );
 
             if (balanceFormatted > 0.000001) {
@@ -306,7 +306,7 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
    */
   const totalUsdValue = useMemo(
     () => tokens.reduce((sum, token) => sum + token.usdValue, 0),
-    [tokens]
+    [tokens],
   );
 
   return {

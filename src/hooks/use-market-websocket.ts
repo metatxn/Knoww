@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { POLYMARKET_API, WEBSOCKET_CONFIG } from "@/lib/constants";
 
 /**
@@ -173,7 +173,7 @@ export interface UseMarketWebSocketReturn {
  * @see https://docs.polymarket.com/developers/CLOB/websocket/market-channel
  */
 export function useMarketWebSocket(
-  options: UseMarketWebSocketOptions
+  options: UseMarketWebSocketOptions,
 ): UseMarketWebSocketReturn {
   const {
     assetIds,
@@ -203,7 +203,7 @@ export function useMarketWebSocket(
       setConnectionState(state);
       onConnectionStateChange?.(state);
     },
-    [onConnectionStateChange]
+    [onConnectionStateChange],
   );
 
   // Handle incoming WebSocket messages
@@ -233,7 +233,7 @@ export function useMarketWebSocket(
                 },
                 _source: "websocket",
                 _oldData: oldData,
-              })
+              }),
             );
             break;
           }
@@ -252,7 +252,7 @@ export function useMarketWebSocket(
                       bids?: OrderBookLevel[];
                       asks?: OrderBookLevel[];
                     };
-                  } | null
+                  } | null,
                 ) => {
                   if (!oldData?.orderBook) return oldData;
 
@@ -262,7 +262,7 @@ export function useMarketWebSocket(
 
                   // Find and update the price level
                   const existingIndex = levels.findIndex(
-                    (l) => l.price === change.price
+                    (l) => l.price === change.price,
                   );
 
                   if (change.size === "0") {
@@ -297,7 +297,7 @@ export function useMarketWebSocket(
                     _source: "websocket_update",
                     _lastUpdate: priceChangeEvent.timestamp,
                   };
-                }
+                },
               );
 
               // Also update best bid/ask in a separate query for quick access
@@ -322,7 +322,7 @@ export function useMarketWebSocket(
                 size: tradeEvent.size,
                 side: tradeEvent.side,
                 timestamp: tradeEvent.timestamp,
-              })
+              }),
             );
             break;
           }
@@ -355,7 +355,7 @@ export function useMarketWebSocket(
       onLastTradePrice,
       onTickSizeChange,
       onError,
-    ]
+    ],
   );
 
   // Send subscription message
@@ -382,7 +382,7 @@ export function useMarketWebSocket(
         return false;
       }
     },
-    []
+    [],
   );
 
   // Connect to WebSocket
@@ -439,7 +439,7 @@ export function useMarketWebSocket(
 
       ws.onclose = (event) => {
         console.log(
-          `[WebSocket] Closed: code=${event.code}, reason=${event.reason}`
+          `[WebSocket] Closed: code=${event.code}, reason=${event.reason}`,
         );
 
         // Don't reconnect if closed cleanly (code 1000) or if we're disconnecting intentionally
@@ -452,17 +452,14 @@ export function useMarketWebSocket(
         updateConnectionState("reconnecting");
         const delay = Math.min(
           WEBSOCKET_CONFIG.RECONNECT_DELAY_MS *
-            Math.pow(
-              WEBSOCKET_CONFIG.RECONNECT_BACKOFF,
-              reconnectAttemptRef.current
-            ),
-          WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS
+            WEBSOCKET_CONFIG.RECONNECT_BACKOFF ** reconnectAttemptRef.current,
+          WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS,
         );
 
         console.log(
           `[WebSocket] Reconnecting in ${delay}ms (attempt ${
             reconnectAttemptRef.current + 1
-          })`
+          })`,
         );
 
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -501,7 +498,7 @@ export function useMarketWebSocket(
   const subscribe = useCallback(
     (newAssetIds: string[]) => {
       const validIds = newAssetIds.filter(
-        (id) => id && id.length > 10 && !subscribedAssetsRef.current.has(id)
+        (id) => id && id.length > 10 && !subscribedAssetsRef.current.has(id),
       );
 
       if (validIds.length === 0) return;
@@ -517,14 +514,14 @@ export function useMarketWebSocket(
         pendingSubscriptionsRef.current.push(...validIds);
       }
     },
-    [connectionState, sendSubscription]
+    [connectionState, sendSubscription],
   );
 
   // Unsubscribe from asset IDs
   const unsubscribe = useCallback(
     (assetIdsToRemove: string[]) => {
       const validIds = assetIdsToRemove.filter((id) =>
-        subscribedAssetsRef.current.has(id)
+        subscribedAssetsRef.current.has(id),
       );
 
       if (validIds.length === 0) return;
@@ -539,10 +536,10 @@ export function useMarketWebSocket(
 
       // Also remove from pending
       pendingSubscriptionsRef.current = pendingSubscriptionsRef.current.filter(
-        (id) => !assetIdsToRemove.includes(id)
+        (id) => !assetIdsToRemove.includes(id),
       );
     },
-    [connectionState, sendSubscription]
+    [connectionState, sendSubscription],
   );
 
   // Auto-connect and subscribe on mount
@@ -572,12 +569,12 @@ export function useMarketWebSocket(
 
     // Find new assets to subscribe
     const toSubscribe = validAssetIds.filter(
-      (id) => !currentSubscriptions.has(id)
+      (id) => !currentSubscriptions.has(id),
     );
 
     // Find assets to unsubscribe
     const toUnsubscribe = [...currentSubscriptions].filter(
-      (id) => !validAssetIds.includes(id)
+      (id) => !validAssetIds.includes(id),
     );
 
     if (toSubscribe.length > 0) {
@@ -651,4 +648,3 @@ export function useMarketOrderBookSubscription(tokenId: string | undefined) {
     isConnected,
   };
 }
-

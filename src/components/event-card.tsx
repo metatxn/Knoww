@@ -1,10 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, TrendingUp } from "lucide-react";
-import Link from "next/link";
+import { AlertCircle, Flame, Sparkles, TrendingUp, Zap } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface EventCardProps {
   event: {
@@ -23,8 +28,6 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, index = 0 }: EventCardProps) {
-  const router = useRouter();
-
   const formatVolume = (vol?: string) => {
     if (!vol) return "N/A";
     const num = parseFloat(vol);
@@ -45,94 +48,171 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
     : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
+  const volume = parseFloat(event.volume || "0");
+
+  // HOT badge calculation:
+  // - Shows "HOT" when 24h volume exceeds $500,000
+  // - Shows lightning bolt (⚡) on volume pill when volume > $100,000
+  const isHighVolume = volume > 100000; // > $100K shows lightning bolt
+  const isHot = volume > 500000; // > $500K shows HOT badge
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3) }}
-      whileHover={{ y: -6, scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: 0.5,
+        delay: Math.min(index * 0.04, 0.4),
+        ease: [0.23, 1, 0.32, 1],
+      }}
+      whileHover={{ y: -10, scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
       className="h-full"
     >
       <Link
         href={href}
-        className="group relative block h-full w-full text-left cursor-pointer rounded-2xl bg-card border border-border/50 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="group relative block h-full w-full text-left cursor-pointer"
       >
-        {/* Image Section with Overlay */}
-        <div className="relative aspect-[16/10] w-full overflow-hidden">
-          {event.image ? (
-            <Image
-              src={event.image}
-              alt={event.title}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"
-              className="object-cover transition-transform duration-500 group-hover:scale-110"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-              <span className="text-3xl sm:text-4xl opacity-50">📊</span>
-            </div>
-          )}
+        {/* Outer glow on hover */}
+        <div className="absolute -inset-px rounded-[1.75rem] bg-linear-to-br from-purple-500/0 via-blue-500/0 to-emerald-500/0 group-hover:from-purple-500/30 group-hover:via-blue-500/30 group-hover:to-emerald-500/30 dark:group-hover:from-purple-500/50 dark:group-hover:via-blue-500/50 dark:group-hover:to-emerald-500/50 opacity-0 group-hover:opacity-100 transition-all duration-500 blur-xl" />
 
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
+        {/* Card Container */}
+        <div className="relative h-full rounded-3xl bg-white/80 dark:bg-card/50 backdrop-blur-xl border border-gray-200/80 dark:border-white/5 overflow-hidden transition-all duration-500 group-hover:border-purple-300/50 dark:group-hover:border-white/20 group-hover:bg-white dark:group-hover:bg-card/80 group-hover:shadow-2xl group-hover:shadow-purple-500/20 dark:group-hover:shadow-purple-500/10">
+          {/* Rainbow border effect on hover */}
+          <div className="absolute inset-0 rounded-3xl p-px bg-linear-to-br from-purple-500/0 via-transparent to-blue-500/0 group-hover:from-purple-400/20 group-hover:via-pink-400/15 group-hover:to-blue-400/20 dark:group-hover:from-purple-500/30 dark:group-hover:via-pink-500/20 dark:group-hover:to-blue-500/30 transition-all duration-500 pointer-events-none" />
 
-          {/* Top Left Badges */}
-          <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex items-center gap-1.5 sm:gap-2">
-            {isActive ? (
-              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium bg-emerald-500/90 text-white rounded-full backdrop-blur-sm shadow-lg">
-                Active
-              </span>
+          {/* Image Section with Overlay */}
+          <div className="relative aspect-16/10 w-full overflow-hidden">
+            {event.image ? (
+              <Image
+                src={event.image}
+                alt={event.title}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"
+                className="object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
+              />
             ) : (
-              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium bg-zinc-500/90 text-white rounded-full backdrop-blur-sm">
-                Closed
-              </span>
+              <div className="w-full h-full bg-linear-to-br from-purple-500/30 via-blue-500/20 to-emerald-500/30 flex items-center justify-center relative overflow-hidden">
+                {/* Animated background pattern */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-size-[20px_20px] opacity-50" />
+                <span className="relative text-5xl opacity-90 group-hover:scale-125 transition-transform duration-300">
+                  📊
+                </span>
+              </div>
             )}
-            {event.negRisk && (
-              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium bg-rose-500/90 text-white rounded-full backdrop-blur-sm flex items-center gap-0.5 sm:gap-1 shadow-lg">
-                Neg Risk
-                <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-              </span>
+
+            {/* Gradient Overlay - More dramatic */}
+            <div className="absolute inset-0 bg-linear-to-t from-white dark:from-background via-white/60 dark:via-background/40 to-transparent opacity-95 group-hover:opacity-85 transition-opacity duration-300" />
+
+            {/* Top Left Badges */}
+            <div className="absolute top-3 left-3 flex items-center gap-2">
+              {isActive ? (
+                <span className="relative px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white rounded-lg shadow-lg shadow-emerald-500/30 border border-emerald-400/30 flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                  </span>
+                  Live
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-zinc-600/80 text-white rounded-lg backdrop-blur-md border border-white/10">
+                  Closed
+                </span>
+              )}
+              {event.negRisk && (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-rose-500/90 text-white rounded-lg shadow-lg shadow-rose-500/30 border border-rose-400/30 flex items-center gap-1 cursor-help">
+                        <AlertCircle className="w-3 h-3" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      sideOffset={8}
+                      className="bg-rose-500 text-white border-rose-400 font-bold text-xs px-2.5 py-1.5 rounded-lg [&>svg]:hidden"
+                    >
+                      Negative Risk Market
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            {/* Hot Badge & Market Count - Top Right */}
+            <div className="absolute top-3 right-3 flex items-center gap-2">
+              {isHot && (
+                <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-linear-to-r from-orange-500 to-red-500 text-white rounded-lg shadow-lg shadow-orange-500/30 border border-orange-400/30 flex items-center gap-1 animate-pulse">
+                  <Flame className="w-3 h-3" />
+                  HOT
+                </span>
+              )}
+              {marketCount > 0 && (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-gray-900/70 dark:bg-black/60 text-white rounded-lg backdrop-blur-xl border border-gray-700/30 dark:border-white/10 cursor-help">
+                        {marketCount}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      sideOffset={8}
+                      className="bg-gray-900 dark:bg-black/90 text-white border-gray-700/50 dark:border-white/20 font-bold text-xs px-2.5 py-1.5 rounded-lg [&>svg]:hidden"
+                    >
+                      {marketCount} Market{marketCount !== 1 ? "s" : ""}{" "}
+                      Available
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            {/* Volume Badge - Floating Pill with Glow */}
+            {event.volume && (
+              <div className="absolute bottom-3 left-3">
+                <div className="relative group/volume">
+                  {/* Glow effect */}
+                  <div className="absolute inset-0 bg-emerald-500/30 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/90 dark:bg-black/70 backdrop-blur-xl rounded-full border border-emerald-500/30 dark:border-white/10 shadow-lg group-hover/volume:border-emerald-400/50 transition-all">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-100 dark:text-emerald-400" />
+                    <span className="text-xs font-black text-white tracking-wide">
+                      {formatVolume(event.volume)}
+                    </span>
+                    {isHighVolume && (
+                      <Zap className="h-3 w-3 text-yellow-300 dark:text-yellow-400 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Market Count Badge - Top Right */}
-          {marketCount > 0 && (
-            <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium bg-background/80 text-foreground rounded-full backdrop-blur-sm border border-border/50 shadow-lg">
-                {marketCount} market{marketCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
+          {/* Content Section */}
+          <div className="p-5 space-y-3 relative">
+            {/* Subtle gradient glow on hover */}
+            <div className="absolute inset-0 bg-linear-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-          {/* Volume Badge - Bottom of Image */}
-          {event.volume && (
-            <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
-              <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-background/80 backdrop-blur-sm rounded-full border border-border/50 shadow-lg">
-                <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-500" />
-                <span className="text-xs sm:text-sm font-semibold">
-                  {formatVolume(event.volume)}
-                </span>
-              </div>
-            </div>
-          )}
+            <h3 className="relative font-black text-base sm:text-lg leading-tight line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-linear-to-r group-hover:from-foreground group-hover:to-primary transition-all duration-300 wrap-break-word tracking-tight">
+              {event.title || "Untitled Event"}
+            </h3>
+            {event.description && (
+              <p className="relative text-xs font-medium text-muted-foreground line-clamp-2 leading-relaxed wrap-break-word opacity-70 group-hover:opacity-100 transition-opacity">
+                {event.description}
+              </p>
+            )}
+          </div>
+
+          {/* Bottom Animated Border */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden">
+            <div className="h-full w-full bg-linear-to-r from-purple-500 via-blue-500 to-emerald-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out" />
+          </div>
+
+          {/* Corner Sparkle on Hover - Bottom Right to avoid overlap */}
+          <div className="absolute bottom-16 right-4 opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:rotate-12">
+            <Sparkles className="h-4 w-4 text-yellow-400/60" />
+          </div>
         </div>
-
-        {/* Content Section */}
-        <div className="p-3 sm:p-4 space-y-1.5 sm:space-y-2">
-          <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2 group-hover:text-primary transition-colors break-words">
-            {event.title || "Untitled Event"}
-          </h3>
-          {event.description && (
-            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed break-words">
-              {event.description}
-            </p>
-          )}
-        </div>
-
-        {/* Hover Indicator */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
       </Link>
     </motion.div>
   );

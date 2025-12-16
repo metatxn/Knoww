@@ -9,7 +9,7 @@ import { fetchMarket } from "@/lib/polymarket";
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ conditionID: string }> }
+  { params }: { params: Promise<{ conditionID: string }> },
 ) {
   try {
     const { conditionID } = await params;
@@ -28,7 +28,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

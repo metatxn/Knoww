@@ -9,7 +9,7 @@ import { fetchTrades } from "@/lib/polymarket";
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ tokenID: string }> }
+  { params }: { params: Promise<{ tokenID: string }> },
 ) {
   try {
     const { tokenID } = await params;
@@ -29,7 +29,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

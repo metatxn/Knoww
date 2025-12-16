@@ -106,7 +106,7 @@ export interface UseUserPnLOptions {
  */
 async function fetchPnL(
   userAddress: string,
-  options: UseUserPnLOptions
+  options: UseUserPnLOptions,
 ): Promise<PnLResponse> {
   const params = new URLSearchParams({
     user: userAddress,
@@ -151,7 +151,7 @@ async function fetchPnL(
  */
 export function useUserPnL(options: UseUserPnLOptions = {}) {
   const { address, isConnected } = useConnection();
-  
+
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
 

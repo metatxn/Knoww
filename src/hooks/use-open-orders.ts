@@ -102,13 +102,14 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
               | "LIVE"
               | "MATCHED"
               | "CANCELLED",
-            createdAt: typeof order.created_at === "number" 
-              ? new Date(order.created_at * 1000).toISOString()
-              : order.created_at || new Date().toISOString(),
+            createdAt:
+              typeof order.created_at === "number"
+                ? new Date(order.created_at * 1000).toISOString()
+                : order.created_at || new Date().toISOString(),
             expiration: order.expiration
               ? new Date(Number(order.expiration) * 1000).toISOString()
               : "",
-          })
+          }),
         );
 
         // Filter by market if specified
@@ -194,13 +195,13 @@ export function useCancelAllOrders() {
       // Cancel each order
       const results = await Promise.allSettled(
         (orders || []).map((order: { id?: string; order_id?: string }) =>
-          cancelOrder(order.id || order.order_id || "")
-        )
+          cancelOrder(order.id || order.order_id || ""),
+        ),
       );
 
       // Return successful cancellations count
       const successCount = results.filter(
-        (r) => r.status === "fulfilled"
+        (r) => r.status === "fulfilled",
       ).length;
       return { cancelled: successCount, total: orders?.length || 0 };
     },

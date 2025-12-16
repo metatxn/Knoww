@@ -1,11 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Activity, TrendingDown, TrendingUp, Wifi, WifiOff } from "lucide-react";
+import {
+  Activity,
+  TrendingDown,
+  TrendingUp,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { useOrderBook, useLastTrade } from "@/hooks/use-orderbook-store";
 import type { ConnectionState } from "@/hooks/use-market-websocket";
+import { useLastTrade, useOrderBook } from "@/hooks/use-orderbook-store";
+import { cn } from "@/lib/utils";
 
 /**
  * Props for the OrderBookSummary component
@@ -99,11 +105,7 @@ function ConnectionIndicator({
   return (
     <div className={cn("flex items-center gap-1", className)}>
       <Icon
-        className={cn(
-          "h-3 w-3",
-          config.color,
-          config.pulse && "animate-pulse"
-        )}
+        className={cn("h-3 w-3", config.color, config.pulse && "animate-pulse")}
       />
       <span className={cn("text-[10px]", config.color)}>{config.label}</span>
     </div>
@@ -134,7 +136,8 @@ export function OrderBookSummary({
   const lastTrade = useLastTrade(tokenId);
 
   // Check if we have valid data
-  const hasData = orderBook && (orderBook.bids.length > 0 || orderBook.asks.length > 0);
+  const hasData =
+    orderBook && (orderBook.bids.length > 0 || orderBook.asks.length > 0);
 
   // Memoize formatted values
   const formattedData = useMemo(() => {
@@ -166,7 +169,7 @@ export function OrderBookSummary({
           "flex items-center gap-2 px-2 py-1 rounded-md transition-colors",
           "hover:bg-muted/50",
           onClick && "cursor-pointer",
-          className
+          className,
         )}
       >
         {/* Best Bid */}
@@ -185,9 +188,10 @@ export function OrderBookSummary({
               "h-1.5 w-1.5 rounded-full",
               connectionState === "connected" && "bg-emerald-500",
               connectionState === "connecting" && "bg-amber-500 animate-pulse",
-              connectionState === "reconnecting" && "bg-amber-500 animate-pulse",
+              connectionState === "reconnecting" &&
+                "bg-amber-500 animate-pulse",
               connectionState === "disconnected" && "bg-muted-foreground",
-              connectionState === "error" && "bg-red-500"
+              connectionState === "error" && "bg-red-500",
             )}
           />
         )}
@@ -202,7 +206,7 @@ export function OrderBookSummary({
       className={cn(
         "rounded-lg border border-border bg-card/50 p-3 space-y-2",
         onClick && "cursor-pointer hover:bg-muted/30 transition-colors",
-        className
+        className,
       )}
       onClick={onClick}
     >
@@ -270,7 +274,7 @@ export function OrderBookSummary({
             <span
               className={cn(
                 "text-xs font-mono",
-                lastTrade.side === "BUY" ? "text-emerald-500" : "text-red-500"
+                lastTrade.side === "BUY" ? "text-emerald-500" : "text-red-500",
               )}
             >
               {formatCents(lastTrade.price)}
@@ -349,5 +353,3 @@ export function OrderBookDepthBar({
     </div>
   );
 }
-
-

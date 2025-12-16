@@ -1,17 +1,22 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
   RefreshCw,
   Wifi,
   WifiOff,
-  ChevronUp,
-  ChevronDown,
-  HelpCircle,
 } from "lucide-react";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -20,19 +25,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import {
   useOrderBook as useOrderBookStore,
   useOrderBookStore as useStore,
 } from "@/hooks/use-orderbook-store";
 import {
-  useOrderBookWebSocket,
   type ConnectionState,
+  useOrderBookWebSocket,
 } from "@/hooks/use-shared-websocket";
+import { cn } from "@/lib/utils";
 
 /**
  * Order book level representing a price point with size
@@ -114,7 +114,7 @@ async function fetchOrderBook(tokenId: string): Promise<OrderBookData> {
       headers: {
         Accept: "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -248,7 +248,7 @@ export function OrderBook({
       setSelectedOutcome(index);
       onOutcomeChange?.(index, outcomes[index]);
     },
-    [outcomes, onOutcomeChange]
+    [outcomes, onOutcomeChange],
   );
 
   // Get order book store action for seeding from REST
@@ -280,7 +280,7 @@ export function OrderBook({
       setOrderBookFromRest(
         tokenId,
         restOrderBook.bids || [],
-        restOrderBook.asks || []
+        restOrderBook.asks || [],
       );
     }
   }, [restOrderBook, tokenId, isValidTokenId, setOrderBookFromRest]);
@@ -289,7 +289,7 @@ export function OrderBook({
   // Uses singleton manager - only ONE connection shared across all OrderBook components
   const assetIds = useMemo(
     () => (isValidTokenId && useWebSocket ? [tokenId] : []),
-    [isValidTokenId, useWebSocket, tokenId]
+    [isValidTokenId, useWebSocket, tokenId],
   );
   const { connectionState, isConnected } = useOrderBookWebSocket(assetIds);
 
@@ -372,7 +372,7 @@ export function OrderBook({
                   "text-sm font-medium transition-colors pb-1",
                   selectedOutcome === index
                     ? "text-foreground border-b-2 border-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 Trade {outcome.name}
@@ -416,7 +416,7 @@ export function OrderBook({
                 "text-xs font-medium px-3 py-1 rounded transition-colors",
                 selectedOutcome === index
                   ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
               )}
             >
               {outcome.name}
@@ -738,7 +738,7 @@ export function OrderBookCompact({
   // WebSocket connection (uses shared singleton manager)
   const assetIds = useMemo(
     () => (isValidTokenId && useWebSocket ? [tokenId] : []),
-    [isValidTokenId, useWebSocket, tokenId]
+    [isValidTokenId, useWebSocket, tokenId],
   );
   const { isConnected } = useOrderBookWebSocket(assetIds);
 
@@ -805,7 +805,7 @@ export function OrderBookCompact({
           <div
             className={cn(
               "h-1.5 w-1.5 rounded-full",
-              isConnected ? "bg-emerald-500" : "bg-muted-foreground"
+              isConnected ? "bg-emerald-500" : "bg-muted-foreground",
             )}
           />
         </div>

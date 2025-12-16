@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { type Config, cookieToInitialState, WagmiProvider } from "wagmi";
 import { networks, projectId, wagmiAdapter } from "@/config";
 import { OnboardingProvider } from "@/context/onboarding-context";
+import { SidebarProvider } from "@/context/sidebar-context";
 
 // Set up queryClient with default options
 const queryClient = new QueryClient({
@@ -72,9 +73,9 @@ function ContextProvider({
           enableSystem
           disableTransitionOnChange
         >
-          <OnboardingProvider>
-            {children}
-          </OnboardingProvider>
+          <SidebarProvider>
+            <OnboardingProvider>{children}</OnboardingProvider>
+          </SidebarProvider>
           <ReactQueryDevtools initialIsOpen={false} />
         </ThemeProvider>
       </QueryClientProvider>

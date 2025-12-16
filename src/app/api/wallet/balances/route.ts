@@ -13,9 +13,10 @@ export async function GET() {
   return NextResponse.json(
     {
       success: false,
-      error: "This endpoint has been deprecated. Use wagmi's useBalance hook or the frontend useClobClient hook instead.",
+      error:
+        "This endpoint has been deprecated. Use wagmi's useBalance hook or the frontend useClobClient hook instead.",
       hint: "Wallet operations require user wallet authentication which is now handled on the frontend.",
     },
-    { status: 410 } // 410 Gone
+    { status: 410 }, // 410 Gone
   );
 }

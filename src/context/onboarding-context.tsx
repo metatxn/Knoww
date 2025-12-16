@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
@@ -8,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
 import { useConnection } from "wagmi";
 import { TradingOnboarding } from "@/components/trading-onboarding";
 import {
@@ -17,10 +17,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useClobClient } from "@/hooks/use-clob-client";
 import { useClobCredentials } from "@/hooks/use-clob-credentials";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
-import { useClobClient } from "@/hooks/use-clob-client";
 
 // LocalStorage key for tracking completed onboarding
 const ONBOARDING_COMPLETE_KEY = "polycaster_onboarding_complete";
@@ -53,7 +53,7 @@ function markOnboardingComplete(walletAddress: string): void {
       completedWallets.push(lowerAddress);
       localStorage.setItem(
         ONBOARDING_COMPLETE_KEY,
-        JSON.stringify(completedWallets)
+        JSON.stringify(completedWallets),
       );
     }
   } catch {
@@ -107,7 +107,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         "[OnboardingContext] Checked localStorage for",
         address,
         ":",
-        isComplete
+        isComplete,
       );
     } else {
       setHasCompletedOnboarding(null);
@@ -166,7 +166,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       } catch (err) {
         console.error(
           "[OnboardingContext] Failed to check USDC approval:",
-          err
+          err,
         );
         setHasUsdcApproval(false);
       } finally {
@@ -260,7 +260,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       setHasCompletedOnboarding(true);
       console.log(
         "[OnboardingContext] Marked onboarding complete for",
-        address
+        address,
       );
     }
 

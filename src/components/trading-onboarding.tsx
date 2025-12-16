@@ -1,8 +1,10 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { useAppKit } from "@reown/appkit/react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
   ChevronRight,
   ExternalLink,
@@ -15,7 +17,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { useAppKit } from "@reown/appkit/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,11 +25,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { useRelayerClient } from "@/hooks/use-relayer-client";
+import { useClobClient } from "@/hooks/use-clob-client";
 import { useClobCredentials } from "@/hooks/use-clob-credentials";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
-import { useClobClient } from "@/hooks/use-clob-client";
+import { useRelayerClient } from "@/hooks/use-relayer-client";
+import { cn } from "@/lib/utils";
 
 interface OnboardingStep {
   id: string;
@@ -118,15 +119,15 @@ export function TradingOnboarding({
     (
       stepId: string,
       status: OnboardingStep["status"],
-      errorMessage?: string
+      errorMessage?: string,
     ) => {
       setSteps((prev) =>
         prev.map((step) =>
-          step.id === stepId ? { ...step, status, errorMessage } : step
-        )
+          step.id === stepId ? { ...step, status, errorMessage } : step,
+        ),
       );
     },
-    []
+    [],
   );
 
   /**
@@ -184,7 +185,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "deploy",
         "error",
-        err instanceof Error ? err.message : "Failed to deploy wallet"
+        err instanceof Error ? err.message : "Failed to deploy wallet",
       );
     }
   }, [deploySafe, updateStepStatus, refreshProxyWallet]);
@@ -204,7 +205,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "approve",
         "error",
-        err instanceof Error ? err.message : "Failed to approve USDC"
+        err instanceof Error ? err.message : "Failed to approve USDC",
       );
     }
   }, [approveUsdcForTrading, updateStepStatus]);
@@ -215,7 +216,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        "Please complete the wallet deployment step first"
+        "Please complete the wallet deployment step first",
       );
       return;
     }
@@ -224,7 +225,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        "Please complete the USDC approval step first"
+        "Please complete the USDC approval step first",
       );
       return;
     }
@@ -238,7 +239,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        err instanceof Error ? err.message : "Failed to setup credentials"
+        err instanceof Error ? err.message : "Failed to setup credentials",
       );
     }
   }, [
@@ -320,7 +321,7 @@ export function TradingOnboarding({
 
     if (wasIncomplete && nowComplete) {
       console.log(
-        "[TradingOnboarding] All steps completed! Showing celebration"
+        "[TradingOnboarding] All steps completed! Showing celebration",
       );
       setShowCelebration(true);
       // Auto-hide celebration after 3 seconds
@@ -447,10 +448,10 @@ export function TradingOnboarding({
                         i % 4 === 0
                           ? "text-yellow-400"
                           : i % 4 === 1
-                          ? "text-green-400"
-                          : i % 4 === 2
-                          ? "text-purple-400"
-                          : "text-blue-400"
+                            ? "text-green-400"
+                            : i % 4 === 2
+                              ? "text-purple-400"
+                              : "text-blue-400"
                       }`}
                     />
                   </motion.div>
@@ -502,7 +503,94 @@ export function TradingOnboarding({
             ? "Your trading account is ready to go!"
             : "Complete these steps to start trading on Polymarket"}
         </CardDescription>
-        <Progress value={progress} className="h-2 mt-2" />
+
+        {/* Custom Progress Bar with Checkpoints */}
+        <div className="pt-3 pb-1">
+          <div className="relative">
+            {/* Background track */}
+            <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-muted/50" />
+
+            {/* Filled progress */}
+            <motion.div
+              className="absolute top-0 left-0 h-2 rounded-full bg-linear-to-r from-emerald-500 via-green-500 to-teal-500"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            />
+
+            {/* Checkpoints */}
+            <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between px-0">
+              {steps.map((step, index) => {
+                const stepProgress = ((index + 1) / steps.length) * 100;
+                const isCompleted = progress >= stepProgress;
+                const isCurrent = index === currentStep;
+
+                return (
+                  <div
+                    key={step.id}
+                    className="relative flex items-center justify-center"
+                    style={{
+                      left: index === 0 ? "0" : "auto",
+                      right: index === steps.length - 1 ? "0" : "auto",
+                    }}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.8 }}
+                      animate={{ scale: isCompleted || isCurrent ? 1 : 0.9 }}
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center border-2 transition-all duration-300",
+                        isCompleted
+                          ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30"
+                          : isCurrent
+                            ? "bg-white dark:bg-gray-900 border-emerald-500 text-emerald-500 shadow-md"
+                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500"
+                      )}
+                    >
+                      {isCompleted ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <span className="text-[10px] font-bold">
+                          {index + 1}
+                        </span>
+                      )}
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step labels below checkpoints */}
+          <div className="flex justify-between mt-2">
+            {steps.map((step, index) => {
+              const stepProgress = ((index + 1) / steps.length) * 100;
+              const isCompleted = progress >= stepProgress;
+              const isCurrent = index === currentStep;
+
+              return (
+                <span
+                  key={`label-${step.id}`}
+                  className={cn(
+                    "text-[9px] font-medium text-center max-w-[60px] leading-tight",
+                    isCompleted
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : isCurrent
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-gray-400 dark:text-gray-500"
+                  )}
+                >
+                  {step.id === "connect"
+                    ? "Connect"
+                    : step.id === "deploy"
+                      ? "Wallet"
+                      : step.id === "approve"
+                        ? "USDC"
+                        : "API"}
+                </span>
+              );
+            })}
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -518,10 +606,10 @@ export function TradingOnboarding({
                 index === currentStep
                   ? "border-primary bg-primary/5"
                   : step.status === "completed"
-                  ? "border-green-500/30 bg-green-500/5"
-                  : step.status === "error"
-                  ? "border-destructive/30 bg-destructive/5"
-                  : "border-border"
+                    ? "border-green-500/30 bg-green-500/5"
+                    : step.status === "error"
+                      ? "border-destructive/30 bg-destructive/5"
+                      : "border-border"
               }`}
             >
               {/* Step Icon */}
@@ -530,10 +618,10 @@ export function TradingOnboarding({
                   step.status === "completed"
                     ? "bg-green-500/20 text-green-600 dark:text-green-400"
                     : step.status === "error"
-                    ? "bg-destructive/20 text-destructive"
-                    : index === currentStep
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
+                      ? "bg-destructive/20 text-destructive"
+                      : index === currentStep
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted text-muted-foreground"
                 }`}
               >
                 {step.icon}
@@ -546,10 +634,10 @@ export function TradingOnboarding({
                     step.status === "completed"
                       ? "text-green-600 dark:text-green-400"
                       : step.status === "error"
-                      ? "text-destructive"
-                      : step.status === "in_progress"
-                      ? "text-primary"
-                      : ""
+                        ? "text-destructive"
+                        : step.status === "in_progress"
+                          ? "text-primary"
+                          : ""
                   }`}
                 >
                   {step.title}
@@ -560,12 +648,12 @@ export function TradingOnboarding({
                       ? step.id === "deploy"
                         ? "Creating your secure wallet... This may take 10-30 seconds"
                         : step.id === "approve"
-                        ? "Approving USDC... This may take 10-30 seconds"
-                        : step.id === "credentials"
-                        ? "Generating your trading credentials..."
-                        : step.id === "connect"
-                        ? "Waiting for wallet connection..."
-                        : step.description
+                          ? "Approving USDC... This may take 10-30 seconds"
+                          : step.id === "credentials"
+                            ? "Generating your trading credentials..."
+                            : step.id === "connect"
+                              ? "Waiting for wallet connection..."
+                              : step.description
                       : step.description)}
                 </p>
               </div>

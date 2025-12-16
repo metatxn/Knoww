@@ -1,13 +1,13 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowUpRight,
   BarChart3,
   Check,
   Copy,
   ExternalLink,
+  FileText,
   History,
   LayoutGrid,
   ListOrdered,
@@ -18,7 +18,6 @@ import {
   Trash2,
   Wallet,
   XCircle,
-  FileText,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -237,7 +236,7 @@ function PositionsTable({
   searchQuery: string;
 }) {
   const filteredPositions = positions.filter((p) =>
-    p.market.title.toLowerCase().includes(searchQuery.toLowerCase())
+    p.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading) {
@@ -270,19 +269,19 @@ function PositionsTable({
   // Calculate totals
   const totalBet = filteredPositions.reduce(
     (sum, p) => sum + p.initialValue,
-    0
+    0,
   );
   const totalToWin = filteredPositions.reduce(
     (sum, p) => sum + p.size * (1 - p.avgPrice),
-    0
+    0,
   );
   const totalValue = filteredPositions.reduce(
     (sum, p) => sum + p.currentValue,
-    0
+    0,
   );
   const totalPnl = filteredPositions.reduce(
     (sum, p) => sum + p.unrealizedPnl,
-    0
+    0,
   );
   const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
 
@@ -354,8 +353,8 @@ function PositionsTable({
                     position.currentPrice > position.avgPrice
                       ? "text-emerald-500"
                       : position.currentPrice < position.avgPrice
-                      ? "text-red-500"
-                      : ""
+                        ? "text-red-500"
+                        : ""
                   }
                 >
                   {formatPrice(position.currentPrice)}
@@ -453,7 +452,7 @@ function OrdersTable({
   const filteredOrders = orders.filter(
     (o) =>
       o.market?.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase())
+      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading) {
@@ -529,7 +528,7 @@ function OrdersTable({
             <TableCell className="text-center text-sm text-muted-foreground">
               {order.expiration && order.expiration !== "0"
                 ? new Date(
-                    parseInt(order.expiration) * 1000
+                    parseInt(order.expiration, 10) * 1000,
                   ).toLocaleDateString()
                 : "GTC"}
             </TableCell>
@@ -575,7 +574,7 @@ interface Trade {
 function getActivityInfo(
   type: string,
   side?: string | null,
-  pnl?: number
+  pnl?: number,
 ): { label: string; icon: React.ElementType; color: string } {
   if (type === "REDEEM") {
     if (pnl && pnl > 0) {
@@ -636,7 +635,7 @@ function HistoryTable({
   searchQuery: string;
 }) {
   const filteredTrades = trades.filter((t) =>
-    t.market.title.toLowerCase().includes(searchQuery.toLowerCase())
+    t.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading) {
@@ -678,7 +677,7 @@ function HistoryTable({
           const activityInfo = getActivityInfo(
             trade.type,
             trade.side,
-            trade.usdcAmount
+            trade.usdcAmount,
           );
           const ActivityIcon = activityInfo.icon;
           const isBuy = trade.side === "BUY";
@@ -742,8 +741,8 @@ function HistoryTable({
                     isBuy
                       ? "text-red-500"
                       : trade.usdcAmount > 0
-                      ? "text-emerald-500"
-                      : "text-muted-foreground"
+                        ? "text-emerald-500"
+                        : "text-muted-foreground"
                   }`}
                 >
                   {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
@@ -896,9 +895,21 @@ export default function PortfolioPage() {
   // Not connected state
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative overflow-x-hidden">
+        {/* Subtle Grid Pattern */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+        </div>
+
+        {/* Animated Background Orbs */}
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
+          <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+          <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
+        </div>
+
         <Navbar />
-        <main className="container max-w-5xl mx-auto px-4 py-12">
+        <main className="relative z-10 container max-w-5xl mx-auto px-4 py-12">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -929,12 +940,24 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Subtle Grid Pattern */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-size-[60px_60px] mask-[radial-gradient(ellipse_80%_50%_at_50%_0%,black_70%,transparent_110%)]" />
+      </div>
+
+      {/* Animated Background Orbs */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] rounded-full blur-[150px] bg-violet-400/10 dark:bg-purple-500/8" />
+        <div className="absolute top-[30%] -right-[15%] w-[50%] h-[50%] rounded-full blur-[130px] bg-sky-400/8 dark:bg-blue-500/6" />
+        <div className="absolute -bottom-[20%] left-[10%] w-[70%] h-[70%] rounded-full blur-[180px] bg-teal-400/6 dark:bg-emerald-500/4" />
+      </div>
+
       <Navbar />
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="container max-w-5xl mx-auto px-4 py-6"
+        className="relative z-10 container max-w-5xl mx-auto px-4 py-6"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

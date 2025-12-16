@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 60 },
-      }
+      },
     );
 
     // Fetch current positions (use same params as Polymarket)
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 60 },
-      }
+      },
     );
 
     if (!positionsResponse.ok) {
@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 60 },
-      }
+      },
     );
 
     if (!tradesResponse.ok) {
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
     // Filter trades by date range
     if (startDate) {
       trades = trades.filter(
-        (t) => new Date(t.timestamp).getTime() >= startDate.getTime()
+        (t) => new Date(t.timestamp).getTime() >= startDate.getTime(),
       );
     }
 
@@ -229,12 +229,12 @@ export async function GET(request: NextRequest) {
     if (unrealizedPnl === 0 && realizedPnlFromPositions === 0) {
       unrealizedPnl = positions.reduce(
         (sum, p) => sum + Number.parseFloat(p.unrealizedPnl || "0"),
-        0
+        0,
       );
 
       realizedPnlFromPositions = positions.reduce(
         (sum, p) => sum + Number.parseFloat(p.realizedPnl || "0"),
-        0
+        0,
       );
     }
 
@@ -244,31 +244,31 @@ export async function GET(request: NextRequest) {
 
     const totalBuyValue = buyTrades.reduce(
       (sum, t) => sum + Number.parseFloat(t.usdcSize || "0"),
-      0
+      0,
     );
 
     const totalSellValue = sellTrades.reduce(
       (sum, t) => sum + Number.parseFloat(t.usdcSize || "0"),
-      0
+      0,
     );
 
     // Calculate current portfolio value
     const currentPortfolioValue = positions.reduce(
       (sum, p) => sum + Number.parseFloat(p.curValue || "0"),
-      0
+      0,
     );
 
     const initialInvestment = positions.reduce(
       (sum, p) => sum + Number.parseFloat(p.initialValue || "0"),
-      0
+      0,
     );
 
     // Calculate win rate (positions with positive P&L)
     const positionsWithPnl = positions.filter(
-      (p) => Number.parseFloat(p.unrealizedPnl || "0") !== 0
+      (p) => Number.parseFloat(p.unrealizedPnl || "0") !== 0,
     );
     const winningPositions = positionsWithPnl.filter(
-      (p) => Number.parseFloat(p.unrealizedPnl || "0") > 0
+      (p) => Number.parseFloat(p.unrealizedPnl || "0") > 0,
     );
     const winRate =
       positionsWithPnl.length > 0
@@ -282,20 +282,26 @@ export async function GET(request: NextRequest) {
     > = {};
 
     if (includeHistory) {
-      dailyHistory = trades.reduce((acc, trade) => {
-        const date = new Date(trade.timestamp).toISOString().split("T")[0];
-        if (!acc[date]) {
-          acc[date] = { realized: 0, trades: 0, volume: 0 };
-        }
+      dailyHistory = trades.reduce(
+        (acc, trade) => {
+          const date = new Date(trade.timestamp).toISOString().split("T")[0];
+          if (!acc[date]) {
+            acc[date] = { realized: 0, trades: 0, volume: 0 };
+          }
 
-        // Approximate realized P&L from trades
-        // This is simplified - actual P&L requires matching buys/sells
-        const tradeValue = Number.parseFloat(trade.usdcSize || "0");
-        acc[date].trades++;
-        acc[date].volume += tradeValue;
+          // Approximate realized P&L from trades
+          // This is simplified - actual P&L requires matching buys/sells
+          const tradeValue = Number.parseFloat(trade.usdcSize || "0");
+          acc[date].trades++;
+          acc[date].volume += tradeValue;
 
-        return acc;
-      }, {} as Record<string, { realized: number; trades: number; volume: number }>);
+          return acc;
+        },
+        {} as Record<
+          string,
+          { realized: number; trades: number; volume: number }
+        >,
+      );
     }
 
     // Calculate ROI
@@ -307,7 +313,7 @@ export async function GET(request: NextRequest) {
     const sortedByPnl = [...positions].sort(
       (a, b) =>
         Number.parseFloat(b.unrealizedPnl || "0") -
-        Number.parseFloat(a.unrealizedPnl || "0")
+        Number.parseFloat(a.unrealizedPnl || "0"),
     );
 
     const bestPerformer = sortedByPnl[0];
@@ -380,7 +386,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

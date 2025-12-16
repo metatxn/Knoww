@@ -89,7 +89,7 @@ export function useBridge() {
   const [error, setError] = useState<string | null>(null);
   const [supportedAssets, setSupportedAssets] = useState<SupportedAsset[]>([]);
   const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>(
-    []
+    [],
   );
 
   /**
@@ -142,7 +142,7 @@ export function useBridge() {
 
       if (!targetAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first."
+          "No wallet address provided. Please complete trading setup first.",
         );
       }
 
@@ -166,7 +166,7 @@ export function useBridge() {
           };
           throw new Error(
             errorData.message ||
-              `Failed to create deposit addresses: ${response.status}`
+              `Failed to create deposit addresses: ${response.status}`,
           );
         }
 
@@ -230,7 +230,7 @@ export function useBridge() {
         setIsLoading(false);
       }
     },
-    [proxyAddress]
+    [proxyAddress],
   );
 
   /**

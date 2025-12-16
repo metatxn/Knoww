@@ -21,7 +21,7 @@ function isNumericId(str: string): boolean {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   // Apply rate limiting: 100 requests per minute
   const rateLimitResponse = checkRateLimit(request, {
@@ -40,7 +40,7 @@ export async function GET(
           success: false,
           error: "Event ID or slug is required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -67,12 +67,12 @@ export async function GET(
             success: false,
             error: "Event not found",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
       const errorText = await eventResponse.text();
       throw new Error(
-        `Gamma API error: ${eventResponse.status} ${eventResponse.statusText} - ${errorText}`
+        `Gamma API error: ${eventResponse.status} ${eventResponse.statusText} - ${errorText}`,
       );
     }
 
@@ -84,7 +84,7 @@ export async function GET(
           success: false,
           error: "Event not found",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -131,7 +131,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
