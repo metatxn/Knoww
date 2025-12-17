@@ -68,7 +68,7 @@ export interface UsePnLHistoryOptions {
  */
 async function fetchPnLHistory(
   userAddress: string,
-  options: UsePnLHistoryOptions,
+  options: UsePnLHistoryOptions
 ): Promise<PnLHistoryResponse> {
   const params = new URLSearchParams({
     user: userAddress,

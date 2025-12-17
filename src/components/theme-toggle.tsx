@@ -37,12 +37,18 @@ export function ThemeToggle() {
 
   const currentTheme = BASE_THEMES.find((t) => t.value === theme);
   const isDark = currentTheme?.isDark ?? false;
+  const themeName = currentTheme?.label ?? "System";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 gap-2 px-2 text-xs font-medium"
+        >
           {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          <span className="hidden sm:inline">{themeName}</span>
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
@@ -62,16 +68,18 @@ export function ThemeToggle() {
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
                 theme === t.value
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary/15 text-primary ring-1 ring-primary/30"
                   : "hover:bg-muted",
               )}
             >
               <div
-                className="h-4 w-4 rounded-full border border-border/50"
+                className="h-4 w-4 rounded-full border border-border/50 shrink-0"
                 style={{ backgroundColor: t.preview }}
               />
-              {t.label}
-              {theme === t.value && <Check className="h-3 w-3 ml-auto" />}
+              <span className="truncate">{t.label}</span>
+              {theme === t.value && (
+                <Check className="h-3 w-3 ml-auto shrink-0 text-primary" />
+              )}
             </button>
           ))}
         </div>
@@ -86,16 +94,18 @@ export function ThemeToggle() {
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
                 theme === t.value
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary/15 text-primary ring-1 ring-primary/30"
                   : "hover:bg-muted",
               )}
             >
               <div
-                className="h-4 w-4 rounded-full border border-border/50"
+                className="h-4 w-4 rounded-full border border-border/50 shrink-0"
                 style={{ backgroundColor: t.preview }}
               />
-              {t.label}
-              {theme === t.value && <Check className="h-3 w-3 ml-auto" />}
+              <span className="truncate">{t.label}</span>
+              {theme === t.value && (
+                <Check className="h-3 w-3 ml-auto shrink-0 text-primary" />
+              )}
             </button>
           ))}
         </div>

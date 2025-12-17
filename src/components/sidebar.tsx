@@ -51,6 +51,7 @@ import { useSidebar } from "@/context/sidebar-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
+import { useUserPnL } from "@/hooks/use-user-pnl";
 import { cn } from "@/lib/utils";
 
 // Categories with Lucide icons
@@ -99,8 +100,19 @@ export function Sidebar() {
   // Fetch public profile using proxy address (Polymarket profiles are tied to proxy wallets)
   const profileAddress = proxyAddress || address;
   const { data: publicProfile, isLoading: isLoadingProfile } = usePublicProfile(
-    profileAddress || undefined,
+    profileAddress || undefined
   );
+
+  // Fetch P&L data
+  const { data: pnlData, isLoading: isPnlLoading } = useUserPnL({
+    period: "all",
+    userAddress: proxyAddress || undefined,
+  });
+
+  // Calculate P&L - use total P&L value directly
+  const totalPnl = pnlData?.pnl?.total ?? 0;
+  const isProfit = totalPnl >= 0;
+  const hasPnlData = pnlData !== undefined && pnlData !== null;
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -110,12 +122,12 @@ export function Sidebar() {
   const displayName = isLoadingProfile
     ? "Loading..."
     : publicProfile?.name && publicProfile.name.length > 0
-      ? publicProfile.name
-      : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
-        ? publicProfile.pseudonym
-        : profileAddress
-          ? formatAddress(profileAddress)
-          : "Connecting...";
+    ? publicProfile.name
+    : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
+    ? publicProfile.pseudonym
+    : profileAddress
+    ? formatAddress(profileAddress)
+    : "Connecting...";
 
   // Get initials for avatar fallback
   const getInitials = (name: string) => {
@@ -141,7 +153,7 @@ export function Sidebar() {
       <aside
         className={cn(
           "hidden lg:flex fixed left-0 top-0 z-40 h-screen flex-col border-r border-gray-200 dark:border-border/40 bg-linear-to-b from-white via-slate-50/50 to-slate-100/50 dark:from-background dark:via-background dark:to-muted/10 transition-all duration-300",
-          isCollapsed ? "w-16" : "w-56",
+          isCollapsed ? "w-16" : "w-56"
         )}
       >
         {/* Subtle gradient overlay */}
@@ -157,7 +169,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative flex h-14 items-center border-b border-border/40",
-            isCollapsed ? "justify-center px-2" : "px-4",
+            isCollapsed ? "justify-center px-2" : "px-4"
           )}
         >
           <button
@@ -178,7 +190,7 @@ export function Sidebar() {
         <nav
           className={cn(
             "relative flex-1 overflow-y-auto py-4 scrollbar-hide",
-            isCollapsed ? "px-1.5" : "px-2",
+            isCollapsed ? "px-1.5" : "px-2"
           )}
         >
           {/* Main Nav */}
@@ -194,7 +206,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/"
                         ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
                     <Target
@@ -203,7 +215,7 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/" ? "text-white" : "",
+                        pathname === "/" ? "text-white" : ""
                       )}
                     />
                     {!isCollapsed && (
@@ -237,7 +249,7 @@ export function Sidebar() {
                         isCollapsed ? "justify-center px-2" : "px-3",
                         pathname === "/portfolio"
                           ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                       )}
                     >
                       <FolderOpen
@@ -246,7 +258,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          pathname === "/portfolio" ? "text-white" : "",
+                          pathname === "/portfolio" ? "text-white" : ""
                         )}
                       />
                       {!isCollapsed && (
@@ -299,7 +311,7 @@ export function Sidebar() {
                         isCollapsed ? "justify-center px-2" : "px-3",
                         isActive
                           ? "bg-linear-to-r from-violet-500 to-purple-500 text-white font-semibold shadow-lg shadow-violet-500/20"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30",
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30"
                       )}
                     >
                       <cat.icon
@@ -308,7 +320,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          isActive ? "text-white" : "",
+                          isActive ? "text-white" : ""
                         )}
                       />
                       {!isCollapsed && (
@@ -338,7 +350,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative border-t border-border/40 p-2",
-            isCollapsed ? "flex justify-center" : "",
+            isCollapsed ? "flex justify-center" : ""
           )}
         >
           <Tooltip>
@@ -348,7 +360,7 @@ export function Sidebar() {
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className={cn(
                   "flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all",
-                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2",
+                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2"
                 )}
               >
                 {isCollapsed ? (
@@ -374,26 +386,41 @@ export function Sidebar() {
           <div className="relative border-t border-border/40 p-3 space-y-3 bg-linear-to-t from-muted/30 to-transparent dark:from-muted/20">
             {/* Balance Card */}
             {isConnected && hasProxyWallet && proxyAddress && (
-              <div className="relative overflow-hidden p-4 rounded-2xl bg-gray-900 dark:bg-gray-900/80 border border-gray-800 shadow-xl">
+              <div className="group relative overflow-hidden p-4 rounded-2xl bg-gray-900 dark:bg-gray-900/80 border border-gray-800 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-violet-500/10 hover:border-gray-700 hover:scale-[1.02]">
                 {/* Subtle gradient overlay */}
-                <div className="absolute inset-0 bg-linear-to-br from-gray-800/50 via-transparent to-gray-900/50 pointer-events-none" />
+                <div className="absolute inset-0 bg-linear-to-br from-gray-800/50 via-transparent to-gray-900/50 pointer-events-none transition-opacity duration-300 group-hover:opacity-70" />
+                {/* Hover glow effect */}
+                <div className="absolute inset-0 bg-linear-to-br from-violet-500/0 via-transparent to-emerald-500/0 pointer-events-none transition-all duration-300 group-hover:from-violet-500/5 group-hover:to-emerald-500/5" />
 
                 <div className="relative space-y-3">
-                  {/* Header: Balance label + percentage */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-gray-400" />
+                  {/* Header: Balance label + P&L */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Wallet className="h-4 w-4 text-gray-400 transition-transform duration-300 group-hover:scale-110" />
                       <span className="text-sm font-medium text-gray-400">
                         Balance
                       </span>
                     </div>
-                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                      +12.5%
-                    </span>
+                    {isPnlLoading ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-400 animate-pulse whitespace-nowrap">
+                        P&L --
+                      </span>
+                    ) : hasPnlData ? (
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold px-1.5 py-0.5 rounded transition-all duration-300 group-hover:scale-105 whitespace-nowrap",
+                          isProfit
+                            ? "text-emerald-400 bg-emerald-500/10"
+                            : "text-red-400 bg-red-500/10"
+                        )}
+                      >
+                        P&L {isProfit ? "+" : ""}${totalPnl.toFixed(2)}
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Balance Amount */}
-                  <p className="text-3xl font-bold text-white tracking-tight">
+                  <p className="text-3xl font-bold text-white tracking-tight transition-transform duration-300 group-hover:translate-x-0.5">
                     $
                     {proxyUsdcBalance.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
@@ -423,7 +450,7 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={() => setShowDepositModal(true)}
-                    className="w-full py-2.5 text-sm font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
+                    className="w-full py-2.5 text-sm font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 group-hover:shadow-emerald-500/30"
                   >
                     Deposit
                   </button>
