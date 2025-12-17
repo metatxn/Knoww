@@ -386,7 +386,7 @@ function PositionsTable({
   // Filter and sort positions
   const filteredPositions = useMemo(() => {
     let result = positions.filter((p) =>
-      p.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
+      p.market.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     // Apply P&L filter
@@ -455,19 +455,19 @@ function PositionsTable({
   // Calculate totals
   const totalBet = filteredPositions.reduce(
     (sum, p) => sum + p.initialValue,
-    0,
+    0
   );
   const totalToWin = filteredPositions.reduce(
     (sum, p) => sum + p.size * (1 - p.avgPrice),
-    0,
+    0
   );
   const totalValue = filteredPositions.reduce(
     (sum, p) => sum + p.currentValue,
-    0,
+    0
   );
   const totalPnl = filteredPositions.reduce(
     (sum, p) => sum + p.unrealizedPnl,
-    0,
+    0
   );
   const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
 
@@ -540,8 +540,8 @@ function PositionsTable({
                         position.currentPrice > position.avgPrice
                           ? "text-emerald-500"
                           : position.currentPrice < position.avgPrice
-                            ? "text-red-500"
-                            : ""
+                          ? "text-red-500"
+                          : ""
                       }
                     >
                       {formatPrice(position.currentPrice)}
@@ -740,8 +740,8 @@ function PositionsTable({
                         position.currentPrice > position.avgPrice
                           ? "text-emerald-500"
                           : position.currentPrice < position.avgPrice
-                            ? "text-red-500"
-                            : ""
+                          ? "text-red-500"
+                          : ""
                       }
                     >
                       {formatPrice(position.currentPrice)}
@@ -860,7 +860,7 @@ function OrdersTable({
   const filteredOrders = orders.filter(
     (o) =>
       o.market?.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase()),
+      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {
@@ -903,7 +903,7 @@ function OrdersTable({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm line-clamp-2 leading-tight">
+                <p className="font-medium text-sm leading-tight">
                   {order.market?.question ||
                     `Token ${order.tokenId.slice(0, 8)}...`}
                 </p>
@@ -969,10 +969,8 @@ function OrdersTable({
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
               <span>
                 Expiration:{" "}
-                {order.expiration && order.expiration !== "0"
-                  ? new Date(
-                      parseInt(order.expiration, 10) * 1000,
-                    ).toLocaleDateString()
+                {order.expiration
+                  ? new Date(order.expiration).toLocaleDateString()
                   : "Good till cancelled"}
               </span>
               {/* Progress indicator */}
@@ -1022,7 +1020,7 @@ function OrdersTable({
                 className="hover:bg-muted/50 transition-colors"
               >
                 <TableCell>
-                  <p className="font-medium text-sm truncate max-w-[250px]">
+                  <p className="font-medium text-sm">
                     {order.market?.question ||
                       `Token ${order.tokenId.slice(0, 8)}...`}
                   </p>
@@ -1065,10 +1063,8 @@ function OrdersTable({
                   {formatCurrency(order.size * order.price)}
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
-                  {order.expiration && order.expiration !== "0"
-                    ? new Date(
-                        parseInt(order.expiration, 10) * 1000,
-                      ).toLocaleDateString()
+                  {order.expiration
+                    ? new Date(order.expiration).toLocaleDateString()
                     : "GTC"}
                 </TableCell>
                 <TableCell>
@@ -1119,7 +1115,7 @@ interface Trade {
 function getActivityInfo(
   type: string,
   side?: string | null,
-  pnl?: number,
+  pnl?: number
 ): { label: string; icon: React.ElementType; color: string } {
   if (type === "REDEEM") {
     if (pnl && pnl > 0) {
@@ -1180,7 +1176,7 @@ function HistoryTable({
   searchQuery: string;
 }) {
   const filteredTrades = trades.filter((t) =>
-    t.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    t.market.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {
@@ -1218,7 +1214,7 @@ function HistoryTable({
           const activityInfo = getActivityInfo(
             trade.type,
             trade.side,
-            trade.usdcAmount,
+            trade.usdcAmount
           );
           const ActivityIcon = activityInfo.icon;
           const isBuy = trade.side === "BUY";
@@ -1253,8 +1249,8 @@ function HistoryTable({
                           isBuy
                             ? "text-red-500"
                             : trade.usdcAmount > 0
-                              ? "text-emerald-500"
-                              : "text-muted-foreground"
+                            ? "text-emerald-500"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
@@ -1266,7 +1262,7 @@ function HistoryTable({
                   </div>
 
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-                    <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-muted shrink-0">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden bg-muted shrink-0">
                       {trade.market.icon ? (
                         <Image
                           src={trade.market.icon}
@@ -1336,7 +1332,7 @@ function HistoryTable({
               const activityInfo = getActivityInfo(
                 trade.type,
                 trade.side,
-                trade.usdcAmount,
+                trade.usdcAmount
               );
               const ActivityIcon = activityInfo.icon;
               const isBuy = trade.side === "BUY";
@@ -1361,7 +1357,7 @@ function HistoryTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+                      <div className="relative w-9 h-9 rounded-full overflow-hidden bg-muted shrink-0">
                         {trade.market.icon ? (
                           <Image
                             src={trade.market.icon}
@@ -1403,8 +1399,8 @@ function HistoryTable({
                         isBuy
                           ? "text-red-500"
                           : trade.usdcAmount > 0
-                            ? "text-emerald-500"
-                            : "text-muted-foreground"
+                          ? "text-emerald-500"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
@@ -1773,8 +1769,8 @@ export default function PortfolioPage() {
                 activeTab === "positions"
                   ? "markets"
                   : activeTab === "orders"
-                    ? "orders"
-                    : "history"
+                  ? "orders"
+                  : "history"
               }...`}
               pnlFilter={pnlFilter}
               onPnlFilterChange={setPnlFilter}

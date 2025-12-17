@@ -37,7 +37,7 @@ interface ProfileResponse {
  * Fetch public profile from our API route (which proxies to Polymarket)
  */
 async function fetchPublicProfile(
-  address: string
+  address: string,
 ): Promise<PublicProfile | null> {
   const response = await fetch(`/api/user/public-profile?address=${address}`);
 

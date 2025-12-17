@@ -40,6 +40,64 @@ export interface UseOpenOrdersOptions {
 }
 
 /**
+ * Fetch market info for a token ID
+ */
+async function fetchMarketInfo(
+  tokenId: string,
+): Promise<{ question: string; slug: string; outcome: string } | null> {
+  try {
+    const response = await fetch(`/api/markets/by-token/${tokenId}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data.success && data.market) {
+      return {
+        question: data.market.question,
+        slug: data.market.slug,
+        outcome: data.market.outcome,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse expiration timestamp
+ * Handles both Unix timestamps (seconds) and special values like "0" for GTC orders
+ */
+function parseExpiration(expiration: string | number | undefined): string {
+  if (!expiration || expiration === "0" || expiration === 0) {
+    return ""; // GTC (Good Till Cancelled) - no expiration
+  }
+
+  const timestamp = Number(expiration);
+
+  // Check if it's a valid timestamp
+  if (Number.isNaN(timestamp) || timestamp <= 0) {
+    return "";
+  }
+
+  // If timestamp is very small (< year 2000 in seconds), it's likely invalid
+  if (timestamp < 946684800) {
+    return "";
+  }
+
+  // If timestamp is in seconds (Unix timestamp), convert to milliseconds
+  // Unix timestamps from Polymarket are typically in seconds
+  const timestampMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+
+  // Check if the resulting date is valid and in the future
+  const date = new Date(timestampMs);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString();
+}
+
+/**
  * Hook to fetch user's open orders using the CLOB client
  *
  * Uses the ClobClient's getOpenOrders() method which requires
@@ -106,16 +164,39 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
               typeof order.created_at === "number"
                 ? new Date(order.created_at * 1000).toISOString()
                 : order.created_at || new Date().toISOString(),
-            expiration: order.expiration
-              ? new Date(Number(order.expiration) * 1000).toISOString()
-              : "",
+            expiration: parseExpiration(order.expiration),
           }),
         );
 
+        // Fetch market info for each unique token ID
+        const uniqueTokenIds = [
+          ...new Set(transformedOrders.map((o) => o.tokenId)),
+        ];
+        const marketInfoMap = new Map<
+          string,
+          { question: string; slug: string; outcome: string }
+        >();
+
+        // Fetch market info in parallel
+        await Promise.all(
+          uniqueTokenIds.map(async (tokenId) => {
+            const marketInfo = await fetchMarketInfo(tokenId);
+            if (marketInfo) {
+              marketInfoMap.set(tokenId, marketInfo);
+            }
+          }),
+        );
+
+        // Enrich orders with market info
+        const enrichedOrders = transformedOrders.map((order) => ({
+          ...order,
+          market: marketInfoMap.get(order.tokenId) || undefined,
+        }));
+
         // Filter by market if specified
         const filteredOrders = options.market
-          ? transformedOrders.filter((o) => o.tokenId === options.market)
-          : transformedOrders;
+          ? enrichedOrders.filter((o) => o.tokenId === options.market)
+          : enrichedOrders;
 
         return {
           success: true,
