@@ -2,7 +2,6 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import {
-  ArrowUpRight,
   BarChart2,
   Bitcoin,
   CircleDollarSign,
@@ -14,7 +13,6 @@ import {
   Landmark,
   Menu,
   MessageSquare,
-  Plus,
   Settings,
   TrendingUp,
   Trophy,
@@ -175,67 +173,64 @@ export function SidebarMobile() {
           <div className="border-t p-3 space-y-3 bg-muted/30">
             {/* Balance Card */}
             {isConnected && hasProxyWallet && proxyAddress && (
-              <div className="p-3 rounded-xl bg-white dark:bg-card border">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-                    BALANCE
-                  </span>
-                  <a
-                    href={`https://polygonscan.com/address/${proxyAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-                <p className="text-2xl font-bold">
-                  ${proxyUsdcBalance.toFixed(2)}
-                </p>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-1">
-                    <code className="text-[11px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+              <div className="relative overflow-hidden p-4 rounded-2xl bg-gray-900 border border-gray-800 shadow-xl">
+                {/* Subtle gradient overlay */}
+                <div className="absolute inset-0 bg-linear-to-br from-gray-800/50 via-transparent to-gray-900/50 pointer-events-none" />
+
+                <div className="relative space-y-3">
+                  {/* Header: Balance label + percentage */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-400">
+                        Balance
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      +12.5%
+                    </span>
+                  </div>
+
+                  {/* Balance Amount */}
+                  <p className="text-3xl font-bold text-white tracking-tight">
+                    $
+                    {proxyUsdcBalance.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+
+                  {/* Wallet Address */}
+                  <div className="flex items-center gap-1.5">
+                    <code className="text-xs text-gray-500 font-mono">
                       {formatAddress(proxyAddress)}
                     </code>
                     <button
                       type="button"
                       onClick={() => handleCopy(proxyAddress)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-gray-500 hover:text-gray-300 transition-colors"
                     >
                       {copied ? (
-                        <span className="text-[10px] text-emerald-500">✓</span>
+                        <span className="text-xs text-emerald-400">✓</span>
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
                     </button>
                   </div>
+
+                  {/* Deposit Button */}
                   <button
                     type="button"
                     onClick={() => {
                       setShowDepositModal(true);
                       setIsOpen(false);
                     }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+                    className="w-full py-2.5 text-sm font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
                   >
-                    <Plus className="h-3 w-3" />
-                    Add
+                    Deposit
                   </button>
                 </div>
               </div>
-            )}
-
-            {/* Deposit Funds Button */}
-            {isConnected && hasProxyWallet && (
-              <Button
-                onClick={() => {
-                  setShowDepositModal(true);
-                  setIsOpen(false);
-                }}
-                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold"
-              >
-                Deposit Funds
-              </Button>
             )}
 
             {/* Account Section */}
