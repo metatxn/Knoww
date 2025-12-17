@@ -40,8 +40,9 @@ interface PnLHistoryResponse {
 
 /**
  * Time interval options
+ * Supported by Polymarket API: 'max', 'all', '1m', '1w', '1d', '12h', '6h'
  */
-export type PnLInterval = "1d" | "1w" | "1m" | "3m" | "1y" | "all";
+export type PnLInterval = "6h" | "12h" | "1d" | "1w" | "1m" | "all" | "max";
 
 /**
  * Data fidelity options

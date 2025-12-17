@@ -17,11 +17,12 @@ interface PnLDataPoint {
 
 /**
  * Validation schema for query parameters
+ * Supported intervals by Polymarket API: 'max', 'all', '1m', '1w', '1d', '12h', '6h'
  */
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
   interval: z
-    .enum(["1d", "1w", "1m", "3m", "1y", "all"])
+    .enum(["6h", "12h", "1d", "1w", "1m", "all", "max"])
     .optional()
     .nullable()
     .transform((val) => val ?? "1m"),
@@ -39,7 +40,7 @@ const querySchema = z.object({
  *
  * Query Parameters:
  * - user: User's wallet address (required)
- * - interval: Time range (1d, 1w, 1m, 3m, 1y, all) (default: 1m)
+ * - interval: Time range (6h, 12h, 1d, 1w, 1m, all, max) (default: 1m)
  * - fidelity: Data point granularity (1h, 1d, 1w) (default: 1d)
  *
  * Response:

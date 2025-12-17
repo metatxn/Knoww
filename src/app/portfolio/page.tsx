@@ -4,6 +4,7 @@ import { useAppKit } from "@reown/appkit/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownRight,
+  ArrowDownToLine,
   ArrowUpDown,
   ArrowUpRight,
   BarChart3,
@@ -27,6 +28,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
+import { DepositModal } from "@/components/deposit-modal";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { PnLChart } from "@/components/pnl-chart";
@@ -665,15 +667,16 @@ function PositionsTable({
               </TableHead>
               <TableHead className="text-right min-w-[80px]">Bet</TableHead>
               <TableHead className="text-right min-w-[80px]">To Win</TableHead>
-              <TableHead className="text-right min-w-[100px]">
-                <SortableHeader
-                  label="Value"
-                  field="value"
-                  currentSort={sortField}
-                  onSort={onSort}
-                  className="justify-end"
-                  tooltip="Current market value of your position"
-                />
+              <TableHead className="min-w-[100px]">
+                <div className="flex justify-end">
+                  <SortableHeader
+                    label="Value"
+                    field="value"
+                    currentSort={sortField}
+                    onSort={onSort}
+                    tooltip="Current market value of your position"
+                  />
+                </div>
               </TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
@@ -1521,6 +1524,7 @@ export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<TabType>("positions");
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Sorting & Filtering state
   const [sortField, setSortField] = useState<SortField>("value");
@@ -1689,10 +1693,22 @@ export default function PortfolioPage() {
               </button>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasProxyWallet && proxyAddress && (
+              <Button
+                onClick={() => setShowDepositModal(true)}
+                size="sm"
+                className="bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
+              >
+                <ArrowDownToLine className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Deposit</span>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -1821,6 +1837,12 @@ export default function PortfolioPage() {
           </AnimatePresence>
         </div>
       </motion.main>
+
+      {/* Deposit Modal */}
+      <DepositModal
+        open={showDepositModal}
+        onOpenChange={setShowDepositModal}
+      />
     </div>
   );
 }

@@ -53,11 +53,11 @@ function formatDate(dateStr: string): string {
 }
 
 const INTERVAL_OPTIONS: { value: PnLInterval; label: string }[] = [
+  { value: "6h", label: "6H" },
+  { value: "12h", label: "12H" },
   { value: "1d", label: "1D" },
   { value: "1w", label: "1W" },
   { value: "1m", label: "1M" },
-  { value: "3m", label: "3M" },
-  { value: "1y", label: "1Y" },
   { value: "all", label: "All" },
 ];
 
@@ -303,7 +303,10 @@ export function PnLChart({
   const { data, isLoading, error } = usePnLHistory({
     userAddress,
     interval,
-    fidelity: interval === "1d" ? "1h" : "1d",
+    fidelity:
+      interval === "6h" || interval === "12h" || interval === "1d"
+        ? "1h"
+        : "1d",
   });
 
   const isPositive = (data?.summary?.endPnl || 0) >= 0;

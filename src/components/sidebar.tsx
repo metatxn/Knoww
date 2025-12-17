@@ -2,6 +2,7 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import {
+  BadgeCheck,
   BarChart2,
   Bitcoin,
   ChevronDown,
@@ -21,7 +22,6 @@ import {
   Target,
   TrendingUp,
   Trophy,
-  User,
   Users,
   Vote,
   Wallet,
@@ -31,6 +31,7 @@ import { useState } from "react";
 import { useConnection, useDisconnect } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ import {
 import { useOnboarding } from "@/context/onboarding-context";
 import { useSidebar } from "@/context/sidebar-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
+import { usePublicProfile } from "@/hooks/use-public-profile";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 import { cn } from "@/lib/utils";
 
@@ -94,8 +96,39 @@ export function Sidebar() {
   const proxyAddress = relayerProxyAddress || proxyWalletAddress;
   const hasProxyWallet = hasDeployedSafeFromRelayer || hasProxyWalletFromHook;
 
+  // Fetch public profile using proxy address (Polymarket profiles are tied to proxy wallets)
+  const profileAddress = proxyAddress || address;
+  const { data: publicProfile, isLoading: isLoadingProfile } = usePublicProfile(
+    profileAddress || undefined,
+  );
+
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  // Get display name - prefer name, then pseudonym, then formatted address
+  // Note: publicProfile can be null if profile not found, or undefined if not yet fetched
+  const displayName = isLoadingProfile
+    ? "Loading..."
+    : publicProfile?.name && publicProfile.name.length > 0
+      ? publicProfile.name
+      : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
+        ? publicProfile.pseudonym
+        : profileAddress
+          ? formatAddress(profileAddress)
+          : "Connecting...";
+
+  // Get initials for avatar fallback
+  const getInitials = (name: string) => {
+    if (!name || name === "Connecting...") return "U";
+    // If it's an address (starts with 0x), return first 2 chars after 0x
+    if (name.startsWith("0x")) return "Ox";
+
+    const parts = name.split(/[\s-]+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -417,26 +450,96 @@ export function Sidebar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full justify-between h-10 rounded-xl hover:bg-muted/60 dark:hover:bg-muted/40"
+                    className="w-full justify-between h-auto py-2 px-2 rounded-xl hover:bg-muted/60 dark:hover:bg-muted/40"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-xl bg-linear-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-md shadow-violet-500/20">
-                        <User className="h-3.5 w-3.5 text-white" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar className="h-8 w-8 rounded-xl border-2 border-violet-500/20 shadow-md">
+                        {publicProfile?.profileImage ? (
+                          <AvatarImage
+                            src={publicProfile.profileImage}
+                            alt={displayName}
+                            className="object-cover"
+                          />
+                        ) : null}
+                        <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-xs font-bold">
+                          {getInitials(displayName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col items-start min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-bold truncate max-w-[100px]">
+                            {displayName}
+                          </span>
+                          {publicProfile?.verifiedBadge && (
+                            <BadgeCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {profileAddress
+                            ? formatAddress(profileAddress)
+                            : "..."}
+                        </span>
                       </div>
-                      <span className="text-xs font-mono font-bold">
-                        {formatAddress(address || "")}
-                      </span>
                     </div>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                  {/* Profile Header in Dropdown */}
+                  {publicProfile && (
+                    <>
+                      <div className="px-3 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="h-10 w-10 rounded-xl border-2 border-violet-500/20">
+                            {publicProfile.profileImage ? (
+                              <AvatarImage
+                                src={publicProfile.profileImage}
+                                alt={displayName}
+                                className="object-cover"
+                              />
+                            ) : null}
+                            <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-sm font-bold">
+                              {getInitials(displayName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <p className="text-sm font-bold truncate">
+                                {publicProfile.name || publicProfile.pseudonym}
+                              </p>
+                              {publicProfile.verifiedBadge && (
+                                <BadgeCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                              )}
+                            </div>
+                            {publicProfile.name && publicProfile.pseudonym && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                @{publicProfile.pseudonym}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {publicProfile.bio && (
+                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                            {publicProfile.bio}
+                          </p>
+                        )}
+                      </div>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => router.push("/portfolio")}
+                    className="rounded-lg"
+                  >
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    Portfolio
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => open()}
                     className="rounded-lg"
                   >
                     <Settings className="mr-2 h-4 w-4" />
-                    Settings
+                    Wallet Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -497,13 +600,29 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={() => open()}
-                    className="w-full h-10 flex items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white shadow-md shadow-violet-500/20"
+                    className="w-full h-10 flex items-center justify-center rounded-xl overflow-hidden"
                   >
-                    <User className="h-4 w-4" />
+                    <Avatar className="h-10 w-10 rounded-xl border-2 border-violet-500/30 shadow-md">
+                      {publicProfile?.profileImage ? (
+                        <AvatarImage
+                          src={publicProfile.profileImage}
+                          alt={displayName}
+                          className="object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-sm font-bold">
+                        {getInitials(displayName)}
+                      </AvatarFallback>
+                    </Avatar>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" sideOffset={10}>
-                  {formatAddress(address || "")}
+                  <div className="flex flex-col">
+                    <span className="font-semibold">{displayName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {profileAddress ? formatAddress(profileAddress) : "..."}
+                    </span>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             ) : (
