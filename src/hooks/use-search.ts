@@ -89,3 +89,4 @@ export function useSearch(query: string, limit = 10) {
     placeholderData: (previousData) => previousData,
   });
 }
+
