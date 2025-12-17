@@ -3,6 +3,9 @@
 import { useAppKit } from "@reown/appkit/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowDownRight,
+  ArrowUpDown,
+  ArrowUpRight,
   BarChart3,
   Check,
   Copy,
@@ -16,12 +19,13 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  TrendingUp,
   Wallet,
   XCircle,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
@@ -38,6 +42,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useCancelOrder, useOpenOrders } from "@/hooks/use-open-orders";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useUserDetails } from "@/hooks/use-user-details";
@@ -83,6 +93,14 @@ function timeAgo(timestamp: string): string {
   if (diffMonths < 12) return `${diffMonths} mo ago`;
   return then.toLocaleDateString();
 }
+
+// ============================================================================
+// Sorting & Filtering Types
+// ============================================================================
+
+type SortField = "value" | "pnl" | "name" | "date";
+type SortDirection = "asc" | "desc";
+type PnLFilter = "all" | "profit" | "loss";
 
 // ============================================================================
 // Tab Navigation
@@ -147,34 +165,81 @@ function TabNav({
 }
 
 // ============================================================================
-// Search Bar
+// Search Bar with Filter
 // ============================================================================
 
 function SearchBar({
   value,
   onChange,
   placeholder = "Search",
+  pnlFilter,
+  onPnlFilterChange,
+  showFilter = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  pnlFilter?: PnLFilter;
+  onPnlFilterChange?: (filter: PnLFilter) => void;
+  showFilter?: boolean;
 }) {
   return (
-    <div className="relative max-w-sm">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="pl-9 h-10 bg-background"
-      />
+    <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="relative flex-1 max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="pl-9 h-10 bg-background"
+        />
+      </div>
+      {showFilter && onPnlFilterChange && (
+        <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-lg">
+          <button
+            type="button"
+            onClick={() => onPnlFilterChange("all")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              pnlFilter === "all"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => onPnlFilterChange("profit")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+              pnlFilter === "profit"
+                ? "bg-emerald-500/15 text-emerald-500 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ArrowUpRight className="h-3 w-3" />
+            Profit
+          </button>
+          <button
+            type="button"
+            onClick={() => onPnlFilterChange("loss")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+              pnlFilter === "loss"
+                ? "bg-red-500/15 text-red-500 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ArrowDownRight className="h-3 w-3" />
+            Loss
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================================================
-// Empty State
+// Empty State - Enhanced
 // ============================================================================
 
 function EmptyState({
@@ -182,26 +247,97 @@ function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
 }: {
   icon: React.ElementType;
   title: string;
   description: string;
   action?: { label: string; href: string };
+  secondaryAction?: { label: string; href: string };
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-        <Icon className="h-7 w-7 text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+      <div className="relative">
+        <div className="absolute inset-0 bg-linear-to-r from-violet-500/20 to-fuchsia-500/20 blur-2xl rounded-full" />
+        <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-linear-to-br from-muted to-muted/50 flex items-center justify-center mb-4">
+          <Icon className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
+        </div>
       </div>
-      <h3 className="text-base font-medium mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-xs">{description}</p>
-      {action && (
-        <Button asChild className="mt-4" size="sm">
-          <Link href={action.href}>{action.label}</Link>
-        </Button>
-      )}
+      <h3 className="text-base sm:text-lg font-semibold mb-1.5">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-xs mb-4">
+        {description}
+      </p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        {action && (
+          <Button
+            asChild
+            size="sm"
+            className="bg-linear-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600"
+          >
+            <Link href={action.href}>
+              <TrendingUp className="h-4 w-4 mr-1.5" />
+              {action.label}
+            </Link>
+          </Button>
+        )}
+        {secondaryAction && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={secondaryAction.href}>{secondaryAction.label}</Link>
+          </Button>
+        )}
+      </div>
     </div>
   );
+}
+
+// ============================================================================
+// Sortable Table Header
+// ============================================================================
+
+function SortableHeader({
+  label,
+  field,
+  currentSort,
+  onSort,
+  className = "",
+  tooltip,
+}: {
+  label: string;
+  field: SortField;
+  currentSort: SortField;
+  onSort: (field: SortField) => void;
+  className?: string;
+  tooltip?: string;
+}) {
+  const isActive = currentSort === field;
+
+  const content = (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      className={`flex items-center gap-1 hover:text-foreground transition-colors ${className} ${
+        isActive ? "text-foreground" : ""
+      }`}
+    >
+      {label}
+      <ArrowUpDown
+        className={`h-3 w-3 ${isActive ? "text-primary" : "opacity-50"}`}
+      />
+    </button>
+  );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="top" className="text-xs max-w-[200px]">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return content;
 }
 
 // ============================================================================
@@ -232,20 +368,59 @@ function PositionsTable({
   positions,
   isLoading,
   searchQuery,
+  pnlFilter,
+  sortField,
+  sortDirection,
+  onSort,
 }: {
   positions: Position[];
   isLoading: boolean;
   searchQuery: string;
+  pnlFilter: PnLFilter;
+  sortField: SortField;
+  sortDirection: SortDirection;
+  onSort: (field: SortField) => void;
 }) {
-  const filteredPositions = positions.filter((p) =>
-    p.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Filter and sort positions
+  const filteredPositions = useMemo(() => {
+    let result = positions.filter((p) =>
+      p.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+
+    // Apply P&L filter
+    if (pnlFilter === "profit") {
+      result = result.filter((p) => p.unrealizedPnl >= 0);
+    } else if (pnlFilter === "loss") {
+      result = result.filter((p) => p.unrealizedPnl < 0);
+    }
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case "value":
+          comparison = a.currentValue - b.currentValue;
+          break;
+        case "pnl":
+          comparison = a.unrealizedPnl - b.unrealizedPnl;
+          break;
+        case "name":
+          comparison = a.market.title.localeCompare(b.market.title);
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+
+    return result;
+  }, [positions, searchQuery, pnlFilter, sortField, sortDirection]);
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+      <div className="p-4 sm:p-6 space-y-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -257,12 +432,19 @@ function PositionsTable({
         icon={LayoutGrid}
         title="No positions found"
         description={
-          searchQuery
-            ? "Try a different search term"
-            : "Start trading to see your positions here"
+          searchQuery || pnlFilter !== "all"
+            ? "Try adjusting your search or filters"
+            : "Start trading to build your portfolio and see your positions here"
         }
         action={
-          !searchQuery ? { label: "Explore Markets", href: "/" } : undefined
+          !searchQuery && pnlFilter === "all"
+            ? { label: "Explore Markets", href: "/" }
+            : undefined
+        }
+        secondaryAction={
+          !searchQuery && pnlFilter === "all"
+            ? { label: "View Trending", href: "/?sort=trending" }
+            : undefined
         }
       />
     );
@@ -288,140 +470,357 @@ function PositionsTable({
   const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[40%] min-w-[200px]">Market</TableHead>
-            <TableHead className="text-center min-w-[100px]">
-              Avg → Now
-            </TableHead>
-            <TableHead className="text-right min-w-[80px]">Bet</TableHead>
-            <TableHead className="text-right min-w-[80px]">To Win</TableHead>
-            <TableHead className="text-right min-w-[100px]">Value</TableHead>
-            <TableHead className="w-[80px]"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredPositions.map((position) => {
-            const isProfit = position.unrealizedPnl >= 0;
-            const toWin = position.size * (1 - position.avgPrice);
+    <TooltipProvider>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3 p-4">
+        {filteredPositions.map((position) => {
+          const isProfit = position.unrealizedPnl >= 0;
+          const toWin = position.size * (1 - position.avgPrice);
 
-            return (
-              <TableRow key={position.id} className="group">
-                <TableCell>
-                  <Link
-                    href={`/events/detail/${position.market.eventSlug}`}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
-                      {position.market.icon ? (
-                        <Image
-                          src={position.market.icon}
-                          alt={position.market.title}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+          return (
+            <motion.div
+              key={position.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-background border border-border rounded-xl p-4 space-y-3"
+            >
+              <Link
+                href={`/events/detail/${position.market.eventSlug}`}
+                className="flex items-start gap-3"
+              >
+                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0">
+                  {position.market.icon ? (
+                    <Image
+                      src={position.market.icon}
+                      alt={position.market.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate max-w-[280px] group-hover:text-primary transition-colors">
-                        {position.market.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        <span
-                          className={
-                            position.outcome === "Yes"
-                              ? "text-emerald-500"
-                              : "text-red-500"
-                          }
-                        >
-                          {position.outcome} {formatPrice(position.avgPrice)}
-                        </span>
-                        <span className="mx-1.5">·</span>
-                        {position.size.toFixed(1)} shares
-                      </p>
-                    </div>
-                  </Link>
-                </TableCell>
-                <TableCell className="text-center">
-                  <span className="text-muted-foreground">
-                    {formatPrice(position.avgPrice)}
-                  </span>
-                  <span className="mx-1 text-muted-foreground">→</span>
-                  <span
-                    className={
-                      position.currentPrice > position.avgPrice
-                        ? "text-emerald-500"
-                        : position.currentPrice < position.avgPrice
-                          ? "text-red-500"
-                          : ""
-                    }
-                  >
-                    {formatPrice(position.currentPrice)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(position.initialValue)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(toWin)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="font-medium">
-                    {formatCurrency(position.currentValue)}
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm line-clamp-2 leading-tight">
+                    {position.market.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        position.outcome === "Yes"
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : "bg-red-500/15 text-red-500"
+                      }`}
+                    >
+                      {position.outcome}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {position.size.toFixed(1)} shares
+                    </span>
                   </div>
-                  <div
-                    className={`text-xs ${
+                </div>
+              </Link>
+
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Avg → Now
+                  </p>
+                  <p className="text-sm font-medium">
+                    <span className="text-muted-foreground">
+                      {formatPrice(position.avgPrice)}
+                    </span>
+                    <span className="mx-1 text-muted-foreground">→</span>
+                    <span
+                      className={
+                        position.currentPrice > position.avgPrice
+                          ? "text-emerald-500"
+                          : position.currentPrice < position.avgPrice
+                            ? "text-red-500"
+                            : ""
+                      }
+                    >
+                      {formatPrice(position.currentPrice)}
+                    </span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Value
+                  </p>
+                  <p className="text-sm font-bold">
+                    {formatCurrency(position.currentValue)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Bet / To Win
+                  </p>
+                  <p className="text-sm">
+                    {formatCurrency(position.initialValue)} /{" "}
+                    {formatCurrency(toWin)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    P&L
+                  </p>
+                  <p
+                    className={`text-sm font-medium flex items-center justify-end gap-1 ${
                       isProfit ? "text-emerald-500" : "text-red-500"
                     }`}
                   >
-                    {formatCurrency(position.unrealizedPnl, true)} (
-                    {formatPercent(position.unrealizedPnlPercent)})
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Button
-                    size="sm"
-                    className="bg-sky-500 hover:bg-sky-600 text-white h-8"
-                  >
-                    Sell
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell className="font-medium">Total</TableCell>
-            <TableCell></TableCell>
-            <TableCell className="text-right font-medium">
-              {formatCurrency(totalBet)}
-            </TableCell>
-            <TableCell className="text-right font-medium">
-              {formatCurrency(totalToWin)}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="font-medium">{formatCurrency(totalValue)}</div>
-              <div
-                className={`text-xs ${
+                    {isProfit ? (
+                      <ArrowUpRight className="h-3 w-3" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3" />
+                    )}
+                    {formatCurrency(position.unrealizedPnl, true)}
+                    <span className="text-xs opacity-80">
+                      ({formatPercent(position.unrealizedPnlPercent)})
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-full mt-2"
+              >
+                <Link href={`/events/detail/${position.market.eventSlug}`}>
+                  Manage Position
+                </Link>
+              </Button>
+            </motion.div>
+          );
+        })}
+
+        {/* Mobile Total Summary */}
+        <div className="bg-muted/50 rounded-xl p-4 border border-border">
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            Portfolio Summary
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">
+                Total Bet
+              </p>
+              <p className="font-semibold">{formatCurrency(totalBet)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground uppercase">
+                Total Value
+              </p>
+              <p className="font-semibold">{formatCurrency(totalValue)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">
+                To Win
+              </p>
+              <p className="font-medium">{formatCurrency(totalToWin)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground uppercase">
+                Total P&L
+              </p>
+              <p
+                className={`font-semibold ${
                   totalPnl >= 0 ? "text-emerald-500" : "text-red-500"
                 }`}
               >
                 {formatCurrency(totalPnl, true)} (
                 {formatPercent(totalPnlPercent)})
-              </div>
-            </TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
-    </div>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b">
+              <TableHead className="w-[40%] min-w-[200px]">
+                <SortableHeader
+                  label="Market"
+                  field="name"
+                  currentSort={sortField}
+                  onSort={onSort}
+                />
+              </TableHead>
+              <TableHead className="text-center min-w-[100px]">
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    Avg → Now
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs max-w-[200px]">
+                    Your average buy price → Current market price
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
+              <TableHead className="text-right min-w-[80px]">Bet</TableHead>
+              <TableHead className="text-right min-w-[80px]">To Win</TableHead>
+              <TableHead className="text-right min-w-[100px]">
+                <SortableHeader
+                  label="Value"
+                  field="value"
+                  currentSort={sortField}
+                  onSort={onSort}
+                  className="justify-end"
+                  tooltip="Current market value of your position"
+                />
+              </TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredPositions.map((position) => {
+              const isProfit = position.unrealizedPnl >= 0;
+              const toWin = position.size * (1 - position.avgPrice);
+
+              return (
+                <TableRow
+                  key={position.id}
+                  className="group hover:bg-muted/50 transition-colors"
+                >
+                  <TableCell>
+                    <Link
+                      href={`/events/detail/${position.market.eventSlug}`}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                        {position.market.icon ? (
+                          <Image
+                            src={position.market.icon}
+                            alt={position.market.title}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate max-w-[280px] group-hover:text-primary transition-colors">
+                          {position.market.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span
+                            className={
+                              position.outcome === "Yes"
+                                ? "text-emerald-500"
+                                : "text-red-500"
+                            }
+                          >
+                            {position.outcome} {formatPrice(position.avgPrice)}
+                          </span>
+                          <span className="mx-1.5">·</span>
+                          {position.size.toFixed(1)} shares
+                        </p>
+                      </div>
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-muted-foreground">
+                      {formatPrice(position.avgPrice)}
+                    </span>
+                    <span className="mx-1 text-muted-foreground">→</span>
+                    <span
+                      className={
+                        position.currentPrice > position.avgPrice
+                          ? "text-emerald-500"
+                          : position.currentPrice < position.avgPrice
+                            ? "text-red-500"
+                            : ""
+                      }
+                    >
+                      {formatPrice(position.currentPrice)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(position.initialValue)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(toWin)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="font-medium">
+                      {formatCurrency(position.currentValue)}
+                    </div>
+                    <div
+                      className={`text-xs flex items-center justify-end gap-0.5 ${
+                        isProfit ? "text-emerald-500" : "text-red-500"
+                      }`}
+                    >
+                      {isProfit ? (
+                        <ArrowUpRight className="h-3 w-3" />
+                      ) : (
+                        <ArrowDownRight className="h-3 w-3" />
+                      )}
+                      {formatCurrency(position.unrealizedPnl, true)} (
+                      {formatPercent(position.unrealizedPnlPercent)})
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="bg-sky-500 hover:bg-sky-600 text-white h-8"
+                    >
+                      <Link
+                        href={`/events/detail/${position.market.eventSlug}`}
+                      >
+                        Trade
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+          <TableFooter>
+            <TableRow className="bg-muted/30">
+              <TableCell className="font-semibold">
+                Total ({filteredPositions.length})
+              </TableCell>
+              <TableCell></TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(totalBet)}
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(totalToWin)}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="font-semibold">
+                  {formatCurrency(totalValue)}
+                </div>
+                <div
+                  className={`text-xs flex items-center justify-end gap-0.5 ${
+                    totalPnl >= 0 ? "text-emerald-500" : "text-red-500"
+                  }`}
+                >
+                  {totalPnl >= 0 ? (
+                    <ArrowUpRight className="h-3 w-3" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3" />
+                  )}
+                  {formatCurrency(totalPnl, true)} (
+                  {formatPercent(totalPnlPercent)})
+                </div>
+              </TableCell>
+              <TableCell></TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -463,9 +862,9 @@ function OrdersTable({
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+      <div className="p-4 sm:p-6 space-y-2">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -475,88 +874,221 @@ function OrdersTable({
     return (
       <EmptyState
         icon={ListOrdered}
-        title="No open orders found"
+        title="No open orders"
         description={
           searchQuery
             ? "Try a different search term"
-            : "Place limit orders to see them here"
+            : "Place limit orders on any market to see them here. Limit orders let you set your own price."
+        }
+        action={
+          !searchQuery ? { label: "Browse Markets", href: "/" } : undefined
         }
       />
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[35%] min-w-[180px]">Market</TableHead>
-            <TableHead className="text-center min-w-[60px]">Side</TableHead>
-            <TableHead className="text-center min-w-[80px]">Outcome</TableHead>
-            <TableHead className="text-right min-w-[70px]">Price</TableHead>
-            <TableHead className="text-right min-w-[90px]">Filled</TableHead>
-            <TableHead className="text-right min-w-[70px]">Total</TableHead>
-            <TableHead className="text-center min-w-[100px]">
-              Expiration
-            </TableHead>
-            <TableHead className="w-[50px]"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredOrders.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell>
-                <p className="font-medium text-sm truncate max-w-[250px]">
+    <>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3 p-4">
+        {filteredOrders.map((order) => (
+          <motion.div
+            key={order.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-background border border-border rounded-xl p-4 space-y-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm line-clamp-2 leading-tight">
                   {order.market?.question ||
                     `Token ${order.tokenId.slice(0, 8)}...`}
                 </p>
-              </TableCell>
-              <TableCell className="text-center">
-                <span
-                  className={`inline-flex text-xs font-medium px-2 py-1 rounded ${
-                    order.side === "BUY"
-                      ? "bg-emerald-500/15 text-emerald-500"
-                      : "bg-red-500/15 text-red-500"
-                  }`}
-                >
-                  {order.side}
-                </span>
-              </TableCell>
-              <TableCell className="text-center text-sm">
-                {order.market?.outcome || "-"}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatPrice(order.price)}
-              </TableCell>
-              <TableCell className="text-right text-sm text-muted-foreground">
-                {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatCurrency(order.size * order.price)}
-              </TableCell>
-              <TableCell className="text-center text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 mt-2">
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      order.side === "BUY"
+                        ? "bg-emerald-500/15 text-emerald-500"
+                        : "bg-red-500/15 text-red-500"
+                    }`}
+                  >
+                    {order.side}
+                  </span>
+                  {order.market?.outcome && (
+                    <span className="text-xs text-muted-foreground">
+                      {order.market.outcome}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onCancel(order.id)}
+                disabled={cancellingOrderId === order.id}
+                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 shrink-0"
+              >
+                {cancellingOrderId === order.id ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  Price
+                </p>
+                <p className="text-sm font-medium">
+                  {formatPrice(order.price)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  Filled
+                </p>
+                <p className="text-sm">
+                  {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  Total
+                </p>
+                <p className="text-sm font-medium">
+                  {formatCurrency(order.size * order.price)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
+              <span>
+                Expiration:{" "}
                 {order.expiration && order.expiration !== "0"
                   ? new Date(
                       parseInt(order.expiration, 10) * 1000,
                     ).toLocaleDateString()
-                  : "GTC"}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onCancel(order.id)}
-                  disabled={cancellingOrderId === order.id}
-                  className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TableCell>
+                  : "Good till cancelled"}
+              </span>
+              {/* Progress indicator */}
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${
+                      order.side === "BUY" ? "bg-emerald-500" : "bg-red-500"
+                    }`}
+                    style={{
+                      width: `${(order.filledSize / order.size) * 100}%`,
+                    }}
+                  />
+                </div>
+                <span>
+                  {((order.filledSize / order.size) * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b">
+              <TableHead className="w-[35%] min-w-[180px]">Market</TableHead>
+              <TableHead className="text-center min-w-[60px]">Side</TableHead>
+              <TableHead className="text-center min-w-[80px]">
+                Outcome
+              </TableHead>
+              <TableHead className="text-right min-w-[70px]">Price</TableHead>
+              <TableHead className="text-right min-w-[90px]">Filled</TableHead>
+              <TableHead className="text-right min-w-[70px]">Total</TableHead>
+              <TableHead className="text-center min-w-[100px]">
+                Expiration
+              </TableHead>
+              <TableHead className="w-[50px]"></TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {filteredOrders.map((order) => (
+              <TableRow
+                key={order.id}
+                className="hover:bg-muted/50 transition-colors"
+              >
+                <TableCell>
+                  <p className="font-medium text-sm truncate max-w-[250px]">
+                    {order.market?.question ||
+                      `Token ${order.tokenId.slice(0, 8)}...`}
+                  </p>
+                </TableCell>
+                <TableCell className="text-center">
+                  <span
+                    className={`inline-flex text-xs font-medium px-2 py-1 rounded ${
+                      order.side === "BUY"
+                        ? "bg-emerald-500/15 text-emerald-500"
+                        : "bg-red-500/15 text-red-500"
+                    }`}
+                  >
+                    {order.side}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center text-sm">
+                  {order.market?.outcome || "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatPrice(order.price)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          order.side === "BUY" ? "bg-emerald-500" : "bg-red-500"
+                        }`}
+                        style={{
+                          width: `${(order.filledSize / order.size) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {order.filledSize.toFixed(1)} / {order.size.toFixed(1)}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatCurrency(order.size * order.price)}
+                </TableCell>
+                <TableCell className="text-center text-sm text-muted-foreground">
+                  {order.expiration && order.expiration !== "0"
+                    ? new Date(
+                        parseInt(order.expiration, 10) * 1000,
+                      ).toLocaleDateString()
+                    : "GTC"}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onCancel(order.id)}
+                    disabled={cancellingOrderId === order.id}
+                    className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                  >
+                    {cancellingOrderId === order.id ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -650,9 +1182,9 @@ function HistoryTable({
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+      <div className="p-4 sm:p-6 space-y-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -662,59 +1194,76 @@ function HistoryTable({
     return (
       <EmptyState
         icon={History}
-        title="No history found"
+        title="No trading history"
         description={
           searchQuery
             ? "Try a different search term"
-            : "Your trading history will appear here"
+            : "Your trades, deposits, and withdrawals will appear here once you start trading"
+        }
+        action={
+          !searchQuery ? { label: "Start Trading", href: "/" } : undefined
         }
       />
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[120px] min-w-[100px]">Activity</TableHead>
-            <TableHead className="min-w-[200px]">Market</TableHead>
-            <TableHead className="text-right w-[100px] min-w-[80px]">
-              Value
-            </TableHead>
-            <TableHead className="text-right w-[120px] min-w-[100px]">
-              Time
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredTrades.map((trade) => {
-            const activityInfo = getActivityInfo(
-              trade.type,
-              trade.side,
-              trade.usdcAmount,
-            );
-            const ActivityIcon = activityInfo.icon;
-            const isBuy = trade.side === "BUY";
-            const isRedeem = trade.type === "REDEEM";
+    <>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3 p-4">
+        {filteredTrades.map((trade) => {
+          const activityInfo = getActivityInfo(
+            trade.type,
+            trade.side,
+            trade.usdcAmount,
+          );
+          const ActivityIcon = activityInfo.icon;
+          const isBuy = trade.side === "BUY";
+          const isRedeem = trade.type === "REDEEM";
 
-            return (
-              <TableRow key={trade.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${activityInfo.color}`}
-                    >
-                      <ActivityIcon className="h-3.5 w-3.5" />
+          return (
+            <motion.div
+              key={trade.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-background border border-border rounded-xl p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${activityInfo.color}`}
+                >
+                  <ActivityIcon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm">
+                        {activityInfo.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {timeAgo(trade.timestamp)}
+                      </p>
                     </div>
-                    <span className="text-sm font-medium">
-                      {activityInfo.label}
-                    </span>
+                    <div className="text-right shrink-0">
+                      <p
+                        className={`font-semibold ${
+                          isBuy
+                            ? "text-red-500"
+                            : trade.usdcAmount > 0
+                              ? "text-emerald-500"
+                              : "text-muted-foreground"
+                        }`}
+                      >
+                        {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
+                        {trade.usdcAmount > 0
+                          ? formatCurrency(trade.usdcAmount)
+                          : "-"}
+                      </p>
+                    </div>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                    <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-muted shrink-0">
                       {trade.market.icon ? (
                         <Image
                           src={trade.market.icon}
@@ -724,14 +1273,12 @@ function HistoryTable({
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate max-w-[300px]">
-                        {trade.market.title}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{trade.market.title}</p>
                       {!isRedeem && (
                         <p className="text-xs text-muted-foreground">
                           <span
@@ -743,55 +1290,153 @@ function HistoryTable({
                           >
                             {trade.outcome} {formatPrice(trade.price)}
                           </span>
-                          <span className="mx-1.5">·</span>
+                          <span className="mx-1">·</span>
                           {trade.size.toFixed(1)} shares
                         </p>
                       )}
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span
-                    className={`font-medium ${
-                      isBuy
-                        ? "text-red-500"
-                        : trade.usdcAmount > 0
-                          ? "text-emerald-500"
-                          : "text-muted-foreground"
-                    }`}
-                  >
-                    {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
-                    {trade.usdcAmount > 0
-                      ? formatCurrency(trade.usdcAmount)
-                      : "-"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {timeAgo(trade.timestamp)}
-                    </span>
                     <a
                       href={`https://polygonscan.com/tx/${trade.transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <ExternalLink className="h-4 w-4" />
                     </a>
                   </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b">
+              <TableHead className="w-[120px] min-w-[100px]">
+                Activity
+              </TableHead>
+              <TableHead className="min-w-[200px]">Market</TableHead>
+              <TableHead className="text-right w-[100px] min-w-[80px]">
+                Value
+              </TableHead>
+              <TableHead className="text-right w-[120px] min-w-[100px]">
+                Time
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredTrades.map((trade) => {
+              const activityInfo = getActivityInfo(
+                trade.type,
+                trade.side,
+                trade.usdcAmount,
+              );
+              const ActivityIcon = activityInfo.icon;
+              const isBuy = trade.side === "BUY";
+              const isRedeem = trade.type === "REDEEM";
+
+              return (
+                <TableRow
+                  key={trade.id}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${activityInfo.color}`}
+                      >
+                        <ActivityIcon className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-sm font-medium">
+                        {activityInfo.label}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+                        {trade.market.icon ? (
+                          <Image
+                            src={trade.market.icon}
+                            alt={trade.market.title}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate max-w-[300px]">
+                          {trade.market.title}
+                        </p>
+                        {!isRedeem && (
+                          <p className="text-xs text-muted-foreground">
+                            <span
+                              className={
+                                trade.outcome === "Yes"
+                                  ? "text-emerald-500"
+                                  : "text-red-500"
+                              }
+                            >
+                              {trade.outcome} {formatPrice(trade.price)}
+                            </span>
+                            <span className="mx-1.5">·</span>
+                            {trade.size.toFixed(1)} shares
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span
+                      className={`font-medium ${
+                        isBuy
+                          ? "text-red-500"
+                          : trade.usdcAmount > 0
+                            ? "text-emerald-500"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
+                      {trade.usdcAmount > 0
+                        ? formatCurrency(trade.usdcAmount)
+                        : "-"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {timeAgo(trade.timestamp)}
+                      </span>
+                      <a
+                        href={`https://polygonscan.com/tx/${trade.transactionHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
 // ============================================================================
-// Stats Card
+// Stats Card - Enhanced
 // ============================================================================
 
 function StatCard({
@@ -799,19 +1444,68 @@ function StatCard({
   value,
   isLoading,
   valueClassName,
+  trend,
+  isHighlighted = false,
+  icon: Icon,
 }: {
   label: string;
   value: string;
   isLoading?: boolean;
   valueClassName?: string;
+  trend?: { value: number; isPositive: boolean };
+  isHighlighted?: boolean;
+  icon?: React.ElementType;
 }) {
   return (
-    <div className="bg-card rounded-xl p-4 border border-border">
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+    <div
+      className={`rounded-xl p-4 border transition-all ${
+        isHighlighted
+          ? "bg-linear-to-br from-violet-500/10 via-fuchsia-500/5 to-background border-violet-500/20 col-span-2 md:col-span-1"
+          : "bg-card border-border"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        {Icon && (
+          <div
+            className={`p-1 rounded-md ${
+              isHighlighted ? "bg-violet-500/10" : "bg-muted"
+            }`}
+          >
+            <Icon
+              className={`h-3.5 w-3.5 ${
+                isHighlighted ? "text-violet-500" : "text-muted-foreground"
+              }`}
+            />
+          </div>
+        )}
+      </div>
       {isLoading ? (
-        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-7 w-24" />
       ) : (
-        <p className={`text-xl font-bold ${valueClassName || ""}`}>{value}</p>
+        <div className="flex items-baseline gap-2">
+          <p
+            className={`text-xl sm:text-2xl font-bold ${valueClassName || ""}`}
+          >
+            {value}
+          </p>
+          {trend && (
+            <span
+              className={`text-xs font-medium flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${
+                trend.isPositive
+                  ? "text-emerald-500 bg-emerald-500/10"
+                  : "text-red-500 bg-red-500/10"
+              }`}
+            >
+              {trend.isPositive ? (
+                <ArrowUpRight className="h-3 w-3" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" />
+              )}
+              {formatPercent(Math.abs(trend.value))}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -827,6 +1521,11 @@ export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<TabType>("positions");
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Sorting & Filtering state
+  const [sortField, setSortField] = useState<SortField>("value");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [pnlFilter, setPnlFilter] = useState<PnLFilter>("all");
 
   // Proxy wallet data
   const {
@@ -902,11 +1601,27 @@ export default function PortfolioPage() {
     });
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
   // Computed values
   const openPositionsValue = positionsData?.summary.totalValue ?? 0;
   const cashBalance = proxyUsdcBalance ?? 0;
   const portfolioValue = openPositionsValue + cashBalance;
   const totalPnl = userDetailsData?.details?.pnl || pnlData?.pnl.total || 0;
+  // Calculate total invested from positions
+  const totalInvested = useMemo(() => {
+    return (
+      positionsData?.positions?.reduce((sum, p) => sum + p.initialValue, 0) ?? 0
+    );
+  }, [positionsData?.positions]);
+  const pnlPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
 
   // Not connected state
   if (!isConnected) {
@@ -986,22 +1701,32 @@ export default function PortfolioPage() {
             label="Portfolio Value"
             value={formatCurrency(portfolioValue)}
             isLoading={loadingPositions || isProxyLoading}
+            isHighlighted={true}
+            icon={Wallet}
           />
           <StatCard
             label="Open Positions"
             value={formatCurrency(openPositionsValue)}
             isLoading={loadingPositions}
+            icon={LayoutGrid}
           />
           <StatCard
-            label="Cash"
+            label="Cash Balance"
             value={formatCurrency(cashBalance)}
             isLoading={isProxyLoading}
+            icon={BarChart3}
           />
           <StatCard
             label="Total P&L"
             value={formatCurrency(totalPnl, true)}
             isLoading={loadingPnl || loadingUserDetails}
             valueClassName={totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}
+            trend={
+              totalInvested > 0
+                ? { value: pnlPercent, isPositive: totalPnl >= 0 }
+                : undefined
+            }
+            icon={TrendingUp}
           />
         </div>
 
@@ -1023,12 +1748,21 @@ export default function PortfolioPage() {
             orderCount={ordersData?.count}
           />
 
-          {/* Search Bar */}
+          {/* Search Bar with Filters */}
           <div className="p-4 border-b border-border">
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search"
+              placeholder={`Search ${
+                activeTab === "positions"
+                  ? "markets"
+                  : activeTab === "orders"
+                    ? "orders"
+                    : "history"
+              }...`}
+              pnlFilter={pnlFilter}
+              onPnlFilterChange={setPnlFilter}
+              showFilter={activeTab === "positions"}
             />
           </div>
 
@@ -1045,6 +1779,10 @@ export default function PortfolioPage() {
                   positions={positionsData?.positions || []}
                   isLoading={loadingPositions}
                   searchQuery={searchQuery}
+                  pnlFilter={pnlFilter}
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
                 />
               </motion.div>
             )}
