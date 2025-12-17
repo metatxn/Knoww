@@ -12,7 +12,15 @@ interface PaginatedEvent {
   closed?: boolean;
   archived?: boolean;
   volume?: string;
-  liquidity?: string;
+  volume24hr?: number | string;
+  volume1wk?: number | string;
+  volume1mo?: number | string;
+  volume1yr?: number | string;
+  liquidity?: number | string;
+  liquidityClob?: number | string;
+  competitive?: number;
+  live?: boolean;
+  ended?: boolean;
   markets?: Array<{
     id: string;
     question: string;
@@ -33,14 +41,32 @@ interface PaginatedEventsResponse {
   error?: string;
 }
 
+// Server-side filter parameters
+export interface EventFilterParams {
+  volume24hrMin?: number | null;
+  volumeWeeklyMin?: number | null;
+  liquidityMin?: number | null;
+  competitiveMin?: number | null;
+  competitiveMax?: number | null;
+  live?: boolean;
+  ended?: boolean;
+  // Date filters (ISO string format)
+  startDateFrom?: string | null;
+  startDateTo?: string | null;
+  endDateFrom?: string | null;
+  endDateTo?: string | null;
+}
+
 interface UsePaginatedEventsParams {
-  tagSlug?: string; // Now optional
+  tagSlug?: string;
   limit?: number;
   active?: boolean;
   archived?: boolean;
   closed?: boolean;
   order?: string;
   ascending?: boolean;
+  // Server-side filters
+  filters?: EventFilterParams;
 }
 
 export function usePaginatedEvents({
@@ -51,6 +77,7 @@ export function usePaginatedEvents({
   closed = false,
   order = "volume24hr",
   ascending = false,
+  filters,
 }: UsePaginatedEventsParams = {}) {
   return useInfiniteQuery({
     queryKey: [
@@ -63,6 +90,18 @@ export function usePaginatedEvents({
       closed,
       order,
       ascending,
+      // Include filters in query key for proper cache invalidation
+      filters?.volume24hrMin ?? null,
+      filters?.volumeWeeklyMin ?? null,
+      filters?.liquidityMin ?? null,
+      filters?.competitiveMin ?? null,
+      filters?.competitiveMax ?? null,
+      filters?.live ?? null,
+      filters?.ended ?? null,
+      filters?.startDateFrom ?? null,
+      filters?.startDateTo ?? null,
+      filters?.endDateFrom ?? null,
+      filters?.endDateTo ?? null,
     ],
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams({
@@ -75,9 +114,52 @@ export function usePaginatedEvents({
         ascending: ascending.toString(),
       });
 
-      // Only add tag_slug if provided
+      // Add tag filter
       if (tagSlug) {
         params.set("tag_slug", tagSlug);
+      }
+
+      // Add server-side filters
+      if (filters?.volume24hrMin) {
+        params.set("volume24hr_min", filters.volume24hrMin.toString());
+      }
+      if (filters?.volumeWeeklyMin) {
+        params.set("volume1wk_min", filters.volumeWeeklyMin.toString());
+      }
+      if (filters?.liquidityMin) {
+        params.set("liquidity_min", filters.liquidityMin.toString());
+      }
+      if (
+        filters?.competitiveMin !== undefined &&
+        filters?.competitiveMin !== null
+      ) {
+        params.set("competitive_min", filters.competitiveMin.toString());
+      }
+      if (
+        filters?.competitiveMax !== undefined &&
+        filters?.competitiveMax !== null
+      ) {
+        params.set("competitive_max", filters.competitiveMax.toString());
+      }
+      if (filters?.live) {
+        params.set("live", "true");
+      }
+      if (filters?.ended) {
+        params.set("ended", "true");
+      }
+
+      // Date filters
+      if (filters?.startDateFrom) {
+        params.set("start_date_min", filters.startDateFrom);
+      }
+      if (filters?.startDateTo) {
+        params.set("start_date_max", filters.startDateTo);
+      }
+      if (filters?.endDateFrom) {
+        params.set("end_date_min", filters.endDateFrom);
+      }
+      if (filters?.endDateTo) {
+        params.set("end_date_max", filters.endDateTo);
       }
 
       const response = await fetch(

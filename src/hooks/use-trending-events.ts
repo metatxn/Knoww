@@ -11,12 +11,21 @@ interface TrendingEvent {
   active?: boolean;
   closed?: boolean;
   volume?: string;
-  liquidity?: string;
+  volume24hr?: number | string;
+  volume1wk?: number | string;
+  volume1mo?: number | string;
+  volume1yr?: number | string;
+  liquidity?: number | string;
+  liquidityClob?: number | string;
+  competitive?: number;
+  live?: boolean;
+  ended?: boolean;
   markets?: Array<{
     id: string;
     question: string;
     slug?: string;
   }>;
+  tags?: Array<string | { id?: string; slug?: string; label?: string }>;
   negRisk?: boolean;
   enableNegRisk?: boolean;
   negRiskAugmented?: boolean;

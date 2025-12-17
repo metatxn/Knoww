@@ -21,10 +21,20 @@ interface EventCardProps {
     volume?: string;
     volume24hr?: number | string;
     volume1wk?: number | string;
+    volume1mo?: number | string;
+    volume1yr?: number | string;
+    liquidity?: number | string;
+    liquidityClob?: number | string;
+    competitive?: number;
+    live?: boolean;
+    ended?: boolean;
     active?: boolean;
     closed?: boolean;
     negRisk?: boolean;
+    startDate?: string;
+    endDate?: string;
     markets?: Array<{ id: string; question: string }>;
+    tags?: Array<string | { id?: string; slug?: string; label?: string }>;
   };
   index?: number;
 }
@@ -46,8 +56,8 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
   const href = event.slug
     ? `/events/detail/${event.slug}`
     : event.id
-    ? `/events/detail/${event.id}`
-    : "#";
+      ? `/events/detail/${event.id}`
+      : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
 

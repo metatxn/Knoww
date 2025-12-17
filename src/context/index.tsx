@@ -8,8 +8,22 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { type Config, cookieToInitialState, WagmiProvider } from "wagmi";
 import { networks, projectId, wagmiAdapter } from "@/config";
+import { AccentColorProvider } from "@/context/color-theme-context";
+import { EventFilterProvider } from "@/context/event-filter-context";
 import { OnboardingProvider } from "@/context/onboarding-context";
 import { SidebarProvider } from "@/context/sidebar-context";
+
+// All available themes for next-themes
+const ALL_THEMES = [
+  "light",
+  "dark",
+  "midnight",
+  "ocean",
+  "slate",
+  "sunset",
+  "forest",
+  "lavender",
+];
 
 // Set up queryClient with default options
 const queryClient = new QueryClient({
@@ -69,13 +83,17 @@ function ContextProvider({
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          themes={ALL_THEMES}
           disableTransitionOnChange
         >
-          <SidebarProvider>
-            <OnboardingProvider>{children}</OnboardingProvider>
-          </SidebarProvider>
+          <AccentColorProvider>
+            <SidebarProvider>
+              <EventFilterProvider>
+                <OnboardingProvider>{children}</OnboardingProvider>
+              </EventFilterProvider>
+            </SidebarProvider>
+          </AccentColorProvider>
           <ReactQueryDevtools initialIsOpen={false} />
         </ThemeProvider>
       </QueryClientProvider>

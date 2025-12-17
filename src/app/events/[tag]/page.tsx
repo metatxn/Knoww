@@ -1,10 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ChevronLeft, Loader2, RefreshCw } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, Sparkles, Star } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { EventCard } from "@/components/event-card";
+import { EventFilterBar } from "@/components/event-filter-bar";
+import { MarketSearch } from "@/components/market-search";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Button } from "@/components/ui/button";
@@ -15,14 +17,24 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEventFilters } from "@/context/event-filter-context";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
 import { useTagDetails } from "@/hooks/use-tag-details";
+
+// Event interface for client-side date filtering
+interface EventWithDates {
+  id: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 export default function TagEventsPage() {
   const router = useRouter();
   const params = useParams();
-
   const tagSlug = params?.tag as string;
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Fetch tag details for display name
   const {
@@ -31,29 +43,56 @@ export default function TagEventsPage() {
     error: tagError,
   } = useTagDetails(tagSlug);
 
-  // Fetch paginated events using tag_slug
+  // Get filter context with server-side filter params
+  const { filters, hasActiveFilters, serverFilterParams, apiQueryParams } =
+    useEventFilters();
+
+  // Client-side date filter as fallback
+  const applyDateFilter = useCallback(
+    <T extends EventWithDates>(events: T[]): T[] => {
+      if (!filters.dateRange.start && !filters.dateRange.end) {
+        return events;
+      }
+
+      return events.filter((event) => {
+        const eventStartDate = event.startDate
+          ? new Date(event.startDate)
+          : null;
+        const eventEndDate = event.endDate ? new Date(event.endDate) : null;
+
+        if (filters.dateRange.start && eventEndDate) {
+          if (eventEndDate < filters.dateRange.start) return false;
+        }
+
+        if (filters.dateRange.end && eventStartDate) {
+          if (eventStartDate > filters.dateRange.end) return false;
+        }
+
+        return true;
+      });
+    },
+    [filters.dateRange],
+  );
+
+  // Fetch paginated events for this category
   const {
-    data,
+    data: allPaginatedData,
     isLoading: loadingEvents,
     error: eventsError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    refetch,
   } = usePaginatedEvents({
     tagSlug,
     limit: 20,
-    active: true,
-    archived: false,
-    closed: false,
     order: "volume24hr",
     ascending: false,
+    active: apiQueryParams.active,
+    closed: apiQueryParams.closed,
+    filters: serverFilterParams,
   });
 
-  // Reference for infinite scroll observer
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // Infinite scroll: auto-load more when reaching bottom
+  // Infinite scroll
   useEffect(() => {
     if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
 
@@ -63,20 +102,22 @@ export default function TagEventsPage() {
           fetchNextPage();
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0.1, rootMargin: "100px" },
     );
 
     observer.observe(loadMoreRef.current);
-
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Flatten all pages into a single events array
-  const events = data?.pages.flatMap((page) => page.events) || [];
-  const error = tagError?.message || eventsError?.message;
-  const isLoading = loadingTag || loadingEvents;
+  // Get events with date filter applied
+  const allEvents =
+    allPaginatedData?.pages.flatMap((page) => page.events) || [];
+  const events = applyDateFilter(allEvents);
 
-  // Format tag name for display - capitalize first letter of each word
+  const isLoading = loadingTag || loadingEvents;
+  const error = tagError?.message || eventsError?.message;
+
+  // Format tag name for display
   const formatTagLabel = (label: string) => {
     return label
       .split(" ")
@@ -96,197 +137,177 @@ export default function TagEventsPage() {
 
       <Navbar />
 
-      <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+      <main className="relative z-10 px-3 sm:px-4 md:px-6 lg:px-8 pt-6 pb-8">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <button
             type="button"
             onClick={() => router.push("/")}
             className="flex items-center gap-1 hover:text-foreground transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span>All Markets</span>
+            <span>Explore Markets</span>
           </button>
           <span>/</span>
           <span className="text-foreground font-medium">{tagLabel}</span>
         </div>
 
-        {/* Header Row */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                  Live
-                </span>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                {tagLabel}
-              </h1>
+        {/* Header Row: Live Badge + Title + Search + Market Count */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-start justify-between gap-4 mb-6"
+        >
+          {/* Left: Live Badge + Title */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 w-fit">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                Live Markets
+              </span>
             </div>
-            <p className="text-muted-foreground">
-              Browse live prediction markets for {tagLabel.toLowerCase()}
-            </p>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              {tagLabel}
+            </h1>
             {tagDetails?.description && (
-              <p className="text-sm text-muted-foreground/80 max-w-2xl">
+              <p className="text-sm text-muted-foreground max-w-xl">
                 {tagDetails.description}
               </p>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="gap-2"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Refresh
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats Bar */}
-        {!isLoading && !error && events.length > 0 && (
-          <div className="flex items-center gap-4 py-3 px-4 rounded-xl bg-card/60 dark:bg-card/40 backdrop-blur-sm border border-border/40 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-violet-600 to-purple-600 dark:from-violet-400 dark:to-purple-400">
-                {events.length}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                active market{events.length !== 1 ? "s" : ""}
-              </span>
+          {/* Right: Search + Market Count */}
+          <div className="flex items-center gap-3 shrink-0">
+            <MarketSearch className="hidden sm:block w-56" />
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-sm">
+              <span className="font-bold text-foreground">{events.length}</span>
+              <span className="text-muted-foreground">active markets</span>
             </div>
           </div>
-        )}
+        </motion.div>
 
-        {/* Error State */}
-        {error && (
-          <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="text-destructive">
-                Error Loading Events
-              </CardTitle>
-              <CardDescription>{error}</CardDescription>
-            </CardHeader>
-          </Card>
-        )}
+        {/* Filter Bar */}
+        <EventFilterBar />
 
-        {/* Loading State */}
-        {isLoading && !error && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-            {[...Array(10)].map((_, i) => (
-              <div
-                key={`skeleton-${i}`}
-                className="rounded-2xl bg-card border border-border/50 overflow-hidden"
-              >
-                <Skeleton className="aspect-16/10 w-full" />
-                <div className="p-4 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Events List */}
-        {!isLoading && !error && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-              {events.map(
-                (
-                  event: {
-                    id: string;
-                    slug?: string;
-                    title: string;
-                    description?: string;
-                    image?: string;
-                    volume?: string;
-                    active?: boolean;
-                    closed?: boolean;
-                    negRisk?: boolean;
-                    markets?: Array<{ id: string; question: string }>;
-                  },
-                  index: number,
-                ) => (
-                  <EventCard
-                    key={`${event.id}-${index}`}
-                    event={event}
-                    index={index}
-                  />
-                ),
-              )}
-            </div>
-
-            {events.length === 0 && (
-              <Card className="text-center py-12">
+        {/* Events Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Error State */}
+            {error && (
+              <Card className="border-destructive/50 bg-destructive/5 backdrop-blur-sm mb-6">
                 <CardHeader>
-                  <CardTitle>No Events Found</CardTitle>
-                  <CardDescription>
-                    No active events found for this category at the moment.
-                  </CardDescription>
-                  <div className="mt-4">
-                    <Button onClick={() => router.push("/")}>
-                      Explore Other Categories
-                    </Button>
-                  </div>
+                  <CardTitle className="text-destructive flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    Oops! Something went wrong
+                  </CardTitle>
+                  <CardDescription>{error}</CardDescription>
                 </CardHeader>
               </Card>
             )}
 
-            {/* Loading skeleton for next page */}
-            {isFetchingNextPage && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mt-6"
-              >
-                {[...Array(5)].map((_, i) => (
+            {/* Loading State */}
+            {isLoading && !error && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                {[...Array(10)].map((_, i) => (
                   <motion.div
-                    key={`loading-skeleton-${i}`}
+                    key={`skeleton-${i}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="rounded-3xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden"
                   >
-                    <Card className="overflow-hidden">
-                      <CardHeader className="space-y-4">
-                        <Skeleton className="h-48 w-full rounded animate-pulse" />
-                        <div className="space-y-3">
-                          <Skeleton className="h-6 w-3/4 animate-pulse" />
-                          <Skeleton className="h-4 w-full animate-pulse" />
-                          <Skeleton className="h-4 w-5/6 animate-pulse" />
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                          <Skeleton className="h-6 w-16 rounded-full animate-pulse" />
-                          <Skeleton className="h-6 w-20 rounded-full animate-pulse" />
-                        </div>
-                        <Skeleton className="h-10 w-full rounded animate-pulse" />
-                      </CardHeader>
-                    </Card>
+                    <Skeleton className="aspect-16/10 w-full bg-muted/50" />
+                    <div className="p-5 space-y-4">
+                      <Skeleton className="h-6 w-4/5 rounded-xl bg-muted/50" />
+                      <Skeleton className="h-4 w-full rounded-lg bg-muted/30" />
+                      <Skeleton className="h-4 w-2/3 rounded-lg bg-muted/30" />
+                    </div>
                   </motion.div>
                 ))}
-              </motion.div>
+              </div>
             )}
 
-            {/* Invisible trigger for infinite scroll */}
-            {hasNextPage && !isFetchingNextPage && (
-              <div ref={loadMoreRef} className="h-10 w-full" />
+            {/* Events Grid */}
+            {!isLoading && events.length > 0 && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                  {events.map((event, index) => (
+                    <EventCard
+                      key={`${event.id}-${index}`}
+                      event={event}
+                      index={index}
+                    />
+                  ))}
+                </div>
+
+                {/* Loading More */}
+                {isFetchingNextPage && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 mt-5">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={`loading-${i}`}
+                        className="rounded-3xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden animate-pulse"
+                      >
+                        <div className="aspect-16/10 w-full bg-muted/30" />
+                        <div className="p-5 space-y-4">
+                          <div className="h-6 w-4/5 rounded-xl bg-muted/30" />
+                          <div className="h-4 w-full rounded-lg bg-muted/20" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Infinite Scroll Trigger */}
+                {hasNextPage && !isFetchingNextPage && (
+                  <div ref={loadMoreRef} className="h-20 w-full" />
+                )}
+
+                {/* End of results message */}
+                {!hasNextPage && !isFetchingNextPage && events.length > 0 && (
+                  <div className="flex justify-center py-6">
+                    <p className="text-sm text-muted-foreground">
+                      {hasActiveFilters
+                        ? `Found ${events.length} markets matching your filters`
+                        : `Showing all ${events.length} markets`}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+
+            {/* Empty State */}
+            {!isLoading && events.length === 0 && !error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-20"
+              >
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-muted/50 mb-6">
+                  <Star className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">No Markets Found</h3>
+                <p className="text-muted-foreground mb-6">
+                  {hasActiveFilters
+                    ? "Try adjusting your filters to find more markets"
+                    : `No active markets in ${tagLabel} right now`}
+                </p>
+                <Button onClick={() => router.push("/")}>
+                  Explore All Markets
+                </Button>
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

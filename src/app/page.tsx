@@ -1,9 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, Clock, Flame, Sparkles, Star, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Activity, Flame, Sparkles, Star, Zap } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EventCard } from "@/components/event-card";
+import { EventFilterBar } from "@/components/event-filter-bar";
+import { MarketSearch } from "@/components/market-search";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Button } from "@/components/ui/button";
@@ -14,20 +16,30 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEventFilters } from "@/context/event-filter-context";
 import { useBreakingEvents } from "@/hooks/use-breaking-events";
 import { useNewEvents } from "@/hooks/use-new-events";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
 import { useTags } from "@/hooks/use-tags";
 import { useTrendingEvents } from "@/hooks/use-trending-events";
 
-// Quick access categories with emojis for GenZ vibes
-const QUICK_CATEGORIES = [
-  { label: "🔥 Trending", slug: "trending", icon: Flame, emoji: "🔥" },
-  { label: "⚡ Breaking", slug: "breaking", icon: Sparkles, emoji: "⚡" },
-  { label: "✨ New", slug: "new", icon: Clock, emoji: "✨" },
+// Tab categories
+const TAB_CATEGORIES = [
+  { label: "All", slug: "categories", icon: Activity },
+  { label: "Trending", slug: "trending", icon: Flame },
+  { label: "Breaking", slug: "breaking", icon: Zap },
+  { label: "New", slug: "new", icon: Sparkles },
 ];
 
 type ViewMode = "categories" | "trending" | "breaking" | "new";
+
+// Event interface for client-side date filtering (fallback if API doesn't support date filters)
+interface EventWithDates {
+  id: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>("categories");
@@ -52,6 +64,46 @@ export default function Home() {
   // Tags available for category filtering if needed
   const { data: _tags, error: _tagsError } = useTags();
 
+  // Get filter context with server-side filter params
+  const {
+    filters,
+    hasActiveFilters,
+    clearAllFilters,
+    serverFilterParams,
+    apiQueryParams,
+  } = useEventFilters();
+
+  // Client-side date filter as fallback (in case API doesn't support date filtering)
+  const applyDateFilter = useCallback(
+    <T extends EventWithDates>(events: T[]): T[] => {
+      // Only apply client-side date filtering if date range is set
+      if (!filters.dateRange.start && !filters.dateRange.end) {
+        return events;
+      }
+
+      return events.filter((event) => {
+        const eventStartDate = event.startDate
+          ? new Date(event.startDate)
+          : null;
+        const eventEndDate = event.endDate ? new Date(event.endDate) : null;
+
+        // If filtering by start date: event must end after the filter start date
+        if (filters.dateRange.start && eventEndDate) {
+          if (eventEndDate < filters.dateRange.start) return false;
+        }
+
+        // If filtering by end date: event must start before the filter end date
+        if (filters.dateRange.end && eventStartDate) {
+          if (eventStartDate > filters.dateRange.end) return false;
+        }
+
+        return true;
+      });
+    },
+    [filters.dateRange],
+  );
+
+  // Use server-side filtering for paginated events
   const {
     data: allPaginatedData,
     isLoading: loadingAllPaginated,
@@ -63,6 +115,10 @@ export default function Home() {
     limit: 20,
     order: "volume24hr",
     ascending: false,
+    active: apiQueryParams.active,
+    closed: apiQueryParams.closed,
+    tagSlug: apiQueryParams.tagSlug,
+    filters: serverFilterParams,
   });
 
   const {
@@ -92,6 +148,7 @@ export default function Home() {
     isFetchingNextPage: isFetchingNextBreaking,
   } = useBreakingEvents(15);
 
+  // Simple infinite scroll - server handles filtering now
   useEffect(() => {
     let hasMore = false;
     let isFetching = false;
@@ -155,13 +212,15 @@ export default function Home() {
     setViewMode(mode);
   };
 
+  // Get current events - server handles most filtering, client-side date filter as fallback
   const getCurrentEvents = () => {
     switch (viewMode) {
       case "categories": {
         const allEvents =
           allPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const filteredEvents = applyDateFilter(allEvents);
         return {
-          events: allEvents,
+          events: filteredEvents,
           isLoading: loadingAllPaginated,
           error: allPaginatedError,
           hasMore: hasNextAllPaginated,
@@ -172,13 +231,14 @@ export default function Home() {
       case "trending": {
         const trendingEvents =
           trendingPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const filteredEvents = applyDateFilter(trendingEvents);
         const totalTrending =
           trendingPaginatedData?.pages[0]?.totalResults ?? 0;
         const hasMoreTrending =
           (hasNextTrending ?? false) ||
           (totalTrending > 0 && trendingEvents.length < totalTrending);
         return {
-          events: trendingEvents,
+          events: filteredEvents,
           isLoading: loadingTrending,
           error: trendingError,
           hasMore: hasMoreTrending,
@@ -189,12 +249,13 @@ export default function Home() {
       case "new": {
         const newEvents =
           newPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const filteredEvents = applyDateFilter(newEvents);
         const totalNew = newPaginatedData?.pages[0]?.totalResults ?? 0;
         const hasMoreNew =
           (hasNextNew ?? false) ||
           (totalNew > 0 && newEvents.length < totalNew);
         return {
-          events: newEvents,
+          events: filteredEvents,
           isLoading: loadingNew,
           error: newError,
           hasMore: hasMoreNew,
@@ -205,13 +266,14 @@ export default function Home() {
       case "breaking": {
         const breakingEvents =
           breakingPaginatedData?.pages.flatMap((page) => page.events) || [];
+        const filteredEvents = applyDateFilter(breakingEvents);
         const totalBreaking =
           breakingPaginatedData?.pages[0]?.totalResults ?? 0;
         const hasMoreBreaking =
           (hasNextBreaking ?? false) ||
           (totalBreaking > 0 && breakingEvents.length < totalBreaking);
         return {
-          events: breakingEvents,
+          events: filteredEvents,
           isLoading: loadingBreaking,
           error: breakingError,
           hasMore: hasMoreBreaking,
@@ -233,20 +295,6 @@ export default function Home() {
 
   const currentData = getCurrentEvents();
 
-  // Get label for current view
-  const getViewLabel = () => {
-    switch (viewMode) {
-      case "trending":
-        return "🔥 Trending Markets";
-      case "breaking":
-        return "⚡ Breaking News";
-      case "new":
-        return "✨ Fresh Markets";
-      default:
-        return "🎯 All Markets";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
       <PageBackground />
@@ -254,106 +302,81 @@ export default function Home() {
       <Navbar />
 
       {/* Main Content */}
-      <main className="relative z-10 px-3 sm:px-4 md:px-6 lg:px-8 pt-4 pb-8">
-        {/* Compact Header Row */}
+      <main className="relative z-10 px-3 sm:px-4 md:px-6 lg:px-8 pt-6 pb-8">
+        {/* Header Row: Live Badge + Title + Market Count */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"
+          className="flex items-center justify-between mb-6"
         >
-          {/* Live Badge + Title */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="relative flex h-2 w-2">
+          {/* Left: Live Badge + Title */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 w-fit">
+              <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
               </span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Live
+                Live Markets
               </span>
             </div>
-            <motion.h1
-              key={viewMode}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="text-2xl sm:text-3xl font-black tracking-tight"
-            >
-              {getViewLabel()}
-            </motion.h1>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              Explore Markets
+            </h1>
           </div>
 
-          {/* Stats Pills */}
-          <div className="flex items-center gap-2">
-            <div className="px-3 py-1.5 rounded-full bg-white/80 dark:bg-card/50 backdrop-blur-sm border border-gray-200 dark:border-border/50 text-xs font-medium text-muted-foreground shadow-sm">
-              <span className="text-foreground font-bold">
+          {/* Right: Market Count */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-sm">
+              <span className="font-bold text-foreground">
                 {currentData.events.length}
-              </span>{" "}
-              markets loaded
+              </span>
+              <span className="text-muted-foreground">active markets</span>
             </div>
           </div>
         </motion.div>
 
-        {/* Category Pills - Horizontal Scroll */}
+        {/* Tab Pills Row + Search */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="mb-8 -mx-3 px-3 sm:mx-0 sm:px-0"
+          className="flex items-center justify-between gap-4 mb-2"
         >
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {/* All Markets */}
-            <button
-              type="button"
-              onClick={() => setViewMode("categories")}
-              className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm whitespace-nowrap transition-all duration-300 ${
-                viewMode === "categories"
-                  ? "bg-gray-900 dark:bg-foreground text-white dark:text-background shadow-lg scale-105"
-                  : "bg-white/80 dark:bg-card/60 hover:bg-white dark:hover:bg-card border border-gray-200 dark:border-border/50 hover:border-gray-300 dark:hover:border-border text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground shadow-sm"
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              All
-              {viewMode === "categories" && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 bg-gray-900 dark:bg-foreground rounded-2xl -z-10"
-                />
-              )}
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-border/50 mx-1" />
-
-            {/* Quick Categories */}
-            {QUICK_CATEGORIES.map((category) => {
-              const isActive = viewMode === category.slug;
+          {/* Tab Pills */}
+          <div className="flex items-center gap-1 bg-muted/30 rounded-full p-1">
+            {TAB_CATEGORIES.map((tab) => {
+              const isActive = viewMode === tab.slug;
+              const Icon = tab.icon;
               return (
                 <button
                   type="button"
-                  key={category.slug}
+                  key={tab.slug}
                   onClick={() =>
-                    handleQuickCategoryClick(category.slug as ViewMode)
+                    tab.slug === "categories"
+                      ? setViewMode("categories")
+                      : handleQuickCategoryClick(tab.slug as ViewMode)
                   }
-                  className={`group relative flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-bold text-sm whitespace-nowrap transition-all duration-300 ${
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
                     isActive
-                      ? "bg-gray-900 dark:bg-foreground text-white dark:text-background shadow-lg scale-105"
-                      : "bg-white/80 dark:bg-card/60 hover:bg-white dark:hover:bg-card border border-gray-200 dark:border-border/50 hover:border-gray-300 dark:hover:border-border text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground shadow-sm"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <span className="text-base">{category.emoji}</span>
-                  {category.label.split(" ")[1]}
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 bg-gray-900 dark:bg-foreground rounded-2xl -z-10"
-                    />
-                  )}
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
                 </button>
               );
             })}
           </div>
+
+          {/* Search Input */}
+          <MarketSearch className="hidden sm:block w-64" />
         </motion.div>
+
+        {/* Filter Bar */}
+        <EventFilterBar />
 
         {/* Events Content */}
         <AnimatePresence mode="wait">
@@ -436,6 +459,19 @@ export default function Home() {
                 {currentData.hasMore && !currentData.isFetchingMore && (
                   <div ref={loadMoreRef} className="h-20 w-full" />
                 )}
+
+                {/* End of results message */}
+                {!currentData.hasMore &&
+                  !currentData.isFetchingMore &&
+                  currentData.events.length > 0 && (
+                    <div className="flex justify-center py-6">
+                      <p className="text-sm text-muted-foreground">
+                        {hasActiveFilters
+                          ? `Found ${currentData.events.length} markets matching your filters`
+                          : `Showing all ${currentData.events.length} markets`}
+                      </p>
+                    </div>
+                  )}
               </>
             )}
 
@@ -451,11 +487,25 @@ export default function Home() {
                   <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-muted/50 mb-6">
                     <Star className="h-10 w-10 text-muted-foreground" />
                   </div>
-                  <h3 className="text-2xl font-black mb-2">No Markets Found</h3>
+                  <h3 className="text-2xl font-black mb-2">
+                    {hasActiveFilters
+                      ? "No Matching Markets"
+                      : "No Markets Found"}
+                  </h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    Looks like there are no {viewMode} markets right now. Check
-                    back soon or explore other categories!
+                    {hasActiveFilters
+                      ? "No markets match your current filters. Try adjusting or clearing your filters."
+                      : `Looks like there are no ${viewMode} markets right now. Check back soon or explore other categories!`}
                   </p>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      onClick={clearAllFilters}
+                      className="mt-4 rounded-xl"
+                    >
+                      Clear All Filters
+                    </Button>
+                  )}
                 </motion.div>
               )}
           </motion.div>

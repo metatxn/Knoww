@@ -5,16 +5,15 @@ import {
   ArrowDownToLine,
   ChevronDown,
   LogOut,
-  Menu,
   Rocket,
   User,
   Wallet,
-  X,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
+import { SidebarMobile } from "@/components/sidebar-mobile";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,29 +28,12 @@ import {
 import { useOnboarding } from "@/context/onboarding-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 
-const navLinks = [
-  { label: "Politics", href: "/events/politics" },
-  { label: "Sports", href: "/events/sports" },
-  { label: "Finance", href: "/events/finance" },
-  { label: "Crypto", href: "/events/crypto" },
-  { label: "Geopolitics", href: "/events/geopolitics" },
-  { label: "Earnings", href: "/events/earnings" },
-  { label: "Tech", href: "/events/tech" },
-  { label: "Culture", href: "/events/pop-culture" },
-  { label: "World", href: "/events/world" },
-  { label: "Economy", href: "/events/economy" },
-  { label: "Elections", href: "/events/elections" },
-  { label: "Mentions", href: "/events/mention-markets" },
-];
-
 export function Navbar() {
   const router = useRouter();
-  const pathname = usePathname();
   const { address, isConnected, chain } = useConnection();
   const disconnect = useDisconnect();
   const { data: balance } = useBalance({ address });
   const { open } = useAppKit();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
 
   // Use the global onboarding context
@@ -59,12 +41,6 @@ export function Navbar() {
 
   // Proxy wallet for deposit functionality
   const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
-
-  // Close mobile menu when route changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname dependency is intentional to close menu on navigation
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -84,21 +60,22 @@ export function Navbar() {
   return (
     <nav className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       {/* Main Navbar - Mobile Only */}
-      <div className="flex h-16 items-center px-4 md:px-6">
-        {/* Logo */}
-        <div className="flex items-center gap-6 mr-6">
+      <div className="flex h-14 items-center px-4 md:px-6">
+        {/* Mobile Sidebar Trigger + Logo */}
+        <div className="flex items-center gap-2">
+          <SidebarMobile />
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity"
           >
-            <span className="text-2xl">📊</span>
-            <span className="hidden sm:inline">Polycaster</span>
+            <span className="text-xl">📊</span>
+            <span>Polycaster</span>
           </button>
         </div>
 
         {/* Right Side - Theme Toggle, Wallet Info & Actions */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
           {/* Theme Toggle */}
           <ThemeToggle />
 
@@ -201,93 +178,8 @@ export function Navbar() {
               Connect Wallet
             </Button>
           )}
-
-          {/* Mobile Menu Toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 hover:bg-muted rounded-md"
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </button>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="border-t bg-background">
-          <div className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            {/* Setup Trading Account - Mobile */}
-            {needsTradingSetup && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowOnboarding(true);
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-linear-to-r from-purple-600/10 to-blue-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-              >
-                <Rocket className="inline mr-2 h-4 w-4" />
-                Setup Trading Account
-              </button>
-            )}
-
-            {/* Deposit Funds - Mobile */}
-            {hasProxyWallet && proxyAddress && !needsTradingSetup && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDepositModal(true);
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors bg-linear-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-              >
-                <ArrowDownToLine className="inline mr-2 h-4 w-4" />
-                Deposit Funds
-              </button>
-            )}
-
-            {/* Home link */}
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                pathname === "/"
-                  ? "text-foreground bg-muted"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-            >
-              All Markets
-            </button>
-
-            {/* Category links */}
-            {navLinks.map((link) => {
-              const isActive =
-                pathname === link.href ||
-                (link.href !== "/" && pathname?.startsWith(link.href));
-
-              return (
-                <button
-                  type="button"
-                  key={link.href}
-                  onClick={() => router.push(link.href)}
-                  className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? "text-foreground bg-muted"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {link.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Deposit Modal */}
       <DepositModal
