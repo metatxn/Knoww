@@ -107,7 +107,7 @@ function isPriceCrossingBook(
   price: number,
   side: "BUY" | "SELL",
   bestBid?: number,
-  bestAsk?: number,
+  bestAsk?: number
 ): { isCrossing: boolean; percentAbove?: number } {
   if (side === "BUY" && bestAsk !== undefined) {
     // For BUY orders, check if price is significantly above best ask
@@ -211,7 +211,7 @@ export function TradingForm({
   // Check if the selected outcome has a valid CLOB token ID
   // CLOB token IDs are long numeric strings (typically 70+ characters)
   const hasValidTokenId = Boolean(
-    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10,
+    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10
   );
 
   // Update limit price when outcome changes
@@ -364,7 +364,7 @@ export function TradingForm({
         return Math.max(tickSize, Math.min(1 - tickSize, newPrice));
       });
     },
-    [tickSize],
+    [tickSize]
   );
 
   // Handle shares change with bounds
@@ -372,7 +372,7 @@ export function TradingForm({
     (delta: number) => {
       setShares((prev) => Math.max(minShares, prev + delta));
     },
-    [minShares],
+    [minShares]
   );
 
   // If user switches to a market with a higher minimum, clamp shares up
@@ -424,8 +424,8 @@ export function TradingForm({
             ? ClobOrderType.FAK // Partial fill allowed
             : ClobOrderType.FOK // Must fill entirely
           : isGTD
-            ? ClobOrderType.GTD
-            : ClobOrderType.GTC;
+          ? ClobOrderType.GTD
+          : ClobOrderType.GTC;
 
       // Only set expiration for GTD orders, otherwise use 0
       const expiration = isGTD
@@ -649,8 +649,8 @@ export function TradingForm({
                     outcome.name === "Yes"
                       ? "text-emerald-600 dark:text-emerald-400"
                       : outcome.name === "No"
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-foreground"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-foreground"
                   }`}
                 >
                   {outcome.name}
@@ -708,7 +708,7 @@ export function TradingForm({
               onClick={() => {
                 if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
-                    effectiveBalance / calculations.price,
+                    effectiveBalance / calculations.price
                   );
                   setShares(Math.max(minShares, maxShares));
                 }
@@ -880,7 +880,7 @@ export function TradingForm({
                     <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                       Need $
                       {(calculations.total - (effectiveBalance || 0)).toFixed(
-                        2,
+                        2
                       )}{" "}
                       more
                     </span>
@@ -927,7 +927,7 @@ export function TradingForm({
                     {hasNoAllowance
                       ? "Approve USDC.e spending to trade"
                       : `Increase allowance to $${calculations.total.toFixed(
-                          2,
+                          2
                         )}`}
                   </span>
                 </div>
@@ -987,8 +987,8 @@ export function TradingForm({
                 hasInsufficientBalance || isBelowMinimum
                   ? "bg-muted text-muted-foreground"
                   : side === "BUY"
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
-                    : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                  : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
               }`}
               onClick={handleSubmit}
               disabled={
