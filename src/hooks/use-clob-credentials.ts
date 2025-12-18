@@ -2,47 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useConnection, useSignTypedData } from "wagmi";
-
-/**
- * EIP-712 Domain for CLOB Authentication (L1)
- * Used for authenticating API requests with the CLOB
- *
- * Note: chainId should match the chain you're authenticating for
- * Polymarket uses chainId in the domain for signature verification
- *
- * IMPORTANT: This must match exactly what Polymarket's SDK uses
- * See: @polymarket/clob-client/dist/signing/eip712.js
- */
-const CLOB_AUTH_DOMAIN = {
-  name: "ClobAuthDomain",
-  version: "1",
-  chainId: 137, // Polygon Mainnet
-} as const;
-
-/**
- * EIP-712 Type definitions for CLOB Authentication
- * Must match exactly what Polymarket expects
- *
- * IMPORTANT: The order and types must match the SDK exactly:
- * - address: address
- * - timestamp: string (NOT number!)
- * - nonce: uint256 (passed as number, not BigInt)
- * - message: string
- */
-const CLOB_AUTH_TYPES = {
-  ClobAuth: [
-    { name: "address", type: "address" },
-    { name: "timestamp", type: "string" },
-    { name: "nonce", type: "uint256" },
-    { name: "message", type: "string" },
-  ],
-} as const;
-
-/**
- * The message to sign for CLOB authentication
- * Must match exactly: "This message attests that I control the given wallet"
- */
-const MSG_TO_SIGN = "This message attests that I control the given wallet";
+import {
+  CLOB_AUTH_DOMAIN,
+  CLOB_AUTH_MESSAGE,
+  CLOB_AUTH_TYPES,
+} from "@/constants/polymarket";
 
 /**
  * API Key credentials returned by Polymarket
@@ -158,7 +122,7 @@ export function useClobCredentials() {
         address: address as `0x${string}`,
         timestamp: `${timestamp}`,
         nonce: BigInt(nonce),
-        message: MSG_TO_SIGN,
+        message: CLOB_AUTH_MESSAGE,
       },
     });
 
@@ -170,21 +134,15 @@ export function useClobCredentials() {
   }, [address, signTypedData]);
 
   /**
-   * Create or derive API credentials from L1 authentication
-   * This requires the user to sign an EIP-712 message
-   *
-   * For new users: Creates a new API key
-   * For returning users: Derives (retrieves) existing API key
+   * Fallback method: Derive credentials via our API route
+   * Used when SDK methods fail (e.g., due to network issues)
    */
-  const deriveCredentials = useCallback(async (): Promise<ApiKeyCreds> => {
-    if (!address) {
-      throw new Error("Wallet not connected");
-    }
+  const deriveCredentialsViaApi =
+    useCallback(async (): Promise<ApiKeyCreds> => {
+      if (!address) {
+        throw new Error("Wallet not connected");
+      }
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
       // Generate L1 signature
       const { signature, timestamp, nonce } = await generateL1Signature();
 
@@ -214,11 +172,9 @@ export function useClobCredentials() {
       };
 
       if (!response.ok || !data.success) {
-        // Provide helpful error messages based on the error
         let errorMessage =
           data.error || data.details || "Failed to derive API credentials";
 
-        // Common error cases with user-friendly messages
         if (errorMessage.includes("Could not derive api key")) {
           errorMessage =
             "Unable to create trading credentials. Please ensure you have completed all previous setup steps (Deploy wallet & Approve USDC) and try again.";
@@ -241,6 +197,89 @@ export function useClobCredentials() {
       setCredentials(creds);
 
       return creds;
+    }, [address, generateL1Signature]);
+
+  /**
+   * Create or derive API credentials using the SDK directly
+   *
+   * This follows the official Polymarket pattern:
+   * 1. First try deriveApiKey() - works for returning users
+   * 2. If that fails, try createApiKey() - for new users
+   *
+   * Reference: https://github.com/Polymarket/wagmi-safe-builder-example
+   */
+  const deriveCredentials = useCallback(async (): Promise<ApiKeyCreds> => {
+    if (!address) {
+      throw new Error("Wallet not connected");
+    }
+
+    if (typeof window === "undefined" || !window.ethereum) {
+      throw new Error("No wallet provider found");
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Dynamic imports to avoid SSR issues
+      const { ClobClient } = await import("@polymarket/clob-client");
+      const ethersModule = await import("ethers");
+
+      // Create ethers signer from wallet provider
+      const provider = new ethersModule.providers.Web3Provider(
+        // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
+        window.ethereum as any,
+      );
+      await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+
+      // Create a temporary CLOB client (no credentials yet)
+      const tempClient = new ClobClient(
+        process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
+          "https://clob.polymarket.com",
+        137, // Polygon chain ID
+        signer,
+      );
+
+      // Try to derive existing credentials first (for returning users)
+      // If that fails, create new credentials (for new users)
+      let creds: { key: string; secret: string; passphrase: string };
+
+      try {
+        console.log(
+          "[ClobCredentials] Attempting to derive existing API key...",
+        );
+        creds = await tempClient.deriveApiKey();
+        console.log("[ClobCredentials] Successfully derived existing API key");
+      } catch (deriveErr) {
+        console.log(
+          "[ClobCredentials] Derive failed, creating new API key...",
+          deriveErr,
+        );
+        try {
+          creds = await tempClient.createApiKey();
+          console.log("[ClobCredentials] Successfully created new API key");
+        } catch (createErr) {
+          // If both SDK methods fail, fall back to our API route
+          console.log(
+            "[ClobCredentials] SDK methods failed, using API fallback...",
+            createErr,
+          );
+          return await deriveCredentialsViaApi();
+        }
+      }
+
+      const apiCreds: ApiKeyCreds = {
+        apiKey: creds.key,
+        apiSecret: creds.secret,
+        apiPassphrase: creds.passphrase,
+      };
+
+      // Store credentials for future use
+      storeCredentials(address, apiCreds);
+      setCredentials(apiCreds);
+
+      return apiCreds;
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error("Failed to derive credentials");
@@ -249,7 +288,7 @@ export function useClobCredentials() {
     } finally {
       setIsLoading(false);
     }
-  }, [address, generateL1Signature]);
+  }, [address, deriveCredentialsViaApi]);
 
   /**
    * Clear stored credentials

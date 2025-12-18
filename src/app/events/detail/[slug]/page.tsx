@@ -178,6 +178,12 @@ export default function EventDetailPage() {
         const change = ((Math.random() - 0.5) * 10).toFixed(1);
         const colors = ["orange", "blue", "purple", "green"];
 
+        const rawMinSize = market.orderMinSize ?? market.order_min_size;
+        const orderMinSize =
+          typeof rawMinSize === "number"
+            ? rawMinSize
+            : Number.parseFloat(String(rawMinSize ?? "1")) || 1;
+
         return {
           id: market.id,
           question: market.question,
@@ -188,6 +194,7 @@ export default function EventDetailPage() {
           yesTokenId: yesTokenId || "",
           noTokenId: noTokenId || "",
           negRisk: market.negRisk || false,
+          orderMinSize,
           change: Number.parseFloat(change),
           volume: market.volume || "0",
           color: colors[idx % colors.length],
@@ -258,6 +265,12 @@ export default function EventDetailPage() {
         const change = ((Math.random() - 0.5) * 10).toFixed(1);
         const colors = ["orange", "blue", "purple", "green"];
 
+        const rawMinSize = market.orderMinSize ?? market.order_min_size;
+        const orderMinSize =
+          typeof rawMinSize === "number"
+            ? rawMinSize
+            : Number.parseFloat(String(rawMinSize ?? "1")) || 1;
+
         return {
           id: market.id,
           question: market.question,
@@ -268,6 +281,7 @@ export default function EventDetailPage() {
           yesTokenId: yesTokenId || "",
           noTokenId: noTokenId || "",
           negRisk: market.negRisk || false,
+          orderMinSize,
           change: Number.parseFloat(change),
           volume: market.volume || "0",
           color: colors[idx % colors.length],
@@ -402,13 +416,15 @@ export default function EventDetailPage() {
   // Store has merged REST + WebSocket data
   const { bestBid, bestAsk, tickSize, minOrderSize, orderBook } =
     useMemo(() => {
+      const marketMinOrderSize = selectedMarket?.orderMinSize ?? 1;
+
       // Use store data (seeded by REST, updated by WebSocket)
       if (storeOrderBook) {
         return {
           bestBid: storeOrderBook.bestBid ?? undefined,
           bestAsk: storeOrderBook.bestAsk ?? undefined,
           tickSize: 0.01, // Default tick size
-          minOrderSize: 1, // Default min order size
+          minOrderSize: marketMinOrderSize,
           orderBook: {
             bids: storeOrderBook.bids,
             asks: storeOrderBook.asks,
@@ -422,7 +438,7 @@ export default function EventDetailPage() {
           bestBid: undefined,
           bestAsk: undefined,
           tickSize: 0.01,
-          minOrderSize: 1,
+          minOrderSize: marketMinOrderSize,
           orderBook: undefined,
         };
       }
@@ -444,9 +460,14 @@ export default function EventDetailPage() {
       const tickSizeValue = ob.tick_size
         ? Number.parseFloat(ob.tick_size)
         : 0.01;
-      const minOrderSizeValue = ob.min_order_size
+      const bookMinOrderSizeValue = ob.min_order_size
         ? Number.parseFloat(ob.min_order_size)
         : 1;
+
+      const minOrderSizeValue = Math.max(
+        marketMinOrderSize,
+        bookMinOrderSizeValue,
+      );
 
       return {
         bestBid: bestBidLevel
@@ -459,7 +480,7 @@ export default function EventDetailPage() {
         minOrderSize: minOrderSizeValue,
         orderBook: { bids, asks },
       };
-    }, [storeOrderBook, orderBookData]);
+    }, [storeOrderBook, orderBookData, selectedMarket]);
 
   // Loading state - AFTER all hooks
   if (loading) {

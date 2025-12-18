@@ -65,7 +65,7 @@ export interface TradingFormProps {
   userBalance?: number;
   /** Market tick size (default: 0.01) */
   tickSize?: number;
-  /** Market minimum order size in USDC (default: 1) */
+  /** Market minimum order size in shares (default: 1) */
   minOrderSize?: number;
   /** Best bid price from order book (for spread warning) */
   bestBid?: number;
@@ -91,6 +91,7 @@ export interface TradingFormProps {
  * Default max slippage for market orders (2%)
  */
 const DEFAULT_MAX_SLIPPAGE_PERCENT = 2;
+const MIN_MARKETABLE_BUY_NOTIONAL_USD = 1;
 
 /**
  * Round price to nearest tick size
@@ -198,6 +199,11 @@ export function TradingForm({
   const [allowPartialFill, setAllowPartialFill] = useState<boolean>(true); // FAK vs FOK for market orders
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
+
+  const minShares = useMemo(() => {
+    const raw = Number.isFinite(minOrderSize) ? minOrderSize : 1;
+    return Math.max(1, Math.ceil(raw));
+  }, [minOrderSize]);
 
   // Get selected outcome
   const selectedOutcome = outcomes[selectedOutcomeIndex];
@@ -362,9 +368,17 @@ export function TradingForm({
   );
 
   // Handle shares change with bounds
-  const handleSharesChange = useCallback((delta: number) => {
-    setShares((prev) => Math.max(1, prev + delta));
-  }, []);
+  const handleSharesChange = useCallback(
+    (delta: number) => {
+      setShares((prev) => Math.max(minShares, prev + delta));
+    },
+    [minShares],
+  );
+
+  // If user switches to a market with a higher minimum, clamp shares up
+  useEffect(() => {
+    setShares((prev) => (prev < minShares ? minShares : prev));
+  }, [minShares]);
 
   // Handle deriving credentials (one-time setup)
   const _handleDeriveCredentials = useCallback(async () => {
@@ -428,6 +442,7 @@ export function TradingForm({
         side: side === "BUY" ? Side.BUY : Side.SELL,
         orderType: clobOrderType,
         expiration,
+        negRisk, // Pass negRisk flag for proper exchange contract selection
       });
 
       if (result.success) {
@@ -453,6 +468,7 @@ export function TradingForm({
     useExpiration,
     expirationHours,
     allowPartialFill,
+    negRisk,
     createOrder,
     onOrderSuccess,
     onOrderError,
@@ -466,8 +482,23 @@ export function TradingForm({
   const hasInsufficientBalance =
     effectiveBalance !== undefined && calculations.total > effectiveBalance;
 
-  // Check minimum order size (use prop or default to $1)
-  const isBelowMinimum = calculations.total < minOrderSize;
+  // Check minimum order size (shares)
+  const isBelowMinimum = shares < minShares;
+
+  // Polymarket enforces a minimum notional for MARKETABLE BUY orders (e.g. market orders,
+  // or limit buys that cross the best ask). If below $1, the CLOB rejects with:
+  // "invalid amount for a marketable BUY order ($X), min size: $1"
+  const isMarketableBuy = useMemo(() => {
+    if (side !== "BUY") return false;
+    if (orderType === "MARKET") return true;
+    if (bestAsk === undefined) return false;
+    return limitPrice >= bestAsk;
+  }, [side, orderType, bestAsk, limitPrice]);
+
+  const isBelowMarketableBuyMinNotional = useMemo(() => {
+    if (!isMarketableBuy) return false;
+    return calculations.total < MIN_MARKETABLE_BUY_NOTIONAL_USD;
+  }, [isMarketableBuy, calculations.total]);
 
   // Check if price crosses the book significantly
   const _spreadWarning = useMemo(() => {
@@ -679,7 +710,7 @@ export function TradingForm({
                   const maxShares = Math.floor(
                     effectiveBalance / calculations.price,
                   );
-                  setShares(Math.max(1, maxShares));
+                  setShares(Math.max(minShares, maxShares));
                 }
               }}
             >
@@ -695,7 +726,7 @@ export function TradingForm({
                 type="button"
                 className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-1 md:flex-none"
                 onClick={() => handleSharesChange(-10)}
-                disabled={shares <= 10}
+                disabled={shares - 10 < minShares}
               >
                 -10
               </button>
@@ -703,7 +734,7 @@ export function TradingForm({
                 type="button"
                 className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 onClick={() => handleSharesChange(-1)}
-                disabled={shares <= 1}
+                disabled={shares - 1 < minShares}
               >
                 -1
               </button>
@@ -716,10 +747,10 @@ export function TradingForm({
               onChange={(e) => {
                 const val = Number.parseInt(e.target.value, 10);
                 if (!Number.isNaN(val)) {
-                  setShares(Math.max(1, val));
+                  setShares(Math.max(minShares, val));
                 }
               }}
-              min={1}
+              min={minShares}
               className="flex-1 min-w-[140px] bg-secondary/30 border border-border rounded-xl px-3 py-3 text-center text-base sm:text-lg font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
 
@@ -785,6 +816,16 @@ export function TradingForm({
                 ${calculations.total.toFixed(2)}
               </span>
             </div>
+            {isBelowMarketableBuyMinNotional && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-amber-600 dark:text-amber-400">
+                  Minimum order value
+                </span>
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  ${MIN_MARKETABLE_BUY_NOTIONAL_USD.toFixed(2)} required
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">
                 Potential Return
@@ -956,6 +997,7 @@ export function TradingForm({
                 hasInsufficientAllowance ||
                 hasNoAllowance ||
                 isBelowMinimum ||
+                isBelowMarketableBuyMinNotional ||
                 !selectedOutcome ||
                 !hasValidTokenId ||
                 (orderType === "MARKET" && !canFullyFill)
@@ -973,7 +1015,9 @@ export function TradingForm({
               ) : hasInsufficientBalance ? (
                 "Insufficient Balance"
               ) : isBelowMinimum ? (
-                `Minimum order: $${minOrderSize}`
+                `Minimum shares: ${minShares}`
+              ) : isBelowMarketableBuyMinNotional ? (
+                `Minimum order: $${MIN_MARKETABLE_BUY_NOTIONAL_USD.toFixed(0)}`
               ) : (
                 <>
                   {side === "BUY" ? (

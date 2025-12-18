@@ -83,7 +83,7 @@ export function MarketSearch({
       setQuery(e.target.value);
       setIsOpen(e.target.value.length >= 2);
     },
-    [],
+    []
   );
 
   const handleClear = useCallback(() => {
@@ -98,7 +98,7 @@ export function MarketSearch({
       setQuery("");
       router.push(`/events/detail/${slug}`);
     },
-    [router],
+    [router]
   );
 
   const handleTagClick = useCallback(
@@ -107,7 +107,7 @@ export function MarketSearch({
       setQuery("");
       router.push(`/events/${slug}`);
     },
-    [router],
+    [router]
   );
 
   const hasResults =
@@ -200,6 +200,7 @@ export function MarketSearch({
                               src={event.image}
                               alt={event.title}
                               fill
+                              sizes="40px"
                               className="object-cover"
                             />
                           </div>

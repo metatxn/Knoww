@@ -496,6 +496,7 @@ function PositionsTable({
                       src={position.market.icon}
                       alt={position.market.title}
                       fill
+                      sizes="48px"
                       className="object-cover"
                     />
                   ) : (
@@ -702,6 +703,7 @@ function PositionsTable({
                             src={position.market.icon}
                             alt={position.market.title}
                             fill
+                            sizes="40px"
                             className="object-cover"
                           />
                         ) : (
@@ -1268,6 +1270,7 @@ function HistoryTable({
                           src={trade.market.icon}
                           alt={trade.market.title}
                           fill
+                          sizes="32px"
                           className="object-cover"
                         />
                       ) : (
@@ -1363,6 +1366,7 @@ function HistoryTable({
                             src={trade.market.icon}
                             alt={trade.market.title}
                             fill
+                            sizes="36px"
                             className="object-cover"
                           />
                         ) : (

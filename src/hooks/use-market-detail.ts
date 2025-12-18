@@ -17,6 +17,14 @@ interface Market {
   icon?: string;
   endDate?: string;
   end_date_iso?: string;
+  /**
+   * Minimum order size (in shares) for this market.
+   *
+   * Gamma market payloads may expose this as `orderMinSize` (camelCase)
+   * or `order_min_size` (snake_case).
+   */
+  orderMinSize?: number | string;
+  order_min_size?: number | string;
   volume?: string;
   volumeNum?: number;
   liquidity?: string;

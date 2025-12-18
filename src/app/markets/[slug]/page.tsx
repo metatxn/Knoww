@@ -522,6 +522,11 @@ export default function MarketDetailPage() {
               selectedOutcomeIndex={selectedOutcome}
               onOutcomeChange={setSelectedOutcome}
               negRisk={market.negRisk}
+              minOrderSize={
+                Number.parseFloat(
+                  String(market.orderMinSize ?? market.order_min_size ?? "1"),
+                ) || 1
+              }
               onOrderSuccess={handleOrderSuccess}
               onOrderError={handleOrderError}
               marketImage={market.image}

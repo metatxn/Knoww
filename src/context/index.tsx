@@ -12,6 +12,8 @@ import { AccentColorProvider } from "@/context/color-theme-context";
 import { EventFilterProvider } from "@/context/event-filter-context";
 import { OnboardingProvider } from "@/context/onboarding-context";
 import { SidebarProvider } from "@/context/sidebar-context";
+import { TradingProvider } from "@/context/trading-context";
+import { WalletProvider } from "@/context/wallet-context";
 
 // All available themes for next-themes
 const ALL_THEMES = [
@@ -88,11 +90,15 @@ function ContextProvider({
           disableTransitionOnChange
         >
           <AccentColorProvider>
-            <SidebarProvider>
-              <EventFilterProvider>
-                <OnboardingProvider>{children}</OnboardingProvider>
-              </EventFilterProvider>
-            </SidebarProvider>
+            <WalletProvider>
+              <SidebarProvider>
+                <EventFilterProvider>
+                  <OnboardingProvider>
+                    <TradingProvider>{children}</TradingProvider>
+                  </OnboardingProvider>
+                </EventFilterProvider>
+              </SidebarProvider>
+            </WalletProvider>
           </AccentColorProvider>
           <ReactQueryDevtools initialIsOpen={false} />
         </ThemeProvider>

@@ -35,6 +35,16 @@ export interface CreateOrderParams {
   side: Side;
   orderType?: OrderType;
   expiration?: number; // Unix timestamp for GTD orders
+  /**
+   * Whether this is a Negative Risk market.
+   *
+   * NegRisk markets use a different exchange contract (NEG_RISK_CTF_EXCHANGE)
+   * and require the `negRisk: true` option when creating orders.
+   * This ensures the order signature is verified against the correct contract.
+   *
+   * @see https://docs.polymarket.com/developers/CLOB/neg-risk
+   */
+  negRisk?: boolean;
 }
 
 /**
@@ -187,15 +197,25 @@ export function useClobClient() {
 
         // Create the order (SDK handles signing)
         // Note: expiration should be 0 for GTC/FOK orders, only set for GTD
-        const order = await client.createOrder({
-          tokenID: params.tokenId,
-          price: params.price,
-          size: params.size,
-          side: params.side,
-          feeRateBps, // Pass the fetched fee rate
-          expiration:
-            params.orderType === OrderType.GTD ? params.expiration : 0,
-        });
+        //
+        // For NegRisk markets, we MUST pass { negRisk: true } in the options parameter.
+        // This tells the SDK to use the NEG_RISK_CTF_EXCHANGE contract for signature
+        // verification instead of the standard CTF_EXCHANGE.
+        // @see https://docs.polymarket.com/developers/CLOB/neg-risk
+        const orderOptions = params.negRisk ? { negRisk: true } : undefined;
+
+        const order = await client.createOrder(
+          {
+            tokenID: params.tokenId,
+            price: params.price,
+            size: params.size,
+            side: params.side,
+            feeRateBps, // Pass the fetched fee rate
+            expiration:
+              params.orderType === OrderType.GTD ? params.expiration : 0,
+          },
+          orderOptions,
+        );
 
         // Post the order (SDK handles builder headers)
         const response = await client.postOrder(order, params.orderType);
@@ -403,10 +423,15 @@ export function useClobClient() {
 
   /**
    * Update (set) the allowance for trading
-   * This approves the Polymarket CTF Exchange to spend your USDC.e
-   * Sends an actual on-chain transaction that requires MetaMask confirmation
+   * This approves both Polymarket CTF Exchange AND Neg Risk CTF Exchange
+   * to spend your USDC.e, so users can trade on both market types.
+   *
+   * Sends actual on-chain transactions that require MetaMask confirmation.
    *
    * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
+   *
+   * Note: This approves BOTH exchanges in sequence. For a more gas-efficient
+   * approach using the relayer (gasless), use useRelayerClient.approveUsdcForTrading()
    */
   const updateAllowance = useCallback(async () => {
     if (!address) {
@@ -428,9 +453,11 @@ export function useClobClient() {
       const USDC_ADDRESS =
         "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
 
-      // Polymarket CTF Exchange contract on Polygon mainnet
+      // Polymarket exchange contracts on Polygon mainnet
       const CTF_EXCHANGE_ADDRESS =
         "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E" as const;
+      const NEG_RISK_CTF_EXCHANGE_ADDRESS =
+        "0xC5d563A36AE78145C45a50134d48A1215220f80a" as const;
 
       // ERC20 ABI for approve function
       const ERC20_ABI = [
@@ -454,34 +481,51 @@ export function useClobClient() {
         account: address,
       });
 
-      // Request account access
-      await walletClient.requestAddresses();
-
-      // Send the approve transaction (this will open MetaMask)
-      const hash = await walletClient.writeContract({
-        address: USDC_ADDRESS,
-        abi: ERC20_ABI,
-        functionName: "approve",
-        args: [CTF_EXCHANGE_ADDRESS, maxUint256],
-      });
-
-      // Wait for transaction confirmation
+      // Wait for transaction confirmation helper
       const { createPublicClient, http } = await import("viem");
       const publicClient = createPublicClient({
         chain: polygon,
         transport: http(),
       });
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      // Request account access
+      await walletClient.requestAddresses();
 
-      if (receipt.status === "success") {
-        return {
-          success: true,
-          hash,
-        };
-      } else {
-        throw new Error("Transaction failed");
+      // Approve standard CTF Exchange
+      const hash1 = await walletClient.writeContract({
+        address: USDC_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [CTF_EXCHANGE_ADDRESS, maxUint256],
+      });
+
+      const receipt1 = await publicClient.waitForTransactionReceipt({
+        hash: hash1,
+      });
+      if (receipt1.status !== "success") {
+        throw new Error("CTF Exchange approval transaction failed");
       }
+
+      // Approve NegRisk CTF Exchange
+      const hash2 = await walletClient.writeContract({
+        address: USDC_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [NEG_RISK_CTF_EXCHANGE_ADDRESS, maxUint256],
+      });
+
+      const receipt2 = await publicClient.waitForTransactionReceipt({
+        hash: hash2,
+      });
+      if (receipt2.status !== "success") {
+        throw new Error("NegRisk CTF Exchange approval transaction failed");
+      }
+
+      return {
+        success: true,
+        hashes: [hash1, hash2],
+        message: "Approved both CTF Exchange and NegRisk CTF Exchange",
+      };
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error("Failed to approve USDC");
@@ -662,10 +706,14 @@ export function useClobClient() {
    *
    * IMPORTANT: Polymarket uses USDC.e (bridged USDC), NOT native USDC!
    *
+   * For NegRisk markets, allowance must be set for NEG_RISK_CTF_EXCHANGE.
+   * For standard markets, allowance must be set for CTF_EXCHANGE.
+   *
    * @param walletAddress - Optional address to check allowance for (defaults to EOA, but should be proxy wallet for trading)
+   * @param negRisk - Whether to check allowance for NegRisk exchange (default: false)
    */
   const getUsdcAllowance = useCallback(
-    async (walletAddress?: string) => {
+    async (walletAddress?: string, negRisk = false) => {
       const targetAddress = walletAddress || address;
       if (!targetAddress) {
         throw new Error("Wallet not connected");
@@ -680,9 +728,16 @@ export function useClobClient() {
           "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
         const USDC_DECIMALS = 6;
 
-        // Polymarket CTF Exchange contract on Polygon mainnet
+        // Polymarket exchange contracts on Polygon mainnet
         const CTF_EXCHANGE_ADDRESS =
           "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E" as const;
+        const NEG_RISK_CTF_EXCHANGE_ADDRESS =
+          "0xC5d563A36AE78145C45a50134d48A1215220f80a" as const;
+
+        // Select the appropriate exchange based on market type
+        const exchangeAddress = negRisk
+          ? NEG_RISK_CTF_EXCHANGE_ADDRESS
+          : CTF_EXCHANGE_ADDRESS;
 
         // ERC20 ABI for allowance function
         const ERC20_ABI = [
@@ -709,7 +764,7 @@ export function useClobClient() {
           address: USDC_ADDRESS,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [targetAddress as `0x${string}`, CTF_EXCHANGE_ADDRESS],
+          args: [targetAddress as `0x${string}`, exchangeAddress],
         });
 
         // Convert to human-readable format
@@ -721,6 +776,7 @@ export function useClobClient() {
           allowance: allowanceFormatted,
           allowanceRaw: allowance.toString(),
           decimals: USDC_DECIMALS,
+          exchange: negRisk ? "NEG_RISK_CTF_EXCHANGE" : "CTF_EXCHANGE",
         };
       } catch (err) {
         console.error("Failed to get USDC allowance:", err);

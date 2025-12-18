@@ -232,6 +232,7 @@ export function TradeHistory({
                             src={trade.market.icon}
                             alt={trade.market.title}
                             fill
+                            sizes="24px"
                             className="object-cover"
                           />
                         </div>
@@ -301,7 +302,7 @@ export function TradeHistory({
           <span>
             Total Volume:{" "}
             {formatCurrency(
-              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0),
+              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0)
             )}
           </span>
         </div>

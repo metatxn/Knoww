@@ -11,28 +11,27 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 
 // Contract addresses on Polygon Mainnet
-const CONTRACTS = {
-  USDC: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
-  CTF: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
-  CTF_EXCHANGE: "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E",
-  NEG_RISK_CTF_EXCHANGE: "0xC5d563A36AE78145C45a50134d48A1215220f80a",
-} as const;
+import {
+  CONTRACTS,
+  SAFE_FACTORY_ADDRESS,
+  SAFE_INIT_CODE_HASH,
+} from "@/constants/contracts";
+import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
 
-// Polymarket Safe Factory address on Polygon mainnet
-// This is Polymarket's custom factory, not the standard Gnosis Safe factory
-const SAFE_FACTORY = "0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b";
+// Shared RPC utilities
+import {
+  clearDeploymentCache,
+  checkIsDeployed as rpcCheckIsDeployed,
+} from "@/lib/rpc";
 
-// Init code hash used by Polymarket's factory
-// This is from @polymarket/builder-relayer-client constants
-const SAFE_INIT_CODE_HASH =
-  "0x2bce2127ff07fb632d16c8347c4ebf501f4841168bed00d9e6ef715ddb6fcecf";
-
-const POLYMARKET_RELAYER_URL = "https://relayer-v2.polymarket.com/";
-const CHAIN_ID = 137; // Polygon mainnet
+// Re-export for backwards compatibility
+const SAFE_FACTORY = SAFE_FACTORY_ADDRESS;
+const POLYMARKET_RELAYER_URL = RELAYER_API_URL;
+const CHAIN_ID = POLYGON_CHAIN_ID;
 
 // Transaction states from the relayer (kept for documentation purposes)
 // type TransactionState =
@@ -51,6 +50,9 @@ interface RelayerClientState {
   hasDeployedSafe: boolean;
 }
 
+// Debounce time for deployment checks
+const CHECK_DEPLOYMENT_DEBOUNCE_MS = 2000;
+
 export function useRelayerClient() {
   const { address, isConnected } = useConnection();
   const { data: walletClient } = useWalletClient();
@@ -62,6 +64,10 @@ export function useRelayerClient() {
     proxyAddress: null,
     hasDeployedSafe: false,
   });
+
+  // Ref for debouncing deployment checks
+  const lastCheckRef = useRef<number>(0);
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get builder signing server URL
   const builderSigningServerUrl =
@@ -106,46 +112,69 @@ export function useRelayerClient() {
       POLYMARKET_RELAYER_URL,
       CHAIN_ID,
       walletClient,
-      builderConfig,
+      builderConfig
     );
 
     return client;
   }, [walletClient, address, builderSigningServerUrl]);
 
   /**
-   * Derive the Safe address using the same formula as Polymarket SDK
-   * deriveSafe(address, safeFactory) from @polymarket/builder-relayer-client
+   * Derive the Safe address using the SDK's built-in function
    *
-   * Uses viem's getCreate2Address with:
-   * - from: safeFactory address (SAFE_FACTORY constant)
-   * - salt: keccak256(abi.encode(ownerAddress))
-   * - bytecodeHash: SAFE_INIT_CODE_HASH
+   * Uses deriveSafe() from @polymarket/builder-relayer-client which ensures
+   * exact compatibility with Polymarket's address derivation.
+   *
+   * Reference: https://github.com/Polymarket/wagmi-safe-builder-example
    */
   const deriveSafeAddress = useCallback(async (): Promise<string | null> => {
     if (!address) return null;
 
     try {
-      const { getCreate2Address, keccak256, encodeAbiParameters } =
-        await import("viem");
-
-      // Salt = keccak256(abi.encode(address))
-      // This matches the SDK's derivation
-      const salt = keccak256(
-        encodeAbiParameters(
-          [{ name: "address", type: "address" }],
-          [address as `0x${string}`],
-        ),
+      // Use the SDK's deriveSafe function for exact compatibility
+      const { deriveSafe } = await import(
+        "@polymarket/builder-relayer-client/dist/builder/derive"
+      );
+      const { getContractConfig } = await import(
+        "@polymarket/builder-relayer-client/dist/config"
       );
 
-      const proxyAddress = getCreate2Address({
-        from: SAFE_FACTORY as `0x${string}`,
-        salt: salt,
-        bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
-      });
+      // Get the contract config for Polygon (chain ID 137)
+      const config = getContractConfig(CHAIN_ID);
+
+      // Derive Safe address using SDK's method
+      const proxyAddress = deriveSafe(
+        address,
+        config.SafeContracts.SafeFactory
+      );
 
       return proxyAddress;
-    } catch {
-      return null;
+    } catch (err) {
+      // Fallback to manual derivation if SDK method fails
+      console.warn(
+        "[RelayerClient] SDK deriveSafe failed, using fallback:",
+        err
+      );
+      try {
+        const { getCreate2Address, keccak256, encodeAbiParameters } =
+          await import("viem");
+
+        const salt = keccak256(
+          encodeAbiParameters(
+            [{ name: "address", type: "address" }],
+            [address as `0x${string}`]
+          )
+        );
+
+        const proxyAddress = getCreate2Address({
+          from: SAFE_FACTORY as `0x${string}`,
+          salt: salt,
+          bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
+        });
+
+        return proxyAddress;
+      } catch {
+        return null;
+      }
     }
   }, [address]);
 
@@ -211,7 +240,7 @@ export function useRelayerClient() {
       // Use SDK's built-in wait() method as per documentation
       // https://docs.polymarket.com/developers/builders/relayer-client#deploying-safe-wallets
       console.log(
-        "[RelayerClient] Waiting for Safe deployment confirmation...",
+        "[RelayerClient] Waiting for Safe deployment confirmation..."
       );
       const result = await response.wait();
 
@@ -251,8 +280,22 @@ export function useRelayerClient() {
   }, [getClient, deriveSafeAddress]);
 
   /**
-   * Set USDC approval for the CTF Exchange (gasless)
-   * This allows the exchange to spend USDC on behalf of the user's Safe
+   * Set all token approvals for trading (gasless)
+   *
+   * This sets up ALL required approvals for Polymarket trading:
+   *
+   * ERC-20 (USDC.e) Approvals:
+   * - CTF Contract: For split/merge operations
+   * - CTF Exchange: For standard binary markets
+   * - Neg Risk CTF Exchange: For negative risk markets
+   * - Neg Risk Adapter: For converting between market types
+   *
+   * ERC-1155 (Outcome Token) Approvals:
+   * - CTF Exchange: To sell positions in standard markets
+   * - Neg Risk CTF Exchange: To sell positions in neg risk markets
+   * - Neg Risk Adapter: To convert positions between market types
+   *
+   * Reference: https://github.com/Polymarket/wagmi-safe-builder-example
    */
   const approveUsdcForTrading = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
@@ -260,12 +303,13 @@ export function useRelayerClient() {
     try {
       const client = await getClient();
       const { encodeFunctionData, maxUint256 } = await import("viem");
+      const { checkAllApprovals } = await import("@/lib/approvals");
 
       // First, verify the Safe is deployed
       const expectedSafe = await deriveSafeAddress();
       if (!expectedSafe) {
         throw new Error(
-          "Could not derive Safe address. Please ensure your wallet is connected.",
+          "Could not derive Safe address. Please ensure your wallet is connected."
         );
       }
 
@@ -275,9 +319,25 @@ export function useRelayerClient() {
         isDeployed,
       });
 
+      // Check if approvals are already set
+      console.log("[RelayerClient] Checking existing approvals...");
+      const approvalStatus = await checkAllApprovals(expectedSafe);
+      console.log("[RelayerClient] Current approval status:", approvalStatus);
+
+      if (approvalStatus.allApproved) {
+        console.log("[RelayerClient] All approvals already set, skipping...");
+        setState((prev) => ({ ...prev, isLoading: false }));
+        return {
+          success: true,
+          transactionHash: "",
+          message: "All approvals already set",
+          alreadyApproved: true,
+        };
+      }
+
       if (!isDeployed) {
         throw new Error(
-          "Your trading wallet is not deployed yet. Please complete the 'Create Trading Wallet' step first.",
+          "Your trading wallet is not deployed yet. Please complete the 'Create Trading Wallet' step first."
         );
       }
 
@@ -294,31 +354,25 @@ export function useRelayerClient() {
         },
       ] as const;
 
-      // Create approval transactions for both exchanges
+      // ERC1155 setApprovalForAll ABI (for outcome tokens)
+      const erc1155ApprovalAbi = [
+        {
+          name: "setApprovalForAll",
+          type: "function",
+          inputs: [
+            { name: "operator", type: "address" },
+            { name: "approved", type: "bool" },
+          ],
+          outputs: [],
+        },
+      ] as const;
+
+      // Create ALL approval transactions
       // The SDK's execute() method expects Transaction objects with: to, data, value
       // It internally converts these to SafeTransactions with operation: Call
       const approvalTxs = [
-        // Approve CTF Exchange
-        {
-          to: CONTRACTS.USDC,
-          data: encodeFunctionData({
-            abi: erc20ApproveAbi,
-            functionName: "approve",
-            args: [CONTRACTS.CTF_EXCHANGE, maxUint256],
-          }),
-          value: "0",
-        },
-        // Approve Neg Risk CTF Exchange
-        {
-          to: CONTRACTS.USDC,
-          data: encodeFunctionData({
-            abi: erc20ApproveAbi,
-            functionName: "approve",
-            args: [CONTRACTS.NEG_RISK_CTF_EXCHANGE, maxUint256],
-          }),
-          value: "0",
-        },
-        // Approve CTF contract itself (for split/merge operations)
+        // ========== ERC-20 (USDC.e) Approvals ==========
+        // Approve CTF Contract (for split/merge operations)
         {
           to: CONTRACTS.USDC,
           data: encodeFunctionData({
@@ -328,14 +382,85 @@ export function useRelayerClient() {
           }),
           value: "0",
         },
+        // Approve CTF Exchange (for standard binary markets)
+        {
+          to: CONTRACTS.USDC,
+          data: encodeFunctionData({
+            abi: erc20ApproveAbi,
+            functionName: "approve",
+            args: [CONTRACTS.CTF_EXCHANGE, maxUint256],
+          }),
+          value: "0",
+        },
+        // Approve Neg Risk CTF Exchange (for negative risk markets)
+        {
+          to: CONTRACTS.USDC,
+          data: encodeFunctionData({
+            abi: erc20ApproveAbi,
+            functionName: "approve",
+            args: [CONTRACTS.NEG_RISK_CTF_EXCHANGE, maxUint256],
+          }),
+          value: "0",
+        },
+        // Approve Neg Risk Adapter (for converting between market types)
+        {
+          to: CONTRACTS.USDC,
+          data: encodeFunctionData({
+            abi: erc20ApproveAbi,
+            functionName: "approve",
+            args: [CONTRACTS.NEG_RISK_ADAPTER, maxUint256],
+          }),
+          value: "0",
+        },
+
+        // ========== ERC-1155 (Outcome Token) Approvals ==========
+        // Allow CTF Exchange to transfer outcome tokens (for selling positions)
+        {
+          to: CONTRACTS.CTF,
+          data: encodeFunctionData({
+            abi: erc1155ApprovalAbi,
+            functionName: "setApprovalForAll",
+            args: [CONTRACTS.CTF_EXCHANGE, true],
+          }),
+          value: "0",
+        },
+        // Allow Neg Risk CTF Exchange to transfer outcome tokens
+        {
+          to: CONTRACTS.CTF,
+          data: encodeFunctionData({
+            abi: erc1155ApprovalAbi,
+            functionName: "setApprovalForAll",
+            args: [CONTRACTS.NEG_RISK_CTF_EXCHANGE, true],
+          }),
+          value: "0",
+        },
+        // Allow Neg Risk Adapter to transfer outcome tokens
+        {
+          to: CONTRACTS.CTF,
+          data: encodeFunctionData({
+            abi: erc1155ApprovalAbi,
+            functionName: "setApprovalForAll",
+            args: [CONTRACTS.NEG_RISK_ADAPTER, true],
+          }),
+          value: "0",
+        },
       ];
 
-      console.log("[RelayerClient] Submitting USDC approval transactions...");
-      console.log("[RelayerClient] Approval targets:", {
+      console.log("[RelayerClient] Submitting token approval transactions...");
+      console.log("[RelayerClient] ERC-20 (USDC) approval targets:", {
+        CTF: CONTRACTS.CTF,
         CTF_EXCHANGE: CONTRACTS.CTF_EXCHANGE,
         NEG_RISK_CTF_EXCHANGE: CONTRACTS.NEG_RISK_CTF_EXCHANGE,
-        CTF: CONTRACTS.CTF,
+        NEG_RISK_ADAPTER: CONTRACTS.NEG_RISK_ADAPTER,
       });
+      console.log(
+        "[RelayerClient] ERC-1155 (Outcome Token) approval targets:",
+        {
+          CTF_EXCHANGE: CONTRACTS.CTF_EXCHANGE,
+          NEG_RISK_CTF_EXCHANGE: CONTRACTS.NEG_RISK_CTF_EXCHANGE,
+          NEG_RISK_ADAPTER: CONTRACTS.NEG_RISK_ADAPTER,
+        }
+      );
 
       // Execute the approval transactions with retry logic
       // The Polymarket relayer can sometimes return STATE_FAILED intermittently
@@ -347,11 +472,11 @@ export function useRelayerClient() {
         try {
           if (retry > 0) {
             console.log(
-              `[RelayerClient] Retry attempt ${retry + 1}/${maxRetries}...`,
+              `[RelayerClient] Retry attempt ${retry + 1}/${maxRetries}...`
             );
             // Wait before retrying (exponential backoff: 1s, 2s, 4s)
             await new Promise((resolve) =>
-              setTimeout(resolve, 1000 * 2 ** (retry - 1)),
+              setTimeout(resolve, 1000 * 2 ** (retry - 1))
             );
           }
 
@@ -370,10 +495,10 @@ export function useRelayerClient() {
             response.state === "STATE_INVALID"
           ) {
             console.warn(
-              `[RelayerClient] Approval failed with state: ${response.state}, will retry...`,
+              `[RelayerClient] Approval failed with state: ${response.state}, will retry...`
             );
             lastError = new Error(
-              `Approval failed with state: ${response.state}`,
+              `Approval failed with state: ${response.state}`
             );
             continue; // Try again
           }
@@ -383,7 +508,7 @@ export function useRelayerClient() {
         } catch (executeErr) {
           console.error(
             `[RelayerClient] Execute error on attempt ${retry + 1}:`,
-            executeErr,
+            executeErr
           );
           lastError =
             executeErr instanceof Error
@@ -418,7 +543,7 @@ export function useRelayerClient() {
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         console.log(
-          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}...`,
+          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}...`
         );
         const txns = await client.getTransaction(transactionId);
 
@@ -431,7 +556,7 @@ export function useRelayerClient() {
             console.error("[RelayerClient] Transaction failed:", tx);
             throw new Error(
               `Approval failed with state: ${tx.state}. ` +
-                `Transaction hash: ${tx.transactionHash || "none"}`,
+                `Transaction hash: ${tx.transactionHash || "none"}`
             );
           }
 
@@ -439,7 +564,7 @@ export function useRelayerClient() {
           if (successStates.includes(tx.state)) {
             console.log(
               "[RelayerClient] Approval successful:",
-              tx.transactionHash,
+              tx.transactionHash
             );
             setState((prev) => ({ ...prev, isLoading: false }));
             return {
@@ -458,7 +583,7 @@ export function useRelayerClient() {
       // If we get here, polling timed out but transaction was submitted
       // Consider it a success since the relayer accepted it
       console.log(
-        "[RelayerClient] Approval polling timed out, but transaction was submitted",
+        "[RelayerClient] Approval polling timed out, but transaction was submitted"
       );
       setState((prev) => ({ ...prev, isLoading: false }));
       return {
@@ -480,88 +605,110 @@ export function useRelayerClient() {
 
   /**
    * Check if an address has deployed code (is a contract)
+   * Uses shared RPC client with caching to avoid rate limiting
    */
   const checkIsDeployed = useCallback(
     async (proxyAddress: string): Promise<boolean> => {
       try {
-        const { createPublicClient, http } = await import("viem");
-        const { polygon } = await import("viem/chains");
-
-        const client = createPublicClient({
-          chain: polygon,
-          transport: http(),
-        });
-
-        const code = await client.getCode({
-          address: proxyAddress as `0x${string}`,
-        });
-
-        return code !== undefined && code !== "0x";
+        return await rpcCheckIsDeployed(proxyAddress);
       } catch (err) {
         console.error("[RelayerClient] Failed to check deployment:", err);
         return false;
       }
     },
-    [],
+    []
   );
 
   /**
    * Check if user has a deployed Safe wallet
    * Derives the expected address and checks if it has code deployed
+   *
+   * Includes debouncing to prevent rate limiting
    */
-  const checkSafeDeployment = useCallback(async () => {
-    if (!address) return;
+  const checkSafeDeployment = useCallback(
+    async (options?: { force?: boolean }) => {
+      if (!address) return;
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      // Debounce: skip if called too recently (unless forced)
+      const now = Date.now();
+      if (
+        !options?.force &&
+        now - lastCheckRef.current < CHECK_DEPLOYMENT_DEBOUNCE_MS
+      ) {
+        return;
+      }
+      lastCheckRef.current = now;
 
-    try {
-      // Derive the expected Safe address
-      const derivedAddress = await deriveSafeAddress();
+      // Clear any pending check
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+        checkTimeoutRef.current = null;
+      }
 
-      if (!derivedAddress) {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        // Derive the expected Safe address
+        const derivedAddress = await deriveSafeAddress();
+
+        if (!derivedAddress) {
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            isInitialized: true,
+            hasDeployedSafe: false,
+            proxyAddress: null,
+          }));
+          return;
+        }
+
+        // IMPORTANT: Check if the derived address actually has code deployed
+        // For new users, this will be FALSE because their Safe doesn't exist yet
+        const isDeployed = await checkIsDeployed(derivedAddress);
+
+        console.log(
+          "[RelayerClient] Safe check:",
+          derivedAddress,
+          "deployed:",
+          isDeployed,
+          isDeployed
+            ? "- Safe exists on-chain"
+            : "- Safe NOT deployed yet (new user)"
+        );
+
         setState((prev) => ({
           ...prev,
           isLoading: false,
           isInitialized: true,
-          hasDeployedSafe: false,
-          proxyAddress: null,
+          // ONLY set proxyAddress if the Safe is actually deployed
+          // For new users, we don't want to show a non-existent address
+          proxyAddress: isDeployed ? derivedAddress : null,
+          hasDeployedSafe: isDeployed,
         }));
-        return;
+      } catch (err) {
+        console.error("[RelayerClient] Check deployment error:", err);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isInitialized: true,
+          error: err instanceof Error ? err.message : "Failed to check Safe",
+        }));
       }
+    },
+    [address, deriveSafeAddress, checkIsDeployed]
+  );
 
-      // IMPORTANT: Check if the derived address actually has code deployed
-      // For new users, this will be FALSE because their Safe doesn't exist yet
-      const isDeployed = await checkIsDeployed(derivedAddress);
-
-      console.log(
-        "[RelayerClient] Safe check:",
-        derivedAddress,
-        "deployed:",
-        isDeployed,
-        isDeployed
-          ? "- Safe exists on-chain"
-          : "- Safe NOT deployed yet (new user)",
-      );
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        isInitialized: true,
-        // ONLY set proxyAddress if the Safe is actually deployed
-        // For new users, we don't want to show a non-existent address
-        proxyAddress: isDeployed ? derivedAddress : null,
-        hasDeployedSafe: isDeployed,
-      }));
-    } catch (err) {
-      console.error("[RelayerClient] Check deployment error:", err);
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        isInitialized: true,
-        error: err instanceof Error ? err.message : "Failed to check Safe",
-      }));
+  /**
+   * Force check deployment with cache clearing
+   */
+  const forceCheckSafeDeployment = useCallback(async () => {
+    // Clear the deployment cache for this address
+    const derivedAddress = await deriveSafeAddress();
+    if (derivedAddress) {
+      clearDeploymentCache(derivedAddress);
     }
-  }, [address, deriveSafeAddress, checkIsDeployed]);
+    return checkSafeDeployment({ force: true });
+  }, [deriveSafeAddress, checkSafeDeployment]);
 
   /**
    * Full onboarding flow:
@@ -606,7 +753,7 @@ export function useRelayerClient() {
     }
   }, [deploySafe, approveUsdcForTrading]);
 
-  // Check Safe deployment when address changes
+  // Check Safe deployment when address changes (with cleanup)
   useEffect(() => {
     if (isConnected && address) {
       checkSafeDeployment();
@@ -619,6 +766,12 @@ export function useRelayerClient() {
         hasDeployedSafe: false,
       });
     }
+
+    return () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+    };
   }, [isConnected, address, checkSafeDeployment]);
 
   return {
@@ -630,6 +783,7 @@ export function useRelayerClient() {
     deploySafe,
     approveUsdcForTrading,
     onboardUser,
+    forceCheckSafeDeployment,
     checkSafeDeployment,
 
     // Constants

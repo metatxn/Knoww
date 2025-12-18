@@ -23,6 +23,14 @@ interface Market {
   tokens?: MarketToken[];
   /** Condition ID for the market */
   conditionId?: string;
+  /**
+   * Minimum order size (in shares) for this specific market.
+   *
+   * NOTE: Gamma market payloads may expose this as `orderMinSize` (camelCase)
+   * or `order_min_size` (snake_case) depending on the endpoint/version.
+   */
+  orderMinSize?: number | string;
+  order_min_size?: number | string;
   volume?: string;
   liquidity?: string;
   active?: boolean;
