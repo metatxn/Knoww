@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  CalendarDays,
   ChevronDown,
   Clock,
   Droplets,
@@ -10,7 +9,7 @@ import {
   SlidersHorizontal,
   Tag,
 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,23 +22,16 @@ import {
   LIQUIDITY_PRESETS,
   STATUS_OPTIONS,
   useEventFilters,
-  VOLUME_24HR_PRESETS,
+  VOLUME_WINDOW_OPTIONS,
+  type VolumeWindow,
 } from "@/context/event-filter-context";
 import { useTags } from "@/hooks/use-tags";
 import { cn } from "@/lib/utils";
 
-// Sort options
-const SORT_OPTIONS = [
-  { value: "newest", label: "Newest" },
-  { value: "volume", label: "Volume" },
-  { value: "liquidity", label: "Liquidity" },
-  { value: "ending", label: "Ending Soon" },
-];
-
 export function EventFilterBar() {
   const {
     filters,
-    setVolume24hr,
+    setVolumeWindow,
     setLiquidity,
     toggleStatus,
     setTagSlugs,
@@ -51,53 +43,68 @@ export function EventFilterBar() {
   const { data: tags } = useTags();
 
   // Get current filter display values
-  const volume24hrLabel =
-    VOLUME_24HR_PRESETS.find((p) => p.value === filters.volume24hr)?.label ||
-    "Any";
   const liquidityLabel =
     LIQUIDITY_PRESETS.find((p) => p.value === filters.liquidity)?.label ||
     "Any";
+  const volumeWindowLabel =
+    VOLUME_WINDOW_OPTIONS.find((o) => o.value === filters.volumeWindow)
+      ?.label || "24h";
 
   // Status display
   const statusLabel =
     filters.status.length === STATUS_OPTIONS.length
       ? "All"
       : filters.status.length === 0
-        ? "None"
-        : filters.status.length === 1
-          ? STATUS_OPTIONS.find((s) => s.value === filters.status[0])?.label
-          : `${filters.status.length} selected`;
+      ? "None"
+      : filters.status.length === 1
+      ? STATUS_OPTIONS.find((s) => s.value === filters.status[0])?.label
+      : `${filters.status.length} selected`;
 
   // Tags display
   const tagsLabel =
     filters.tagSlugs.length === 0
       ? "All"
       : filters.tagSlugs.length === 1
-        ? tags?.find((t) => t.slug === filters.tagSlugs[0])?.label ||
-          filters.tagSlugs[0]
-        : `${filters.tagSlugs.length} tags`;
+      ? tags?.find((t) => t.slug === filters.tagSlugs[0])?.label ||
+        filters.tagSlugs[0]
+      : `${filters.tagSlugs.length} tags`;
 
   // Date range display
-  const dateRangeLabel =
-    !filters.dateRange.start && !filters.dateRange.end
-      ? "24h"
-      : filters.dateRange.start && filters.dateRange.end
-        ? "Custom"
-        : "All time";
+  // "All time" = no date range set (both null)
+  // "24h", "7 days", "30 days" = both start and end are set
+  // "Custom" = only one of start/end is set (partial range)
+  const dateRangeLabel = useMemo(() => {
+    const { start, end } = filters.dateRange;
+    // No dates set = All time
+    if (!start && !end) return "All time";
+    // Both dates set - check which preset it matches
+    if (start && end) {
+      const now = Date.now();
+      const diffMs = now - start.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      // Check for approximate matches (within a few hours tolerance)
+      if (diffDays <= 1.1) return "24h";
+      if (diffDays <= 7.5 && diffDays >= 6.5) return "7 days";
+      if (diffDays <= 31 && diffDays >= 28) return "30 days";
+      return "Custom";
+    }
+    // Only one date set = Custom range
+    return "Custom";
+  }, [filters.dateRange]);
 
-  // Handle volume selection
-  const handleVolume24hrChange = useCallback(
-    (value: number | null) => {
-      setVolume24hr(value);
+  // Handle volume window selection
+  const handleVolumeWindowChange = useCallback(
+    (window: VolumeWindow) => {
+      setVolumeWindow(window);
     },
-    [setVolume24hr],
+    [setVolumeWindow]
   );
 
   const handleLiquidityChange = useCallback(
     (value: number | null) => {
       setLiquidity(value);
     },
-    [setLiquidity],
+    [setLiquidity]
   );
 
   const handleTagToggle = useCallback(
@@ -108,7 +115,7 @@ export function EventFilterBar() {
         setTagSlugs([...filters.tagSlugs, tagSlug]);
       }
     },
-    [filters.tagSlugs, setTagSlugs],
+    [filters.tagSlugs, setTagSlugs]
   );
 
   // Date quick presets
@@ -139,53 +146,50 @@ export function EventFilterBar() {
           break;
       }
     },
-    [setDateRange],
+    [setDateRange]
   );
 
   return (
-    <div className="flex items-center gap-4 py-4 border-t border-border/40 overflow-x-auto scrollbar-hide">
-      {/* Timeframe Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
+    <div className="flex items-center gap-8 py-4 px-1 border-t border-border/40 overflow-x-auto scrollbar-hide">
+      {/* Created At Filter */}
+      <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Timeframe
+          Created At
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50"
+              className="h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50"
             >
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              {dateRangeLabel}
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="truncate">{dateRangeLabel}</span>
+              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
             <DropdownMenuCheckboxItem
-              checked={
-                filters.dateRange.start !== null &&
-                filters.dateRange.end !== null
-              }
+              checked={dateRangeLabel === "24h"}
               onCheckedChange={() => handleDatePreset("24h")}
             >
               24h
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
-              checked={false}
+              checked={dateRangeLabel === "7 days"}
               onCheckedChange={() => handleDatePreset("week")}
             >
               7 days
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
-              checked={false}
+              checked={dateRangeLabel === "30 days"}
               onCheckedChange={() => handleDatePreset("month")}
             >
               30 days
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem
-              checked={!filters.dateRange.start && !filters.dateRange.end}
+              checked={dateRangeLabel === "All time"}
               onCheckedChange={() => handleDatePreset("all")}
             >
               All time
@@ -195,7 +199,7 @@ export function EventFilterBar() {
       </div>
 
       {/* Liquidity Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 w-[110px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Liquidity
         </span>
@@ -205,13 +209,13 @@ export function EventFilterBar() {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.liquidity !== null && "text-primary",
+                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
+                filters.liquidity !== null && "text-primary"
               )}
             >
-              <Droplets className="h-4 w-4 text-muted-foreground" />
-              {liquidityLabel}
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+              <Droplets className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="truncate">{liquidityLabel}</span>
+              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
@@ -229,7 +233,7 @@ export function EventFilterBar() {
       </div>
 
       {/* Status Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 w-[110px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Status
         </span>
@@ -239,15 +243,15 @@ export function EventFilterBar() {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
+                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
                 (filters.status.length !== 1 ||
                   !filters.status.includes("active")) &&
-                  "text-primary",
+                  "text-primary"
               )}
             >
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              {statusLabel}
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+              <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="truncate">{statusLabel}</span>
+              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
@@ -265,7 +269,7 @@ export function EventFilterBar() {
       </div>
 
       {/* Tags Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 w-[100px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Tags
         </span>
@@ -275,13 +279,13 @@ export function EventFilterBar() {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.tagSlugs.length > 0 && "text-primary",
+                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
+                filters.tagSlugs.length > 0 && "text-primary"
               )}
             >
-              <Tag className="h-4 w-4 text-muted-foreground" />
-              {tagsLabel}
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+              <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="truncate">{tagsLabel}</span>
+              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -309,7 +313,7 @@ export function EventFilterBar() {
       </div>
 
       {/* Volume Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 w-[100px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Volume
         </span>
@@ -319,51 +323,21 @@ export function EventFilterBar() {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.volume24hr !== null && "text-primary",
+                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
+                filters.volumeWindow !== "24h" && "text-primary"
               )}
             >
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              {volume24hrLabel}
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="truncate">{volumeWindowLabel}</span>
+              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
-            {VOLUME_24HR_PRESETS.map((preset) => (
-              <DropdownMenuCheckboxItem
-                key={preset.label}
-                checked={filters.volume24hr === preset.value}
-                onCheckedChange={() => handleVolume24hrChange(preset.value)}
-              >
-                {preset.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Sort Filter */}
-      <div className="flex flex-col gap-1.5 min-w-[100px]">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Sort
-        </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50"
-            >
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              Newest
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-36">
-            {SORT_OPTIONS.map((option) => (
+            {VOLUME_WINDOW_OPTIONS.map((option) => (
               <DropdownMenuCheckboxItem
                 key={option.value}
-                checked={option.value === "newest"}
+                checked={filters.volumeWindow === option.value}
+                onCheckedChange={() => handleVolumeWindowChange(option.value)}
               >
                 {option.label}
               </DropdownMenuCheckboxItem>

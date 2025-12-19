@@ -1,6 +1,9 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { EventFilters } from "@/context/event-filter-context";
+import type {
+  EventFilters,
+  VolumeWindow,
+} from "@/context/event-filter-context";
 import { useEventFilters } from "@/context/event-filter-context";
 
 // Extended event interface with all filterable fields
@@ -60,22 +63,44 @@ function parseNumeric(value: number | string | undefined): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+// Sort events by volume based on the selected window (highest first)
+function sortEventsByVolume(
+  events: FilterableEvent[],
+  volumeWindow: VolumeWindow
+): FilterableEvent[] {
+  const sorted = [...events];
+
+  return sorted.sort((a, b) => {
+    const volA = resolveVolumeByWindow(a, volumeWindow);
+    const volB = resolveVolumeByWindow(b, volumeWindow);
+    return volB - volA; // Highest volume first
+  });
+}
+
+// Helper to resolve volume by window
+function resolveVolumeByWindow(
+  evt: FilterableEvent,
+  window: VolumeWindow
+): number {
+  switch (window) {
+    case "1wk":
+      return parseNumeric(evt.volume1wk);
+    case "1mo":
+      return parseNumeric(evt.volume1mo);
+    case "1yr":
+      return parseNumeric(evt.volume1yr);
+    default:
+      return parseNumeric(evt.volume24hr);
+  }
+}
+
 // Check if event matches the current filters
 function matchesFilters(
   event: FilterableEvent,
-  filters: EventFilters,
+  filters: EventFilters
 ): boolean {
-  // Volume 24hr filter
-  if (filters.volume24hr !== null) {
-    const volume24hr = parseNumeric(event.volume24hr);
-    if (volume24hr < filters.volume24hr) return false;
-  }
-
-  // Volume weekly filter
-  if (filters.volumeWeekly !== null) {
-    const volume1wk = parseNumeric(event.volume1wk);
-    if (volume1wk < filters.volumeWeekly) return false;
-  }
+  // Volume filters are no longer used as threshold filters
+  // (we removed volume24hr threshold - now we just sort by volume)
 
   // Liquidity filter
   if (filters.liquidity !== null) {
@@ -106,10 +131,10 @@ function matchesFilters(
   if (filters.tagSlugs.length > 0) {
     const eventTags = event.tags || [];
     const eventTagSlugs = eventTags.map((tag) =>
-      typeof tag === "string" ? tag : tag.slug || "",
+      typeof tag === "string" ? tag : tag.slug || ""
     );
     const hasMatchingTag = filters.tagSlugs.some((slug) =>
-      eventTagSlugs.includes(slug),
+      eventTagSlugs.includes(slug)
     );
     if (!hasMatchingTag) return false;
   }
@@ -147,17 +172,29 @@ function matchesFilters(
  */
 export function useFilteredEvents({
   limit = 50, // Fetch more to allow for client-side filtering
-  order = "volume24hr",
-  ascending = false,
 }: UseFilteredEventsParams = {}) {
   const { filters } = useEventFilters();
+
+  // Map volume window to API order field
+  const volumeOrderField = useMemo(() => {
+    switch (filters.volumeWindow) {
+      case "1wk":
+        return "volume1wk";
+      case "1mo":
+        return "volume1mo";
+      case "1yr":
+        return "volume1yr";
+      default:
+        return "volume24hr";
+    }
+  }, [filters.volumeWindow]);
 
   // Build server-side filter params
   const serverParams = useMemo(() => {
     const params: Record<string, string> = {
       limit: limit.toString(),
-      order,
-      ascending: ascending.toString(),
+      order: volumeOrderField,
+      ascending: "false", // Always sort by volume descending (highest first)
     };
 
     // Server supports active/closed filtering
@@ -185,11 +222,11 @@ export function useFilteredEvents({
     }
 
     return params;
-  }, [filters.status, filters.tagSlugs, limit, order, ascending]);
+  }, [filters.status, filters.tagSlugs, limit, volumeOrderField]);
 
   // Fetch events from API
   const query = useInfiniteQuery({
-    queryKey: ["filtered-events", serverParams],
+    queryKey: ["filtered-events", serverParams, filters.volumeWindow],
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams({
         ...serverParams,
@@ -197,7 +234,7 @@ export function useFilteredEvents({
       });
 
       const response = await fetch(
-        `/api/events/paginated?${params.toString()}`,
+        `/api/events/paginated?${params.toString()}`
       );
 
       if (!response.ok) {
@@ -224,12 +261,16 @@ export function useFilteredEvents({
     refetchOnWindowFocus: false,
   });
 
-  // Apply client-side filtering
+  // Apply client-side filtering and sorting by volume
   const filteredEvents = useMemo(() => {
     if (!query.data?.pages) return [];
 
     const allEvents = query.data.pages.flatMap((page) => page.events);
-    return allEvents.filter((event) => matchesFilters(event, filters));
+    const filtered = allEvents.filter((event) =>
+      matchesFilters(event, filters)
+    );
+    // Sort by the selected volume window (highest first)
+    return sortEventsByVolume(filtered, filters.volumeWindow);
   }, [query.data?.pages, filters]);
 
   // Calculate if there are more events (considering client-side filtering)
@@ -256,7 +297,7 @@ export function useFilteredEvents({
  */
 export function useFilteredEventsWithViewMode(
   viewMode: "categories" | "trending" | "breaking" | "new",
-  baseLimit = 20,
+  baseLimit = 20
 ) {
   const { filters } = useEventFilters();
 
@@ -276,7 +317,7 @@ export function useFilteredEventsWithViewMode(
 
   // Fetch events from the appropriate endpoint
   const query = useInfiniteQuery({
-    queryKey: ["filtered-events", viewMode, baseLimit],
+    queryKey: ["filtered-events", viewMode, baseLimit, filters.volumeWindow],
     queryFn: async ({ pageParam = 0 }) => {
       const params = new URLSearchParams({
         limit: baseLimit.toString(),
@@ -309,12 +350,16 @@ export function useFilteredEventsWithViewMode(
     refetchOnWindowFocus: false,
   });
 
-  // Apply client-side filtering
+  // Apply client-side filtering and sorting by volume
   const filteredEvents = useMemo(() => {
     if (!query.data?.pages) return [];
 
     const allEvents = query.data.pages.flatMap((page) => page.events);
-    return allEvents.filter((event) => matchesFilters(event, filters));
+    const filtered = allEvents.filter((event) =>
+      matchesFilters(event, filters)
+    );
+    // Sort by the selected volume window (highest first)
+    return sortEventsByVolume(filtered, filters.volumeWindow);
   }, [query.data?.pages, filters]);
 
   return {

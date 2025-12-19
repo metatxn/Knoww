@@ -40,6 +40,8 @@ export const LIQUIDITY_PRESETS: VolumeThreshold[] = [
   { value: 1_000_000, label: "> $1M" },
 ];
 
+export type VolumeWindow = "24h" | "1wk" | "1mo" | "1yr";
+
 // Status filter options
 export type StatusFilter = "active" | "live" | "ended" | "closed";
 
@@ -48,6 +50,14 @@ export const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "live", label: "Live" },
   { value: "ended", label: "Ended" },
   { value: "closed", label: "Closed" },
+];
+
+// Volume window options for the Volume filter dropdown
+export const VOLUME_WINDOW_OPTIONS: { value: VolumeWindow; label: string }[] = [
+  { value: "24h", label: "24h" },
+  { value: "1wk", label: "7 days" },
+  { value: "1mo", label: "30 days" },
+  { value: "1yr", label: "1 year" },
 ];
 
 // Competitiveness presets (stored as 0-100 in UI, converted to 0-1 for API)
@@ -74,6 +84,7 @@ export interface DateRange {
 export interface EventFilters {
   volume24hr: number | null;
   volumeWeekly: number | null;
+  volumeWindow: VolumeWindow;
   liquidity: number | null;
   status: StatusFilter[];
   tagSlugs: string[];
@@ -90,6 +101,7 @@ export const DEFAULT_FILTERS: EventFilters = {
   tagSlugs: [],
   competitiveness: { min: 0, max: 100 },
   dateRange: { start: null, end: null },
+  volumeWindow: "24h",
 };
 
 // Context type
@@ -97,6 +109,7 @@ interface EventFilterContextType {
   filters: EventFilters;
   setVolume24hr: (value: number | null) => void;
   setVolumeWeekly: (value: number | null) => void;
+  setVolumeWindow: (window: VolumeWindow) => void;
   setLiquidity: (value: number | null) => void;
   toggleStatus: (status: StatusFilter) => void;
   setStatus: (status: StatusFilter[]) => void;
@@ -118,7 +131,7 @@ interface EventFilterContextType {
 }
 
 const EventFilterContext = createContext<EventFilterContextType | undefined>(
-  undefined,
+  undefined
 );
 
 export function EventFilterProvider({ children }: { children: ReactNode }) {
@@ -130,6 +143,10 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
 
   const setVolumeWeekly = useCallback((value: number | null) => {
     setFilters((prev) => ({ ...prev, volumeWeekly: value }));
+  }, []);
+
+  const setVolumeWindow = useCallback((window: VolumeWindow) => {
+    setFilters((prev) => ({ ...prev, volumeWindow: window }));
   }, []);
 
   const setLiquidity = useCallback((value: number | null) => {
@@ -272,6 +289,7 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
       filters,
       setVolume24hr,
       setVolumeWeekly,
+      setVolumeWindow,
       setLiquidity,
       toggleStatus,
       setStatus,
@@ -289,6 +307,7 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
       filters,
       setVolume24hr,
       setVolumeWeekly,
+      setVolumeWindow,
       setLiquidity,
       toggleStatus,
       setStatus,
@@ -301,7 +320,7 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
       hasActiveFilters,
       serverFilterParams,
       apiQueryParams,
-    ],
+    ]
   );
 
   return (
@@ -315,7 +334,7 @@ export function useEventFilters() {
   const context = useContext(EventFilterContext);
   if (context === undefined) {
     throw new Error(
-      "useEventFilters must be used within an EventFilterProvider",
+      "useEventFilters must be used within an EventFilterProvider"
     );
   }
   return context;

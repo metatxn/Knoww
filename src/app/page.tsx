@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Flame, Sparkles, Star, Zap } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventCard } from "@/components/event-card";
 import { EventFilterBar } from "@/components/event-filter-bar";
 import { MarketSearch } from "@/components/market-search";
@@ -73,6 +73,20 @@ export default function Home() {
     apiQueryParams,
   } = useEventFilters();
 
+  // Map volume window to API order field
+  const volumeOrderField = useMemo(() => {
+    switch (filters.volumeWindow) {
+      case "1wk":
+        return "volume1wk";
+      case "1mo":
+        return "volume1mo";
+      case "1yr":
+        return "volume1yr";
+      default:
+        return "volume24hr";
+    }
+  }, [filters.volumeWindow]);
+
   // Client-side date filter as fallback (in case API doesn't support date filtering)
   const applyDateFilter = useCallback(
     <T extends EventWithDates>(events: T[]): T[] => {
@@ -100,7 +114,7 @@ export default function Home() {
         return true;
       });
     },
-    [filters.dateRange],
+    [filters.dateRange]
   );
 
   // Use server-side filtering for paginated events
@@ -113,7 +127,7 @@ export default function Home() {
     isFetchingNextPage: isFetchingNextAllPaginated,
   } = usePaginatedEvents({
     limit: 20,
-    order: "volume24hr",
+    order: volumeOrderField,
     ascending: false,
     active: apiQueryParams.active,
     closed: apiQueryParams.closed,
@@ -187,7 +201,7 @@ export default function Home() {
           fetchMore();
         }
       },
-      { threshold: 0.1, rootMargin: "200px" },
+      { threshold: 0.1, rootMargin: "200px" }
     );
 
     observer.observe(loadMoreRef.current);
