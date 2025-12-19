@@ -383,4 +383,3 @@ export function useTrading() {
   }
   return context;
 }
-

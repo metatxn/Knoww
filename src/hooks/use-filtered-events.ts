@@ -66,7 +66,7 @@ function parseNumeric(value: number | string | undefined): number {
 // Sort events by volume based on the selected window (highest first)
 function sortEventsByVolume(
   events: FilterableEvent[],
-  volumeWindow: VolumeWindow
+  volumeWindow: VolumeWindow,
 ): FilterableEvent[] {
   const sorted = [...events];
 
@@ -80,7 +80,7 @@ function sortEventsByVolume(
 // Helper to resolve volume by window
 function resolveVolumeByWindow(
   evt: FilterableEvent,
-  window: VolumeWindow
+  window: VolumeWindow,
 ): number {
   switch (window) {
     case "1wk":
@@ -97,7 +97,7 @@ function resolveVolumeByWindow(
 // Check if event matches the current filters
 function matchesFilters(
   event: FilterableEvent,
-  filters: EventFilters
+  filters: EventFilters,
 ): boolean {
   // Volume filters are no longer used as threshold filters
   // (we removed volume24hr threshold - now we just sort by volume)
@@ -131,10 +131,10 @@ function matchesFilters(
   if (filters.tagSlugs.length > 0) {
     const eventTags = event.tags || [];
     const eventTagSlugs = eventTags.map((tag) =>
-      typeof tag === "string" ? tag : tag.slug || ""
+      typeof tag === "string" ? tag : tag.slug || "",
     );
     const hasMatchingTag = filters.tagSlugs.some((slug) =>
-      eventTagSlugs.includes(slug)
+      eventTagSlugs.includes(slug),
     );
     if (!hasMatchingTag) return false;
   }
@@ -234,7 +234,7 @@ export function useFilteredEvents({
       });
 
       const response = await fetch(
-        `/api/events/paginated?${params.toString()}`
+        `/api/events/paginated?${params.toString()}`,
       );
 
       if (!response.ok) {
@@ -267,7 +267,7 @@ export function useFilteredEvents({
 
     const allEvents = query.data.pages.flatMap((page) => page.events);
     const filtered = allEvents.filter((event) =>
-      matchesFilters(event, filters)
+      matchesFilters(event, filters),
     );
     // Sort by the selected volume window (highest first)
     return sortEventsByVolume(filtered, filters.volumeWindow);
@@ -297,7 +297,7 @@ export function useFilteredEvents({
  */
 export function useFilteredEventsWithViewMode(
   viewMode: "categories" | "trending" | "breaking" | "new",
-  baseLimit = 20
+  baseLimit = 20,
 ) {
   const { filters } = useEventFilters();
 
@@ -356,7 +356,7 @@ export function useFilteredEventsWithViewMode(
 
     const allEvents = query.data.pages.flatMap((page) => page.events);
     const filtered = allEvents.filter((event) =>
-      matchesFilters(event, filters)
+      matchesFilters(event, filters),
     );
     // Sort by the selected volume window (highest first)
     return sortEventsByVolume(filtered, filters.volumeWindow);

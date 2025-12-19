@@ -15,7 +15,7 @@ export function MainContent({ children }: MainContentProps) {
     <div
       className={cn(
         "transition-all duration-300",
-        isCollapsed ? "xl:ml-16" : "xl:ml-56"
+        isCollapsed ? "xl:ml-16" : "xl:ml-56",
       )}
     >
       {children}

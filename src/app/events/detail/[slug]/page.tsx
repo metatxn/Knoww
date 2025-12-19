@@ -87,7 +87,7 @@ export default function EventDetailPage() {
       try {
         const res = await fetch(
           `https://clob.polymarket.com/book?token_id=${tokenId}`,
-          { headers: { Accept: "application/json" } }
+          { headers: { Accept: "application/json" } },
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -99,7 +99,7 @@ export default function EventDetailPage() {
         console.error("Preload order book failed", err);
       }
     },
-    [setOrderBookFromRest]
+    [setOrderBookFromRest],
   );
 
   // Use slug from URL params - API handles both slugs and numeric IDs
@@ -134,12 +134,12 @@ export default function EventDetailPage() {
 
   const openMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed !== true),
-    [allMarkets]
+    [allMarkets],
   );
 
   const closedMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed === true),
-    [allMarkets]
+    [allMarkets],
   );
 
   // Closed market rows (precomputed; used later in the dropdown)
@@ -156,10 +156,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes")
+          o.toLowerCase().includes("yes"),
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no")
+          o.toLowerCase().includes("no"),
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -170,7 +170,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes"
+            (t) => t.outcome?.toLowerCase() === "yes",
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -246,10 +246,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes")
+          o.toLowerCase().includes("yes"),
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no")
+          o.toLowerCase().includes("no"),
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -260,7 +260,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes"
+            (t) => t.outcome?.toLowerCase() === "yes",
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -302,7 +302,7 @@ export default function EventDetailPage() {
       });
 
       const sortedMarketData = [...marketData].sort(
-        (a, b) => b.yesProbability - a.yesProbability
+        (a, b) => b.yesProbability - a.yesProbability,
       );
 
       const selected =
@@ -370,7 +370,7 @@ export default function EventDetailPage() {
       // Direct call to Polymarket CLOB API (public, allows CORS)
       const response = await fetch(
         `https://clob.polymarket.com/book?token_id=${currentTokenId}`,
-        { headers: { Accept: "application/json" } }
+        { headers: { Accept: "application/json" } },
       );
       if (!response.ok) return null;
       const data = (await response.json()) as {
@@ -411,7 +411,7 @@ export default function EventDetailPage() {
       setOrderBookFromRest(
         currentTokenId,
         orderBookData.orderBook.bids || [],
-        orderBookData.orderBook.asks || []
+        orderBookData.orderBook.asks || [],
       );
     }
   }, [orderBookData, currentTokenId, setOrderBookFromRest]);
@@ -460,10 +460,10 @@ export default function EventDetailPage() {
       const asks = ob.asks || [];
 
       const sortedBids = [...bids].sort(
-        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
+        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
       );
       const sortedAsks = [...asks].sort(
-        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
+        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
       );
 
       const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
@@ -478,7 +478,7 @@ export default function EventDetailPage() {
 
       const minOrderSizeValue = Math.max(
         marketMinOrderSize,
-        bookMinOrderSizeValue
+        bookMinOrderSizeValue,
       );
 
       return {
@@ -569,10 +569,10 @@ export default function EventDetailPage() {
       : [];
 
     const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes")
+      o.toLowerCase().includes("yes"),
     );
     const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no")
+      o.toLowerCase().includes("no"),
     );
 
     const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -615,7 +615,7 @@ export default function EventDetailPage() {
   });
 
   const sortedMarketData = [...marketData].sort(
-    (a, b) => b.yesProbability - a.yesProbability
+    (a, b) => b.yesProbability - a.yesProbability,
   );
 
   // Chart behavior:
@@ -673,7 +673,7 @@ export default function EventDetailPage() {
         ? market.createdAt
         : earliest;
     },
-    event.createdAt
+    event.createdAt,
   );
 
   return (
@@ -825,7 +825,7 @@ export default function EventDetailPage() {
                           No{" "}
                           {Math.max(
                             0,
-                            100 - singleMarketForChart.yesProbability
+                            100 - singleMarketForChart.yesProbability,
                           )}
                           %
                         </span>
@@ -842,10 +842,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -890,9 +890,9 @@ export default function EventDetailPage() {
                             isConnected
                               ? "text-emerald-500"
                               : connectionState === "connecting" ||
-                                connectionState === "reconnecting"
-                              ? "text-amber-500 animate-pulse"
-                              : "text-muted-foreground"
+                                  connectionState === "reconnecting"
+                                ? "text-amber-500 animate-pulse"
+                                : "text-muted-foreground",
                           )}
                         />
                         <span
@@ -901,18 +901,18 @@ export default function EventDetailPage() {
                             isConnected
                               ? "text-emerald-500"
                               : connectionState === "connecting" ||
-                                connectionState === "reconnecting"
-                              ? "text-amber-500"
-                              : "text-muted-foreground"
+                                  connectionState === "reconnecting"
+                                ? "text-amber-500"
+                                : "text-muted-foreground",
                           )}
                         >
                           {isConnected
                             ? "Live"
                             : connectionState === "connecting"
-                            ? "Connecting..."
-                            : connectionState === "reconnecting"
-                            ? "Reconnecting..."
-                            : "Offline"}
+                              ? "Connecting..."
+                              : connectionState === "reconnecting"
+                                ? "Reconnecting..."
+                                : "Offline"}
                         </span>
                       </div>
                       {/* Collapse/Expand toggle */}
@@ -969,7 +969,7 @@ export default function EventDetailPage() {
                                 selectedMarket?.id === market.id
                                   ? "bg-primary/5"
                                   : "hover:bg-accent/30",
-                                isExpanded && "bg-muted/30"
+                                isExpanded && "bg-muted/30",
                               )}
                               onClick={() => {
                                 // Toggle order book expansion
@@ -1062,7 +1062,7 @@ export default function EventDetailPage() {
                                       "flex-1 h-9 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400"
+                                        "ring-2 ring-green-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1082,7 +1082,7 @@ export default function EventDetailPage() {
                                       "flex-1 h-9 text-xs font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400"
+                                        "ring-2 ring-red-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1147,7 +1147,7 @@ export default function EventDetailPage() {
                                       "h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400"
+                                        "ring-2 ring-green-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1167,7 +1167,7 @@ export default function EventDetailPage() {
                                       "h-8 px-3 text-xs font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400"
+                                        "ring-2 ring-red-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1248,7 +1248,7 @@ export default function EventDetailPage() {
                                       "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400"
+                                        "ring-2 ring-green-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1271,7 +1271,7 @@ export default function EventDetailPage() {
                                       "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400"
+                                        "ring-2 ring-red-400",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1296,7 +1296,7 @@ export default function EventDetailPage() {
                                 "grid transition-all duration-300 ease-in-out border-b border-border bg-muted/10",
                                 isExpanded
                                   ? "grid-rows-[1fr] opacity-100"
-                                  : "grid-rows-[0fr] opacity-0"
+                                  : "grid-rows-[0fr] opacity-0",
                               )}
                             >
                               <div className="overflow-hidden">
@@ -1430,7 +1430,7 @@ export default function EventDetailPage() {
                             <button
                               type="button"
                               className={cn(
-                                "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors"
+                                "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors",
                               )}
                             >
                               <span>
@@ -1439,7 +1439,7 @@ export default function EventDetailPage() {
                               <ChevronDown
                                 className={cn(
                                   "h-4 w-4 transition-transform",
-                                  showClosedMarkets && "rotate-180"
+                                  showClosedMarkets && "rotate-180",
                                 )}
                               />
                             </button>
@@ -1474,14 +1474,14 @@ export default function EventDetailPage() {
                                       className={cn(
                                         "w-full text-left p-3 md:p-4 border-t border-border transition-all cursor-pointer",
                                         "hover:bg-accent/30",
-                                        isExpanded && "bg-muted/30"
+                                        isExpanded && "bg-muted/30",
                                       )}
                                       onClick={() => {
                                         if (isExpanded) {
                                           setExpandedOrderBookMarketId(null);
                                         } else {
                                           setExpandedOrderBookMarketId(
-                                            market.id
+                                            market.id,
                                           );
                                           // Market is closed — do not fetch order book snapshots.
                                         }
@@ -1496,7 +1496,7 @@ export default function EventDetailPage() {
                                             setExpandedOrderBookMarketId(null);
                                           } else {
                                             setExpandedOrderBookMarketId(
-                                              market.id
+                                              market.id,
                                             );
                                           }
                                         }
@@ -1566,7 +1566,7 @@ export default function EventDetailPage() {
                                         "grid transition-all duration-300 ease-in-out border-t border-border bg-muted/10",
                                         isExpanded
                                           ? "grid-rows-[1fr] opacity-100"
-                                          : "grid-rows-[0fr] opacity-0"
+                                          : "grid-rows-[0fr] opacity-0",
                                       )}
                                     >
                                       <div className="overflow-hidden">

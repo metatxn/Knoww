@@ -92,4 +92,3 @@ export const SIGNATURE_TYPES = {
   POLY_PROXY: 1, // Polymarket Proxy Wallet
   POLY_GNOSIS_SAFE: 2, // Gnosis Safe (used for trading via proxy)
 } as const;
-

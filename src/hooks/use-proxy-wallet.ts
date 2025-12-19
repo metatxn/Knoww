@@ -69,7 +69,7 @@ export function useProxyWallet() {
       try {
         // Check for positions using the PROXY address (not EOA)
         const positionsRes = await fetch(
-          `${DATA_API_BASE}/positions?user=${proxyAddress.toLowerCase()}&sizeThreshold=.1&redeemable=true&limit=1`
+          `${DATA_API_BASE}/positions?user=${proxyAddress.toLowerCase()}&sizeThreshold=.1&redeemable=true&limit=1`,
         );
 
         if (positionsRes.ok) {
@@ -81,7 +81,7 @@ export function useProxyWallet() {
 
         // Check for activity using the PROXY address (not EOA)
         const activityRes = await fetch(
-          `${DATA_API_BASE}/activity?user=${proxyAddress.toLowerCase()}&limit=1`
+          `${DATA_API_BASE}/activity?user=${proxyAddress.toLowerCase()}&limit=1`,
         );
 
         if (activityRes.ok) {
@@ -96,7 +96,7 @@ export function useProxyWallet() {
         return false;
       }
     },
-    []
+    [],
   );
 
   /**
@@ -112,8 +112,8 @@ export function useProxyWallet() {
         const salt = keccak256(
           encodeAbiParameters(
             [{ name: "address", type: "address" }],
-            [ownerAddress as `0x${string}`]
-          )
+            [ownerAddress as `0x${string}`],
+          ),
         );
 
         const proxyAddress = getCreate2Address({
@@ -127,7 +127,7 @@ export function useProxyWallet() {
         return null;
       }
     },
-    []
+    [],
   );
 
   /**
@@ -138,7 +138,7 @@ export function useProxyWallet() {
     async (proxyAddress: string): Promise<boolean> => {
       return rpcCheckIsDeployed(proxyAddress);
     },
-    []
+    [],
   );
 
   /**
@@ -149,7 +149,7 @@ export function useProxyWallet() {
     async (walletAddress: string): Promise<number> => {
       return rpcFetchUsdcBalance(walletAddress);
     },
-    []
+    [],
   );
 
   /**
@@ -246,7 +246,13 @@ export function useProxyWallet() {
         }));
       }
     },
-    [address, isConnected, deriveSafeAddress, checkIsDeployed, fetchUsdcBalance]
+    [
+      address,
+      isConnected,
+      deriveSafeAddress,
+      checkIsDeployed,
+      fetchUsdcBalance,
+    ],
   );
 
   /**

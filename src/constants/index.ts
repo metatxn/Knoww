@@ -6,4 +6,3 @@
 
 export * from "./contracts";
 export * from "./polymarket";
-

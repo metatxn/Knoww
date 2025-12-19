@@ -114,7 +114,7 @@ export default function Home() {
         return true;
       });
     },
-    [filters.dateRange]
+    [filters.dateRange],
   );
 
   // Use server-side filtering for paginated events
@@ -201,7 +201,7 @@ export default function Home() {
           fetchMore();
         }
       },
-      { threshold: 0.1, rootMargin: "200px" }
+      { threshold: 0.1, rootMargin: "200px" },
     );
 
     observer.observe(loadMoreRef.current);

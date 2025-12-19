@@ -112,7 +112,7 @@ export function useRelayerClient() {
       POLYMARKET_RELAYER_URL,
       CHAIN_ID,
       walletClient,
-      builderConfig
+      builderConfig,
     );
 
     return client;
@@ -144,7 +144,7 @@ export function useRelayerClient() {
       // Derive Safe address using SDK's method
       const proxyAddress = deriveSafe(
         address,
-        config.SafeContracts.SafeFactory
+        config.SafeContracts.SafeFactory,
       );
 
       return proxyAddress;
@@ -152,7 +152,7 @@ export function useRelayerClient() {
       // Fallback to manual derivation if SDK method fails
       console.warn(
         "[RelayerClient] SDK deriveSafe failed, using fallback:",
-        err
+        err,
       );
       try {
         const { getCreate2Address, keccak256, encodeAbiParameters } =
@@ -161,8 +161,8 @@ export function useRelayerClient() {
         const salt = keccak256(
           encodeAbiParameters(
             [{ name: "address", type: "address" }],
-            [address as `0x${string}`]
-          )
+            [address as `0x${string}`],
+          ),
         );
 
         const proxyAddress = getCreate2Address({
@@ -240,7 +240,7 @@ export function useRelayerClient() {
       // Use SDK's built-in wait() method as per documentation
       // https://docs.polymarket.com/developers/builders/relayer-client#deploying-safe-wallets
       console.log(
-        "[RelayerClient] Waiting for Safe deployment confirmation..."
+        "[RelayerClient] Waiting for Safe deployment confirmation...",
       );
       const result = await response.wait();
 
@@ -309,7 +309,7 @@ export function useRelayerClient() {
       const expectedSafe = await deriveSafeAddress();
       if (!expectedSafe) {
         throw new Error(
-          "Could not derive Safe address. Please ensure your wallet is connected."
+          "Could not derive Safe address. Please ensure your wallet is connected.",
         );
       }
 
@@ -337,7 +337,7 @@ export function useRelayerClient() {
 
       if (!isDeployed) {
         throw new Error(
-          "Your trading wallet is not deployed yet. Please complete the 'Create Trading Wallet' step first."
+          "Your trading wallet is not deployed yet. Please complete the 'Create Trading Wallet' step first.",
         );
       }
 
@@ -459,7 +459,7 @@ export function useRelayerClient() {
           CTF_EXCHANGE: CONTRACTS.CTF_EXCHANGE,
           NEG_RISK_CTF_EXCHANGE: CONTRACTS.NEG_RISK_CTF_EXCHANGE,
           NEG_RISK_ADAPTER: CONTRACTS.NEG_RISK_ADAPTER,
-        }
+        },
       );
 
       // Execute the approval transactions with retry logic
@@ -472,11 +472,11 @@ export function useRelayerClient() {
         try {
           if (retry > 0) {
             console.log(
-              `[RelayerClient] Retry attempt ${retry + 1}/${maxRetries}...`
+              `[RelayerClient] Retry attempt ${retry + 1}/${maxRetries}...`,
             );
             // Wait before retrying (exponential backoff: 1s, 2s, 4s)
             await new Promise((resolve) =>
-              setTimeout(resolve, 1000 * 2 ** (retry - 1))
+              setTimeout(resolve, 1000 * 2 ** (retry - 1)),
             );
           }
 
@@ -495,10 +495,10 @@ export function useRelayerClient() {
             response.state === "STATE_INVALID"
           ) {
             console.warn(
-              `[RelayerClient] Approval failed with state: ${response.state}, will retry...`
+              `[RelayerClient] Approval failed with state: ${response.state}, will retry...`,
             );
             lastError = new Error(
-              `Approval failed with state: ${response.state}`
+              `Approval failed with state: ${response.state}`,
             );
             continue; // Try again
           }
@@ -508,7 +508,7 @@ export function useRelayerClient() {
         } catch (executeErr) {
           console.error(
             `[RelayerClient] Execute error on attempt ${retry + 1}:`,
-            executeErr
+            executeErr,
           );
           lastError =
             executeErr instanceof Error
@@ -543,7 +543,7 @@ export function useRelayerClient() {
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         console.log(
-          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}...`
+          `[RelayerClient] Polling attempt ${attempt + 1}/${maxAttempts}...`,
         );
         const txns = await client.getTransaction(transactionId);
 
@@ -556,7 +556,7 @@ export function useRelayerClient() {
             console.error("[RelayerClient] Transaction failed:", tx);
             throw new Error(
               `Approval failed with state: ${tx.state}. ` +
-                `Transaction hash: ${tx.transactionHash || "none"}`
+                `Transaction hash: ${tx.transactionHash || "none"}`,
             );
           }
 
@@ -564,7 +564,7 @@ export function useRelayerClient() {
           if (successStates.includes(tx.state)) {
             console.log(
               "[RelayerClient] Approval successful:",
-              tx.transactionHash
+              tx.transactionHash,
             );
             setState((prev) => ({ ...prev, isLoading: false }));
             return {
@@ -583,7 +583,7 @@ export function useRelayerClient() {
       // If we get here, polling timed out but transaction was submitted
       // Consider it a success since the relayer accepted it
       console.log(
-        "[RelayerClient] Approval polling timed out, but transaction was submitted"
+        "[RelayerClient] Approval polling timed out, but transaction was submitted",
       );
       setState((prev) => ({ ...prev, isLoading: false }));
       return {
@@ -616,7 +616,7 @@ export function useRelayerClient() {
         return false;
       }
     },
-    []
+    [],
   );
 
   /**
@@ -673,7 +673,7 @@ export function useRelayerClient() {
           isDeployed,
           isDeployed
             ? "- Safe exists on-chain"
-            : "- Safe NOT deployed yet (new user)"
+            : "- Safe NOT deployed yet (new user)",
         );
 
         setState((prev) => ({
@@ -695,7 +695,7 @@ export function useRelayerClient() {
         }));
       }
     },
-    [address, deriveSafeAddress, checkIsDeployed]
+    [address, deriveSafeAddress, checkIsDeployed],
   );
 
   /**
