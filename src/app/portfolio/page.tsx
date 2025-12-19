@@ -1463,7 +1463,7 @@ function StatCard({
     <div
       className={`rounded-xl p-4 border transition-all ${
         isHighlighted
-          ? "bg-linear-to-br from-violet-500/10 via-fuchsia-500/5 to-background border-violet-500/20 col-span-2 md:col-span-1"
+          ? "bg-linear-to-br from-violet-500/10 via-fuchsia-500/5 to-background border-violet-500/20"
           : "bg-card border-border"
       }`}
     >

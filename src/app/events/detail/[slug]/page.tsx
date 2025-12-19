@@ -78,7 +78,7 @@ export default function EventDetailPage() {
       try {
         const res = await fetch(
           `https://clob.polymarket.com/book?token_id=${tokenId}`,
-          { headers: { Accept: "application/json" } },
+          { headers: { Accept: "application/json" } }
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -90,7 +90,7 @@ export default function EventDetailPage() {
         console.error("Preload order book failed", err);
       }
     },
-    [setOrderBookFromRest],
+    [setOrderBookFromRest]
   );
 
   // Use slug from URL params - API handles both slugs and numeric IDs
@@ -125,12 +125,12 @@ export default function EventDetailPage() {
 
   const openMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed !== true),
-    [allMarkets],
+    [allMarkets]
   );
 
   const closedMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed === true),
-    [allMarkets],
+    [allMarkets]
   );
 
   // Closed market rows (precomputed; used later in the dropdown)
@@ -147,10 +147,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes"),
+          o.toLowerCase().includes("yes")
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no"),
+          o.toLowerCase().includes("no")
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -161,7 +161,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes",
+            (t) => t.outcome?.toLowerCase() === "yes"
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -237,10 +237,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes"),
+          o.toLowerCase().includes("yes")
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no"),
+          o.toLowerCase().includes("no")
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -251,7 +251,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes",
+            (t) => t.outcome?.toLowerCase() === "yes"
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -293,7 +293,7 @@ export default function EventDetailPage() {
       });
 
       const sortedMarketData = [...marketData].sort(
-        (a, b) => b.yesProbability - a.yesProbability,
+        (a, b) => b.yesProbability - a.yesProbability
       );
 
       const selected =
@@ -361,7 +361,7 @@ export default function EventDetailPage() {
       // Direct call to Polymarket CLOB API (public, allows CORS)
       const response = await fetch(
         `https://clob.polymarket.com/book?token_id=${currentTokenId}`,
-        { headers: { Accept: "application/json" } },
+        { headers: { Accept: "application/json" } }
       );
       if (!response.ok) return null;
       const data = (await response.json()) as {
@@ -402,7 +402,7 @@ export default function EventDetailPage() {
       setOrderBookFromRest(
         currentTokenId,
         orderBookData.orderBook.bids || [],
-        orderBookData.orderBook.asks || [],
+        orderBookData.orderBook.asks || []
       );
     }
   }, [orderBookData, currentTokenId, setOrderBookFromRest]);
@@ -451,10 +451,10 @@ export default function EventDetailPage() {
       const asks = ob.asks || [];
 
       const sortedBids = [...bids].sort(
-        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
+        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
       );
       const sortedAsks = [...asks].sort(
-        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
+        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
       );
 
       const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
@@ -469,7 +469,7 @@ export default function EventDetailPage() {
 
       const minOrderSizeValue = Math.max(
         marketMinOrderSize,
-        bookMinOrderSizeValue,
+        bookMinOrderSizeValue
       );
 
       return {
@@ -560,10 +560,10 @@ export default function EventDetailPage() {
       : [];
 
     const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes"),
+      o.toLowerCase().includes("yes")
     );
     const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no"),
+      o.toLowerCase().includes("no")
     );
 
     const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -606,7 +606,7 @@ export default function EventDetailPage() {
   });
 
   const sortedMarketData = [...marketData].sort(
-    (a, b) => b.yesProbability - a.yesProbability,
+    (a, b) => b.yesProbability - a.yesProbability
   );
 
   // Chart behavior:
@@ -664,7 +664,7 @@ export default function EventDetailPage() {
         ? market.createdAt
         : earliest;
     },
-    event.createdAt,
+    event.createdAt
   );
 
   return (
@@ -695,10 +695,11 @@ export default function EventDetailPage() {
         </div>
 
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-start gap-4 flex-1">
+        <div className="space-y-3 sm:space-y-4">
+          {/* Title Row with Image, Title, and Action Buttons */}
+          <div className="flex items-start gap-3 md:gap-4">
             {event.image && (
-              <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
+              <div className="relative w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0">
                 <Image
                   src={event.image}
                   alt={event.title}
@@ -710,78 +711,86 @@ export default function EventDetailPage() {
             )}
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-bold">
-                  {event.title}
-                </h1>
-                {event.negRisk && <NegRiskBadge />}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                  <Trophy className="h-4 w-4" />
-                  <span className="font-medium">
-                    {formatVolume(event.volume)} Vol.
-                  </span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight">
+                    {event.title}
+                  </h1>
+                  {event.negRisk && (
+                    <div className="mt-1.5">
+                      <NegRiskBadge />
+                    </div>
+                  )}
                 </div>
-                {event.endDate && (
-                  <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(event.endDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                  <span className="font-medium">
-                    {totalMarketsCount} markets
-                  </span>
+                {/* Action Buttons - Icon only on mobile/tablet, with text on desktop */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
+                    onClick={async () => {
+                      if (typeof window !== "undefined" && navigator.share) {
+                        try {
+                          await navigator.share({
+                            title: event.title,
+                            url: window.location.href,
+                          });
+                        } catch (err) {
+                          if ((err as Error).name !== "AbortError") {
+                            console.error("Share failed:", err);
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    <span className="hidden lg:inline">Share</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    <span className="hidden lg:inline">Save</span>
+                  </Button>
                 </div>
-                {closedMarkets.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
-                    <span className="font-medium">
-                      {openMarkets.length} open • {closedMarkets.length} closed
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={async () => {
-                if (typeof window !== "undefined" && navigator.share) {
-                  try {
-                    await navigator.share({
-                      title: event.title,
-                      url: window.location.href,
-                    });
-                  } catch (err) {
-                    // User cancelled or share failed - ignore
-                    if ((err as Error).name !== "AbortError") {
-                      console.error("Share failed:", err);
-                    }
-                  }
-                }
-              }}
-            >
-              <Share2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Share</span>
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="gap-2">
-              <Bookmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Save</span>
-            </Button>
+          {/* Stats Row - 2x2 grid on mobile/tablet, flex on desktop */}
+          <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
+              <Trophy className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-medium truncate">
+                {formatVolume(event.volume)} Vol.
+              </span>
+            </div>
+            {event.endDate && (
+              <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {new Date(event.endDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
+              <span className="font-medium">{totalMarketsCount} markets</span>
+            </div>
+            {closedMarkets.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
+                <span className="font-medium">
+                  {openMarkets.length} open • {closedMarkets.length} closed
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -807,7 +816,7 @@ export default function EventDetailPage() {
                           No{" "}
                           {Math.max(
                             0,
-                            100 - singleMarketForChart.yesProbability,
+                            100 - singleMarketForChart.yesProbability
                           )}
                           %
                         </span>
@@ -824,10 +833,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                                ? "bg-blue-500"
-                                : idx === 2
-                                  ? "bg-purple-400"
-                                  : "bg-green-500"
+                              ? "bg-blue-500"
+                              : idx === 2
+                              ? "bg-purple-400"
+                              : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -861,9 +870,9 @@ export default function EventDetailPage() {
                         isConnected
                           ? "text-emerald-500"
                           : connectionState === "connecting" ||
-                              connectionState === "reconnecting"
-                            ? "text-amber-500 animate-pulse"
-                            : "text-muted-foreground",
+                            connectionState === "reconnecting"
+                          ? "text-amber-500 animate-pulse"
+                          : "text-muted-foreground"
                       )}
                     />
                     <span
@@ -872,23 +881,23 @@ export default function EventDetailPage() {
                         isConnected
                           ? "text-emerald-500"
                           : connectionState === "connecting" ||
-                              connectionState === "reconnecting"
-                            ? "text-amber-500"
-                            : "text-muted-foreground",
+                            connectionState === "reconnecting"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
                       )}
                     >
                       {isConnected
                         ? "Live"
                         : connectionState === "connecting"
-                          ? "Connecting..."
-                          : connectionState === "reconnecting"
-                            ? "Reconnecting..."
-                            : "Offline"}
+                        ? "Connecting..."
+                        : connectionState === "reconnecting"
+                        ? "Reconnecting..."
+                        : "Offline"}
                     </span>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="space-y-0">
                   {sortedMarketData.map((market) => {
                     const isMarketClosed = false;
@@ -915,11 +924,11 @@ export default function EventDetailPage() {
                           role="button"
                           tabIndex={0}
                           className={cn(
-                            "w-full text-left p-3 md:p-4 border-b border-border transition-all cursor-pointer",
+                            "w-full text-left px-6 py-4 border-b border-border transition-all cursor-pointer",
                             selectedMarket?.id === market.id
                               ? "bg-primary/5"
                               : "hover:bg-accent/30",
-                            isExpanded && "bg-muted/30",
+                            isExpanded && "bg-muted/30"
                           )}
                           onClick={() => {
                             // Toggle order book expansion
@@ -1012,7 +1021,7 @@ export default function EventDetailPage() {
                                   "flex-1 h-9 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 0 &&
-                                    "ring-2 ring-green-400",
+                                    "ring-2 ring-green-400"
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1032,7 +1041,7 @@ export default function EventDetailPage() {
                                   "flex-1 h-9 text-xs font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 1 &&
-                                    "ring-2 ring-red-400",
+                                    "ring-2 ring-red-400"
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1047,8 +1056,8 @@ export default function EventDetailPage() {
                             </div>
                           </div>
 
-                          {/* Desktop Layout - Grid for proper alignment */}
-                          <div className="hidden md:grid md:grid-cols-[1fr_120px_240px] md:items-center md:gap-4">
+                          {/* Tablet Layout (md to lg) - Grid for proper alignment */}
+                          <div className="hidden md:grid lg:hidden md:grid-cols-[1fr_100px_180px] md:items-center md:gap-6">
                             {/* Column 1: Image + Title + Volume */}
                             <div className="flex items-center gap-3 min-w-0">
                               {market.image && (
@@ -1063,10 +1072,95 @@ export default function EventDetailPage() {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-base truncate">
+                                <h3 className="font-semibold text-sm truncate">
                                   {market.groupItemTitle}
                                 </h3>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                                <span className="text-xs text-muted-foreground">
+                                  {formatVolume(market.volume)} Vol.
+                                </span>
+                              </div>
+                            </div>
+                            {/* Column 2: Percentage + Change - Fixed width, right aligned */}
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-lg font-bold tabular-nums">
+                                {market.yesProbability}%
+                              </span>
+                              <span
+                                className={`text-xs tabular-nums min-w-[45px] ${
+                                  market.change >= 0
+                                    ? "text-green-500"
+                                    : "text-red-500"
+                                }`}
+                              >
+                                {market.change >= 0 ? "↗" : "↘"}{" "}
+                                {market.change >= 0 ? "+" : ""}
+                                {market.change}%
+                              </span>
+                            </div>
+                            {/* Column 3: Yes/No Buttons */}
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className={cn(
+                                  "h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
+                                  isExpanded &&
+                                    selectedOutcomeIndex === 0 &&
+                                    "ring-2 ring-green-400"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedOrderBookMarketId(market.id);
+                                  setSelectedMarketId(market.id);
+                                  setSelectedOutcomeIndex(0);
+                                  void preloadOrderBook(market.yesTokenId);
+                                }}
+                              >
+                                Yes {formatPrice(market.yesPrice)}¢
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className={cn(
+                                  "h-8 px-3 text-xs font-medium",
+                                  isExpanded &&
+                                    selectedOutcomeIndex === 1 &&
+                                    "ring-2 ring-red-400"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedOrderBookMarketId(market.id);
+                                  setSelectedMarketId(market.id);
+                                  setSelectedOutcomeIndex(1);
+                                  void preloadOrderBook(market.noTokenId);
+                                }}
+                              >
+                                No {formatPrice(market.noPrice)}¢
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout (lg+) - Full grid for proper alignment */}
+                          <div className="hidden lg:grid lg:grid-cols-[1fr_100px_220px] lg:items-center lg:gap-3">
+                            {/* Column 1: Image + Title + Volume */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              {market.image && (
+                                <div className="relative w-10 h-10 shrink-0">
+                                  <Image
+                                    src={market.image}
+                                    alt={market.groupItemTitle || "Market"}
+                                    fill
+                                    sizes="40px"
+                                    className="rounded object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-sm xl:text-base truncate">
+                                  {market.groupItemTitle}
+                                </h3>
+                                <div className="flex items-center gap-2 text-xs xl:text-sm text-muted-foreground mt-0.5">
                                   <span>
                                     {formatVolume(market.volume)} Vol.
                                   </span>
@@ -1080,20 +1174,20 @@ export default function EventDetailPage() {
                               </div>
                             </div>
 
-                            {/* Column 2: Percentage + Change - Fixed width for alignment */}
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-xl font-bold tabular-nums">
+                            {/* Column 2: Percentage + Change */}
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="text-lg xl:text-xl font-bold tabular-nums">
                                 {market.yesProbability}%
                               </span>
                               <div
-                                className={`flex items-center gap-1 text-sm min-w-[60px] ${
+                                className={`flex items-center gap-0.5 text-xs xl:text-sm ${
                                   market.change >= 0
                                     ? "text-green-500"
                                     : "text-red-500"
                                 }`}
                               >
                                 <TrendingUp
-                                  className={`h-4 w-4 shrink-0 ${
+                                  className={`h-3.5 w-3.5 shrink-0 ${
                                     market.change < 0 ? "rotate-180" : ""
                                   }`}
                                 />
@@ -1104,16 +1198,16 @@ export default function EventDetailPage() {
                               </div>
                             </div>
 
-                            {/* Column 3: Yes/No Buttons - Fixed width for alignment */}
-                            <div className="flex items-center justify-end gap-2">
+                            {/* Column 3: Yes/No Buttons */}
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 type="button"
                                 size="sm"
                                 className={cn(
-                                  "w-[110px] h-9 text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
+                                  "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 0 &&
-                                    "ring-2 ring-green-400",
+                                    "ring-2 ring-green-400"
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1123,17 +1217,20 @@ export default function EventDetailPage() {
                                   void preloadOrderBook(market.yesTokenId);
                                 }}
                               >
-                                Buy Yes {formatPrice(market.yesPrice)}¢
+                                <span className="lg:hidden xl:inline">
+                                  Buy{" "}
+                                </span>
+                                Yes {formatPrice(market.yesPrice)}¢
                               </Button>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="destructive"
                                 className={cn(
-                                  "w-[110px] h-9 text-sm font-medium",
+                                  "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm font-medium",
                                   isExpanded &&
                                     selectedOutcomeIndex === 1 &&
-                                    "ring-2 ring-red-400",
+                                    "ring-2 ring-red-400"
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1143,7 +1240,10 @@ export default function EventDetailPage() {
                                   void preloadOrderBook(market.noTokenId);
                                 }}
                               >
-                                Buy No {formatPrice(market.noPrice)}¢
+                                <span className="lg:hidden xl:inline">
+                                  Buy{" "}
+                                </span>
+                                No {formatPrice(market.noPrice)}¢
                               </Button>
                             </div>
                           </div>
@@ -1155,7 +1255,7 @@ export default function EventDetailPage() {
                             "grid transition-all duration-300 ease-in-out border-b border-border bg-muted/10",
                             isExpanded
                               ? "grid-rows-[1fr] opacity-100"
-                              : "grid-rows-[0fr] opacity-0",
+                              : "grid-rows-[0fr] opacity-0"
                           )}
                         >
                           <div className="overflow-hidden">
@@ -1283,7 +1383,7 @@ export default function EventDetailPage() {
                         <button
                           type="button"
                           className={cn(
-                            "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors",
+                            "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors"
                           )}
                         >
                           <span>
@@ -1292,7 +1392,7 @@ export default function EventDetailPage() {
                           <ChevronDown
                             className={cn(
                               "h-4 w-4 transition-transform",
-                              showClosedMarkets && "rotate-180",
+                              showClosedMarkets && "rotate-180"
                             )}
                           />
                         </button>
@@ -1326,7 +1426,7 @@ export default function EventDetailPage() {
                                   className={cn(
                                     "w-full text-left p-3 md:p-4 border-t border-border transition-all cursor-pointer",
                                     "hover:bg-accent/30",
-                                    isExpanded && "bg-muted/30",
+                                    isExpanded && "bg-muted/30"
                                   )}
                                   onClick={() => {
                                     if (isExpanded) {
@@ -1409,7 +1509,7 @@ export default function EventDetailPage() {
                                     "grid transition-all duration-300 ease-in-out border-t border-border bg-muted/10",
                                     isExpanded
                                       ? "grid-rows-[1fr] opacity-100"
-                                      : "grid-rows-[0fr] opacity-0",
+                                      : "grid-rows-[0fr] opacity-0"
                                   )}
                                 >
                                   <div className="overflow-hidden">

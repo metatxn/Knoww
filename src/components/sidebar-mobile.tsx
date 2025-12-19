@@ -92,7 +92,7 @@ export function SidebarMobile() {
     <>
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden">
+          <Button variant="ghost" size="icon" className="xl:hidden">
             <Menu className="h-5 w-5" />
             <span className="sr-only">Open menu</span>
           </Button>
@@ -116,7 +116,7 @@ export function SidebarMobile() {
                   "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
                   pathname === "/"
                     ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <Grid3X3 className="h-5 w-5" />
@@ -131,7 +131,7 @@ export function SidebarMobile() {
                     "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
                     pathname === "/portfolio"
                       ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
                   <FolderOpen className="h-5 w-5" />
@@ -157,7 +157,7 @@ export function SidebarMobile() {
                         "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors",
                         isActive
                           ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       )}
                     >
                       <cat.icon className="h-4 w-4" />

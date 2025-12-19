@@ -58,7 +58,7 @@ export function Navbar() {
   };
 
   return (
-    <nav className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <nav className="xl:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       {/* Main Navbar - Mobile Only */}
       <div className="flex h-14 items-center px-4 md:px-6">
         {/* Mobile Sidebar Trigger + Logo */}
