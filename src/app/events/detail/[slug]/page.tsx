@@ -207,7 +207,10 @@ export default function EventDetailPage() {
 
   // "Single outcome" in this UI means: the event only has ONE market.
   // If there are multiple markets under the event, we only show order books when a user expands a specific market row.
-  const totalMarketsCount = event?.markets?.length ?? 0;
+  const totalMarketsCount =
+    (typeof event?.marketCount === "number" ? event.marketCount : undefined) ??
+    event?.markets?.length ??
+    0;
   const isSingleMarketEvent = totalMarketsCount === 1;
 
   // Compute selected market and trading outcomes
