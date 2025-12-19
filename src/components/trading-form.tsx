@@ -663,38 +663,21 @@ export function TradingForm({
           </div>
         </div>
 
-        {/* Execution Info */}
+        {/* Execution Info - Simplified */}
         <div className="px-4 pb-3">
-          <div className="rounded-xl bg-secondary/30 p-3 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Est. Execution</span>
-              <span
-                className={`font-medium ${
-                  slippageExceedsMax
-                    ? "text-amber-500"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {slippageDisplay?.slippagePercent || "0.00%"} slippage
-              </span>
-              <span className="text-muted-foreground">Avg Fill</span>
-              <span className="font-mono font-medium text-foreground">
-                {slippageDisplay?.avgPrice || formatCents(calculations.price)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                Best {side === "BUY" ? "Ask" : "Bid"}
-              </span>
-              <span className="font-mono text-foreground">
-                {slippageDisplay?.bestPrice ||
-                  formatCents(side === "BUY" ? bestAsk || 0 : bestBid || 0)}
-              </span>
-              <span className="text-muted-foreground">Worst Price</span>
-              <span className="font-mono text-foreground">
-                {slippageDisplay?.worstPrice || formatCents(calculations.price)}
-              </span>
-            </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Avg. Price</span>
+            <span className="font-mono font-medium text-foreground">
+              {slippageDisplay?.avgPrice || formatCents(calculations.price)}
+            </span>
+            <span>Slippage</span>
+            <span
+              className={`font-mono font-medium ${
+                slippageExceedsMax ? "text-amber-500" : "text-foreground"
+              }`}
+            >
+              {slippageDisplay?.slippagePercent || "0.00%"}
+            </span>
           </div>
         </div>
 
@@ -719,26 +702,24 @@ export function TradingForm({
           </div>
 
           {/* Shares Input with flanking buttons */}
-          <div className="flex flex-wrap md:flex-nowrap items-stretch gap-2">
+          <div className="flex items-stretch gap-1.5">
             {/* Left decrement buttons */}
-            <div className="flex gap-1 w-full md:w-auto">
-              <button
-                type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-1 md:flex-none"
-                onClick={() => handleSharesChange(-10)}
-                disabled={shares - 10 < minShares}
-              >
-                -10
-              </button>
-              <button
-                type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                onClick={() => handleSharesChange(-1)}
-                disabled={shares - 1 < minShares}
-              >
-                -1
-              </button>
-            </div>
+            <button
+              type="button"
+              className="px-2 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              onClick={() => handleSharesChange(-10)}
+              disabled={shares - 10 < minShares}
+            >
+              -10
+            </button>
+            <button
+              type="button"
+              className="px-2.5 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              onClick={() => handleSharesChange(-1)}
+              disabled={shares - 1 < minShares}
+            >
+              -1
+            </button>
 
             {/* Center input */}
             <input
@@ -751,26 +732,24 @@ export function TradingForm({
                 }
               }}
               min={minShares}
-              className="flex-1 min-w-[140px] bg-secondary/30 border border-border rounded-xl px-3 py-3 text-center text-base sm:text-lg font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+              className="flex-1 min-w-0 bg-secondary/30 border border-border rounded-xl px-2 py-2.5 text-center text-base font-semibold font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
 
             {/* Right increment buttons */}
-            <div className="flex gap-1 w-full md:w-auto">
-              <button
-                type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors flex-1 md:flex-none"
-                onClick={() => handleSharesChange(1)}
-              >
-                +1
-              </button>
-              <button
-                type="button"
-                className="px-3 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors flex-1 md:flex-none"
-                onClick={() => handleSharesChange(10)}
-              >
-                +10
-              </button>
-            </div>
+            <button
+              type="button"
+              className="px-2.5 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors shrink-0"
+              onClick={() => handleSharesChange(1)}
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              className="px-2 py-2 text-xs font-medium text-muted-foreground rounded-lg border border-border hover:bg-secondary/50 hover:text-foreground transition-colors shrink-0"
+              onClick={() => handleSharesChange(10)}
+            >
+              +10
+            </button>
           </div>
 
           {/* Partial Fill Toggle - Only for market orders */}
