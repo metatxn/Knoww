@@ -11,6 +11,7 @@ import {
   Share2,
   TrendingUp,
   Trophy,
+  User,
   Wifi,
 } from "lucide-react";
 import Image from "next/image";
@@ -32,13 +33,21 @@ import {
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEventDetail } from "@/hooks/use-event-detail";
 import {
   useBestPrices,
   useOrderBook as useOrderBookFromStore,
   useOrderBookStore,
 } from "@/hooks/use-orderbook-store";
+import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
+import { type Position, useUserPositions } from "@/hooks/use-user-positions";
 import { cn } from "@/lib/utils";
 
 // Order book response type - defined outside component to avoid hook order issues
@@ -109,6 +118,77 @@ export default function EventDetailPage() {
     isLoading: loading,
     error,
   } = useEventDetail(eventSlugOrId);
+
+  // Fetch user positions to show "You have a position" indicator
+  const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
+  const tradingAddress =
+    hasProxyWallet && proxyAddress ? proxyAddress : undefined;
+  const { data: positionsData } = useUserPositions({
+    userAddress: tradingAddress,
+    enabled: !!tradingAddress,
+  });
+
+  // Build position lookup maps for fast matching
+  const { positionsByConditionId, positionsByAsset } = useMemo(() => {
+    const byConditionId = new Map<string, Position[]>();
+    const byAsset = new Map<string, Position[]>();
+
+    if (!positionsData?.positions) {
+      return {
+        positionsByConditionId: byConditionId,
+        positionsByAsset: byAsset,
+      };
+    }
+
+    for (const position of positionsData.positions) {
+      // Group by conditionId
+      if (position.conditionId) {
+        const existing = byConditionId.get(position.conditionId) || [];
+        existing.push(position);
+        byConditionId.set(position.conditionId, existing);
+      }
+      // Group by asset (token ID)
+      if (position.asset) {
+        const existing = byAsset.get(position.asset) || [];
+        existing.push(position);
+        byAsset.set(position.asset, existing);
+      }
+    }
+
+    return { positionsByConditionId: byConditionId, positionsByAsset: byAsset };
+  }, [positionsData?.positions]);
+
+  // Helper to get user's position for a market
+  const getMarketPosition = useCallback(
+    (market: {
+      conditionId?: string;
+      yesTokenId?: string;
+      noTokenId?: string;
+    }): Position | null => {
+      // Try conditionId first (most reliable)
+      if (market.conditionId) {
+        const positions = positionsByConditionId.get(market.conditionId);
+        if (positions && positions.length > 0) {
+          return positions[0];
+        }
+      }
+      // Fallback to asset/token ID matching
+      if (market.yesTokenId) {
+        const positions = positionsByAsset.get(market.yesTokenId);
+        if (positions && positions.length > 0) {
+          return positions[0];
+        }
+      }
+      if (market.noTokenId) {
+        const positions = positionsByAsset.get(market.noTokenId);
+        if (positions && positions.length > 0) {
+          return positions[0];
+        }
+      }
+      return null;
+    },
+    [positionsByConditionId, positionsByAsset],
+  );
 
   // Handle order success
   const handleOrderSuccess = useCallback((_order: unknown) => {
@@ -195,6 +275,7 @@ export default function EventDetailPage() {
 
         return {
           id: market.id,
+          conditionId: market.conditionId || "",
           question: market.question,
           groupItemTitle: market.groupItemTitle || market.question,
           yesProbability,
@@ -285,6 +366,7 @@ export default function EventDetailPage() {
 
         return {
           id: market.id,
+          conditionId: market.conditionId || "",
           question: market.question,
           groupItemTitle: market.groupItemTitle || market.question,
           yesProbability,
@@ -599,6 +681,7 @@ export default function EventDetailPage() {
 
     return {
       id: market.id,
+      conditionId: market.conditionId || "",
       question: market.question,
       groupItemTitle: market.groupItemTitle || market.question,
       yesProbability,
@@ -871,8 +954,8 @@ export default function EventDetailPage() {
               open={isOutcomeTableExpanded}
               onOpenChange={setIsOutcomeTableExpanded}
             >
-              <Card>
-                <CardHeader className="pb-3">
+              <Card className="py-0 gap-0">
+                <CardHeader className="py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <CardTitle className="text-lg">OUTCOME</CardTitle>
@@ -957,6 +1040,13 @@ export default function EventDetailPage() {
                         const isExpanded =
                           expandedOrderBookMarketId === market.id;
 
+                        // Check if user has a position in this market
+                        const userPosition = getMarketPosition({
+                          conditionId: market.conditionId,
+                          yesTokenId: market.yesTokenId,
+                          noTokenId: market.noTokenId,
+                        });
+
                         return (
                           <div key={market.id}>
                             {/* Market Row - Clickable to expand/collapse */}
@@ -965,7 +1055,7 @@ export default function EventDetailPage() {
                               role="button"
                               tabIndex={0}
                               className={cn(
-                                "w-full text-left px-6 py-4 border-b border-border transition-all cursor-pointer",
+                                "w-full text-left px-6 py-3 border-b border-border transition-all cursor-pointer",
                                 selectedMarket?.id === market.id
                                   ? "bg-primary/5"
                                   : "hover:bg-accent/30",
@@ -1014,9 +1104,30 @@ export default function EventDetailPage() {
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-sm truncate">
-                                      {market.groupItemTitle}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-sm truncate">
+                                        {market.groupItemTitle}
+                                      </h3>
+                                      {userPosition && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
+                                                <User className="h-2.5 w-2.5" />
+                                                {userPosition.size.toFixed(1)}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>
+                                                You hold{" "}
+                                                {userPosition.size.toFixed(2)}{" "}
+                                                {userPosition.outcome} shares
+                                              </p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                       <span>
                                         {formatVolume(market.volume)} Vol.
@@ -1113,9 +1224,30 @@ export default function EventDetailPage() {
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-sm truncate">
-                                      {market.groupItemTitle}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-sm truncate">
+                                        {market.groupItemTitle}
+                                      </h3>
+                                      {userPosition && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
+                                                <User className="h-2.5 w-2.5" />
+                                                {userPosition.size.toFixed(1)}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>
+                                                You hold{" "}
+                                                {userPosition.size.toFixed(2)}{" "}
+                                                {userPosition.outcome} shares
+                                              </p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
                                     <span className="text-xs text-muted-foreground">
                                       {formatVolume(market.volume)} Vol.
                                     </span>
@@ -1198,9 +1330,30 @@ export default function EventDetailPage() {
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-sm xl:text-base truncate">
-                                      {market.groupItemTitle}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-sm xl:text-base truncate">
+                                        {market.groupItemTitle}
+                                      </h3>
+                                      {userPosition && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
+                                                <User className="h-2.5 w-2.5" />
+                                                {userPosition.size.toFixed(1)}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>
+                                                You hold{" "}
+                                                {userPosition.size.toFixed(2)}{" "}
+                                                {userPosition.outcome} shares
+                                              </p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 text-xs xl:text-sm text-muted-foreground mt-0.5">
                                       <span>
                                         {formatVolume(market.volume)} Vol.
@@ -1301,14 +1454,25 @@ export default function EventDetailPage() {
                             >
                               <div className="overflow-hidden">
                                 <Tabs
-                                  defaultValue="orderbook"
+                                  defaultValue={
+                                    userPosition ? "position" : "orderbook"
+                                  }
                                   className="w-full"
                                 >
-                                  <div className="flex items-center justify-between px-4 border-b border-border">
-                                    <TabsList className="h-auto p-0 bg-transparent gap-0">
+                                  <div className="flex items-center justify-between px-2 sm:px-4 border-b border-border overflow-x-auto">
+                                    <TabsList className="h-auto p-0 bg-transparent gap-0 shrink-0">
+                                      {/* Position tab - only show if user has a position */}
+                                      {userPosition && (
+                                        <TabsTrigger
+                                          value="position"
+                                          className="px-2 sm:px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400"
+                                        >
+                                          Position
+                                        </TabsTrigger>
+                                      )}
                                       <TabsTrigger
                                         value="orderbook"
-                                        className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                        className="px-2 sm:px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium whitespace-nowrap"
                                       >
                                         Order Book
                                       </TabsTrigger>
@@ -1316,19 +1480,19 @@ export default function EventDetailPage() {
                                       {!isSingleMarketEvent && (
                                         <TabsTrigger
                                           value="graph"
-                                          className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                          className="px-2 sm:px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
                                         >
                                           Graph
                                         </TabsTrigger>
                                       )}
                                       <TabsTrigger
                                         value="resolution"
-                                        className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm font-medium"
+                                        className="px-2 sm:px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
                                       >
                                         Resolution
                                       </TabsTrigger>
                                     </TabsList>
-                                    <div className="flex items-center gap-2 text-xs">
+                                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs shrink-0 ml-2">
                                       <span className="text-muted-foreground">
                                         Rewards
                                       </span>
@@ -1337,6 +1501,143 @@ export default function EventDetailPage() {
                                       </span>
                                     </div>
                                   </div>
+
+                                  {/* Position Tab - shows user's position details */}
+                                  {userPosition && (
+                                    <TabsContent
+                                      value="position"
+                                      className="m-0 px-4 py-3"
+                                    >
+                                      {/* Single row layout with responsive fallback */}
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        {/* Position stats - evenly distributed */}
+                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-6 gap-y-3 flex-1">
+                                          {/* Outcome */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Outcome
+                                            </span>
+                                            <span
+                                              className={cn(
+                                                "font-semibold text-sm",
+                                                userPosition.outcome.toLowerCase() ===
+                                                  "yes"
+                                                  ? "text-green-600 dark:text-green-400"
+                                                  : "text-red-600 dark:text-red-400",
+                                              )}
+                                            >
+                                              {userPosition.outcome}
+                                            </span>
+                                          </div>
+
+                                          {/* Quantity */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Qty
+                                            </span>
+                                            <span className="font-semibold text-sm tabular-nums">
+                                              {userPosition.size.toFixed(2)}
+                                            </span>
+                                          </div>
+
+                                          {/* Avg Price */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Avg
+                                            </span>
+                                            <span className="font-semibold text-sm tabular-nums">
+                                              {(
+                                                userPosition.avgPrice * 100
+                                              ).toFixed(1)}
+                                              ¢
+                                            </span>
+                                          </div>
+
+                                          {/* Current Value */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Value
+                                            </span>
+                                            <span className="font-semibold text-sm tabular-nums">
+                                              $
+                                              {userPosition.currentValue.toFixed(
+                                                2,
+                                              )}
+                                            </span>
+                                          </div>
+
+                                          {/* Cost */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Cost
+                                            </span>
+                                            <span className="font-semibold text-sm tabular-nums">
+                                              $
+                                              {userPosition.initialValue.toFixed(
+                                                2,
+                                              )}
+                                            </span>
+                                          </div>
+
+                                          {/* Return / ROI */}
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                                              Return
+                                            </span>
+                                            <span
+                                              className={cn(
+                                                "font-semibold text-sm tabular-nums",
+                                                userPosition.unrealizedPnl >= 0
+                                                  ? "text-green-600 dark:text-green-400"
+                                                  : "text-red-600 dark:text-red-400",
+                                              )}
+                                            >
+                                              {userPosition.unrealizedPnl >= 0
+                                                ? ""
+                                                : "-"}
+                                              $
+                                              {Math.abs(
+                                                userPosition.unrealizedPnl,
+                                              ).toFixed(2)}
+                                              <span className="text-xs ml-1 opacity-80">
+                                                (
+                                                {userPosition.unrealizedPnl >= 0
+                                                  ? ""
+                                                  : "-"}
+                                                {Math.abs(
+                                                  userPosition.unrealizedPnlPercent,
+                                                ).toFixed(1)}
+                                                %)
+                                              </span>
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        {/* Sell Button - inline on sm+, full width on mobile */}
+                                        <Button
+                                          size="sm"
+                                          className="bg-red-600 hover:bg-red-700 text-white shrink-0 w-full sm:w-auto"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedMarketId(market.id);
+                                            const outcomeIdx =
+                                              userPosition.outcome.toLowerCase() ===
+                                              "yes"
+                                                ? 0
+                                                : 1;
+                                            setSelectedOutcomeIndex(outcomeIdx);
+                                            const tokenId =
+                                              outcomeIdx === 0
+                                                ? market.yesTokenId
+                                                : market.noTokenId;
+                                            void preloadOrderBook(tokenId);
+                                          }}
+                                        >
+                                          Sell
+                                        </Button>
+                                      </div>
+                                    </TabsContent>
+                                  )}
 
                                   {/* Order Book Tab - forceMount keeps it mounted */}
                                   <TabsContent
