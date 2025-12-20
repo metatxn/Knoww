@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppKit } from "@reown/appkit/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -25,7 +25,11 @@ import {
   useClobClient,
 } from "@/hooks/use-clob-client";
 import { calculatePotentialPnL, OrderSide } from "@/hooks/use-order-signing";
-import { useProxyWallet } from "@/hooks/use-proxy-wallet";
+import {
+  PROXY_WALLET_QUERY_KEY,
+  useProxyWallet,
+} from "@/hooks/use-proxy-wallet";
+import { clearBalanceCache } from "@/lib/rpc";
 import {
   calculateSlippage,
   formatSlippageDisplay,
@@ -107,7 +111,7 @@ function isPriceCrossingBook(
   price: number,
   side: "BUY" | "SELL",
   bestBid?: number,
-  bestAsk?: number,
+  bestAsk?: number
 ): { isCrossing: boolean; percentAbove?: number } {
   if (side === "BUY" && bestAsk !== undefined) {
     // For BUY orders, check if price is significantly above best ask
@@ -171,6 +175,7 @@ export function TradingForm({
 }: TradingFormProps) {
   const { isConnected } = useConnection();
   const { open } = useAppKit();
+  const queryClient = useQueryClient();
   const {
     createOrder,
     isLoading,
@@ -211,7 +216,7 @@ export function TradingForm({
   // Check if the selected outcome has a valid CLOB token ID
   // CLOB token IDs are long numeric strings (typically 70+ characters)
   const hasValidTokenId = Boolean(
-    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10,
+    selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10
   );
 
   // Update limit price when outcome changes
@@ -364,7 +369,7 @@ export function TradingForm({
         return Math.max(tickSize, Math.min(1 - tickSize, newPrice));
       });
     },
-    [tickSize],
+    [tickSize]
   );
 
   // Handle shares change with bounds
@@ -372,7 +377,7 @@ export function TradingForm({
     (delta: number) => {
       setShares((prev) => Math.max(minShares, prev + delta));
     },
-    [minShares],
+    [minShares]
   );
 
   // If user switches to a market with a higher minimum, clamp shares up
@@ -449,6 +454,18 @@ export function TradingForm({
         onOrderSuccess?.(result.order);
         // Reset form
         setShares(10);
+
+        // Refresh balance globally
+        if (proxyAddress) {
+          clearBalanceCache(proxyAddress);
+          await queryClient.invalidateQueries({
+            queryKey: [PROXY_WALLET_QUERY_KEY],
+          });
+          // Also refresh the local form balance query
+          await queryClient.invalidateQueries({
+            queryKey: ["usdcBalance"],
+          });
+        }
       } else {
         throw new Error("Order failed");
       }
@@ -472,6 +489,8 @@ export function TradingForm({
     createOrder,
     onOrderSuccess,
     onOrderError,
+    proxyAddress,
+    queryClient,
   ]);
 
   // Format price as cents
@@ -691,7 +710,7 @@ export function TradingForm({
               onClick={() => {
                 if (effectiveBalance && calculations.price > 0) {
                   const maxShares = Math.floor(
-                    effectiveBalance / calculations.price,
+                    effectiveBalance / calculations.price
                   );
                   setShares(Math.max(minShares, maxShares));
                 }
@@ -859,7 +878,7 @@ export function TradingForm({
                     <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                       Need $
                       {(calculations.total - (effectiveBalance || 0)).toFixed(
-                        2,
+                        2
                       )}{" "}
                       more
                     </span>
@@ -906,7 +925,7 @@ export function TradingForm({
                     {hasNoAllowance
                       ? "Approve USDC.e spending to trade"
                       : `Increase allowance to $${calculations.total.toFixed(
-                          2,
+                          2
                         )}`}
                   </span>
                 </div>

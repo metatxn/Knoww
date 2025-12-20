@@ -9,7 +9,7 @@ import { CACHE_DURATION, POLYMARKET_API } from "@/lib/constants";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   // Apply rate limiting: 100 requests per minute
   const rateLimitResponse = checkRateLimit(request, {
@@ -28,7 +28,7 @@ export async function GET(
           success: false,
           error: "Tag slug is required",
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -45,7 +45,7 @@ export async function GET(
           "Content-Type": "application/json",
         },
         next: { revalidate: CACHE_DURATION.SPORTS_LIST }, // Cache for 1 hour
-      },
+      }
     );
 
     if (!response.ok) {
@@ -55,7 +55,7 @@ export async function GET(
           success: false,
           error: `Tag not found: ${slug}`,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -67,7 +67,7 @@ export async function GET(
           success: false,
           error: `Tag not found: ${slug}`,
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -82,7 +82,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

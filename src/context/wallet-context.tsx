@@ -102,7 +102,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const ethersModule = await import("ethers");
       const provider = new ethersModule.providers.Web3Provider(
         // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-        window.ethereum as any,
+        window.ethereum as any
       );
       await provider.send("eth_requestAccounts", []);
       return provider.getSigner();
@@ -141,7 +141,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       connect,
       disconnect,
       getEthersSigner,
-    ],
+    ]
   );
 
   return (

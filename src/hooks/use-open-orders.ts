@@ -56,7 +56,7 @@ interface MarketInfoResponse {
  * Fetch market info for a token ID
  */
 async function fetchMarketInfo(
-  tokenId: string,
+  tokenId: string
 ): Promise<{ question: string; slug: string; outcome: string } | null> {
   try {
     const response = await fetch(`/api/markets/by-token/${tokenId}`);
@@ -178,7 +178,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
                 ? new Date(order.created_at * 1000).toISOString()
                 : order.created_at || new Date().toISOString(),
             expiration: parseExpiration(order.expiration),
-          }),
+          })
         );
 
         // Fetch market info for each unique token ID
@@ -197,7 +197,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
             if (marketInfo) {
               marketInfoMap.set(tokenId, marketInfo);
             }
-          }),
+          })
         );
 
         // Enrich orders with market info
@@ -289,13 +289,13 @@ export function useCancelAllOrders() {
       // Cancel each order
       const results = await Promise.allSettled(
         (orders || []).map((order: { id?: string; order_id?: string }) =>
-          cancelOrder(order.id || order.order_id || ""),
-        ),
+          cancelOrder(order.id || order.order_id || "")
+        )
       );
 
       // Return successful cancellations count
       const successCount = results.filter(
-        (r) => r.status === "fulfilled",
+        (r) => r.status === "fulfilled"
       ).length;
       return { cancelled: successCount, total: orders?.length || 0 };
     },

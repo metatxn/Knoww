@@ -8,7 +8,7 @@ import { POLYMARKET_API } from "@/lib/constants";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   // Apply rate limiting: 100 requests per minute
   const rateLimitResponse = checkRateLimit(request, {
@@ -28,7 +28,7 @@ export async function GET(
           success: false,
           error: "Market slug is required",
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -41,7 +41,7 @@ export async function GET(
           "Content-Type": "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      },
+      }
     );
 
     if (!slugResponse.ok) {
@@ -59,7 +59,7 @@ export async function GET(
           success: false,
           error: "Market not found",
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -76,7 +76,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

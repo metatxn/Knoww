@@ -23,7 +23,7 @@ interface TagDetailsResponse {
  * This returns the tag ID needed to fetch markets
  */
 async function fetchTagDetails(
-  slug: string | undefined,
+  slug: string | undefined
 ): Promise<TagDetails | null> {
   if (!slug) return null;
 

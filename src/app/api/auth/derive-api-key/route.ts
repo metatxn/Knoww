@@ -38,7 +38,7 @@ interface ApiKeyResponse {
  */
 async function createApiKey(
   clobHost: string,
-  headers: L1Headers,
+  headers: L1Headers
 ): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
   const response = await fetch(`${clobHost}/auth/api-key`, {
     method: "POST",
@@ -67,7 +67,7 @@ async function createApiKey(
  */
 async function deriveApiKey(
   clobHost: string,
-  headers: L1Headers,
+  headers: L1Headers
 ): Promise<{ success: boolean; data?: ApiKeyResponse; error?: string }> {
   const response = await fetch(`${clobHost}/auth/derive-api-key`, {
     method: "GET",
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
           error: "Invalid request body",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
           deriveError: deriveResult.error,
         },
       },
-      { status: 400 },
+      { status: 400 }
     );
   } catch (error) {
     console.error("[api-key] Error:", error);
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

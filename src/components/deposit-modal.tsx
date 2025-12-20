@@ -98,7 +98,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   // Modal state
   const [step, setStep] = useState<DepositStep>("method");
   const [selectedMethod, setSelectedMethod] = useState<DepositMethod | null>(
-    null,
+    null
   );
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
   const [selectedBridgeAsset, setSelectedBridgeAsset] =
@@ -178,7 +178,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
           (tokenSymbol.toUpperCase() === "USDC.E" &&
             asset.token.symbol.toUpperCase() === "USDC") ||
           (tokenSymbol.toUpperCase() === "USDC" &&
-            asset.token.symbol.toUpperCase() === "USDC"),
+            asset.token.symbol.toUpperCase() === "USDC")
       );
 
       if (matchingAssets.length === 0) {
@@ -190,7 +190,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       // Return the lowest minimum across all chains
       return Math.min(...matchingAssets.map((a) => a.minCheckoutUsd));
     },
-    [supportedAssets],
+    [supportedAssets]
   );
 
   /**
@@ -209,7 +209,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       (asset) =>
         asset.token.symbol.toLowerCase().includes(query) ||
         asset.token.name.toLowerCase().includes(query) ||
-        asset.chainName.toLowerCase().includes(query),
+        asset.chainName.toLowerCase().includes(query)
     );
   }, [supportedAssets, searchQuery]);
 
@@ -226,7 +226,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       }
       // Card, Exchange, PayPal show "Coming Soon" - no navigation
     },
-    [],
+    []
   );
 
   // Handle token selection - also fetch deposit address for this token
@@ -241,7 +241,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       try {
         console.log(
           "[DepositModal] Fetching deposit addresses for proxy:",
-          proxyAddress,
+          proxyAddress
         );
 
         // Get deposit addresses from Polymarket Bridge API
@@ -257,14 +257,14 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
               chainId: a.chainId,
               symbol: a.tokenSymbol,
               address: a.depositAddress,
-            })),
+            }))
           );
 
           // Find the deposit address for Polygon (chainId 137) and the selected token
           const matching = addresses.find(
             (addr) =>
               addr.chainId === "137" &&
-              addr.tokenSymbol.toUpperCase() === token.symbol.toUpperCase(),
+              addr.tokenSymbol.toUpperCase() === token.symbol.toUpperCase()
           );
 
           if (matching) {
@@ -278,38 +278,38 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
             const polygonUsdc = addresses.find(
               (addr) =>
                 addr.chainId === "137" &&
-                addr.tokenSymbol.toUpperCase() === "USDC",
+                addr.tokenSymbol.toUpperCase() === "USDC"
             );
             if (polygonUsdc) {
               resolvedDepositAddress = polygonUsdc.depositAddress;
               console.log(
                 "[DepositModal] Using Polygon USDC deposit address:",
-                resolvedDepositAddress,
+                resolvedDepositAddress
               );
             } else {
               // Last resort: any Polygon address
               const polygonAddr = addresses.find(
-                (addr) => addr.chainId === "137",
+                (addr) => addr.chainId === "137"
               );
               if (polygonAddr) {
                 resolvedDepositAddress = polygonAddr.depositAddress;
                 console.log(
                   "[DepositModal] Using any Polygon deposit address:",
-                  resolvedDepositAddress,
+                  resolvedDepositAddress
                 );
               } else {
                 console.error(
-                  "[DepositModal] No Polygon deposit address found!",
+                  "[DepositModal] No Polygon deposit address found!"
                 );
                 setDepositError(
-                  "No deposit address available for Polygon. Please try Transfer Crypto option.",
+                  "No deposit address available for Polygon. Please try Transfer Crypto option."
                 );
               }
             }
           }
         } else {
           console.error(
-            "[DepositModal] No deposit addresses returned from API",
+            "[DepositModal] No deposit addresses returned from API"
           );
           setDepositError("Failed to get deposit addresses. Please try again.");
         }
@@ -318,7 +318,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         setDepositError(
           err instanceof Error
             ? `Failed to get deposit address: ${err.message}`
-            : "Failed to get deposit address. Please try again.",
+            : "Failed to get deposit address. Please try again."
         );
       } finally {
         setIsProcessing(false);
@@ -331,7 +331,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setBridgeAddress(resolvedDepositAddress);
       setStep("amount");
     },
-    [createDepositAddresses, proxyAddress],
+    [createDepositAddresses, proxyAddress]
   );
 
   // Handle bridge asset selection
@@ -347,7 +347,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
             addresses.find(
               (addr) =>
                 addr.chainId === asset.chainId &&
-                addr.tokenSymbol === asset.token.symbol,
+                addr.tokenSymbol === asset.token.symbol
             ) || addresses.find((addr) => addr.chainId === asset.chainId);
 
           if (matching) {
@@ -361,7 +361,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         setStep("confirm");
       }
     },
-    [createDepositAddresses],
+    [createDepositAddresses]
   );
 
   // Handle amount percentage buttons
@@ -370,10 +370,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       if (!selectedToken) return;
       const value = (selectedToken.balance * percent) / 100;
       setAmount(
-        value.toFixed(selectedToken.decimals > 6 ? 6 : selectedToken.decimals),
+        value.toFixed(selectedToken.decimals > 6 ? 6 : selectedToken.decimals)
       );
     },
-    [selectedToken],
+    [selectedToken]
   );
 
   // Handle copy bridge address
@@ -389,7 +389,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   const handleDeposit = useCallback(async () => {
     if (!selectedToken || !amount || !bridgeAddress) {
       setDepositError(
-        "Missing required information. Please go back and try again.",
+        "Missing required information. Please go back and try again."
       );
       return;
     }
@@ -441,7 +441,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
             to: bridgeAddress,
             value: amountInWei.toString(),
             chainId: polygon.id,
-          },
+          }
         );
 
         hash = await walletClient.sendTransaction({
@@ -459,7 +459,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
             to: bridgeAddress,
             amount: amountInWei.toString(),
             chainId: polygon.id,
-          },
+          }
         );
 
         hash = await walletClient.writeContract({
@@ -494,7 +494,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       console.error("[DepositModal] Deposit error:", err);
       setTxError(err instanceof Error ? err : new Error("Transaction failed"));
       setDepositError(
-        err instanceof Error ? err.message : "Transaction failed",
+        err instanceof Error ? err.message : "Transaction failed"
       );
       setIsPending(false);
       setIsConfirming(false);
@@ -804,7 +804,9 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                       variant="outline"
                       size="sm"
                       className="mt-4"
-                      onClick={refreshTokens}
+                      onClick={() => {
+                        void refreshTokens();
+                      }}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh

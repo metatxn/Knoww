@@ -10,7 +10,7 @@ import { getClobHost } from "@/lib/polymarket";
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ orderID: string }> },
+  { params }: { params: Promise<{ orderID: string }> }
 ) {
   try {
     const { orderID } = await params;
@@ -37,7 +37,7 @@ export async function GET(
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

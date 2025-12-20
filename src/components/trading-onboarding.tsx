@@ -119,15 +119,15 @@ export function TradingOnboarding({
     (
       stepId: string,
       status: OnboardingStep["status"],
-      errorMessage?: string,
+      errorMessage?: string
     ) => {
       setSteps((prev) =>
         prev.map((step) =>
-          step.id === stepId ? { ...step, status, errorMessage } : step,
-        ),
+          step.id === stepId ? { ...step, status, errorMessage } : step
+        )
       );
     },
-    [],
+    []
   );
 
   /**
@@ -185,7 +185,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "deploy",
         "error",
-        err instanceof Error ? err.message : "Failed to deploy wallet",
+        err instanceof Error ? err.message : "Failed to deploy wallet"
       );
     }
   }, [deploySafe, updateStepStatus, refreshProxyWallet]);
@@ -205,7 +205,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "approve",
         "error",
-        err instanceof Error ? err.message : "Failed to approve USDC",
+        err instanceof Error ? err.message : "Failed to approve USDC"
       );
     }
   }, [approveUsdcForTrading, updateStepStatus]);
@@ -216,7 +216,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        "Please complete the wallet deployment step first",
+        "Please complete the wallet deployment step first"
       );
       return;
     }
@@ -225,7 +225,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        "Please complete the USDC approval step first",
+        "Please complete the USDC approval step first"
       );
       return;
     }
@@ -239,7 +239,7 @@ export function TradingOnboarding({
       updateStepStatus(
         "credentials",
         "error",
-        err instanceof Error ? err.message : "Failed to setup credentials",
+        err instanceof Error ? err.message : "Failed to setup credentials"
       );
     }
   }, [
@@ -321,7 +321,7 @@ export function TradingOnboarding({
 
     if (wasIncomplete && nowComplete) {
       console.log(
-        "[TradingOnboarding] All steps completed! Showing celebration",
+        "[TradingOnboarding] All steps completed! Showing celebration"
       );
       setShowCelebration(true);
       // Auto-hide celebration after 3 seconds
@@ -543,7 +543,7 @@ export function TradingOnboarding({
                           ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30"
                           : isCurrent
                             ? "bg-white dark:bg-gray-900 border-emerald-500 text-emerald-500 shadow-md"
-                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500",
+                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500"
                       )}
                     >
                       {isCompleted ? (
@@ -576,7 +576,7 @@ export function TradingOnboarding({
                       ? "text-emerald-600 dark:text-emerald-400"
                       : isCurrent
                         ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-gray-400 dark:text-gray-500",
+                        : "text-gray-400 dark:text-gray-500"
                   )}
                 >
                   {step.id === "connect"

@@ -30,6 +30,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
+import { formatPrice, formatVolume } from "@/lib/utils";
 
 export default function MarketDetailPage() {
   const params = useParams();
@@ -236,23 +237,6 @@ export default function MarketDetailPage() {
   const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
   const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
 
-  const formatPrice = (price: string) => {
-    const num = Number.parseFloat(price);
-    return (num * 100).toFixed(1);
-  };
-
-  const formatVolume = (vol?: number | string) => {
-    if (!vol) return "N/A";
-    const num = typeof vol === "string" ? Number.parseFloat(vol) : vol;
-    if (num >= 1_000_000) {
-      return `$${(num / 1_000_000).toFixed(2)}M`;
-    }
-    if (num >= 1_000) {
-      return `$${(num / 1_000).toFixed(2)}K`;
-    }
-    return `$${num.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -296,7 +280,7 @@ export default function MarketDetailPage() {
       let tokenId = "";
       if (tokens.length > 0) {
         const token = tokens.find(
-          (t) => t.outcome?.toLowerCase() === outcome.toLowerCase(),
+          (t) => t.outcome?.toLowerCase() === outcome.toLowerCase()
         );
         tokenId = token?.token_id || "";
       }
@@ -391,7 +375,7 @@ export default function MarketDetailPage() {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
-                        },
+                        }
                       )}
                     </span>
                   </div>
@@ -459,7 +443,7 @@ export default function MarketDetailPage() {
           {outcomeData.map(
             (
               outcome: { name: string; probability: number; color: string },
-              idx: number,
+              idx: number
             ) => (
               <div key={idx} className="flex items-center gap-2">
                 <div
@@ -477,7 +461,7 @@ export default function MarketDetailPage() {
                   {outcome.name} {outcome.probability}%
                 </span>
               </div>
-            ),
+            )
           )}
         </div>
 
@@ -524,7 +508,7 @@ export default function MarketDetailPage() {
               negRisk={market.negRisk}
               minOrderSize={
                 Number.parseFloat(
-                  String(market.orderMinSize ?? market.order_min_size ?? "1"),
+                  String(market.orderMinSize ?? market.order_min_size ?? "1")
                 ) || 1
               }
               onOrderSuccess={handleOrderSuccess}
@@ -550,7 +534,7 @@ export default function MarketDetailPage() {
                   change: number;
                   color: string;
                 },
-                idx: number,
+                idx: number
               ) => (
                 <Card key={idx}>
                   <CardContent className="p-4">
@@ -643,7 +627,7 @@ export default function MarketDetailPage() {
                           {formatPrice(
                             (
                               1 - Number.parseFloat(prices[idx] || "0")
-                            ).toString(),
+                            ).toString()
                           )}
                           ¢
                         </Button>
@@ -680,7 +664,7 @@ export default function MarketDetailPage() {
                       )}
                   </CardContent>
                 </Card>
-              ),
+              )
             )}
           </div>
 

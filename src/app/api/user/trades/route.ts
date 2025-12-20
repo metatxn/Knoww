@@ -59,12 +59,12 @@ const optionalNumber = z
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
   limit: optionalNumber.pipe(
-    z.number().min(1).max(100).optional().default(100),
+    z.number().min(1).max(100).optional().default(100)
   ),
   offset: optionalNumber.pipe(z.number().min(0).optional().default(0)),
   sortBy: optionalString.pipe(z.string().optional().default("TIMESTAMP")),
   sortDirection: optionalString.pipe(
-    z.enum(["ASC", "DESC"]).optional().default("DESC"),
+    z.enum(["ASC", "DESC"]).optional().default("DESC")
   ),
   market: optionalString,
   type: z
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch trades from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
         acc[date].volume += trade.usdcAmount;
         return acc;
       },
-      {} as Record<string, { count: number; volume: number }>,
+      {} as Record<string, { count: number; volume: number }>
     );
 
     return NextResponse.json({
@@ -245,7 +245,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

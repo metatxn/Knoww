@@ -128,7 +128,7 @@ function InteractiveLineChart({
       const index = Math.round(relativeX * (data.length - 1));
       setHoveredIndex(Math.max(0, Math.min(data.length - 1, index)));
     },
-    [data.length],
+    [data.length]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -278,7 +278,7 @@ function InteractiveLineChart({
                   <ArrowDownRight className="h-2.5 w-2.5" />
                 )}
                 {formatCurrency(
-                  Math.abs(hoveredPoint.data.pnl - data[hoveredIndex - 1].pnl),
+                  Math.abs(hoveredPoint.data.pnl - data[hoveredIndex - 1].pnl)
                 )}
               </p>
             )}

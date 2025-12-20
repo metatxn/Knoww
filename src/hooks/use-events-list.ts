@@ -39,7 +39,7 @@ interface UseEventsListParams {
  * Fetch events list with optional filtering
  */
 async function fetchEventsList(
-  params: UseEventsListParams = {},
+  params: UseEventsListParams = {}
 ): Promise<Event[]> {
   const queryParams = new URLSearchParams();
 

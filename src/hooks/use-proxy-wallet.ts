@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useConnection } from "wagmi";
 import {
   clearBalanceCache,
@@ -23,6 +24,7 @@ import {
  * 4. Fetches the USDC.e balance
  *
  * Uses shared RPC client with caching to avoid rate limiting.
+ * Now uses React Query for global state management and cache invalidation.
  */
 
 // Polymarket Safe Factory address on Polygon mainnet
@@ -33,10 +35,10 @@ const SAFE_INIT_CODE_HASH =
   "0x2bce2127ff07fb632d16c8347c4ebf501f4841168bed00d9e6ef715ddb6fcecf";
 
 // Polymarket Data API
-const DATA_API_BASE = "https://data-api.polymarket.com";
+// const DATA_API_BASE = "https://data-api.polymarket.com";
 
-// Debounce time for refresh calls
-const REFRESH_DEBOUNCE_MS = 1000;
+// Query key for proxy wallet data
+export const PROXY_WALLET_QUERY_KEY = "proxy-wallet";
 
 export interface ProxyWalletData {
   proxyAddress: string | null;
@@ -46,239 +48,95 @@ export interface ProxyWalletData {
   error: string | null;
 }
 
-export function useProxyWallet() {
-  const { address, isConnected } = useConnection();
-  const [data, setData] = useState<ProxyWalletData>({
-    proxyAddress: null,
-    isDeployed: false,
-    usdcBalance: 0,
-    isLoading: false,
-    error: null,
+/**
+ * Fetch wallet data helper
+ */
+async function fetchWalletData(eoaAddress: string) {
+  // Step 1: Derive the Safe address using CREATE2 formula
+  // This is deterministic - same EOA always produces same Safe address
+  const { getCreate2Address, keccak256, encodeAbiParameters } = await import(
+    "viem"
+  );
+
+  const salt = keccak256(
+    encodeAbiParameters(
+      [{ name: "address", type: "address" }],
+      [eoaAddress as `0x${string}`]
+    )
+  );
+
+  const proxyAddress = getCreate2Address({
+    from: SAFE_FACTORY as `0x${string}`,
+    salt: salt,
+    bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
   });
 
-  // Ref to track last refresh time for debouncing
-  const lastRefreshRef = useRef<number>(0);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  if (!proxyAddress) {
+    throw new Error("Failed to derive Polymarket wallet address");
+  }
 
-  /**
-   * Check if a proxy wallet has any positions or activity on Polymarket
-   * This validates that the derived address is correct and active
-   */
-  const _checkWalletHasData = useCallback(
-    async (proxyAddress: string): Promise<boolean> => {
-      try {
-        // Check for positions using the PROXY address (not EOA)
-        const positionsRes = await fetch(
-          `${DATA_API_BASE}/positions?user=${proxyAddress.toLowerCase()}&sizeThreshold=.1&redeemable=true&limit=1`,
-        );
+  // Step 2: Check if the derived Safe is actually deployed on-chain
+  const isDeployed = await rpcCheckIsDeployed(proxyAddress);
 
-        if (positionsRes.ok) {
-          const positions = (await positionsRes.json()) as Array<unknown>;
-          if (positions.length > 0) {
-            return true;
-          }
-        }
+  if (!isDeployed) {
+    return {
+      proxyAddress,
+      isDeployed: false,
+      usdcBalance: 0,
+    };
+  }
 
-        // Check for activity using the PROXY address (not EOA)
-        const activityRes = await fetch(
-          `${DATA_API_BASE}/activity?user=${proxyAddress.toLowerCase()}&limit=1`,
-        );
+  // Step 3: Safe is deployed - fetch USDC balance
+  const usdcBalance = await rpcFetchUsdcBalance(proxyAddress);
 
-        if (activityRes.ok) {
-          const activity = (await activityRes.json()) as Array<unknown>;
-          if (activity.length > 0) {
-            return true;
-          }
-        }
+  return {
+    proxyAddress,
+    isDeployed: true,
+    usdcBalance,
+  };
+}
 
-        return false;
-      } catch {
-        return false;
-      }
+export function useProxyWallet() {
+  const { address, isConnected } = useConnection();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: [PROXY_WALLET_QUERY_KEY, address],
+    queryFn: async () => {
+      if (!address) throw new Error("No address");
+      return fetchWalletData(address);
     },
-    [],
-  );
-
-  /**
-   * Derive the Safe address using CREATE2 formula (fallback)
-   * Only used when user has no existing positions/trades
-   */
-  const deriveSafeAddress = useCallback(
-    async (ownerAddress: string): Promise<string | null> => {
-      try {
-        const { getCreate2Address, keccak256, encodeAbiParameters } =
-          await import("viem");
-
-        const salt = keccak256(
-          encodeAbiParameters(
-            [{ name: "address", type: "address" }],
-            [ownerAddress as `0x${string}`],
-          ),
-        );
-
-        const proxyAddress = getCreate2Address({
-          from: SAFE_FACTORY as `0x${string}`,
-          salt: salt,
-          bytecodeHash: SAFE_INIT_CODE_HASH as `0x${string}`,
-        });
-
-        return proxyAddress;
-      } catch {
-        return null;
-      }
-    },
-    [],
-  );
-
-  /**
-   * Check if an address has deployed code (is a contract)
-   * Uses shared RPC client with caching
-   */
-  const checkIsDeployed = useCallback(
-    async (proxyAddress: string): Promise<boolean> => {
-      return rpcCheckIsDeployed(proxyAddress);
-    },
-    [],
-  );
-
-  /**
-   * Fetch USDC.e balance for an address
-   * Uses shared RPC client with caching
-   */
-  const fetchUsdcBalance = useCallback(
-    async (walletAddress: string): Promise<number> => {
-      return rpcFetchUsdcBalance(walletAddress);
-    },
-    [],
-  );
+    enabled: !!address && isConnected,
+    // Stale time matches RPC cache roughly, but we can invalidate manually
+    staleTime: 30000,
+  });
 
   /**
    * Refresh proxy wallet data
-   *
-   * Strategy:
-   * 1. Always derive the Safe address first using CREATE2 (deterministic)
-   * 2. Check if the derived Safe is deployed on-chain
-   * 3. If deployed, fetch USDC balance and optionally verify it has data
-   *
-   * This avoids the chicken-and-egg problem of querying Polymarket with EOA
-   * when they only store data under proxy wallet addresses.
-   *
-   * Includes debouncing to prevent multiple rapid refreshes.
    */
-  const refresh = useCallback(
-    async (options?: { force?: boolean }) => {
-      if (!address || !isConnected) {
-        setData({
-          proxyAddress: null,
-          isDeployed: false,
-          usdcBalance: 0,
-          isLoading: false,
-          error: null,
-        });
-        return;
-      }
-
-      // Debounce: skip if called too recently (unless forced)
-      const now = Date.now();
-      if (
-        !options?.force &&
-        now - lastRefreshRef.current < REFRESH_DEBOUNCE_MS
-      ) {
-        return;
-      }
-      lastRefreshRef.current = now;
-
-      // Clear any pending refresh
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-        refreshTimeoutRef.current = null;
-      }
-
-      setData((prev) => ({ ...prev, isLoading: true, error: null }));
-
-      try {
-        // Step 1: Derive the Safe address using CREATE2 formula
-        // This is deterministic - same EOA always produces same Safe address
-        const derivedAddress = await deriveSafeAddress(address);
-
-        if (!derivedAddress) {
-          setData({
-            proxyAddress: null,
-            isDeployed: false,
-            usdcBalance: 0,
-            isLoading: false,
-            error: "Failed to derive Polymarket wallet address",
-          });
-          return;
-        }
-
-        // Step 2: Check if the derived Safe is actually deployed on-chain
-        // Uses cached value unless force refresh
-        const isActuallyDeployed = await checkIsDeployed(derivedAddress);
-
-        if (!isActuallyDeployed) {
-          // Safe not deployed - new user needs to create trading wallet
-          setData({
-            proxyAddress: null,
-            isDeployed: false,
-            usdcBalance: 0,
-            isLoading: false,
-            error: null,
-          });
-          return;
-        }
-
-        // Step 3: Safe is deployed - fetch USDC balance
-        const usdcBalance = await fetchUsdcBalance(derivedAddress);
-
-        setData({
-          proxyAddress: derivedAddress,
-          isDeployed: true,
-          usdcBalance,
-          isLoading: false,
-          error: null,
-        });
-      } catch (err) {
-        setData((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: err instanceof Error ? err.message : "Unknown error",
-        }));
-      }
-    },
-    [
-      address,
-      isConnected,
-      deriveSafeAddress,
-      checkIsDeployed,
-      fetchUsdcBalance,
-    ],
-  );
+  const refresh = useCallback(async () => {
+    return queryClient.invalidateQueries({
+      queryKey: [PROXY_WALLET_QUERY_KEY, address],
+    });
+  }, [queryClient, address]);
 
   /**
    * Force refresh with cache clearing
    */
   const forceRefresh = useCallback(async () => {
-    if (data.proxyAddress) {
-      clearDeploymentCache(data.proxyAddress);
-      clearBalanceCache(data.proxyAddress);
+    if (query.data?.proxyAddress) {
+      clearDeploymentCache(query.data.proxyAddress);
+      clearBalanceCache(query.data.proxyAddress);
     }
-    return refresh({ force: true });
-  }, [data.proxyAddress, refresh]);
-
-  // Auto-refresh when address changes (with cleanup)
-  useEffect(() => {
-    refresh();
-
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, [refresh]);
+    return refresh();
+  }, [query.data?.proxyAddress, refresh]);
 
   return {
-    ...data,
+    proxyAddress: query.data?.proxyAddress ?? null,
+    isDeployed: query.data?.isDeployed ?? false,
+    usdcBalance: query.data?.usdcBalance ?? 0,
+    isLoading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
     refresh,
     forceRefresh,
   };

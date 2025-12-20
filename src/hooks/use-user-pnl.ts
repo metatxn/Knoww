@@ -106,7 +106,7 @@ export interface UseUserPnLOptions {
  */
 async function fetchPnL(
   userAddress: string,
-  options: UseUserPnLOptions,
+  options: UseUserPnLOptions
 ): Promise<PnLResponse> {
   const params = new URLSearchParams({
     user: userAddress,

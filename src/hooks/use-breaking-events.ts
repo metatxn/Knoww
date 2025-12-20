@@ -46,7 +46,7 @@ export function useBreakingEvents(limit = 15) {
     queryKey: ["breaking-events", limit],
     queryFn: async ({ pageParam = 0 }) => {
       const response = await fetch(
-        `/api/events/breaking?limit=${limit}&offset=${pageParam}`,
+        `/api/events/breaking?limit=${limit}&offset=${pageParam}`
       );
 
       if (!response.ok) {

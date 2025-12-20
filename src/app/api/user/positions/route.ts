@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch positions from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -169,17 +169,17 @@ export async function GET(request: NextRequest) {
     // Calculate totals using actual field names from API
     const totalValue = positions.reduce(
       (sum, p) => sum + (p.currentValue || 0),
-      0,
+      0
     );
 
     const totalUnrealizedPnl = positions.reduce(
       (sum, p) => sum + (p.cashPnl || 0),
-      0,
+      0
     );
 
     const totalRealizedPnl = positions.reduce(
       (sum, p) => sum + (p.realizedPnl || 0),
-      0,
+      0
     );
 
     // Transform positions for frontend
@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

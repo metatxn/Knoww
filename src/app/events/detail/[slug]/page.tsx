@@ -1,16 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import {
-  Bookmark,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
-  Clock,
-  Share2,
   TrendingUp,
-  Trophy,
   User,
   Wifi,
 } from "lucide-react";
@@ -19,7 +14,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
-import { NegRiskBadge } from "@/components/neg-risk-badge";
 import { OrderBook } from "@/components/order-book";
 import { OrderBookInline } from "@/components/order-book-summary";
 import { PageBackground } from "@/components/page-background";
@@ -48,7 +42,9 @@ import {
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice, formatVolume } from "@/lib/utils";
+
+import { HeaderSection } from "./header-section";
 
 // Order book response type - defined outside component to avoid hook order issues
 interface OrderBookResponse {
@@ -85,6 +81,23 @@ export default function EventDetailPage() {
     return true; // Default to expanded for SSR
   });
   const [showClosedMarkets, setShowClosedMarkets] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Handle scroll for sticky header effects with performance optimization
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setIsScrolled(window.scrollY > 20);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Order book store action for preloading from REST
   const { setOrderBookFromRest } = useOrderBookStore();
@@ -96,7 +109,7 @@ export default function EventDetailPage() {
       try {
         const res = await fetch(
           `https://clob.polymarket.com/book?token_id=${tokenId}`,
-          { headers: { Accept: "application/json" } },
+          { headers: { Accept: "application/json" } }
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -108,7 +121,7 @@ export default function EventDetailPage() {
         console.error("Preload order book failed", err);
       }
     },
-    [setOrderBookFromRest],
+    [setOrderBookFromRest]
   );
 
   // Use slug from URL params - API handles both slugs and numeric IDs
@@ -187,7 +200,7 @@ export default function EventDetailPage() {
       }
       return null;
     },
-    [positionsByConditionId, positionsByAsset],
+    [positionsByConditionId, positionsByAsset]
   );
 
   // Handle order success
@@ -214,12 +227,12 @@ export default function EventDetailPage() {
 
   const openMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed !== true),
-    [allMarkets],
+    [allMarkets]
   );
 
   const closedMarkets = useMemo(
     () => allMarkets.filter((m) => m.closed === true),
-    [allMarkets],
+    [allMarkets]
   );
 
   // Closed market rows (precomputed; used later in the dropdown)
@@ -236,10 +249,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes"),
+          o.toLowerCase().includes("yes")
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no"),
+          o.toLowerCase().includes("no")
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -250,7 +263,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes",
+            (t) => t.outcome?.toLowerCase() === "yes"
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -327,10 +340,10 @@ export default function EventDetailPage() {
           : [];
 
         const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes"),
+          o.toLowerCase().includes("yes")
         );
         const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no"),
+          o.toLowerCase().includes("no")
         );
 
         const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -341,7 +354,7 @@ export default function EventDetailPage() {
 
         if (tokens.length > 0) {
           const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes",
+            (t) => t.outcome?.toLowerCase() === "yes"
           );
           const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
           yesTokenId = yesToken?.token_id || "";
@@ -384,7 +397,7 @@ export default function EventDetailPage() {
       });
 
       const sortedMarketData = [...marketData].sort(
-        (a, b) => b.yesProbability - a.yesProbability,
+        (a, b) => b.yesProbability - a.yesProbability
       );
 
       const selected =
@@ -452,7 +465,7 @@ export default function EventDetailPage() {
       // Direct call to Polymarket CLOB API (public, allows CORS)
       const response = await fetch(
         `https://clob.polymarket.com/book?token_id=${currentTokenId}`,
-        { headers: { Accept: "application/json" } },
+        { headers: { Accept: "application/json" } }
       );
       if (!response.ok) return null;
       const data = (await response.json()) as {
@@ -493,7 +506,7 @@ export default function EventDetailPage() {
       setOrderBookFromRest(
         currentTokenId,
         orderBookData.orderBook.bids || [],
-        orderBookData.orderBook.asks || [],
+        orderBookData.orderBook.asks || []
       );
     }
   }, [orderBookData, currentTokenId, setOrderBookFromRest]);
@@ -542,10 +555,10 @@ export default function EventDetailPage() {
       const asks = ob.asks || [];
 
       const sortedBids = [...bids].sort(
-        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
+        (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
       );
       const sortedAsks = [...asks].sort(
-        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
+        (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
       );
 
       const bestBidLevel = sortedBids.length > 0 ? sortedBids[0] : null;
@@ -560,7 +573,7 @@ export default function EventDetailPage() {
 
       const minOrderSizeValue = Math.max(
         marketMinOrderSize,
-        bookMinOrderSizeValue,
+        bookMinOrderSizeValue
       );
 
       return {
@@ -624,23 +637,6 @@ export default function EventDetailPage() {
     );
   }
 
-  const formatVolume = (vol?: number | string) => {
-    if (!vol) return "N/A";
-    const num = typeof vol === "string" ? Number.parseFloat(vol) : vol;
-    if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
-    if (num >= 1_000) return `$${(num / 1_000).toFixed(2)}K`;
-    return `$${num.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  };
-
-  const formatPrice = (price: string) => {
-    const num = Number.parseFloat(price);
-    return (num * 100).toFixed(1);
-  };
-
-  const _copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
   // Build market data for display (reuse the computed markets)
   const marketData = openMarkets.map((market, idx) => {
     const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
@@ -651,10 +647,10 @@ export default function EventDetailPage() {
       : [];
 
     const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes"),
+      o.toLowerCase().includes("yes")
     );
     const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no"),
+      o.toLowerCase().includes("no")
     );
 
     const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
@@ -698,7 +694,7 @@ export default function EventDetailPage() {
   });
 
   const sortedMarketData = [...marketData].sort(
-    (a, b) => b.yesProbability - a.yesProbability,
+    (a, b) => b.yesProbability - a.yesProbability
   );
 
   // Chart behavior:
@@ -756,22 +752,17 @@ export default function EventDetailPage() {
         ? market.createdAt
         : earliest;
     },
-    event.createdAt,
+    event.createdAt
   );
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative selection:bg-purple-500/30">
       <PageBackground />
 
       <Navbar />
-      <motion.main
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="relative z-10 px-4 md:px-6 lg:px-8 py-6 space-y-6"
-      >
+      <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <button
             type="button"
             onClick={() => router.push("/")}
@@ -787,104 +778,14 @@ export default function EventDetailPage() {
         </div>
 
         {/* Header Section */}
-        <div className="space-y-3 sm:space-y-4">
-          {/* Title Row with Image, Title, and Action Buttons */}
-          <div className="flex items-start gap-3 md:gap-4">
-            {event.image && (
-              <div className="relative w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0">
-                <Image
-                  src={event.image}
-                  alt={event.title}
-                  fill
-                  sizes="80px"
-                  className="rounded-xl object-cover"
-                />
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight">
-                    {event.title}
-                  </h1>
-                  {event.negRisk && (
-                    <div className="mt-1.5">
-                      <NegRiskBadge />
-                    </div>
-                  )}
-                </div>
-                {/* Action Buttons - Icon only on mobile/tablet, with text on desktop */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
-                    onClick={async () => {
-                      if (typeof window !== "undefined" && navigator.share) {
-                        try {
-                          await navigator.share({
-                            title: event.title,
-                            url: window.location.href,
-                          });
-                        } catch (err) {
-                          if ((err as Error).name !== "AbortError") {
-                            console.error("Share failed:", err);
-                          }
-                        }
-                      }
-                    }}
-                  >
-                    <Share2 className="h-4 w-4" />
-                    <span className="hidden lg:inline">Share</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
-                  >
-                    <Bookmark className="h-4 w-4" />
-                    <span className="hidden lg:inline">Save</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Row - 2x2 grid on mobile/tablet, flex on desktop */}
-          <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
-              <Trophy className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-medium truncate">
-                {formatVolume(event.volume)} Vol.
-              </span>
-            </div>
-            {event.endDate && (
-              <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {new Date(event.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
-              <span className="font-medium">{totalMarketsCount} markets</span>
-            </div>
-            {closedMarkets.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-full">
-                <span className="font-medium">
-                  {openMarkets.length} open • {closedMarkets.length} closed
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        <HeaderSection
+          event={event}
+          isScrolled={isScrolled}
+          formatVolume={formatVolume}
+          totalMarketsCount={totalMarketsCount}
+          openMarkets={openMarkets}
+          closedMarkets={closedMarkets}
+        />
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -908,7 +809,7 @@ export default function EventDetailPage() {
                           No{" "}
                           {Math.max(
                             0,
-                            100 - singleMarketForChart.yesProbability,
+                            100 - singleMarketForChart.yesProbability
                           )}
                           %
                         </span>
@@ -975,7 +876,7 @@ export default function EventDetailPage() {
                               : connectionState === "connecting" ||
                                   connectionState === "reconnecting"
                                 ? "text-amber-500 animate-pulse"
-                                : "text-muted-foreground",
+                                : "text-muted-foreground"
                           )}
                         />
                         <span
@@ -986,7 +887,7 @@ export default function EventDetailPage() {
                               : connectionState === "connecting" ||
                                   connectionState === "reconnecting"
                                 ? "text-amber-500"
-                                : "text-muted-foreground",
+                                : "text-muted-foreground"
                           )}
                         >
                           {isConnected
@@ -1059,7 +960,7 @@ export default function EventDetailPage() {
                                 selectedMarket?.id === market.id
                                   ? "bg-primary/5"
                                   : "hover:bg-accent/30",
-                                isExpanded && "bg-muted/30",
+                                isExpanded && "bg-muted/30"
                               )}
                               onClick={() => {
                                 // Toggle order book expansion
@@ -1173,7 +1074,7 @@ export default function EventDetailPage() {
                                       "flex-1 h-9 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400",
+                                        "ring-2 ring-green-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1193,7 +1094,7 @@ export default function EventDetailPage() {
                                       "flex-1 h-9 text-xs font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400",
+                                        "ring-2 ring-red-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1279,7 +1180,7 @@ export default function EventDetailPage() {
                                       "h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400",
+                                        "ring-2 ring-green-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1299,7 +1200,7 @@ export default function EventDetailPage() {
                                       "h-8 px-3 text-xs font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400",
+                                        "ring-2 ring-red-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1401,7 +1302,7 @@ export default function EventDetailPage() {
                                       "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm bg-green-600 hover:bg-green-700 text-white font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 0 &&
-                                        "ring-2 ring-green-400",
+                                        "ring-2 ring-green-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1424,7 +1325,7 @@ export default function EventDetailPage() {
                                       "h-8 px-2.5 text-xs xl:w-[100px] xl:h-9 xl:text-sm font-medium",
                                       isExpanded &&
                                         selectedOutcomeIndex === 1 &&
-                                        "ring-2 ring-red-400",
+                                        "ring-2 ring-red-400"
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1449,7 +1350,7 @@ export default function EventDetailPage() {
                                 "grid transition-all duration-300 ease-in-out border-b border-border bg-muted/10",
                                 isExpanded
                                   ? "grid-rows-[1fr] opacity-100"
-                                  : "grid-rows-[0fr] opacity-0",
+                                  : "grid-rows-[0fr] opacity-0"
                               )}
                             >
                               <div className="overflow-hidden">
@@ -1523,7 +1424,7 @@ export default function EventDetailPage() {
                                                 userPosition.outcome.toLowerCase() ===
                                                   "yes"
                                                   ? "text-green-600 dark:text-green-400"
-                                                  : "text-red-600 dark:text-red-400",
+                                                  : "text-red-600 dark:text-red-400"
                                               )}
                                             >
                                               {userPosition.outcome}
@@ -1561,7 +1462,7 @@ export default function EventDetailPage() {
                                             <span className="font-semibold text-sm tabular-nums">
                                               $
                                               {userPosition.currentValue.toFixed(
-                                                2,
+                                                2
                                               )}
                                             </span>
                                           </div>
@@ -1574,7 +1475,7 @@ export default function EventDetailPage() {
                                             <span className="font-semibold text-sm tabular-nums">
                                               $
                                               {userPosition.initialValue.toFixed(
-                                                2,
+                                                2
                                               )}
                                             </span>
                                           </div>
@@ -1589,7 +1490,7 @@ export default function EventDetailPage() {
                                                 "font-semibold text-sm tabular-nums",
                                                 userPosition.unrealizedPnl >= 0
                                                   ? "text-green-600 dark:text-green-400"
-                                                  : "text-red-600 dark:text-red-400",
+                                                  : "text-red-600 dark:text-red-400"
                                               )}
                                             >
                                               {userPosition.unrealizedPnl >= 0
@@ -1597,7 +1498,7 @@ export default function EventDetailPage() {
                                                 : "-"}
                                               $
                                               {Math.abs(
-                                                userPosition.unrealizedPnl,
+                                                userPosition.unrealizedPnl
                                               ).toFixed(2)}
                                               <span className="text-xs ml-1 opacity-80">
                                                 (
@@ -1605,7 +1506,7 @@ export default function EventDetailPage() {
                                                   ? ""
                                                   : "-"}
                                                 {Math.abs(
-                                                  userPosition.unrealizedPnlPercent,
+                                                  userPosition.unrealizedPnlPercent
                                                 ).toFixed(1)}
                                                 %)
                                               </span>
@@ -1731,7 +1632,7 @@ export default function EventDetailPage() {
                             <button
                               type="button"
                               className={cn(
-                                "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors",
+                                "w-full flex items-center justify-between px-3 md:px-4 py-3 text-sm font-medium border-t border-border hover:bg-accent/30 transition-colors"
                               )}
                             >
                               <span>
@@ -1740,7 +1641,7 @@ export default function EventDetailPage() {
                               <ChevronDown
                                 className={cn(
                                   "h-4 w-4 transition-transform",
-                                  showClosedMarkets && "rotate-180",
+                                  showClosedMarkets && "rotate-180"
                                 )}
                               />
                             </button>
@@ -1775,14 +1676,14 @@ export default function EventDetailPage() {
                                       className={cn(
                                         "w-full text-left p-3 md:p-4 border-t border-border transition-all cursor-pointer",
                                         "hover:bg-accent/30",
-                                        isExpanded && "bg-muted/30",
+                                        isExpanded && "bg-muted/30"
                                       )}
                                       onClick={() => {
                                         if (isExpanded) {
                                           setExpandedOrderBookMarketId(null);
                                         } else {
                                           setExpandedOrderBookMarketId(
-                                            market.id,
+                                            market.id
                                           );
                                           // Market is closed — do not fetch order book snapshots.
                                         }
@@ -1797,7 +1698,7 @@ export default function EventDetailPage() {
                                             setExpandedOrderBookMarketId(null);
                                           } else {
                                             setExpandedOrderBookMarketId(
-                                              market.id,
+                                              market.id
                                             );
                                           }
                                         }
@@ -1867,7 +1768,7 @@ export default function EventDetailPage() {
                                         "grid transition-all duration-300 ease-in-out border-t border-border bg-muted/10",
                                         isExpanded
                                           ? "grid-rows-[1fr] opacity-100"
-                                          : "grid-rows-[0fr] opacity-0",
+                                          : "grid-rows-[0fr] opacity-0"
                                       )}
                                     >
                                       <div className="overflow-hidden">
@@ -2028,7 +1929,7 @@ export default function EventDetailPage() {
             </Tabs>
           </CardContent>
         </Card>
-      </motion.main>
+      </main>
     </div>
   );
 }

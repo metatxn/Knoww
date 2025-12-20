@@ -386,7 +386,7 @@ function PositionsTable({
   // Filter and sort positions
   const filteredPositions = useMemo(() => {
     let result = positions.filter((p) =>
-      p.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
+      p.market.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     // Apply P&L filter
@@ -455,19 +455,19 @@ function PositionsTable({
   // Calculate totals
   const totalBet = filteredPositions.reduce(
     (sum, p) => sum + p.initialValue,
-    0,
+    0
   );
   const totalToWin = filteredPositions.reduce(
     (sum, p) => sum + p.size * (1 - p.avgPrice),
-    0,
+    0
   );
   const totalValue = filteredPositions.reduce(
     (sum, p) => sum + p.currentValue,
-    0,
+    0
   );
   const totalPnl = filteredPositions.reduce(
     (sum, p) => sum + p.unrealizedPnl,
-    0,
+    0
   );
   const totalPnlPercent = totalBet > 0 ? (totalPnl / totalBet) * 100 : 0;
 
@@ -862,7 +862,7 @@ function OrdersTable({
   const filteredOrders = orders.filter(
     (o) =>
       o.market?.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase()),
+      o.tokenId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {
@@ -1117,7 +1117,7 @@ interface Trade {
 function getActivityInfo(
   type: string,
   side?: string | null,
-  pnl?: number,
+  pnl?: number
 ): { label: string; icon: React.ElementType; color: string } {
   if (type === "REDEEM") {
     if (pnl && pnl > 0) {
@@ -1178,7 +1178,7 @@ function HistoryTable({
   searchQuery: string;
 }) {
   const filteredTrades = trades.filter((t) =>
-    t.market.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    t.market.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {
@@ -1216,7 +1216,7 @@ function HistoryTable({
           const activityInfo = getActivityInfo(
             trade.type,
             trade.side,
-            trade.usdcAmount,
+            trade.usdcAmount
           );
           const ActivityIcon = activityInfo.icon;
           const isBuy = trade.side === "BUY";
@@ -1335,7 +1335,7 @@ function HistoryTable({
               const activityInfo = getActivityInfo(
                 trade.type,
                 trade.side,
-                trade.usdcAmount,
+                trade.usdcAmount
               );
               const ActivityIcon = activityInfo.icon;
               const isBuy = trade.side === "BUY";

@@ -142,7 +142,7 @@ function generateNonce(): number {
 function calculateAmounts(
   price: number,
   size: number,
-  side: OrderSide,
+  side: OrderSide
 ): { makerAmount: string; takerAmount: string } {
   // Price is between 0 and 1 (e.g., 0.55 for 55%)
   // Size is number of shares
@@ -236,7 +236,7 @@ export function useOrderSigning() {
 
       return order;
     },
-    [address],
+    [address]
   );
 
   /**
@@ -310,7 +310,7 @@ export function useOrderSigning() {
         setIsLoading(false);
       }
     },
-    [address, buildOrder, signTypedData],
+    [address, buildOrder, signTypedData]
   );
   /**
    * Submit a signed order to the backend API
@@ -320,7 +320,7 @@ export function useOrderSigning() {
     async (
       signedOrder: SignedOrder,
       orderType: OrderType = OrderType.GTC,
-      userCreds?: UserApiCreds,
+      userCreds?: UserApiCreds
     ): Promise<{ success: boolean; order?: unknown; error?: string }> => {
       if (!address) {
         throw new Error("Wallet not connected");
@@ -377,7 +377,7 @@ export function useOrderSigning() {
         setIsLoading(false);
       }
     },
-    [address],
+    [address]
   );
 
   /**
@@ -388,12 +388,12 @@ export function useOrderSigning() {
     async (
       params: OrderParams,
       orderType: OrderType = OrderType.GTC,
-      userCreds?: UserApiCreds,
+      userCreds?: UserApiCreds
     ): Promise<{ success: boolean; order?: unknown; error?: string }> => {
       const signedOrder = await signOrder(params);
       return submitOrder(signedOrder, orderType, userCreds);
     },
-    [signOrder, submitOrder],
+    [signOrder, submitOrder]
   );
 
   /**
@@ -401,7 +401,7 @@ export function useOrderSigning() {
    */
   const cancelOrder = useCallback(
     async (
-      orderId: string,
+      orderId: string
     ): Promise<{ success: boolean; response?: unknown; error?: string }> => {
       if (!address) {
         throw new Error("Wallet not connected");
@@ -443,7 +443,7 @@ export function useOrderSigning() {
         setIsLoading(false);
       }
     },
-    [address],
+    [address]
   );
 
   return {
@@ -473,7 +473,7 @@ export function useOrderSigning() {
 export function calculatePotentialPnL(
   price: number,
   size: number,
-  side: OrderSide,
+  side: OrderSide
 ): { cost: number; potentialWin: number; potentialLoss: number } {
   const cost = price * size;
 

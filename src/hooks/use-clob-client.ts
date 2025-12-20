@@ -115,7 +115,7 @@ export function useClobClient() {
 
       if (!credentials) {
         throw new Error(
-          "API credentials not available. Please derive credentials first.",
+          "API credentials not available. Please derive credentials first."
         );
       }
 
@@ -125,7 +125,7 @@ export function useClobClient() {
 
       if (!proxyAddress || !hasProxyWallet) {
         throw new Error(
-          "Proxy wallet not deployed. Please complete trading setup first.",
+          "Proxy wallet not deployed. Please complete trading setup first."
         );
       }
 
@@ -143,7 +143,7 @@ export function useClobClient() {
         // Get signer from MetaMask/wallet provider using window.ethereum
         const provider = new ethersModule.providers.Web3Provider(
           // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-          window.ethereum as any,
+          window.ethereum as any
         );
         // Request account access if needed
         await provider.send("eth_requestAccounts", []);
@@ -188,7 +188,7 @@ export function useClobClient() {
           proxyAddress, // funderAddress - the proxy wallet that holds the funds
           undefined, // marketOrderDelay
           false, // enableAutoMargin
-          builderConfig,
+          builderConfig
         );
 
         // Fetch the fee rate for this token
@@ -214,7 +214,7 @@ export function useClobClient() {
             expiration:
               params.orderType === OrderType.GTD ? params.expiration : 0,
           },
-          orderOptions,
+          orderOptions
         );
 
         // Post the order (SDK handles builder headers)
@@ -241,7 +241,7 @@ export function useClobClient() {
       builderSigningServerUrl,
       proxyAddress,
       hasProxyWallet,
-    ],
+    ]
   );
 
   /**
@@ -264,7 +264,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [clobHost],
+    [clobHost]
   );
 
   /**
@@ -280,7 +280,7 @@ export function useClobClient() {
     // Gracefully return empty if prerequisites aren't met
     if (!address || !credentials) {
       console.debug(
-        "[getOpenOrders] Skipping: wallet not connected or no credentials",
+        "[getOpenOrders] Skipping: wallet not connected or no credentials"
       );
       return [];
     }
@@ -301,7 +301,7 @@ export function useClobClient() {
 
       const provider = new ethersModule.providers.Web3Provider(
         // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-        window.ethereum as any,
+        window.ethereum as any
       );
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
@@ -320,7 +320,7 @@ export function useClobClient() {
         signer,
         creds,
         SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
-        proxyAddress, // funderAddress - the proxy wallet that holds the funds
+        proxyAddress // funderAddress - the proxy wallet that holds the funds
       );
 
       const orders = await client.getOpenOrders();
@@ -347,12 +347,12 @@ export function useClobClient() {
   const getBalanceAllowance = useCallback(
     async (
       assetType: "COLLATERAL" | "CONDITIONAL" = "COLLATERAL",
-      tokenId?: string,
+      tokenId?: string
     ) => {
       // Gracefully return defaults if prerequisites aren't met
       if (!address || !credentials) {
         console.debug(
-          "[getBalanceAllowance] Skipping: wallet not connected or no credentials",
+          "[getBalanceAllowance] Skipping: wallet not connected or no credentials"
         );
         return { balance: "0", allowance: "0" };
       }
@@ -364,7 +364,7 @@ export function useClobClient() {
 
       if (!proxyAddress || !hasProxyWallet) {
         console.debug(
-          "[getBalanceAllowance] Skipping: proxy wallet not deployed",
+          "[getBalanceAllowance] Skipping: proxy wallet not deployed"
         );
         return { balance: "0", allowance: "0" };
       }
@@ -377,7 +377,7 @@ export function useClobClient() {
 
         const provider = new ethersModule.providers.Web3Provider(
           // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-          window.ethereum as any,
+          window.ethereum as any
         );
         await provider.send("eth_requestAccounts", []);
         const signer = provider.getSigner();
@@ -396,7 +396,7 @@ export function useClobClient() {
           signer,
           creds,
           SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
-          proxyAddress, // funderAddress - the proxy wallet that holds the funds
+          proxyAddress // funderAddress - the proxy wallet that holds the funds
         );
 
         // Get balance and allowance
@@ -418,7 +418,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet],
+    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet]
   );
 
   /**
@@ -554,7 +554,7 @@ export function useClobClient() {
 
       if (!proxyAddress || !hasProxyWallet) {
         throw new Error(
-          "Proxy wallet not deployed. Please complete trading setup first.",
+          "Proxy wallet not deployed. Please complete trading setup first."
         );
       }
 
@@ -568,7 +568,7 @@ export function useClobClient() {
         // Get signer from MetaMask/wallet provider
         const provider = new ethersModule.providers.Web3Provider(
           // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-          window.ethereum as any,
+          window.ethereum as any
         );
         await provider.send("eth_requestAccounts", []);
         const signer = provider.getSigner();
@@ -587,7 +587,7 @@ export function useClobClient() {
           signer,
           creds,
           SIGNATURE_TYPE_POLY_GNOSIS_SAFE,
-          proxyAddress, // funderAddress - the proxy wallet that holds the funds
+          proxyAddress // funderAddress - the proxy wallet that holds the funds
         );
 
         const response = await client.cancelOrder({ orderID: orderId });
@@ -605,7 +605,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet],
+    [address, credentials, clobHost, chainId, proxyAddress, hasProxyWallet]
   );
 
   /**
@@ -673,7 +673,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address],
+    [address]
   );
 
   /**
@@ -697,7 +697,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [clobHost, chainId],
+    [clobHost, chainId]
   );
 
   /**
@@ -769,7 +769,7 @@ export function useClobClient() {
 
         // Convert to human-readable format
         const allowanceFormatted = Number(
-          formatUnits(allowance, USDC_DECIMALS),
+          formatUnits(allowance, USDC_DECIMALS)
         );
 
         return {
@@ -783,7 +783,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address],
+    [address]
   );
 
   return {

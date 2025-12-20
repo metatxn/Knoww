@@ -163,7 +163,7 @@ export function usePaginatedEvents({
       }
 
       const response = await fetch(
-        `/api/events/paginated?${params.toString()}`,
+        `/api/events/paginated?${params.toString()}`
       );
 
       if (!response.ok) {

@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.warn(
-        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`,
+        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`
       );
       // Use fallback tags if endpoint doesn't exist
       return NextResponse.json({

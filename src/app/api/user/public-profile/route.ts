@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
           Accept: "application/json",
         },
         next: { revalidate: 300 }, // Cache for 5 minutes
-      },
+      }
     );
 
     // Handle 404 - profile not found
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch profile from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

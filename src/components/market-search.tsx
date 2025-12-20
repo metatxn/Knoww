@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/use-search";
-import { cn } from "@/lib/utils";
+import { cn, formatVolume } from "@/lib/utils";
 
 // Custom hook for debouncing values
 function useDebouncedValue<T>(value: T, delay: number): T {
@@ -83,7 +83,7 @@ export function MarketSearch({
       setQuery(e.target.value);
       setIsOpen(e.target.value.length >= 2);
     },
-    [],
+    []
   );
 
   const handleClear = useCallback(() => {
@@ -98,7 +98,7 @@ export function MarketSearch({
       setQuery("");
       router.push(`/events/detail/${slug}`);
     },
-    [router],
+    [router]
   );
 
   const handleTagClick = useCallback(
@@ -107,7 +107,7 @@ export function MarketSearch({
       setQuery("");
       router.push(`/events/${slug}`);
     },
-    [router],
+    [router]
   );
 
   const hasResults =
@@ -115,14 +115,6 @@ export function MarketSearch({
     (data?.tags && data.tags.length > 0);
 
   const showDropdown = isOpen && query.length >= 2;
-
-  // Format volume for display
-  const formatVolume = (volume?: number) => {
-    if (!volume) return null;
-    if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
-    if (volume >= 1000) return `$${(volume / 1000).toFixed(0)}K`;
-    return `$${volume.toFixed(0)}`;
-  };
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>

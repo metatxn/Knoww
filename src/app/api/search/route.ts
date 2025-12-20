@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       console.error("Search API error:", response.status, response.statusText);
       return NextResponse.json(
         { error: "Failed to search" },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     console.error("Search error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

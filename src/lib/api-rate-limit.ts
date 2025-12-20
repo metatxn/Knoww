@@ -22,7 +22,7 @@ export function checkRateLimit(
   options?: {
     interval?: number;
     uniqueTokenPerInterval?: number;
-  },
+  }
 ): NextResponse | null {
   const identifier = getIdentifier(request);
 
@@ -50,10 +50,10 @@ export function checkRateLimit(
           "X-RateLimit-Remaining": "0",
           "X-RateLimit-Reset": rateLimitResult.reset.toString(),
           "Retry-After": Math.ceil(
-            (rateLimitResult.reset - Date.now()) / 1000,
+            (rateLimitResult.reset - Date.now()) / 1000
           ).toString(),
         },
-      },
+      }
     );
   }
 

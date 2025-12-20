@@ -59,7 +59,7 @@ export function usePortfolioValue(options: UsePortfolioValueOptions = {}) {
       }
 
       const response = await fetch(
-        `/api/user/portfolio-value?user=${userAddress}`,
+        `/api/user/portfolio-value?user=${userAddress}`
       );
 
       if (!response.ok) {

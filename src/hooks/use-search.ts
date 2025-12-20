@@ -56,7 +56,7 @@ export interface SearchResponse {
 
 async function fetchSearchResults(
   query: string,
-  limit = 10,
+  limit = 10
 ): Promise<SearchResponse> {
   if (!query.trim()) {
     return {

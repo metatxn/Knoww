@@ -46,7 +46,7 @@ interface UseMarketsByTagParams {
  * Fetch markets by tag_id
  */
 async function fetchMarketsByTag(
-  params: UseMarketsByTagParams,
+  params: UseMarketsByTagParams
 ): Promise<Market[]> {
   if (!params.tag_id) return [];
 

@@ -30,7 +30,7 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
 
   try {
     const stored = localStorage.getItem(
-      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`,
+      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`
     );
     if (stored) {
       return JSON.parse(stored) as ApiKeyCreds;
@@ -49,7 +49,7 @@ function storeCredentials(address: string, creds: ApiKeyCreds): void {
 
   localStorage.setItem(
     `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`,
-    JSON.stringify(creds),
+    JSON.stringify(creds)
   );
 }
 
@@ -228,7 +228,7 @@ export function useClobCredentials() {
       // Create ethers signer from wallet provider
       const provider = new ethersModule.providers.Web3Provider(
         // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-        window.ethereum as any,
+        window.ethereum as any
       );
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
@@ -238,7 +238,7 @@ export function useClobCredentials() {
         process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
           "https://clob.polymarket.com",
         137, // Polygon chain ID
-        signer,
+        signer
       );
 
       // Try to derive existing credentials first (for returning users)
@@ -247,14 +247,14 @@ export function useClobCredentials() {
 
       try {
         console.log(
-          "[ClobCredentials] Attempting to derive existing API key...",
+          "[ClobCredentials] Attempting to derive existing API key..."
         );
         creds = await tempClient.deriveApiKey();
         console.log("[ClobCredentials] Successfully derived existing API key");
       } catch (deriveErr) {
         console.log(
           "[ClobCredentials] Derive failed, creating new API key...",
-          deriveErr,
+          deriveErr
         );
         try {
           creds = await tempClient.createApiKey();
@@ -263,7 +263,7 @@ export function useClobCredentials() {
           // If both SDK methods fail, fall back to our API route
           console.log(
             "[ClobCredentials] SDK methods failed, using API fallback...",
-            createErr,
+            createErr
           );
           return await deriveCredentialsViaApi();
         }

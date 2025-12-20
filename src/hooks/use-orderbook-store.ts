@@ -77,7 +77,7 @@ interface OrderBookStoreState {
   setOrderBookFromRest: (
     assetId: string,
     bids: OrderBookLevel[],
-    asks: OrderBookLevel[],
+    asks: OrderBookLevel[]
   ) => void;
   /** Clear order book for an asset */
   clearOrderBook: (assetId: string) => void;
@@ -111,16 +111,16 @@ function processOrderBook(
   rawAsks: OrderBookLevel[],
   timestamp: string,
   hash: string,
-  source: "websocket" | "rest",
+  source: "websocket" | "rest"
 ): ProcessedOrderBook {
   // Sort bids descending by price
   const bids = [...rawBids].sort(
-    (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
+    (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
   );
 
   // Sort asks ascending by price
   const asks = [...rawAsks].sort(
-    (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
+    (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
   );
 
   // Calculate best prices
@@ -136,11 +136,11 @@ function processOrderBook(
   // Calculate total sizes
   const totalBidSize = bids.reduce(
     (sum, level) => sum + Number.parseFloat(level.size),
-    0,
+    0
   );
   const totalAskSize = asks.reduce(
     (sum, level) => sum + Number.parseFloat(level.size),
-    0,
+    0
   );
 
   return {
@@ -170,7 +170,7 @@ function applyPriceChange(
   side: "BUY" | "SELL",
   bestBid: string,
   bestAsk: string,
-  timestamp: string,
+  timestamp: string
 ): ProcessedOrderBook {
   const levels = side === "BUY" ? [...orderBook.bids] : [...orderBook.asks];
 
@@ -194,11 +194,11 @@ function applyPriceChange(
   // Re-sort
   if (side === "BUY") {
     levels.sort(
-      (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price),
+      (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
     );
   } else {
     levels.sort(
-      (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price),
+      (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
     );
   }
 
@@ -221,11 +221,11 @@ function applyPriceChange(
     midpoint: newMidpoint,
     totalBidSize: newBids.reduce(
       (sum, l) => sum + Number.parseFloat(l.size),
-      0,
+      0
     ),
     totalAskSize: newAsks.reduce(
       (sum, l) => sum + Number.parseFloat(l.size),
-      0,
+      0
     ),
     timestamp,
     source: "websocket",
@@ -257,7 +257,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         event.asks,
         event.timestamp,
         event.hash,
-        "websocket",
+        "websocket"
       );
 
       set((state) => {
@@ -281,7 +281,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
               change.side,
               change.best_bid,
               change.best_ask,
-              event.timestamp,
+              event.timestamp
             );
             newOrderBooks.set(change.asset_id, updated);
           }
@@ -310,7 +310,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
     setOrderBookFromRest: (
       assetId: string,
       bids: OrderBookLevel[],
-      asks: OrderBookLevel[],
+      asks: OrderBookLevel[]
     ) => {
       const processed = processOrderBook(
         assetId,
@@ -319,7 +319,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         asks,
         Date.now().toString(),
         "",
-        "rest",
+        "rest"
       );
 
       set((state) => {
@@ -374,7 +374,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
     getLastTrade: (assetId: string) => {
       return get().lastTrades.get(assetId);
     },
-  })),
+  }))
 );
 
 /**
@@ -382,7 +382,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
  */
 export function useOrderBook(assetId: string | undefined) {
   return useOrderBookStore((state: OrderBookStoreState) =>
-    assetId ? state.orderBooks.get(assetId) : undefined,
+    assetId ? state.orderBooks.get(assetId) : undefined
   );
 }
 
@@ -400,7 +400,7 @@ export function useBestPrices(assetId: string | undefined) {
         bestAsk: orderBook?.bestAsk ?? null,
         spread: orderBook?.spread ?? null,
       };
-    }),
+    })
   );
 }
 
@@ -409,7 +409,7 @@ export function useBestPrices(assetId: string | undefined) {
  */
 export function useLastTrade(assetId: string | undefined) {
   return useOrderBookStore((state: OrderBookStoreState) =>
-    assetId ? state.lastTrades.get(assetId) : undefined,
+    assetId ? state.lastTrades.get(assetId) : undefined
   );
 }
 
@@ -422,6 +422,6 @@ export function useOrderBookConnectionStatus() {
     useShallow((state: OrderBookStoreState) => ({
       isConnected: state.isConnected,
       lastError: state.lastError,
-    })),
+    }))
   );
 }

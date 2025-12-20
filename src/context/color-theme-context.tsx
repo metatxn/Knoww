@@ -66,7 +66,7 @@ interface AccentColorContextType {
 }
 
 const AccentColorContext = createContext<AccentColorContextType | undefined>(
-  undefined,
+  undefined
 );
 
 const ACCENT_COLOR_STORAGE_KEY = "polycaster-accent-color";
@@ -78,7 +78,7 @@ export function AccentColorProvider({ children }: { children: ReactNode }) {
   // Load saved accent color on mount
   useEffect(() => {
     const saved = localStorage.getItem(
-      ACCENT_COLOR_STORAGE_KEY,
+      ACCENT_COLOR_STORAGE_KEY
     ) as AccentColor | null;
     if (saved && ACCENT_COLORS.some((c) => c.value === saved)) {
       setAccentColorState(saved);
@@ -115,7 +115,7 @@ export function useAccentColor() {
   const context = useContext(AccentColorContext);
   if (context === undefined) {
     throw new Error(
-      "useAccentColor must be used within an AccentColorProvider",
+      "useAccentColor must be used within an AccentColorProvider"
     );
   }
   return context;

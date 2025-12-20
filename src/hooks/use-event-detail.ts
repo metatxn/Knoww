@@ -40,7 +40,7 @@ interface Market {
   negRisk?: boolean;
 }
 
-interface Event {
+export type Event = {
   id: string;
   slug: string;
   title: string;
@@ -60,7 +60,7 @@ interface Event {
   negRisk?: boolean;
   enableNegRisk?: boolean;
   negRiskAugmented?: boolean;
-}
+};
 
 interface EventDetailResponse {
   success: boolean;
@@ -73,7 +73,7 @@ interface EventDetailResponse {
  * The API automatically handles both formats (slug preferred, ID as fallback)
  */
 async function fetchEventDetail(
-  slugOrId: string | undefined,
+  slugOrId: string | undefined
 ): Promise<Event | null> {
   if (!slugOrId) return null;
 

@@ -53,7 +53,7 @@ function markOnboardingComplete(walletAddress: string): void {
       completedWallets.push(lowerAddress);
       localStorage.setItem(
         ONBOARDING_COMPLETE_KEY,
-        JSON.stringify(completedWallets),
+        JSON.stringify(completedWallets)
       );
     }
   } catch {
@@ -107,7 +107,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         "[OnboardingContext] Checked localStorage for",
         address,
         ":",
-        isComplete,
+        isComplete
       );
     } else {
       setHasCompletedOnboarding(null);
@@ -166,7 +166,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       } catch (err) {
         console.error(
           "[OnboardingContext] Failed to check USDC approval:",
-          err,
+          err
         );
         setHasUsdcApproval(false);
       } finally {
@@ -260,7 +260,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       setHasCompletedOnboarding(true);
       console.log(
         "[OnboardingContext] Marked onboarding complete for",
-        address,
+        address
       );
     }
 

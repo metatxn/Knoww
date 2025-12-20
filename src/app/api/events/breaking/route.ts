@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
           "Content-Type": "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      },
+      }
     );
 
     if (!response.ok) {
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

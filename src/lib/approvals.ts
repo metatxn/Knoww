@@ -57,7 +57,7 @@ async function throttleApprovalCheck(): Promise<void> {
 
   if (timeSinceLastCheck < MIN_APPROVAL_CHECK_INTERVAL) {
     await new Promise((resolve) =>
-      setTimeout(resolve, MIN_APPROVAL_CHECK_INTERVAL - timeSinceLastCheck),
+      setTimeout(resolve, MIN_APPROVAL_CHECK_INTERVAL - timeSinceLastCheck)
     );
   }
 
@@ -70,7 +70,7 @@ async function throttleApprovalCheck(): Promise<void> {
  */
 async function checkErc20Allowance(
   owner: `0x${string}`,
-  spender: `0x${string}`,
+  spender: `0x${string}`
 ): Promise<boolean> {
   try {
     await throttleApprovalCheck();
@@ -94,7 +94,7 @@ async function checkErc20Allowance(
  */
 async function checkErc1155Approval(
   owner: `0x${string}`,
-  operator: `0x${string}`,
+  operator: `0x${string}`
 ): Promise<boolean> {
   try {
     await throttleApprovalCheck();
@@ -120,7 +120,7 @@ async function checkErc1155Approval(
  * - Outcome Token approvals for: CTF Exchange, Neg Risk Exchange, Neg Risk Adapter
  */
 export async function checkAllApprovals(
-  safeAddress: string,
+  safeAddress: string
 ): Promise<ApprovalStatus> {
   const owner = safeAddress as `0x${string}`;
 

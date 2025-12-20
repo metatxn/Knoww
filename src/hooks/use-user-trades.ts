@@ -92,7 +92,7 @@ export interface UseUserTradesOptions {
  */
 async function fetchTrades(
   userAddress: string,
-  options: UseUserTradesOptions,
+  options: UseUserTradesOptions
 ): Promise<TradesResponse> {
   const params = new URLSearchParams({
     user: userAddress,
@@ -186,7 +186,7 @@ export function useUserTrades(options: UseUserTradesOptions = {}) {
  * @returns Infinite query result with trades data
  */
 export function useUserTradesInfinite(
-  options: Omit<UseUserTradesOptions, "offset"> = {},
+  options: Omit<UseUserTradesOptions, "offset"> = {}
 ) {
   const { address, isConnected } = useConnection();
   const pageSize = options.limit || 50;

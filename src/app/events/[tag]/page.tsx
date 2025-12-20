@@ -71,7 +71,7 @@ export default function TagEventsPage() {
         return true;
       });
     },
-    [filters.dateRange],
+    [filters.dateRange]
   );
 
   // Fetch paginated events for this category
@@ -102,7 +102,7 @@ export default function TagEventsPage() {
           fetchNextPage();
         }
       },
-      { threshold: 0.1, rootMargin: "100px" },
+      { threshold: 0.1, rootMargin: "100px" }
     );
 
     observer.observe(loadMoreRef.current);

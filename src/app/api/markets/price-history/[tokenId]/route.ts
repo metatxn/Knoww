@@ -27,7 +27,7 @@ interface PolymarketPriceHistoryResponse {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ tokenId: string }> },
+  { params }: { params: Promise<{ tokenId: string }> }
 ) {
   try {
     const { tokenId } = await params;
@@ -35,7 +35,7 @@ export async function GET(
     if (!tokenId) {
       return NextResponse.json(
         { success: false, error: "Token ID is required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -43,7 +43,7 @@ export async function GET(
     if (tokenId.length < 10) {
       return NextResponse.json(
         { success: false, error: "Invalid token ID format" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -81,7 +81,7 @@ export async function GET(
       if (response.status === 404) {
         return NextResponse.json(
           { success: false, error: "Token not found", history: [] },
-          { status: 404 },
+          { status: 404 }
         );
       }
 
@@ -90,7 +90,7 @@ export async function GET(
 
       return NextResponse.json(
         { success: false, error: "Failed to fetch price history", history: [] },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -112,7 +112,7 @@ export async function GET(
         error: error instanceof Error ? error.message : "Unknown error",
         history: [],
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

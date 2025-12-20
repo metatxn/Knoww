@@ -69,7 +69,7 @@ export function ThemeToggle() {
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
                 theme === t.value
                   ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                  : "hover:bg-muted",
+                  : "hover:bg-muted"
               )}
             >
               <div
@@ -95,7 +95,7 @@ export function ThemeToggle() {
                 "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
                 theme === t.value
                   ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                  : "hover:bg-muted",
+                  : "hover:bg-muted"
               )}
             >
               <div
@@ -126,7 +126,7 @@ export function ThemeToggle() {
                 "h-6 w-6 rounded-full border-2 transition-all hover:scale-110",
                 accentColor === color.value
                   ? "border-foreground ring-2 ring-foreground ring-offset-1 ring-offset-background"
-                  : "border-transparent",
+                  : "border-transparent"
               )}
               style={{ backgroundColor: color.color }}
               title={color.label}

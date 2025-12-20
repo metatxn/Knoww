@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatVolume } from "@/lib/utils";
 
 interface EventCardProps {
   event: {
@@ -40,18 +41,6 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, index = 0 }: EventCardProps) {
-  const formatVolume = (vol?: string) => {
-    if (!vol) return "N/A";
-    const num = parseFloat(vol);
-    if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-      return `$${(num / 1000).toFixed(0)}K`;
-    }
-    return `$${num.toFixed(0)}`;
-  };
-
   // Prefer slug for SEO-friendly URLs, fallback to ID
   const href = event.slug
     ? `/events/detail/${event.slug}`

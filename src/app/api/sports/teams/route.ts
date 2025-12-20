@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
           "Content-Type": "application/json",
         },
         next: { revalidate: 3600 }, // Cache for 1 hour
-      },
+      }
     );
 
     if (!response.ok) {
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

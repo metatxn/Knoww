@@ -169,7 +169,7 @@ export function OrderBookSummary({
           "flex items-center gap-2 px-2 py-1 rounded-md transition-colors",
           "hover:bg-muted/50",
           onClick && "cursor-pointer",
-          className,
+          className
         )}
       >
         {/* Best Bid */}
@@ -191,7 +191,7 @@ export function OrderBookSummary({
               connectionState === "reconnecting" &&
                 "bg-amber-500 animate-pulse",
               connectionState === "disconnected" && "bg-muted-foreground",
-              connectionState === "error" && "bg-red-500",
+              connectionState === "error" && "bg-red-500"
             )}
           />
         )}
@@ -206,7 +206,7 @@ export function OrderBookSummary({
       className={cn(
         "rounded-lg border border-border bg-card/50 p-3 space-y-2",
         onClick && "cursor-pointer hover:bg-muted/30 transition-colors",
-        className,
+        className
       )}
       onClick={onClick}
     >
@@ -274,7 +274,7 @@ export function OrderBookSummary({
             <span
               className={cn(
                 "text-xs font-mono",
-                lastTrade.side === "BUY" ? "text-emerald-500" : "text-red-500",
+                lastTrade.side === "BUY" ? "text-emerald-500" : "text-red-500"
               )}
             >
               {formatCents(lastTrade.price)}

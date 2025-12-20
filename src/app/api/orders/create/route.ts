@@ -23,6 +23,6 @@ export async function POST() {
         "This endpoint has been deprecated. Use the frontend useClobClient hook's createOrder() method instead.",
       hint: "Order creation requires user wallet signing which is now handled on the frontend with the ClobClient SDK.",
     },
-    { status: 410 }, // 410 Gone
+    { status: 410 } // 410 Gone
   );
 }

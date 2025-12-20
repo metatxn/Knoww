@@ -72,7 +72,7 @@ export function getStoredSession(address: string): StoredTradingSession | null {
  * Store trading session for an address
  */
 export function storeSession(
-  session: Omit<StoredTradingSession, "lastUpdated">,
+  session: Omit<StoredTradingSession, "lastUpdated">
 ): void {
   if (typeof window === "undefined") return;
 
@@ -93,7 +93,7 @@ export function storeSession(
  */
 export function updateSession(
   address: string,
-  updates: Partial<Omit<StoredTradingSession, "eoaAddress" | "lastUpdated">>,
+  updates: Partial<Omit<StoredTradingSession, "eoaAddress" | "lastUpdated">>
 ): void {
   if (typeof window === "undefined") return;
 

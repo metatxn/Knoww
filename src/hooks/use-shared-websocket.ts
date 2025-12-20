@@ -104,7 +104,7 @@ export function useSharedWebSocket(options: UseSharedWebSocketOptions) {
         case "price_change": {
           // Price change can affect multiple assets
           const relevantChanges = event.price_changes.filter((c) =>
-            assetIdSet.has(c.asset_id),
+            assetIdSet.has(c.asset_id)
           );
           if (relevantChanges.length > 0) {
             onPriceChange?.({ ...event, price_changes: relevantChanges });

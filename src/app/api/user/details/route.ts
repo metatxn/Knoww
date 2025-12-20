@@ -37,13 +37,13 @@ const optionalString = z
 const querySchema = z.object({
   user: z.string().min(1, "User address is required"),
   timePeriod: optionalString.pipe(
-    z.enum(["day", "week", "month", "all"]).optional().default("day"),
+    z.enum(["day", "week", "month", "all"]).optional().default("day")
   ),
   category: optionalString.pipe(
     z
       .enum(["overall", "crypto", "sports", "politics"])
       .optional()
-      .default("overall"),
+      .default("overall")
   ),
 });
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
           error: "Invalid query parameters",
           details: parsed.error.message,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
           Accept: "application/json",
         },
         next: { revalidate: 60 }, // Cache for 1 minute
-      },
+      }
     );
 
     if (!response.ok) {
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch user details from Polymarket",
           details: response.status,
         },
-        { status: response.status },
+        { status: response.status }
       );
     }
 
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

@@ -81,7 +81,7 @@ export interface UseUserPositionsOptions {
  */
 async function fetchPositions(
   userAddress: string,
-  options: UseUserPositionsOptions,
+  options: UseUserPositionsOptions
 ): Promise<PositionsResponse> {
   const params = new URLSearchParams({
     user: userAddress,

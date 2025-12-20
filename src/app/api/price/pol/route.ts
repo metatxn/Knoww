@@ -44,7 +44,7 @@ export async function GET() {
       console.warn("COINMARKET_API_KEY is not defined");
       return NextResponse.json(
         { error: "API key not configured" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -56,7 +56,7 @@ export async function GET() {
           Accept: "application/json",
         },
         next: { revalidate: 300 }, // Next.js cache for 5 minutes
-      },
+      }
     );
 
     if (!response.ok) {
@@ -100,7 +100,7 @@ export async function GET() {
 
     return NextResponse.json(
       { error: "Failed to fetch POL price" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

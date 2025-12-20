@@ -59,7 +59,7 @@ export interface UseUserDetailsOptions {
  */
 async function fetchUserDetails(
   userAddress: string,
-  options: UseUserDetailsOptions,
+  options: UseUserDetailsOptions
 ): Promise<UserDetailsResponse> {
   const params = new URLSearchParams({
     user: userAddress,

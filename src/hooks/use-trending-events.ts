@@ -46,7 +46,7 @@ export function useTrendingEvents(limit = 15) {
     queryKey: ["trending-events", limit],
     queryFn: async ({ pageParam = 0 }) => {
       const response = await fetch(
-        `/api/events/trending?limit=${limit}&offset=${pageParam}`,
+        `/api/events/trending?limit=${limit}&offset=${pageParam}`
       );
 
       if (!response.ok) {

@@ -75,7 +75,7 @@ const timeRangeToFidelity: Record<TimeRange, number> = {
 async function fetchPriceHistory(
   tokenId: string,
   startTs: number,
-  fidelity: number,
+  fidelity: number
 ): Promise<PriceHistoryPoint[]> {
   if (!tokenId || tokenId.length < 10) {
     return [];
@@ -88,7 +88,7 @@ async function fetchPriceHistory(
     });
 
     const response = await fetch(
-      `/api/markets/price-history/${tokenId}?${params.toString()}`,
+      `/api/markets/price-history/${tokenId}?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -144,7 +144,7 @@ export function MarketPriceChart({
           name: token.name,
           color: token.color,
           history: await fetchPriceHistory(token.tokenId, startTs, fidelity),
-        })),
+        }))
       );
       return histories;
     },
@@ -197,7 +197,7 @@ export function MarketPriceChart({
     // Helper function to find the closest price for a timestamp using interpolation
     const findPriceAtTimestamp = (
       tokenData: (typeof tokenPriceMaps)[0],
-      timestamp: number,
+      timestamp: number
     ): number | null => {
       // Direct match
       if (tokenData.priceMap.has(timestamp)) {
@@ -470,7 +470,7 @@ export function MarketPriceChart({
                       {payload
                         .filter((entry) => entry.value !== undefined)
                         .sort(
-                          (a, b) => (b.value as number) - (a.value as number),
+                          (a, b) => (b.value as number) - (a.value as number)
                         )
                         .map((entry) => {
                           const configKey =
@@ -545,7 +545,7 @@ export function MarketPriceChart({
 function generateMockData(
   _outcomes: string[],
   outcomePrices: string[],
-  timeRange: TimeRange,
+  timeRange: TimeRange
 ): Record<string, number | string>[] {
   const data: Record<string, number | string>[] = [];
   const now = new Date();

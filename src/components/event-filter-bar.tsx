@@ -97,14 +97,14 @@ export function EventFilterBar() {
     (window: VolumeWindow) => {
       setVolumeWindow(window);
     },
-    [setVolumeWindow],
+    [setVolumeWindow]
   );
 
   const handleLiquidityChange = useCallback(
     (value: number | null) => {
       setLiquidity(value);
     },
-    [setLiquidity],
+    [setLiquidity]
   );
 
   const handleTagToggle = useCallback(
@@ -115,7 +115,7 @@ export function EventFilterBar() {
         setTagSlugs([...filters.tagSlugs, tagSlug]);
       }
     },
-    [filters.tagSlugs, setTagSlugs],
+    [filters.tagSlugs, setTagSlugs]
   );
 
   // Date quick presets
@@ -146,7 +146,7 @@ export function EventFilterBar() {
           break;
       }
     },
-    [setDateRange],
+    [setDateRange]
   );
 
   return (
@@ -210,7 +210,7 @@ export function EventFilterBar() {
               size="sm"
               className={cn(
                 "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.liquidity !== null && "text-primary",
+                filters.liquidity !== null && "text-primary"
               )}
             >
               <Droplets className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -246,7 +246,7 @@ export function EventFilterBar() {
                 "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
                 (filters.status.length !== 1 ||
                   !filters.status.includes("active")) &&
-                  "text-primary",
+                  "text-primary"
               )}
             >
               <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -280,7 +280,7 @@ export function EventFilterBar() {
               size="sm"
               className={cn(
                 "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.tagSlugs.length > 0 && "text-primary",
+                filters.tagSlugs.length > 0 && "text-primary"
               )}
             >
               <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -324,7 +324,7 @@ export function EventFilterBar() {
               size="sm"
               className={cn(
                 "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.volumeWindow !== "24h" && "text-primary",
+                filters.volumeWindow !== "24h" && "text-primary"
               )}
             >
               <SlidersHorizontal className="h-4 w-4 text-muted-foreground shrink-0" />

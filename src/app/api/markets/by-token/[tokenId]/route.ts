@@ -14,7 +14,7 @@ const GAMMA_API = "https://gamma-api.polymarket.com";
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ tokenId: string }> },
+  { params }: { params: Promise<{ tokenId: string }> }
 ) {
   try {
     const { tokenId } = await params;
@@ -25,7 +25,7 @@ export async function GET(
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 300 }, // Cache for 5 minutes
-      },
+      }
     );
 
     if (gammaResponse.ok) {
@@ -42,7 +42,7 @@ export async function GET(
           const tokenIds = market.clobTokenIds.split(",");
           const outcomes = market.outcomes.split(",");
           const tokenIndex = tokenIds.findIndex(
-            (id: string) => id.trim() === tokenId,
+            (id: string) => id.trim() === tokenId
           );
           if (tokenIndex !== -1 && outcomes[tokenIndex]) {
             outcome = outcomes[tokenIndex].trim();
@@ -75,7 +75,7 @@ export async function GET(
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

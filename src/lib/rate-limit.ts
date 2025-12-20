@@ -33,7 +33,7 @@ export function rateLimit(
   options: RateLimitOptions = {
     interval: 60 * 1000, // 1 minute
     uniqueTokenPerInterval: 60, // 60 requests per minute
-  },
+  }
 ): { success: boolean; limit: number; remaining: number; reset: number } {
   const now = Date.now();
   const store = rateLimitMap.get(uniqueId);

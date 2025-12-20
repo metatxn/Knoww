@@ -131,7 +131,7 @@ interface EventFilterContextType {
 }
 
 const EventFilterContext = createContext<EventFilterContextType | undefined>(
-  undefined,
+  undefined
 );
 
 export function EventFilterProvider({ children }: { children: ReactNode }) {
@@ -320,7 +320,7 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
       hasActiveFilters,
       serverFilterParams,
       apiQueryParams,
-    ],
+    ]
   );
 
   return (
@@ -334,7 +334,7 @@ export function useEventFilters() {
   const context = useContext(EventFilterContext);
   if (context === undefined) {
     throw new Error(
-      "useEventFilters must be used within an EventFilterProvider",
+      "useEventFilters must be used within an EventFilterProvider"
     );
   }
   return context;

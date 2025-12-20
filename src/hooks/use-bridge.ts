@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useProxyWallet } from "./use-proxy-wallet";
 
 /**
@@ -73,56 +74,175 @@ export const CHAIN_METADATA: Record<
 };
 
 /**
+ * Query keys for React Query
+ */
+export const BRIDGE_QUERY_KEYS = {
+  supportedAssets: ["bridge-supported-assets"] as const,
+  depositAddresses: (address: string) =>
+    ["bridge-deposit-addresses", address] as const,
+};
+
+/**
+ * Fetch supported assets from Bridge API
+ */
+async function fetchSupportedAssets(): Promise<SupportedAsset[]> {
+  const response = await fetch(`${BRIDGE_API_URL}/supported-assets`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch supported assets: ${response.status}`);
+  }
+
+  const data: SupportedAssetsResponse = await response.json();
+  return data.supportedAssets;
+}
+
+/**
+ * Convert API response to DepositAddress format
+ */
+function convertToDepositAddresses(
+  data: CreateDepositResponse
+): DepositAddress[] {
+  // Convert the API response to our DepositAddress format
+  // The EVM address is used for all EVM chains (Polygon, Ethereum, Arbitrum, etc.)
+  return [
+    // Polygon (primary for Polymarket)
+    {
+      chainId: "137",
+      chainName: "Polygon",
+      tokenAddress: "", // Any supported token
+      tokenSymbol: "USDC", // Default to USDC
+      depositAddress: data.address.evm,
+    },
+    // Ethereum
+    {
+      chainId: "1",
+      chainName: "Ethereum",
+      tokenAddress: "",
+      tokenSymbol: "USDC",
+      depositAddress: data.address.evm,
+    },
+    // Arbitrum
+    {
+      chainId: "42161",
+      chainName: "Arbitrum",
+      tokenAddress: "",
+      tokenSymbol: "USDC",
+      depositAddress: data.address.evm,
+    },
+    // Base
+    {
+      chainId: "8453",
+      chainName: "Base",
+      tokenAddress: "",
+      tokenSymbol: "USDC",
+      depositAddress: data.address.evm,
+    },
+    // Optimism
+    {
+      chainId: "10",
+      chainName: "Optimism",
+      tokenAddress: "",
+      tokenSymbol: "USDC",
+      depositAddress: data.address.evm,
+    },
+  ];
+}
+
+/**
+ * Create deposit addresses for a wallet
+ */
+async function createDepositAddresses(
+  walletAddress: string
+): Promise<DepositAddress[]> {
+  const response = await fetch(`${BRIDGE_API_URL}/deposit`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      address: walletAddress,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw new Error(
+      errorData.message ||
+        `Failed to create deposit addresses: ${response.status}`
+    );
+  }
+
+  const data: CreateDepositResponse = await response.json();
+  return convertToDepositAddresses(data);
+}
+
+/**
  * Hook for interacting with Polymarket Bridge API
  *
  * This hook provides methods to:
  * 1. Get supported assets for deposits
  * 2. Create deposit addresses for bridging assets to Polymarket
  *
+ * Now uses React Query for automatic caching, deduplication, and refetching.
+ *
  * @see https://docs.polymarket.com/developers/misc-endpoints/bridge-deposit
  * @see https://docs.polymarket.com/developers/misc-endpoints/bridge-supported-assets
  */
 export function useBridge() {
   const { proxyAddress } = useProxyWallet();
+  const queryClient = useQueryClient();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [supportedAssets, setSupportedAssets] = useState<SupportedAsset[]>([]);
-  const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>(
-    [],
-  );
+  // Query for supported assets (auto-fetches, cached globally)
+  const supportedAssetsQuery = useQuery({
+    queryKey: BRIDGE_QUERY_KEYS.supportedAssets,
+    queryFn: fetchSupportedAssets,
+    staleTime: 5 * 60 * 1000, // 5 minutes - supported assets don't change often
+  });
+
+  // Query for deposit addresses (cached per address)
+  const depositAddressesQuery = useQuery({
+    queryKey: BRIDGE_QUERY_KEYS.depositAddresses(proxyAddress || ""),
+    queryFn: () => {
+      if (!proxyAddress) {
+        throw new Error(
+          "No wallet address provided. Please complete trading setup first."
+        );
+      }
+      return createDepositAddresses(proxyAddress);
+    },
+    enabled: !!proxyAddress,
+    staleTime: 10 * 60 * 1000, // 10 minutes - deposit addresses are stable
+  });
+
+  // Mutation for creating deposit addresses (can be called with custom address)
+  const createDepositMutation = useMutation({
+    mutationFn: createDepositAddresses,
+    onSuccess: (data, walletAddress) => {
+      // Cache the result
+      queryClient.setQueryData(
+        BRIDGE_QUERY_KEYS.depositAddresses(walletAddress),
+        data
+      );
+    },
+  });
 
   /**
-   * Fetch supported assets for deposits
+   * Get supported assets for deposits
    *
    * Returns all supported chains and tokens that can be used for deposits.
    * Each asset includes minimum deposit amount in USD.
+   *
+   * Now uses React Query - automatically cached and deduplicated.
    */
   const getSupportedAssets = useCallback(async (): Promise<
     SupportedAsset[]
   > => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`${BRIDGE_API_URL}/supported-assets`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch supported assets: ${response.status}`);
-      }
-
-      const data: SupportedAssetsResponse = await response.json();
-      setSupportedAssets(data.supportedAssets);
-      return data.supportedAssets;
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch supported assets";
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    // Refetch if needed, otherwise return cached data
+    await supportedAssetsQuery.refetch();
+    return supportedAssetsQuery.data || [];
+  }, [supportedAssetsQuery]);
 
   /**
    * Create deposit addresses for a wallet
@@ -134,103 +254,30 @@ export function useBridge() {
    *
    * Assets sent to these addresses are automatically bridged to USDC.e on Polygon.
    *
-   * @param walletAddress - The Polymarket wallet address (proxy wallet)
+   * @param walletAddress - Optional wallet address (defaults to proxy wallet)
    */
-  const createDepositAddresses = useCallback(
+  const createDepositAddressesFn = useCallback(
     async (walletAddress?: string): Promise<DepositAddress[]> => {
       const targetAddress = walletAddress || proxyAddress;
 
       if (!targetAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first.",
+          "No wallet address provided. Please complete trading setup first."
         );
       }
 
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(`${BRIDGE_API_URL}/deposit`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            address: targetAddress,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = (await response.json().catch(() => ({}))) as {
-            message?: string;
-          };
-          throw new Error(
-            errorData.message ||
-              `Failed to create deposit addresses: ${response.status}`,
-          );
-        }
-
-        const data: CreateDepositResponse = await response.json();
-
-        // Convert the API response to our DepositAddress format
-        // The EVM address is used for all EVM chains (Polygon, Ethereum, Arbitrum, etc.)
-        const evmDepositAddresses: DepositAddress[] = [
-          // Polygon (primary for Polymarket)
-          {
-            chainId: "137",
-            chainName: "Polygon",
-            tokenAddress: "", // Any supported token
-            tokenSymbol: "USDC", // Default to USDC
-            depositAddress: data.address.evm,
-          },
-          // Ethereum
-          {
-            chainId: "1",
-            chainName: "Ethereum",
-            tokenAddress: "",
-            tokenSymbol: "USDC",
-            depositAddress: data.address.evm,
-          },
-          // Arbitrum
-          {
-            chainId: "42161",
-            chainName: "Arbitrum",
-            tokenAddress: "",
-            tokenSymbol: "USDC",
-            depositAddress: data.address.evm,
-          },
-          // Base
-          {
-            chainId: "8453",
-            chainName: "Base",
-            tokenAddress: "",
-            tokenSymbol: "USDC",
-            depositAddress: data.address.evm,
-          },
-          // Optimism
-          {
-            chainId: "10",
-            chainName: "Optimism",
-            tokenAddress: "",
-            tokenSymbol: "USDC",
-            depositAddress: data.address.evm,
-          },
-        ];
-
-        setDepositAddresses(evmDepositAddresses);
-        return evmDepositAddresses;
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Failed to create deposit addresses";
-        setError(errorMessage);
-        throw err;
-      } finally {
-        setIsLoading(false);
+      // If we already have cached data for this address, return it
+      const cached = queryClient.getQueryData<DepositAddress[]>(
+        BRIDGE_QUERY_KEYS.depositAddresses(targetAddress)
+      );
+      if (cached) {
+        return cached;
       }
+
+      // Otherwise, use mutation to create new addresses
+      return createDepositMutation.mutateAsync(targetAddress);
     },
-    [proxyAddress],
+    [proxyAddress, queryClient, createDepositMutation]
   );
 
   /**
@@ -247,24 +294,37 @@ export function useBridge() {
   }, []);
 
   /**
-   * Clear deposit addresses (reset state)
+   * Clear deposit addresses (reset cache)
    */
   const clearDepositAddresses = useCallback(() => {
-    setDepositAddresses([]);
-    setError(null);
-  }, []);
+    if (proxyAddress) {
+      queryClient.removeQueries({
+        queryKey: BRIDGE_QUERY_KEYS.depositAddresses(proxyAddress),
+      });
+    }
+  }, [proxyAddress, queryClient]);
+
+  // Combine loading states
+  const isLoading =
+    supportedAssetsQuery.isLoading || createDepositMutation.isPending;
+
+  // Combine error states (prioritize mutation error, then query error)
+  const error =
+    createDepositMutation.error?.message ||
+    supportedAssetsQuery.error?.message ||
+    null;
 
   return {
-    // State
+    // State (maintaining backward compatibility)
     isLoading,
     error,
-    supportedAssets,
-    depositAddresses,
+    supportedAssets: supportedAssetsQuery.data || [],
+    depositAddresses: depositAddressesQuery.data || [],
     proxyAddress,
 
-    // Actions
+    // Actions (maintaining backward compatibility)
     getSupportedAssets,
-    createDepositAddresses,
+    createDepositAddresses: createDepositAddressesFn,
     getChainMetadata,
     clearDepositAddresses,
   };

@@ -302,7 +302,7 @@ export function TradeHistory({
           <span>
             Total Volume:{" "}
             {formatCurrency(
-              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0),
+              filteredTrades.reduce((sum, t) => sum + t.usdcAmount, 0)
             )}
           </span>
         </div>
