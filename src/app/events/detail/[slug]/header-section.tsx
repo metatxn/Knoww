@@ -68,9 +68,9 @@ export function HeaderSection({
   return (
     <div
       className={cn(
-        "sticky top-14 xl:top-0 z-30 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 transition-all duration-300",
+        "lg:sticky lg:top-0 z-30 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 transition-all duration-300",
         isScrolled
-          ? "bg-background/80 backdrop-blur-md border-b border-border/40 shadow-xs py-3 mb-4"
+          ? "lg:bg-background/80 lg:backdrop-blur-md lg:border-b lg:border-border/40 lg:shadow-xs lg:py-3 lg:mb-4 py-4 mb-6"
           : "bg-transparent py-4 mb-6"
       )}
     >
@@ -82,7 +82,7 @@ export function HeaderSection({
               className={cn(
                 "relative shrink-0 transition-all duration-300",
                 isScrolled
-                  ? "w-10 h-10 sm:w-12 sm:h-12"
+                  ? "lg:w-10 lg:h-10 lg:sm:w-12 lg:sm:h-12 w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
                   : "w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
               )}
             >
@@ -103,7 +103,7 @@ export function HeaderSection({
                   className={cn(
                     "font-bold leading-tight transition-all duration-300",
                     isScrolled
-                      ? "text-lg sm:text-xl md:text-2xl"
+                      ? "lg:text-lg lg:sm:text-xl lg:md:text-2xl text-xl sm:text-2xl md:text-3xl"
                       : "text-xl sm:text-2xl md:text-3xl"
                   )}
                 >
@@ -112,17 +112,17 @@ export function HeaderSection({
                 <div
                   className={cn(
                     "flex flex-wrap items-center gap-2 transition-all duration-300",
-                    isScrolled ? "mt-1" : "mt-1.5"
+                    isScrolled ? "lg:mt-1 mt-1.5" : "mt-1.5"
                   )}
                 >
                   {event.negRisk && <NegRiskBadge />}
 
-                  {/* Compact Stats Row - visible only when scrolled */}
+                  {/* Compact Stats Row - visible only when scrolled on desktop */}
                   <div
                     className={cn(
                       "flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
                       isScrolled
-                        ? "opacity-100 translate-x-0"
+                        ? "lg:opacity-100 lg:translate-x-0 opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden lg:w-auto lg:h-auto lg:overflow-visible"
                         : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                     )}
                   >
@@ -145,43 +145,10 @@ export function HeaderSection({
                       />
                     )}
                     <StatItem value={`${totalMarketsCount} mkts`} compact />
-                  </div>
-
-                  {/* Full Stats Row - visible only when NOT scrolled, now inline with NegRisk label */}
-                  <div
-                    className={cn(
-                      "flex flex-wrap items-center gap-1.5 sm:gap-2 text-muted-foreground transition-all duration-300",
-                      isScrolled
-                        ? "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-                        : "opacity-100 translate-x-0"
-                    )}
-                  >
-                    <StatItem
-                      icon={Trophy}
-                      value={formatVolume(event.volume)}
-                      label="Vol."
-                    />
-                    {event.endDate && (
-                      <StatItem
-                        icon={Clock}
-                        value={new Date(event.endDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
-                        )}
-                      />
-                    )}
-                    <StatItem
-                      value={`${totalMarketsCount} market${
-                        totalMarketsCount !== 1 ? "s" : ""
-                      }`}
-                    />
                     {closedMarkets.length > 0 && (
                       <StatItem
-                        value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
+                        value={`${openMarkets.length} open · ${closedMarkets.length} closed`}
+                        compact
                       />
                     )}
                   </div>
@@ -191,7 +158,7 @@ export function HeaderSection({
               <div
                 className={cn(
                   "flex items-center gap-1.5 shrink-0 transition-all duration-300",
-                  isScrolled ? "scale-90" : "scale-100"
+                  isScrolled ? "lg:scale-90 scale-100" : "scale-100"
                 )}
               >
                 <button
@@ -220,6 +187,56 @@ export function HeaderSection({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Full Stats Row - Moved out to align with image on mobile, hidden when scrolled on desktop */}
+        <div
+          className={cn(
+            "transition-all duration-300",
+            isScrolled
+              ? "lg:opacity-0 lg:-translate-x-2 lg:pointer-events-none lg:w-0 lg:h-0 lg:overflow-hidden opacity-100 translate-x-0"
+              : "opacity-100 translate-x-0"
+          )}
+        >
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-1.5 sm:gap-2 text-muted-foreground",
+              // If we have 4 labels (endDate exists AND closedMarkets exist), use a 2x2 grid on mobile
+              event.endDate && closedMarkets.length > 0
+                ? "grid grid-cols-2 sm:flex sm:flex-nowrap"
+                : "flex flex-wrap sm:flex-nowrap"
+            )}
+          >
+            <StatItem
+              icon={Trophy}
+              value={formatVolume(event.volume)}
+              label="Vol."
+              className="w-full sm:w-auto text-[11px] xs:text-xs sm:text-sm"
+            />
+            {event.endDate && (
+              <StatItem
+                icon={Clock}
+                value={new Date(event.endDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                className="w-full sm:w-auto text-[11px] xs:text-xs sm:text-sm"
+              />
+            )}
+            <StatItem
+              value={`${totalMarketsCount} market${
+                totalMarketsCount !== 1 ? "s" : ""
+              }`}
+              className="w-full sm:w-auto text-[11px] xs:text-xs sm:text-sm"
+            />
+            {closedMarkets.length > 0 && (
+              <StatItem
+                value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
+                className="w-full sm:w-auto text-[11px] xs:text-xs sm:text-sm"
+              />
+            )}
           </div>
         </div>
       </div>

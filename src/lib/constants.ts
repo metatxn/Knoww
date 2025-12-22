@@ -15,6 +15,10 @@ export const POLYMARKET_API = {
   CLOB: {
     BASE: "https://clob.polymarket.com",
   },
+  DATA: {
+    BASE: "https://data-api.polymarket.com",
+    HOLDERS: "https://data-api.polymarket.com/holders",
+  },
   WSS: {
     /** WebSocket endpoint for market data (order books, price changes, trades) */
     MARKET: "wss://ws-subscriptions-clob.polymarket.com/ws/market",

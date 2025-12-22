@@ -1,7 +1,18 @@
 "use client";
 
-import { ChevronDown, ChevronUp, User, Wifi } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  History,
+  Info,
+  LineChart,
+  User,
+  Users,
+  Wifi,
+} from "lucide-react";
 import Image from "next/image";
+import { MarketPriceChart } from "@/components/market-price-chart";
+import { OrderBook } from "@/components/order-book";
 import { OrderBookInline } from "@/components/order-book-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +21,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -17,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ConnectionState } from "@/hooks/use-market-websocket";
+import { useTopHolders } from "@/hooks/use-top-holders";
 import type { Position } from "@/hooks/use-user-positions";
 import { cn, formatPrice, formatVolume } from "@/lib/utils";
 
@@ -50,6 +64,134 @@ interface OutcomesTableProps {
     yesTokenId: string;
     noTokenId: string;
   }) => Position | null;
+  handlePriceClick: (price: number) => void;
+  isSingleMarketEvent: boolean;
+}
+
+function TopHoldersContent({ conditionId }: { conditionId: string }) {
+  const { data: holdersData, isLoading, error } = useTopHolders(conditionId);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error || !holdersData || holdersData.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
+        <p>No holder data available for this market.</p>
+      </div>
+    );
+  }
+
+  // holdersData is an array of TopHoldersResponse, each with a holders array.
+  // We'll combine them and group by outcome if needed, but for now let's show all top holders.
+  const allHolders = holdersData
+    .flatMap((d) => d.holders)
+    .sort((a, b) => b.amount - a.amount);
+
+  if (allHolders.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
+        <p>No holder data available for this market.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-0 overflow-hidden border-t border-border/50">
+      <div className="max-h-[400px] overflow-y-auto overflow-x-auto no-scrollbar">
+        <div className="min-w-[320px]">
+          <table className="w-full text-sm">
+            <thead className="bg-background sticky top-0 z-10 border-b border-border/50">
+              <tr>
+                <th className="px-2 sm:px-4 py-3 text-left font-bold text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/20 w-10 sm:w-16">
+                  Rank
+                </th>
+                <th className="px-2 sm:px-4 py-3 text-left font-bold text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/20">
+                  Holder
+                </th>
+                <th className="px-2 sm:px-4 py-3 text-left font-bold text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/20">
+                  Outcome
+                </th>
+                <th className="px-2 sm:px-4 py-3 text-right font-bold text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/20">
+                  Shares
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {allHolders.slice(0, 20).map((holder, idx) => (
+                <tr
+                  key={`${holder.proxyWallet}-${holder.asset}`}
+                  className="hover:bg-accent/20 transition-colors"
+                >
+                  <td className="px-2 sm:px-4 py-3 text-muted-foreground font-mono text-xs">
+                    {idx + 1}
+                  </td>
+                  <td className="px-2 sm:px-4 py-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {holder.profileImageOptimized ? (
+                        <div className="relative h-5 w-5 sm:h-6 sm:w-6 rounded-full overflow-hidden border border-border/50 shrink-0">
+                          <Image
+                            src={holder.profileImageOptimized}
+                            alt={holder.pseudonym || "Holder"}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 20px, 24px"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-primary/10 flex items-center justify-center text-[8px] sm:text-[10px] font-bold text-primary border border-primary/20 shrink-0">
+                          {(holder.pseudonym || "0x").slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="font-medium truncate max-w-[70px] xs:max-w-[100px] sm:max-w-[150px] text-xs sm:text-sm">
+                        {holder.pseudonym ||
+                          `${holder.proxyWallet.slice(
+                            0,
+                            4
+                          )}...${holder.proxyWallet.slice(-4)}`}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-2 sm:px-4 py-3">
+                    <span
+                      className={cn(
+                        "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase",
+                        holder.outcomeIndex === 0
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                      )}
+                    >
+                      {holder.outcomeIndex === 0 ? "Yes" : "No"}
+                    </span>
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 text-right font-mono font-medium text-xs sm:text-sm whitespace-nowrap">
+                    {holder.amount.toLocaleString(undefined, {
+                      maximumFractionDigits: 1,
+                    })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function OutcomesTable({
@@ -66,6 +208,8 @@ export function OutcomesTable({
   setSelectedOutcomeIndex,
   preloadOrderBook,
   getMarketPosition,
+  handlePriceClick,
+  isSingleMarketEvent,
 }: OutcomesTableProps) {
   return (
     <Collapsible
@@ -73,52 +217,52 @@ export function OutcomesTable({
       onOpenChange={setIsOutcomeTableExpanded}
     >
       <Card className="py-0 gap-0 border-border/50 shadow-sm overflow-hidden">
-        <CardHeader className="py-3 px-6 bg-muted/20 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-lg">OUTCOME</CardTitle>
-              <span className="text-xs text-muted-foreground">
-                {sortedMarketData.length} market
-                {sortedMarketData.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* WebSocket connection indicator */}
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/50 border border-border/50 shadow-xs transition-colors duration-500">
-                <Wifi
-                  className={cn(
-                    "h-3 w-3",
-                    isConnected
-                      ? "text-emerald-500"
-                      : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500 animate-pulse"
-                        : "text-muted-foreground"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-[10px] font-medium uppercase tracking-wider",
-                    isConnected
-                      ? "text-emerald-500"
-                      : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500"
-                        : "text-muted-foreground"
-                  )}
-                >
-                  {isConnected
-                    ? "Live"
-                    : connectionState === "connecting"
-                      ? "Connecting..."
-                      : connectionState === "reconnecting"
-                        ? "Reconnecting..."
-                        : "Offline"}
+        <CollapsibleTrigger asChild>
+          <CardHeader className="py-3 px-6 bg-muted/20 border-b border-border/50 cursor-pointer hover:bg-muted/30 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-lg">OUTCOME</CardTitle>
+                <span className="text-xs text-muted-foreground">
+                  {sortedMarketData.length} market
+                  {sortedMarketData.length !== 1 ? "s" : ""}
                 </span>
               </div>
-              {/* Collapse/Expand toggle */}
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <div className="flex items-center gap-3">
+                {/* WebSocket connection indicator */}
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background/50 border border-border/50 shadow-xs transition-colors duration-500">
+                  <Wifi
+                    className={cn(
+                      "h-3 w-3",
+                      isConnected
+                        ? "text-emerald-500"
+                        : connectionState === "connecting" ||
+                            connectionState === "reconnecting"
+                          ? "text-amber-500 animate-pulse"
+                          : "text-muted-foreground"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium uppercase tracking-wider",
+                      isConnected
+                        ? "text-emerald-500"
+                        : connectionState === "connecting" ||
+                            connectionState === "reconnecting"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
+                    )}
+                  >
+                    {isConnected
+                      ? "Live"
+                      : connectionState === "connecting"
+                        ? "Connecting..."
+                        : connectionState === "reconnecting"
+                          ? "Reconnecting..."
+                          : "Offline"}
+                  </span>
+                </div>
+                {/* Collapse/Expand toggle icon */}
+                <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent/50 transition-colors">
                   {isOutcomeTableExpanded ? (
                     <ChevronUp className="h-4 w-4" />
                   ) : (
@@ -127,17 +271,31 @@ export function OutcomesTable({
                   <span className="sr-only">
                     {isOutcomeTableExpanded ? "Collapse" : "Expand"} outcomes
                   </span>
-                </Button>
-              </CollapsibleTrigger>
+                </div>
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-0">
             <div className="divide-y divide-border/50">
               {sortedMarketData.map((market) => {
                 const isMarketClosed = false;
                 const isExpanded = expandedOrderBookMarketId === market.id;
+
+                // Build outcomes for this specific market
+                const marketOutcomes = [
+                  {
+                    name: "Yes",
+                    tokenId: market.yesTokenId,
+                    price: Number.parseFloat(market.yesPrice) || 0.5,
+                  },
+                  {
+                    name: "No",
+                    tokenId: market.noTokenId,
+                    price: Number.parseFloat(market.noPrice) || 0.5,
+                  },
+                ];
 
                 // Check if user has a position in this market
                 const userPosition = getMarketPosition({
@@ -174,6 +332,108 @@ export function OutcomesTable({
                         }
                       }}
                     >
+                      {/* Mobile & Tablet Layout (<lg) */}
+                      <div className="lg:hidden flex flex-col gap-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            {market.image && (
+                              <div className="relative w-10 h-10 shrink-0 mt-0.5">
+                                <Image
+                                  src={market.image}
+                                  alt={market.groupItemTitle || "Market"}
+                                  fill
+                                  sizes="40px"
+                                  className="rounded object-cover ring-1 ring-border/20 shadow-xs"
+                                />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-bold text-sm leading-tight text-foreground group-hover:text-primary transition-colors">
+                                  {market.groupItemTitle}
+                                </h3>
+                                {userPosition && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shrink-0">
+                                    <User className="h-2.5 w-2.5" />
+                                    {userPosition.size.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] font-bold text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
+                                  {formatVolume(market.volume)} VOL
+                                </span>
+                                {market.yesTokenId && (
+                                  <OrderBookInline
+                                    tokenId={market.yesTokenId}
+                                    connectionState={connectionState}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="text-xl font-black tabular-nums leading-none">
+                              {market.yesProbability}%
+                            </span>
+                            <div
+                              className={cn(
+                                "text-[10px] font-bold mt-1.5 px-1.5 py-0.5 rounded tabular-nums",
+                                market.change >= 0
+                                  ? "text-emerald-600 bg-emerald-500/10 dark:text-emerald-400"
+                                  : "text-rose-600 bg-rose-500/10 dark:text-rose-400"
+                              )}
+                            >
+                              {market.change >= 0 ? "+" : ""}
+                              {market.change}%
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className={cn(
+                              "h-9 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95",
+                              isExpanded &&
+                                selectedOutcomeIndex === 0 &&
+                                "ring-2 ring-emerald-400 ring-offset-2"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedOrderBookMarketId(market.id);
+                              setSelectedMarketId(market.id);
+                              setSelectedOutcomeIndex(0);
+                              void preloadOrderBook(market.yesTokenId);
+                            }}
+                          >
+                            Yes {formatPrice(market.yesPrice)}¢
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className={cn(
+                              "h-9 px-3 text-xs font-bold shadow-lg shadow-rose-500/20 transition-all active:scale-95",
+                              isExpanded &&
+                                selectedOutcomeIndex === 1 &&
+                                "ring-2 ring-rose-400 ring-offset-2"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedOrderBookMarketId(market.id);
+                              setSelectedMarketId(market.id);
+                              setSelectedOutcomeIndex(1);
+                              void preloadOrderBook(market.noTokenId);
+                            }}
+                          >
+                            No {formatPrice(market.noPrice)}¢
+                          </Button>
+                        </div>
+                      </div>
+
                       {/* Desktop Layout (lg+) - Full grid for proper alignment */}
                       <div className="hidden lg:grid lg:grid-cols-[1fr_140px_220px] lg:items-center lg:gap-4">
                         {/* Column 1: Image + Title + Volume */}
@@ -294,7 +554,270 @@ export function OutcomesTable({
                       </div>
                     </button>
 
-                    {/* Expanded Content ... */}
+                    {/* Expanded Content - Order Book, Graph, Top Holders, Resolution Tabs */}
+                    <div
+                      className={cn(
+                        "grid transition-all duration-300 ease-in-out border-b border-border/50 bg-muted/5",
+                        isExpanded
+                          ? "grid-rows-[1fr] opacity-100"
+                          : "grid-rows-[0fr] opacity-0"
+                      )}
+                    >
+                      <div className="overflow-hidden">
+                        <Tabs
+                          defaultValue={userPosition ? "position" : "orderbook"}
+                          className="w-full"
+                        >
+                          <div className="flex items-center justify-between px-2 sm:px-6 border-b border-border/50 overflow-x-auto no-scrollbar">
+                            <TabsList className="h-auto p-0 bg-transparent gap-0 shrink-0">
+                              {/* Position tab - only show if user has a position */}
+                              {userPosition && (
+                                <TabsTrigger
+                                  value="position"
+                                  className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-violet-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400"
+                                >
+                                  <User className="h-3.5 w-3.5 mr-2 inline-block" />
+                                  Position
+                                </TabsTrigger>
+                              )}
+                              <TabsTrigger
+                                value="orderbook"
+                                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium whitespace-nowrap"
+                              >
+                                <History className="h-3.5 w-3.5 mr-2 inline-block" />
+                                Order Book
+                              </TabsTrigger>
+                              {/* Only show Graph tab for multi-market events */}
+                              {!isSingleMarketEvent && (
+                                <TabsTrigger
+                                  value="graph"
+                                  className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                                >
+                                  <LineChart className="h-3.5 w-3.5 mr-2 inline-block" />
+                                  Graph
+                                </TabsTrigger>
+                              )}
+                              {/* Top Holders Tab */}
+                              <TabsTrigger
+                                value="holders"
+                                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                              >
+                                <Users className="h-3.5 w-3.5 mr-2 inline-block" />
+                                Top Holders
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="resolution"
+                                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                              >
+                                <Info className="h-3.5 w-3.5 mr-2 inline-block" />
+                                Resolution
+                              </TabsTrigger>
+                            </TabsList>
+                          </div>
+
+                          {/* Position Tab Content */}
+                          {userPosition && (
+                            <TabsContent
+                              value="position"
+                              className="m-0 px-6 py-4"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-2 md:gap-x-4 lg:gap-x-8 gap-y-4 flex-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Outcome
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "font-bold text-sm",
+                                        userPosition.outcome.toLowerCase() ===
+                                          "yes"
+                                          ? "text-emerald-600 dark:text-emerald-400"
+                                          : "text-rose-600 dark:text-rose-400"
+                                      )}
+                                    >
+                                      {userPosition.outcome}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Qty
+                                    </span>
+                                    <span className="font-bold text-sm tabular-nums">
+                                      {userPosition.size.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Avg Price
+                                    </span>
+                                    <span className="font-bold text-sm tabular-nums">
+                                      {(userPosition.avgPrice * 100).toFixed(1)}
+                                      ¢
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Value
+                                    </span>
+                                    <span className="font-bold text-sm tabular-nums">
+                                      ${userPosition.currentValue.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Cost
+                                    </span>
+                                    <span className="font-bold text-sm tabular-nums">
+                                      ${userPosition.initialValue.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                                      Return
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "font-bold text-sm tabular-nums whitespace-nowrap",
+                                        userPosition.unrealizedPnl >= 0
+                                          ? "text-emerald-600 dark:text-emerald-400"
+                                          : "text-rose-600 dark:text-rose-400"
+                                      )}
+                                    >
+                                      $
+                                      {Math.abs(
+                                        userPosition.unrealizedPnl
+                                      ).toFixed(2)}
+                                      <span className="text-xs ml-1 opacity-80">
+                                        (
+                                        {userPosition.unrealizedPnl >= 0
+                                          ? "+"
+                                          : "-"}
+                                        {Math.abs(
+                                          userPosition.unrealizedPnlPercent
+                                        ).toFixed(1)}
+                                        %)
+                                      </span>
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="shrink-0 w-full sm:w-auto font-bold shadow-lg shadow-rose-500/20 transition-all active:scale-95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMarketId(market.id);
+                                    const outcomeIdx =
+                                      userPosition.outcome.toLowerCase() ===
+                                      "yes"
+                                        ? 0
+                                        : 1;
+                                    setSelectedOutcomeIndex(outcomeIdx);
+                                    void preloadOrderBook(
+                                      outcomeIdx === 0
+                                        ? market.yesTokenId
+                                        : market.noTokenId
+                                    );
+                                  }}
+                                >
+                                  <span className="hidden lg:inline">
+                                    Sell Position
+                                  </span>
+                                  <span className="lg:hidden">Sell</span>
+                                </Button>
+                              </div>
+                            </TabsContent>
+                          )}
+
+                          {/* Order Book Tab Content */}
+                          <TabsContent
+                            value="orderbook"
+                            className="m-0 data-[state=inactive]:hidden"
+                            forceMount
+                          >
+                            <OrderBook
+                              outcomes={marketOutcomes}
+                              defaultOutcomeIndex={selectedOutcomeIndex}
+                              maxLevels={4}
+                              onPriceClick={handlePriceClick}
+                              onOutcomeChange={setSelectedOutcomeIndex}
+                              embedded
+                            />
+                          </TabsContent>
+
+                          {/* Graph Tab Content */}
+                          {!isSingleMarketEvent && (
+                            <TabsContent value="graph" className="m-0 p-6">
+                              <MarketPriceChart
+                                tokens={[
+                                  {
+                                    tokenId: market.yesTokenId,
+                                    name: "Yes",
+                                    color: "hsl(142, 76%, 36%)",
+                                  },
+                                  {
+                                    tokenId: market.noTokenId,
+                                    name: "No",
+                                    color: "hsl(0, 84%, 60%)",
+                                  },
+                                ]}
+                                outcomes={["Yes", "No"]}
+                                outcomePrices={[
+                                  market.yesPrice,
+                                  market.noPrice,
+                                ]}
+                              />
+                            </TabsContent>
+                          )}
+
+                          {/* Top Holders Tab Content */}
+                          <TabsContent value="holders" className="m-0">
+                            <TopHoldersContent
+                              conditionId={market.conditionId}
+                            />
+                          </TabsContent>
+
+                          {/* Resolution Tab Content */}
+                          <TabsContent value="resolution" className="m-0 p-6">
+                            <div className="space-y-4 text-sm max-w-2xl">
+                              <div className="flex gap-3">
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                  <Info className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <h4 className="font-bold mb-1">
+                                    Resolution Source
+                                  </h4>
+                                  <p className="text-muted-foreground leading-relaxed">
+                                    Official announcement or verified news
+                                    reports from established media organizations
+                                    will be used to resolve this market.
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex gap-3">
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                  <History className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <h4 className="font-bold mb-1">
+                                    Resolution Rules
+                                  </h4>
+                                  <p className="text-muted-foreground leading-relaxed">
+                                    This market will resolve based on the first
+                                    official reporting of the outcome. If no
+                                    official outcome is reached by the
+                                    expiration date, it may be extended or
+                                    resolved based on available data.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    </div>
                   </div>
                 );
               })}

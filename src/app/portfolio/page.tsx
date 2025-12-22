@@ -541,8 +541,8 @@ function PositionsTable({
                         position.currentPrice > position.avgPrice
                           ? "text-emerald-500"
                           : position.currentPrice < position.avgPrice
-                            ? "text-red-500"
-                            : ""
+                          ? "text-red-500"
+                          : ""
                       }
                     >
                       {formatPrice(position.currentPrice)}
@@ -742,8 +742,8 @@ function PositionsTable({
                         position.currentPrice > position.avgPrice
                           ? "text-emerald-500"
                           : position.currentPrice < position.avgPrice
-                            ? "text-red-500"
-                            : ""
+                          ? "text-red-500"
+                          : ""
                       }
                     >
                       {formatPrice(position.currentPrice)}
@@ -1251,8 +1251,8 @@ function HistoryTable({
                           isBuy
                             ? "text-red-500"
                             : trade.usdcAmount > 0
-                              ? "text-emerald-500"
-                              : "text-muted-foreground"
+                            ? "text-emerald-500"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
@@ -1403,8 +1403,8 @@ function HistoryTable({
                         isBuy
                           ? "text-red-500"
                           : trade.usdcAmount > 0
-                            ? "text-emerald-500"
-                            : "text-muted-foreground"
+                          ? "text-emerald-500"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {isBuy ? "-" : trade.usdcAmount > 0 ? "+" : ""}
@@ -1461,55 +1461,68 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-xl p-4 border transition-all ${
+      className={`rounded-xl p-4 border transition-all h-full flex flex-col justify-between ${
         isHighlighted
-          ? "bg-linear-to-br from-violet-500/10 via-fuchsia-500/5 to-background border-violet-500/20"
-          : "bg-card border-border"
+          ? "bg-linear-to-br from-primary/10 via-primary/5 to-background border-primary/20 shadow-xs"
+          : "bg-card border-border shadow-xs"
       }`}
     >
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        {Icon && (
-          <div
-            className={`p-1 rounded-md ${
-              isHighlighted ? "bg-violet-500/10" : "bg-muted"
-            }`}
-          >
-            <Icon
-              className={`h-3.5 w-3.5 ${
-                isHighlighted ? "text-violet-500" : "text-muted-foreground"
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+            {label}
+          </p>
+          {Icon && (
+            <div
+              className={`p-1.5 rounded-lg ${
+                isHighlighted ? "bg-primary/10" : "bg-muted/50"
               }`}
-            />
+            >
+              <Icon
+                className={`h-4 w-4 ${
+                  isHighlighted ? "text-primary" : "text-muted-foreground"
+                }`}
+              />
+            </div>
+          )}
+        </div>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-24" />
+            {trend && <Skeleton className="h-4 w-16" />}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <p
+              className={`text-xl sm:text-2xl font-black tabular-nums tracking-tight ${
+                valueClassName || ""
+              }`}
+            >
+              {value}
+            </p>
+            <div className="flex items-center h-5">
+              {trend ? (
+                <span
+                  className={`text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${
+                    trend.isPositive
+                      ? "text-emerald-500 bg-emerald-500/10"
+                      : "text-red-500 bg-red-500/10"
+                  }`}
+                >
+                  {trend.isPositive ? (
+                    <ArrowUpRight className="h-3 w-3" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3" />
+                  )}
+                  {formatPercent(trend.value)}
+                </span>
+              ) : (
+                <div className="h-5" /> // Spacer for symmetry
+              )}
+            </div>
           </div>
         )}
       </div>
-      {isLoading ? (
-        <Skeleton className="h-7 w-24" />
-      ) : (
-        <div className="flex items-baseline gap-2">
-          <p
-            className={`text-xl sm:text-2xl font-bold ${valueClassName || ""}`}
-          >
-            {value}
-          </p>
-          {trend && (
-            <span
-              className={`text-xs font-medium flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${
-                trend.isPositive
-                  ? "text-emerald-500 bg-emerald-500/10"
-                  : "text-red-500 bg-red-500/10"
-              }`}
-            >
-              {trend.isPositive ? (
-                <ArrowUpRight className="h-3 w-3" />
-              ) : (
-                <ArrowDownRight className="h-3 w-3" />
-              )}
-              {formatPercent(Math.abs(trend.value))}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1675,36 +1688,47 @@ export default function PortfolioPage() {
         className="relative z-10 container max-w-5xl mx-auto px-4 py-6"
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-xl font-bold">Portfolio</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              Portfolio
+            </h1>
             {proxyAddress && (
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <code>{formatAddress(proxyAddress)}</code>
-                {copied ? (
-                  <Check className="h-3 w-3 text-emerald-500" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
-              </button>
+              <div className="flex items-center gap-2 mt-1.5">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 hover:bg-muted transition-colors group border border-border/50"
+                >
+                  <code className="text-[10px] sm:text-xs font-mono text-muted-foreground group-hover:text-foreground">
+                    {formatAddress(proxyAddress)}
+                  </code>
+                  {copied ? (
+                    <Check className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
+                  )}
+                </button>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
             {hasProxyWallet && proxyAddress && (
               <Button
                 onClick={() => setShowDepositModal(true)}
                 size="sm"
-                className="bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 h-9 sm:h-10 px-4 sm:px-6 font-bold transition-all active:scale-95"
               >
-                <ArrowDownToLine className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Deposit</span>
+                <ArrowDownToLine className="h-4 w-4 mr-2" />
+                Deposit
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-9 sm:h-10 px-3 sm:px-4 border-2 font-bold transition-all active:scale-95"
+            >
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
@@ -1712,12 +1736,12 @@ export default function PortfolioPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard
             label="Portfolio Value"
             value={formatCurrency(portfolioValue)}
             isLoading={loadingPositions || isProxyLoading}
-            isHighlighted={true}
+            isHighlighted={false}
             icon={Wallet}
           />
           <StatCard
@@ -1773,8 +1797,8 @@ export default function PortfolioPage() {
                 activeTab === "positions"
                   ? "markets"
                   : activeTab === "orders"
-                    ? "orders"
-                    : "history"
+                  ? "orders"
+                  : "history"
               }...`}
               pnlFilter={pnlFilter}
               onPnlFilterChange={setPnlFilter}
