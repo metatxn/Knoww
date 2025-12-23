@@ -233,7 +233,7 @@ export function EventFilterBar() {
       </div>
 
       {/* Status Filter */}
-      <div className="flex flex-col gap-1.5 w-[110px] shrink-0">
+      <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Status
         </span>
