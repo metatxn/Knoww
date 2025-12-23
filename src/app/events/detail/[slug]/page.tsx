@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
-import { type OutcomeData, TradingForm } from "@/components/trading-form";
+import { TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +22,8 @@ import {
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
-import { formatVolume } from "@/lib/utils";
+import { formatVolume } from "@/lib/formatters";
+import type { OutcomeData } from "@/types/market";
 
 import { HeaderSection } from "./header-section";
 import { OutcomesTable } from "./outcomes-table";
@@ -732,10 +734,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -747,57 +749,63 @@ export default function EventDetailPage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <MarketPriceChart
-                  tokens={chartTokens}
-                  outcomes={marketTitles}
-                  outcomePrices={yesProb}
-                  startDate={earliestCreatedAt}
-                />
+                <ErrorBoundary name="Market Price Chart">
+                  <MarketPriceChart
+                    tokens={chartTokens}
+                    outcomes={marketTitles}
+                    outcomePrices={yesProb}
+                    startDate={earliestCreatedAt}
+                  />
+                </ErrorBoundary>
               </CardContent>
             </Card>
 
-            <OutcomesTable
-              sortedMarketData={sortedMarketData}
-              isOutcomeTableExpanded={isOutcomeTableExpanded}
-              setIsOutcomeTableExpanded={setIsOutcomeTableExpanded}
-              isConnected={isConnected}
-              connectionState={connectionState}
-              expandedOrderBookMarketId={expandedOrderBookMarketId}
-              setExpandedOrderBookMarketId={setExpandedOrderBookMarketId}
-              selectedMarketId={selectedMarketId}
-              setSelectedMarketId={setSelectedMarketId}
-              selectedOutcomeIndex={selectedOutcomeIndex}
-              setSelectedOutcomeIndex={setSelectedOutcomeIndex}
-              preloadOrderBook={preloadOrderBook}
-              getMarketPosition={getMarketPosition}
-              handlePriceClick={handlePriceClick}
-              isSingleMarketEvent={isSingleMarketEvent}
-            />
+            <ErrorBoundary name="Outcomes Table">
+              <OutcomesTable
+                sortedMarketData={sortedMarketData}
+                isOutcomeTableExpanded={isOutcomeTableExpanded}
+                setIsOutcomeTableExpanded={setIsOutcomeTableExpanded}
+                isConnected={isConnected}
+                connectionState={connectionState}
+                expandedOrderBookMarketId={expandedOrderBookMarketId}
+                setExpandedOrderBookMarketId={setExpandedOrderBookMarketId}
+                selectedMarketId={selectedMarketId}
+                setSelectedMarketId={setSelectedMarketId}
+                selectedOutcomeIndex={selectedOutcomeIndex}
+                setSelectedOutcomeIndex={setSelectedOutcomeIndex}
+                preloadOrderBook={preloadOrderBook}
+                getMarketPosition={getMarketPosition}
+                handlePriceClick={handlePriceClick}
+                isSingleMarketEvent={isSingleMarketEvent}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Trading Panel */}
           <div className="lg:col-span-1">
             {/* Trading Form with Merged Header */}
             {selectedMarket && tradingOutcomes.length > 0 && (
-              <TradingForm
-                marketTitle={selectedMarket.groupItemTitle || event.title}
-                tokenId={tradingOutcomes[selectedOutcomeIndex]?.tokenId || ""}
-                outcomes={tradingOutcomes}
-                selectedOutcomeIndex={selectedOutcomeIndex}
-                onOutcomeChange={setSelectedOutcomeIndex}
-                negRisk={selectedMarket.negRisk || event.negRisk}
-                tickSize={tickSize}
-                minOrderSize={minOrderSize}
-                bestBid={bestBid}
-                bestAsk={bestAsk}
-                orderBook={orderBook}
-                maxSlippagePercent={2}
-                onOrderSuccess={handleOrderSuccess}
-                onOrderError={handleOrderError}
-                marketImage={selectedMarket.image}
-                yesProbability={selectedMarket.yesProbability}
-                isLiveData={isConnected}
-              />
+              <ErrorBoundary name="Trading Form">
+                <TradingForm
+                  marketTitle={selectedMarket.groupItemTitle || event.title}
+                  tokenId={tradingOutcomes[selectedOutcomeIndex]?.tokenId || ""}
+                  outcomes={tradingOutcomes}
+                  selectedOutcomeIndex={selectedOutcomeIndex}
+                  onOutcomeChange={setSelectedOutcomeIndex}
+                  negRisk={selectedMarket.negRisk || event.negRisk}
+                  tickSize={tickSize}
+                  minOrderSize={minOrderSize}
+                  bestBid={bestBid}
+                  bestAsk={bestAsk}
+                  orderBook={orderBook}
+                  maxSlippagePercent={2}
+                  onOrderSuccess={handleOrderSuccess}
+                  onOrderError={handleOrderError}
+                  marketImage={selectedMarket.image}
+                  yesProbability={selectedMarket.yesProbability}
+                  isLiveData={isConnected}
+                />
+              </ErrorBoundary>
             )}
           </div>
         </div>

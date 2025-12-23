@@ -13,10 +13,46 @@ export enum Side {
   SELL = "SELL",
 }
 
+/**
+ * Order side enum matching Polymarket's CLOB numeric values
+ */
+export enum OrderSide {
+  BUY = 0,
+  SELL = 1,
+}
+
 export enum SignatureType {
   EOA = 0,
   POLY_PROXY = 1,
   POLY_GNOSIS_SAFE = 2,
+}
+
+/**
+ * Calculate potential profit/loss for an order
+ */
+export function calculatePotentialPnL(
+  price: number,
+  size: number,
+  side: OrderSide
+): { cost: number; potentialWin: number; potentialLoss: number } {
+  const cost = price * size;
+
+  if (side === OrderSide.BUY) {
+    // Buying YES: pay price * size, win size if YES, lose cost if NO
+    return {
+      cost,
+      potentialWin: size - cost, // Profit = payout - cost
+      potentialLoss: cost,
+    };
+  }
+  // Selling YES (buying NO): pay (1-price) * size, win size if NO
+  const noPrice = 1 - price;
+  const noCost = noPrice * size;
+  return {
+    cost: noCost,
+    potentialWin: size - noCost,
+    potentialLoss: noCost,
+  };
 }
 
 /**

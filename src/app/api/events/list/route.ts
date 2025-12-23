@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { CACHE_DURATION, POLYMARKET_API } from "@/lib/constants";
+import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
 
 const eventsSchema = z.object({
   tag: z.string().nullable().optional(),

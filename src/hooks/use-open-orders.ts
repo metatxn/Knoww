@@ -47,7 +47,9 @@ interface MarketInfoResponse {
   market?: {
     question: string;
     slug: string;
+    eventSlug: string;
     outcome: string;
+    icon?: string;
   };
   error?: string;
 }
@@ -55,9 +57,13 @@ interface MarketInfoResponse {
 /**
  * Fetch market info for a token ID
  */
-async function fetchMarketInfo(
-  tokenId: string
-): Promise<{ question: string; slug: string; outcome: string } | null> {
+async function fetchMarketInfo(tokenId: string): Promise<{
+  question: string;
+  slug: string;
+  eventSlug: string;
+  outcome: string;
+  icon?: string;
+} | null> {
   try {
     const response = await fetch(`/api/markets/by-token/${tokenId}`);
     if (!response.ok) return null;
@@ -67,7 +73,9 @@ async function fetchMarketInfo(
       return {
         question: data.market.question,
         slug: data.market.slug,
+        eventSlug: data.market.eventSlug,
         outcome: data.market.outcome,
+        icon: data.market.icon,
       };
     }
     return null;
@@ -187,7 +195,13 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
         ];
         const marketInfoMap = new Map<
           string,
-          { question: string; slug: string; outcome: string }
+          {
+            question: string;
+            slug: string;
+            eventSlug: string;
+            outcome: string;
+            icon?: string;
+          }
         >();
 
         // Fetch market info in parallel
@@ -246,7 +260,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
  * Hook to cancel an order using the CLOB client
  *
  * Returns a mutation that can be used to cancel orders.
- * Automatically invalidates the open orders query on success.
+ * Uses optimistic updates for instant UI feedback.
  *
  * @returns Mutation for canceling orders
  */
@@ -260,9 +274,45 @@ export function useCancelOrder() {
       if (!address) throw new Error("Address not available");
       return cancelOrder(orderId);
     },
-    onSuccess: () => {
-      // Invalidate open orders query to refetch
-      queryClient.invalidateQueries({ queryKey: ["openOrders", address] });
+    onMutate: async (orderId: string) => {
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ["openOrders"] });
+
+      // Snapshot previous values for all open orders queries
+      const previousData = queryClient.getQueriesData({
+        queryKey: ["openOrders"],
+      });
+
+      // Optimistically remove the order from all cached queries
+      queryClient.setQueriesData(
+        { queryKey: ["openOrders"] },
+        (old: { orders?: OpenOrder[]; count?: number } | undefined) => {
+          if (!old?.orders) return old;
+          const filteredOrders = old.orders.filter(
+            (order) => order.id !== orderId
+          );
+          return {
+            ...old,
+            orders: filteredOrders,
+            count: filteredOrders.length,
+          };
+        }
+      );
+
+      // Return context with previous data for rollback
+      return { previousData };
+    },
+    onError: (_err, _orderId, context) => {
+      // Rollback to previous data on error
+      if (context?.previousData) {
+        for (const [queryKey, data] of context.previousData) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure server state is synced
+      queryClient.invalidateQueries({ queryKey: ["openOrders"] });
     },
   });
 }
@@ -276,7 +326,7 @@ export function useCancelOrder() {
  */
 export function useCancelAllOrders() {
   const { address } = useConnection();
-  const { getOpenOrders, cancelOrder } = useClobClient();
+  const { getOpenOrders, cancelOrder, proxyAddress } = useClobClient();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -300,7 +350,17 @@ export function useCancelAllOrders() {
       return { cancelled: successCount, total: orders?.length || 0 };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["openOrders", address] });
+      // Invalidate all open orders queries
+      queryClient.invalidateQueries({ queryKey: ["openOrders"] });
+
+      if (address) {
+        queryClient.invalidateQueries({ queryKey: ["openOrders", address] });
+      }
+      if (proxyAddress) {
+        queryClient.invalidateQueries({
+          queryKey: ["openOrders", proxyAddress],
+        });
+      }
     },
   });
 }

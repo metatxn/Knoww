@@ -3,12 +3,12 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+import type { OrderBookLevel } from "@/types/market";
 import type {
   BookEvent,
   LastTradePriceEvent,
-  OrderBookLevel,
   PriceChangeEvent,
-} from "./use-market-websocket";
+} from "@/types/websocket";
 
 /**
  * Processed order book data with computed values

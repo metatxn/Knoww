@@ -4,6 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useConnection } from "wagmi";
 import {
+  SAFE_FACTORY_ADDRESS as SAFE_FACTORY,
+  SAFE_INIT_CODE_HASH,
+} from "@/constants/contracts";
+import {
   clearBalanceCache,
   clearDeploymentCache,
   checkIsDeployed as rpcCheckIsDeployed,
@@ -12,27 +16,7 @@ import {
 
 /**
  * Polymarket Proxy Wallet Hook
- *
- * Polymarket uses different wallet types for trading:
- * 1. Gnosis Safe proxy wallets - deployed via Polymarket's factory
- * 2. Direct EOA trading - some users trade directly with their EOA
- *
- * This hook:
- * 1. Fetches the user's actual Polymarket wallet from the Data API
- * 2. Falls back to CREATE2 derivation if no positions exist
- * 3. Checks if it's deployed (has code)
- * 4. Fetches the USDC.e balance
- *
- * Uses shared RPC client with caching to avoid rate limiting.
- * Now uses React Query for global state management and cache invalidation.
  */
-
-// Polymarket Safe Factory address on Polygon mainnet
-const SAFE_FACTORY = "0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b";
-
-// Init code hash used by Polymarket's factory
-const SAFE_INIT_CODE_HASH =
-  "0x2bce2127ff07fb632d16c8347c4ebf501f4841168bed00d9e6ef715ddb6fcecf";
 
 // Polymarket Data API
 // const DATA_API_BASE = "https://data-api.polymarket.com";

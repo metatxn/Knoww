@@ -13,10 +13,10 @@
 
 import { createPublicClient, erc20Abi, http, type PublicClient } from "viem";
 import { polygon } from "viem/chains";
-
-// USDC.e address on Polygon
-const USDC_E_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
-const USDC_DECIMALS = 6;
+import {
+  USDC_DECIMALS,
+  USDC_ADDRESS as USDC_E_ADDRESS,
+} from "@/constants/contracts";
 
 // Cache expiration times
 const DEPLOYMENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes

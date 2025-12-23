@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { CACHE_DURATION, POLYMARKET_API } from "@/lib/constants";
+import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
 
 // Fallback tags if API doesn't have a tags endpoint
 const FALLBACK_TAGS = [

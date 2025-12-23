@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { POLYMARKET_API } from "@/lib/constants";
+import { POLYMARKET_API } from "@/constants/polymarket";
 
 /**
  * Price history response from Polymarket CLOB API

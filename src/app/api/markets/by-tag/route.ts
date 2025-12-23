@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { CACHE_DURATION, POLYMARKET_API } from "@/lib/constants";
 
 const marketsByTagSchema = z.object({
   tag_id: z.string(),

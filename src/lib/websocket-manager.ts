@@ -1,86 +1,11 @@
 "use client";
 
-import { POLYMARKET_API, WEBSOCKET_CONFIG } from "@/lib/constants";
+import { POLYMARKET_API, WEBSOCKET_CONFIG } from "@/constants/polymarket";
+import type { ConnectionState, WebSocketEvent } from "@/types/websocket";
 
 /**
  * Singleton WebSocket Manager for Polymarket Market Channel
- *
- * This class manages a SINGLE WebSocket connection that all components share.
- * Components subscribe/unsubscribe to specific asset IDs, and the manager
- * handles the underlying connection lifecycle.
- *
- * Benefits:
- * - Single connection = less memory/CPU
- * - Automatic reconnection with exponential backoff
- * - Reference counting for subscriptions
- * - Event broadcasting to all subscribers
  */
-
-export type ConnectionState =
-  | "disconnected"
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "error";
-
-export interface OrderBookLevel {
-  price: string;
-  size: string;
-}
-
-export interface BookEvent {
-  event_type: "book";
-  asset_id: string;
-  market: string;
-  bids: OrderBookLevel[];
-  asks: OrderBookLevel[];
-  timestamp: string;
-  hash: string;
-}
-
-export interface PriceChange {
-  asset_id: string;
-  price: string;
-  size: string;
-  side: "BUY" | "SELL";
-  hash: string;
-  best_bid: string;
-  best_ask: string;
-}
-
-export interface PriceChangeEvent {
-  event_type: "price_change";
-  market: string;
-  price_changes: PriceChange[];
-  timestamp: string;
-}
-
-export interface LastTradePriceEvent {
-  event_type: "last_trade_price";
-  asset_id: string;
-  market: string;
-  price: string;
-  size: string;
-  side: "BUY" | "SELL";
-  fee_rate_bps: string;
-  timestamp: string;
-}
-
-export interface TickSizeChangeEvent {
-  event_type: "tick_size_change";
-  asset_id: string;
-  market: string;
-  old_tick_size: string;
-  new_tick_size: string;
-  side: string;
-  timestamp: string;
-}
-
-export type WebSocketEvent =
-  | BookEvent
-  | PriceChangeEvent
-  | LastTradePriceEvent
-  | TickSizeChangeEvent;
 
 type EventCallback = (event: WebSocketEvent) => void;
 type ConnectionCallback = (state: ConnectionState) => void;

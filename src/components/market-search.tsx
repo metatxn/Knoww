@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/use-search";
-import { cn, formatVolume } from "@/lib/utils";
+import { formatVolume } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 // Custom hook for debouncing values
 function useDebouncedValue<T>(value: T, delay: number): T {

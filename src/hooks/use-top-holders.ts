@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { POLYMARKET_API } from "@/lib/constants";
+import { POLYMARKET_API } from "@/constants/polymarket";
 
 export interface Holder {
   proxyWallet: string;

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { POLYMARKET_API } from "@/lib/constants";
 
 /**
  * GET /api/events/trending

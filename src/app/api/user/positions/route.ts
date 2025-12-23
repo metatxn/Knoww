@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { ERROR_MESSAGES } from "@/lib/constants";
+import { ERROR_MESSAGES } from "@/constants/polymarket";
 
 /**
  * Polymarket Data API base URL

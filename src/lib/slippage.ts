@@ -1,25 +1,11 @@
+import type { OrderBook, OrderBookLevel } from "@/types/market";
+
 /**
  * Slippage calculation utilities for Polymarket orders
  *
  * Calculates actual slippage by walking the order book based on order size,
  * rather than using a fixed percentage.
  */
-
-/**
- * Order book level representing a price point with size
- */
-export interface OrderBookLevel {
-  price: string;
-  size: string;
-}
-
-/**
- * Order book data structure
- */
-export interface OrderBook {
-  bids: OrderBookLevel[];
-  asks: OrderBookLevel[];
-}
 
 /**
  * Result of slippage calculation

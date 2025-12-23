@@ -13,11 +13,12 @@ import {
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { OrderBook } from "@/components/order-book";
 import { PageBackground } from "@/components/page-background";
-import { type OutcomeData, TradingForm } from "@/components/trading-form";
+import { TradingForm } from "@/components/trading-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +31,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
-import { formatPrice, formatVolume } from "@/lib/utils";
+import { formatPrice, formatVolume } from "@/lib/formatters";
+import type { OutcomeData } from "@/types/market";
 
 export default function MarketDetailPage() {
   const params = useParams();
@@ -471,53 +473,59 @@ export default function MarketDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="pt-6">
-                <MarketPriceChart
-                  tokens={chartTokens}
-                  outcomes={outcomes}
-                  outcomePrices={prices.map((p: string) => p.toString())}
-                />
+                <ErrorBoundary name="Market Price Chart">
+                  <MarketPriceChart
+                    tokens={chartTokens}
+                    outcomes={outcomes}
+                    outcomePrices={prices.map((p: string) => p.toString())}
+                  />
+                </ErrorBoundary>
               </CardContent>
             </Card>
 
             {/* Order Book - Always visible only for single outcome markets */}
             {tradingOutcomes.length === 1 && (
-              <OrderBook
-                outcomes={tradingOutcomes.map((o) => ({
-                  name: o.name,
-                  tokenId: o.tokenId,
-                  price: o.price,
-                }))}
-                defaultOutcomeIndex={selectedOutcome}
-                maxLevels={5}
-                onPriceClick={handlePriceClick}
-                onOutcomeChange={(index) => setSelectedOutcome(index)}
-                defaultCollapsed={false}
-              />
+              <ErrorBoundary name="Order Book">
+                <OrderBook
+                  outcomes={tradingOutcomes.map((o) => ({
+                    name: o.name,
+                    tokenId: o.tokenId,
+                    price: o.price,
+                  }))}
+                  defaultOutcomeIndex={selectedOutcome}
+                  maxLevels={5}
+                  onPriceClick={handlePriceClick}
+                  onOutcomeChange={(index) => setSelectedOutcome(index)}
+                  defaultCollapsed={false}
+                />
+              </ErrorBoundary>
             )}
           </div>
 
           {/* Trading Panel - Right Side (1/3 width) */}
           <div className="lg:col-span-1">
             {/* Trading Form with Merged Header */}
-            <TradingForm
-              marketTitle={market.question}
-              tokenId={tradingOutcomes[selectedOutcome]?.tokenId || ""}
-              outcomes={tradingOutcomes}
-              selectedOutcomeIndex={selectedOutcome}
-              onOutcomeChange={setSelectedOutcome}
-              negRisk={market.negRisk}
-              minOrderSize={
-                Number.parseFloat(
-                  String(market.orderMinSize ?? market.order_min_size ?? "1")
-                ) || 1
-              }
-              onOrderSuccess={handleOrderSuccess}
-              onOrderError={handleOrderError}
-              marketImage={market.image}
-              yesProbability={
-                market.bestAsk ? Math.round(market.bestAsk * 100) : undefined
-              }
-            />
+            <ErrorBoundary name="Trading Form">
+              <TradingForm
+                marketTitle={market.question}
+                tokenId={tradingOutcomes[selectedOutcome]?.tokenId || ""}
+                outcomes={tradingOutcomes}
+                selectedOutcomeIndex={selectedOutcome}
+                onOutcomeChange={setSelectedOutcome}
+                negRisk={market.negRisk}
+                minOrderSize={
+                  Number.parseFloat(
+                    String(market.orderMinSize ?? market.order_min_size ?? "1")
+                  ) || 1
+                }
+                onOrderSuccess={handleOrderSuccess}
+                onOrderError={handleOrderError}
+                marketImage={market.image}
+                yesProbability={
+                  market.bestAsk ? Math.round(market.bestAsk * 100) : undefined
+                }
+              />
+            </ErrorBoundary>
           </div>
         </div>
 

@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatVolume } from "@/lib/utils";
+import { formatVolume } from "@/lib/formatters";
 
 interface EventCardProps {
   event: {

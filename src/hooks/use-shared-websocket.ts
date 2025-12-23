@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrderBookStore } from "@/hooks/use-orderbook-store";
-import {
-  type BookEvent,
-  type ConnectionState,
-  getWebSocketManager,
-  type LastTradePriceEvent,
-  type PriceChangeEvent,
-  type TickSizeChangeEvent,
-  type WebSocketEvent,
-} from "@/lib/websocket-manager";
+import { getWebSocketManager } from "@/lib/websocket-manager";
+import type {
+  BookEvent,
+  ConnectionState,
+  LastTradePriceEvent,
+  PriceChangeEvent,
+  TickSizeChangeEvent,
+  WebSocketEvent,
+} from "@/types/websocket";
 
 export type {
   BookEvent,

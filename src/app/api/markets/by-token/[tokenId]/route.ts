@@ -54,6 +54,8 @@ export async function GET(
           market: {
             question: market.question || market.title || "Unknown Market",
             slug: market.slug || market.marketSlug || "",
+            eventSlug:
+              market.eventSlug || market.event_slug || market.slug || "",
             conditionId: market.conditionId || "",
             outcome,
             endDate: market.endDate || market.endDateIso || null,

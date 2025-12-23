@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { POLYMARKET_API } from "@/lib/constants";
+import { POLYMARKET_API } from "@/constants/polymarket";
 
 // Validation schema - nullable to handle null from searchParams.get()
 const marketsSchema = z.object({
