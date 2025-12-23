@@ -22,10 +22,12 @@ import { HistoryTable } from "@/components/portfolio/history-table";
 import { OrdersTable } from "@/components/portfolio/orders-table";
 import { PositionsTable } from "@/components/portfolio/positions-table";
 import { SearchBar } from "@/components/portfolio/search-bar";
+import { SellPositionModal } from "@/components/portfolio/sell-position-modal";
 import { StatCard } from "@/components/portfolio/stat-card";
 import { TabNav } from "@/components/portfolio/tab-nav";
 import type {
   PnLFilter,
+  Position,
   SortDirection,
   SortField,
   TabType,
@@ -101,6 +103,10 @@ export default function PortfolioPage() {
   const { mutate: cancelOrder } = useCancelOrder();
   const [cancellingOrderId, setCancellingOrderId] = useState<string>();
 
+  // Sell position modal state
+  const [sellPosition, setSellPosition] = useState<Position | null>(null);
+  const [showSellModal, setShowSellModal] = useState(false);
+
   // Handlers
   const handleCopy = () => {
     if (proxyAddress) {
@@ -133,6 +139,31 @@ export default function PortfolioPage() {
       setSortField(field);
       setSortDirection("desc");
     }
+  };
+
+  // Handle sell position
+  const handleSellPosition = (position: Position) => {
+    setSellPosition(position);
+    setShowSellModal(true);
+  };
+
+  const handleSellSuccess = () => {
+    // Immediate refetch
+    refetchPositions();
+    refreshProxyWallet();
+
+    // Multiple delayed refetches to catch backend updates
+    const refetchAll = () => {
+      refetchPositions();
+      refreshProxyWallet();
+    };
+
+    // Refetch at 1s, 3s, and 5s to catch the update
+    setTimeout(refetchAll, 1000);
+    setTimeout(refetchAll, 3000);
+    setTimeout(refetchAll, 5000);
+
+    setSellPosition(null);
   };
 
   // Computed values
@@ -305,8 +336,8 @@ export default function PortfolioPage() {
                 activeTab === "positions"
                   ? "markets"
                   : activeTab === "orders"
-                    ? "orders"
-                    : "history"
+                  ? "orders"
+                  : "history"
               }...`}
               pnlFilter={pnlFilter}
               onPnlFilterChange={setPnlFilter}
@@ -331,6 +362,7 @@ export default function PortfolioPage() {
                   sortField={sortField}
                   sortDirection={sortDirection}
                   onSort={handleSort}
+                  onSell={handleSellPosition}
                 />
               </motion.div>
             )}
@@ -374,6 +406,14 @@ export default function PortfolioPage() {
       <DepositModal
         open={showDepositModal}
         onOpenChange={setShowDepositModal}
+      />
+
+      {/* Sell Position Modal */}
+      <SellPositionModal
+        open={showSellModal}
+        onOpenChange={setShowSellModal}
+        position={sellPosition}
+        onSellSuccess={handleSellSuccess}
       />
     </div>
   );

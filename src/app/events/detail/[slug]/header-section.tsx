@@ -85,7 +85,7 @@ export function HeaderSection({
               className={cn(
                 "relative shrink-0 transition-all duration-300",
                 isScrolled
-                  ? "lg:w-10 lg:h-10 lg:sm:w-12 lg:sm:h-12 w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
+                  ? "lg:w-10 lg:h-10 w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
                   : "w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
               )}
             >
@@ -104,7 +104,10 @@ export function HeaderSection({
               <div
                 className={cn(
                   "flex-1 min-w-0",
-                  !isScrolled && "md:h-20 flex flex-col justify-between"
+                  // On md (tablet): Always use flex layout for bottom alignment
+                  // On lg (desktop): Only use flex layout when not scrolled
+                  "md:h-20 md:flex md:flex-col md:justify-between",
+                  isScrolled && "lg:h-auto lg:block"
                 )}
               >
                 <div className="min-w-0">
@@ -112,7 +115,7 @@ export function HeaderSection({
                     className={cn(
                       "font-bold leading-tight transition-all duration-300",
                       isScrolled
-                        ? "lg:text-lg lg:sm:text-xl lg:md:text-2xl text-xl sm:text-2xl md:text-3xl"
+                        ? "lg:text-2xl text-xl sm:text-2xl md:text-3xl"
                         : "text-xl sm:text-2xl md:text-3xl"
                     )}
                   >
@@ -126,12 +129,12 @@ export function HeaderSection({
                   >
                     {event.negRisk && <NegRiskBadge />}
 
-                    {/* Compact Stats Row - visible only when scrolled on desktop */}
+                    {/* Compact Stats Row - visible only when scrolled on large desktop (lg+) */}
                     <div
                       className={cn(
                         "flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
                         isScrolled
-                          ? "lg:opacity-100 lg:translate-x-0 opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden lg:w-auto lg:h-auto lg:overflow-visible"
+                          ? "lg:opacity-100 lg:translate-x-0 lg:w-auto lg:h-auto lg:overflow-visible lg:pointer-events-auto opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                           : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                       )}
                     >
@@ -164,43 +167,49 @@ export function HeaderSection({
                   </div>
                 </div>
 
-                {/* Full Stats Row for Tablet/Desktop - shown below title when NOT scrolled */}
-                {!isScrolled && (
-                  <div className="hidden md:flex flex-wrap items-center gap-2 mt-2 text-muted-foreground">
+                {/* Full Stats Row for Tablet and Desktop - bottom-aligned with avatar
+                    - On md (tablet): Always visible (no sticky header)
+                    - On lg (desktop): Hidden when scrolled (compact stats appear in sticky header instead)
+                */}
+                <div
+                  className={cn(
+                    "hidden md:flex flex-wrap items-center gap-2 mt-2 text-muted-foreground",
+                    isScrolled && "lg:hidden"
+                  )}
+                >
+                  <StatItem
+                    icon={Trophy}
+                    value={formatVolume(event.volume)}
+                    label="Vol."
+                    className="text-xs sm:text-sm"
+                  />
+                  {event.endDate && (
                     <StatItem
-                      icon={Trophy}
-                      value={formatVolume(event.volume)}
-                      label="Vol."
+                      icon={Clock}
+                      value={new Date(event.endDate).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )}
                       className="text-xs sm:text-sm"
                     />
-                    {event.endDate && (
-                      <StatItem
-                        icon={Clock}
-                        value={new Date(event.endDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
-                        )}
-                        className="text-xs sm:text-sm"
-                      />
-                    )}
+                  )}
+                  <StatItem
+                    value={`${totalMarketsCount} market${
+                      totalMarketsCount !== 1 ? "s" : ""
+                    }`}
+                    className="text-xs sm:text-sm"
+                  />
+                  {closedMarkets.length > 0 && (
                     <StatItem
-                      value={`${totalMarketsCount} market${
-                        totalMarketsCount !== 1 ? "s" : ""
-                      }`}
+                      value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
                       className="text-xs sm:text-sm"
                     />
-                    {closedMarkets.length > 0 && (
-                      <StatItem
-                        value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
-                        className="text-xs sm:text-sm"
-                      />
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Action Buttons - Icon only on mobile/tablet, with text on desktop */}
@@ -240,15 +249,8 @@ export function HeaderSection({
           </div>
         </div>
 
-        {/* Full Stats Row - Moved out to align with image on mobile, hidden on tablet/desktop as it's moved up */}
-        <div
-          className={cn(
-            "md:hidden transition-all duration-300",
-            isScrolled
-              ? "opacity-100 translate-x-0"
-              : "opacity-100 translate-x-0"
-          )}
-        >
+        {/* Full Stats Row - Only shown on mobile (below md), hidden on tablet and desktop */}
+        <div className="md:hidden">
           <div
             className={cn(
               "text-muted-foreground",

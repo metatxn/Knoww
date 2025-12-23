@@ -15,6 +15,12 @@ export interface Position {
   initialValue: number;
   unrealizedPnl: number;
   unrealizedPnlPercent: number;
+  /** Token ID (asset) for the position */
+  asset?: string;
+  /** Condition ID for the market */
+  conditionId?: string;
+  /** Whether this is a negative risk market */
+  negRisk?: boolean;
   market: {
     title: string;
     slug: string;

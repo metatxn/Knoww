@@ -38,6 +38,8 @@ export function useTradingFormState({
   maxSlippagePercent = DEFAULT_MAX_SLIPPAGE_PERCENT,
   onOrderSuccess,
   onOrderError,
+  initialSide,
+  initialShares,
 }: Partial<TradingFormProps> & {
   outcomes: TradingFormProps["outcomes"];
   selectedOutcomeIndex: number;
@@ -57,10 +59,34 @@ export function useTradingFormState({
 
   const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
 
-  const [side, setSide] = useState<TradingSide>("BUY");
+  // Type for user positions response
+  interface UserPositionsResponse {
+    positions?: Array<{
+      asset?: string;
+      size?: number;
+    }>;
+  }
+
+  // Fetch user's position for the current token (for SELL max shares)
+  const { data: userPositionData } = useQuery<UserPositionsResponse | null>({
+    queryKey: ["userPositions", proxyAddress],
+    queryFn: async (): Promise<UserPositionsResponse | null> => {
+      if (!proxyAddress) return null;
+      const response = await fetch(
+        `/api/user/positions?user=${proxyAddress}&active=true`
+      );
+      if (!response.ok) return null;
+      return response.json() as Promise<UserPositionsResponse>;
+    },
+    enabled: !!proxyAddress && hasProxyWallet,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+
+  const [side, setSide] = useState<TradingSide>(initialSide ?? "BUY");
   const [orderType, setOrderType] = useState<OrderTypeSelection>("MARKET");
   const [limitPrice, setLimitPrice] = useState<number>(0.5);
-  const [shares, setShares] = useState<number>(10);
+  const [shares, setShares] = useState<number>(initialShares ?? 10);
   const [allowPartialFill, setAllowPartialFill] = useState<boolean>(true);
   const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
   const [hasUserEditedPrice, setHasUserEditedPrice] = useState(false);
@@ -73,6 +99,18 @@ export function useTradingFormState({
   const hasValidTokenId = Boolean(
     selectedOutcome?.tokenId && selectedOutcome.tokenId.length > 10
   );
+
+  // Calculate max shares user can sell based on their position
+  const maxSellShares = useMemo(() => {
+    if (!userPositionData?.positions || !selectedOutcome?.tokenId) return 0;
+
+    // Find position matching the current token
+    const position = userPositionData.positions.find(
+      (p) => p.asset === selectedOutcome.tokenId
+    );
+
+    return position?.size ?? 0;
+  }, [userPositionData?.positions, selectedOutcome?.tokenId]);
 
   const minShares = useMemo(() => {
     const raw = Number.isFinite(minOrderSize) ? minOrderSize : 1;
@@ -95,9 +133,47 @@ export function useTradingFormState({
     }
   }, [selectedOutcome?.tokenId]);
 
+  // Update side when initialSide changes (e.g., from URL params)
   useEffect(() => {
-    setShares((prev) => (prev < minShares ? minShares : prev));
-  }, [minShares]);
+    if (initialSide) {
+      setSide(initialSide);
+    }
+  }, [initialSide]);
+
+  // Update shares when initialShares changes (e.g., from URL params)
+  useEffect(() => {
+    if (initialShares !== undefined && initialShares > 0) {
+      setShares(initialShares);
+    }
+  }, [initialShares]);
+
+  // For BUY, ensure shares meet minimum
+  useEffect(() => {
+    if (side === "BUY") {
+      setShares((prev) => (prev < minShares ? minShares : prev));
+    }
+  }, [minShares, side]);
+
+  // When switching to SELL, auto-fill with user's position size
+  const previousSideRef = useRef(side);
+  useEffect(() => {
+    // Only trigger when side changes TO SELL
+    if (
+      side === "SELL" &&
+      previousSideRef.current === "BUY" &&
+      maxSellShares > 0
+    ) {
+      setShares(maxSellShares);
+    }
+    previousSideRef.current = side;
+  }, [side, maxSellShares]);
+
+  // Also cap shares if they exceed position when on SELL
+  useEffect(() => {
+    if (side === "SELL" && maxSellShares > 0 && shares > maxSellShares) {
+      setShares(maxSellShares);
+    }
+  }, [side, maxSellShares, shares]);
 
   const handleLimitPriceChange = useCallback((price: number) => {
     setHasUserEditedPrice(true);
@@ -217,9 +293,11 @@ export function useTradingFormState({
 
   const handleSharesChange = useCallback(
     (delta: number) => {
-      setShares((prev) => Math.max(minShares, prev + delta));
+      // For SELL, minimum is 1. For BUY, use minShares from market.
+      const effectiveMin = side === "SELL" ? 1 : minShares;
+      setShares((prev) => Math.max(effectiveMin, prev + delta));
     },
-    [minShares]
+    [minShares, side]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -264,13 +342,42 @@ export function useTradingFormState({
 
       if (result.success) {
         onOrderSuccess?.(result.order);
-        setShares(10);
+        setShares(initialShares ?? 10);
         if (proxyAddress) {
           clearBalanceCache(proxyAddress);
-          await queryClient.invalidateQueries({
-            queryKey: [PROXY_WALLET_QUERY_KEY],
-          });
-          await queryClient.invalidateQueries({ queryKey: ["usdcBalance"] });
+
+          // Immediate invalidation and refetch
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: [PROXY_WALLET_QUERY_KEY],
+            }),
+            queryClient.invalidateQueries({ queryKey: ["usdcBalance"] }),
+            queryClient.invalidateQueries({ queryKey: ["userPositions"] }),
+            queryClient.invalidateQueries({ queryKey: ["openOrders"] }),
+          ]);
+
+          // Immediate refetch
+          await Promise.all([
+            queryClient.refetchQueries({ queryKey: ["userPositions"] }),
+            queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY] }),
+            queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+          ]);
+
+          // Multiple delayed refetches to catch backend updates
+          const refetchAll = async () => {
+            await Promise.all([
+              queryClient.refetchQueries({ queryKey: ["userPositions"] }),
+              queryClient.refetchQueries({
+                queryKey: [PROXY_WALLET_QUERY_KEY],
+              }),
+              queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+            ]);
+          };
+
+          // Refetch at 1s, 3s, and 5s to catch the update
+          setTimeout(refetchAll, 1000);
+          setTimeout(refetchAll, 3000);
+          setTimeout(refetchAll, 5000);
         }
       } else {
         throw new Error("Order failed");
@@ -297,6 +404,7 @@ export function useTradingFormState({
     proxyAddress,
     queryClient,
     onOrderError,
+    initialShares,
   ]);
 
   return {
@@ -326,6 +434,7 @@ export function useTradingFormState({
     hasNoAllowance,
     isBelowMarketableBuyMinNotional,
     minShares,
+    maxSellShares,
     canTrade,
     hasCredentials,
     isConnected,

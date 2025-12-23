@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { MarketPriceChart } from "@/components/market-price-chart";
@@ -12,7 +12,6 @@ import { TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEventDetail } from "@/hooks/use-event-detail";
 import {
   useBestPrices,
@@ -23,7 +22,7 @@ import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
 import { formatVolume } from "@/lib/formatters";
-import type { OutcomeData } from "@/types/market";
+import type { OutcomeData, TradingSide } from "@/types/market";
 
 import { HeaderSection } from "./header-section";
 import { OutcomesTable } from "./outcomes-table";
@@ -48,6 +47,21 @@ interface OrderBookResponse {
 export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read URL params for pre-filling trading form (from "Modify Order" in sell modal)
+  const urlSide = searchParams?.get("side") as TradingSide | null;
+  const urlShares = searchParams?.get("shares");
+  const urlOutcome = searchParams?.get("outcome");
+
+  // Parse initial values from URL
+  const initialSide: TradingSide | undefined =
+    urlSide === "SELL" || urlSide === "BUY" ? urlSide : undefined;
+  const initialShares: number | undefined = urlShares
+    ? Number.parseFloat(urlShares)
+    : undefined;
+  const initialOutcomeFromUrl = urlOutcome?.toLowerCase();
+
   const [selectedMarketId, setSelectedMarketId] = useState<string>("");
   const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState(0);
   // Track which market has its order book expanded (null = none)
@@ -64,13 +78,21 @@ export default function EventDetailPage() {
   });
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Handle scroll for sticky header effects with performance optimization
+  // Handle scroll for sticky header effects with performance optimization and hysteresis
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          setIsScrolled(window.scrollY > 20);
+          const scrollY = window.scrollY;
+          // Use hysteresis to prevent flickering:
+          // - Scroll down: trigger at 50px
+          // - Scroll up: untrigger at 10px
+          setIsScrolled((prev) => {
+            if (!prev && scrollY > 50) return true;
+            if (prev && scrollY < 10) return false;
+            return prev;
+          });
           ticking = false;
         });
         ticking = true;
@@ -361,6 +383,18 @@ export default function EventDetailPage() {
     }
   }, [isSingleMarketEvent, openMarkets, preloadOrderBook, selectedMarket]);
 
+  // Set outcome index based on URL param (for "Modify Order" from sell modal)
+  useEffect(() => {
+    if (initialOutcomeFromUrl && tradingOutcomes.length > 0) {
+      const outcomeIndex = tradingOutcomes.findIndex(
+        (o) => o.name.toLowerCase() === initialOutcomeFromUrl
+      );
+      if (outcomeIndex !== -1 && outcomeIndex !== selectedOutcomeIndex) {
+        setSelectedOutcomeIndex(outcomeIndex);
+      }
+    }
+  }, [initialOutcomeFromUrl, tradingOutcomes, selectedOutcomeIndex]);
+
   // ARCHITECTURE: REST first, then WebSocket for real-time updates
   // This is how Binance, Coinbase, and Polymarket work
 
@@ -605,6 +639,58 @@ export default function EventDetailPage() {
     (a, b) => b.yesProbability - a.yesProbability
   );
 
+  // Build closed market data for display
+  const closedMarketData = closedMarkets.map((market) => {
+    const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
+    const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
+    const tokens = market.tokens || [];
+    const clobTokenIds = market.clobTokenIds
+      ? JSON.parse(market.clobTokenIds)
+      : [];
+
+    const yesIndex = outcomes.findIndex((o: string) =>
+      o.toLowerCase().includes("yes")
+    );
+    const noIndex = outcomes.findIndex((o: string) =>
+      o.toLowerCase().includes("no")
+    );
+
+    const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
+    const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
+
+    let yesTokenId = "";
+    let noTokenId = "";
+
+    if (tokens.length > 0) {
+      const yesToken = tokens.find((t) => t.outcome?.toLowerCase() === "yes");
+      const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
+      yesTokenId = yesToken?.token_id || "";
+      noTokenId = noToken?.token_id || "";
+    } else if (clobTokenIds.length > 0) {
+      yesTokenId = yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
+      noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
+    }
+
+    const yesProbability = yesPrice
+      ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
+      : 0;
+
+    return {
+      id: market.id,
+      conditionId: market.conditionId || "",
+      groupItemTitle: market.groupItemTitle || market.question,
+      yesProbability,
+      yesPrice: yesPrice || "0",
+      noPrice: noPrice || "0",
+      yesTokenId: yesTokenId || "",
+      noTokenId: noTokenId || "",
+      change: 0,
+      volume: market.volume || "0",
+      image: market.image,
+      closed: true,
+    };
+  });
+
   // Chart behavior:
   // - If the event has ONE market, show BOTH Yes + No on the main chart.
   // - If the event has multiple markets, show top 4 markets (Yes) like before.
@@ -668,7 +754,7 @@ export default function EventDetailPage() {
       <PageBackground />
 
       <Navbar />
-      <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6">
+      <main className="relative z-10 px-4 md:px-6 lg:px-8 py-6 min-h-screen">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <button
@@ -734,10 +820,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                                ? "bg-blue-500"
-                                : idx === 2
-                                  ? "bg-purple-400"
-                                  : "bg-green-500"
+                              ? "bg-blue-500"
+                              : idx === 2
+                              ? "bg-purple-400"
+                              : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -763,6 +849,7 @@ export default function EventDetailPage() {
             <ErrorBoundary name="Outcomes Table">
               <OutcomesTable
                 sortedMarketData={sortedMarketData}
+                closedMarkets={closedMarketData}
                 isOutcomeTableExpanded={isOutcomeTableExpanded}
                 setIsOutcomeTableExpanded={setIsOutcomeTableExpanded}
                 isConnected={isConnected}
@@ -804,50 +891,13 @@ export default function EventDetailPage() {
                   marketImage={selectedMarket.image}
                   yesProbability={selectedMarket.yesProbability}
                   isLiveData={isConnected}
+                  initialSide={initialSide}
+                  initialShares={initialShares}
                 />
               </ErrorBoundary>
             )}
           </div>
         </div>
-
-        {/* Related Markets Section */}
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="w-full justify-start h-auto p-1 bg-transparent border-b rounded-none">
-                <TabsTrigger
-                  value="all"
-                  className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent"
-                >
-                  All
-                </TabsTrigger>
-                {event.tags &&
-                  event.tags.length > 0 &&
-                  event.tags.slice(0, 3).map((tag, idx) => {
-                    const tagLabel =
-                      typeof tag === "string"
-                        ? tag
-                        : (tag as { label?: string })?.label || "Tag";
-                    return (
-                      <TabsTrigger
-                        key={idx}
-                        value={tagLabel.toLowerCase()}
-                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent"
-                      >
-                        {tagLabel}
-                      </TabsTrigger>
-                    );
-                  })}
-              </TabsList>
-
-              <TabsContent value="all" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  Related markets coming soon
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );

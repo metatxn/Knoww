@@ -1,4 +1,4 @@
-import type { OrderBook, OutcomeData } from "@/types/market";
+import type { OrderBook, OutcomeData, TradingSide } from "@/types/market";
 
 /**
  * Props for the TradingForm component
@@ -40,4 +40,8 @@ export interface TradingFormProps {
   yesProbability?: number;
   /** Whether order book data is from live WebSocket */
   isLiveData?: boolean;
+  /** Initial side for the trading form (BUY or SELL) */
+  initialSide?: TradingSide;
+  /** Initial number of shares */
+  initialShares?: number;
 }

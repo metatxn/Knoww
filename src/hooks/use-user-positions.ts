@@ -150,8 +150,8 @@ export function useUserPositions(options: UseUserPositionsOptions = {}) {
       return fetchPositions(userAddress, options);
     },
     enabled: isConnected && !!userAddress && options.enabled !== false,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    staleTime: 10 * 1000, // 5 seconds - more responsive after trades
+    refetchInterval: 30 * 1000, // Refetch every 15 seconds
   });
 }
 

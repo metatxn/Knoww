@@ -38,6 +38,7 @@ export function PositionsTable({
   sortField,
   sortDirection,
   onSort,
+  onSell,
 }: {
   positions: Position[];
   isLoading: boolean;
@@ -46,6 +47,7 @@ export function PositionsTable({
   sortField: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
+  onSell?: (position: Position) => void;
 }) {
   // Filter and sort positions
   const filteredPositions = useMemo(() => {
@@ -252,16 +254,21 @@ export function PositionsTable({
                 </div>
               </div>
 
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="w-full mt-2"
-              >
-                <Link href={`/events/detail/${position.market.eventSlug}`}>
-                  Manage Position
-                </Link>
-              </Button>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => onSell?.(position)}
+                >
+                  Sell
+                </Button>
+                <Button asChild size="sm" variant="outline" className="flex-1">
+                  <Link href={`/events/detail/${position.market.eventSlug}`}>
+                    Trade
+                  </Link>
+                </Button>
+              </div>
             </motion.div>
           );
         })}
@@ -438,17 +445,27 @@ export function PositionsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      asChild
-                      size="sm"
-                      className="bg-sky-500 hover:bg-sky-600 text-white h-8"
-                    >
-                      <Link
-                        href={`/events/detail/${position.market.eventSlug}`}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white h-8"
+                        onClick={() => onSell?.(position)}
                       >
-                        Trade
-                      </Link>
-                    </Button>
+                        Sell
+                      </Button>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                      >
+                        <Link
+                          href={`/events/detail/${position.market.eventSlug}`}
+                        >
+                          Trade
+                        </Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );

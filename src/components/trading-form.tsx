@@ -78,6 +78,7 @@ export function TradingForm(props: TradingFormProps) {
     hasNoAllowance,
     isBelowMarketableBuyMinNotional,
     minShares,
+    maxSellShares,
     hasCredentials,
     isConnected,
     handleSetAllowance,
@@ -197,6 +198,7 @@ export function TradingForm(props: TradingFormProps) {
             effectiveBalance={effectiveBalance}
             price={calculations.price}
             side={side}
+            maxSellShares={maxSellShares}
           />
 
           {/* Partial Fill Toggle - Only for market orders */}
@@ -238,6 +240,7 @@ export function TradingForm(props: TradingFormProps) {
             profitPercent={calculations.returnPercent}
             selectedOutcomeName={selectedOutcome?.name}
             isBelowMinNotional={isBelowMarketableBuyMinNotional}
+            side={side}
           />
 
           {/* Conditional UI Sections */}
@@ -257,7 +260,23 @@ export function TradingForm(props: TradingFormProps) {
               </motion.div>
             )}
 
-            {hasInsufficientBalance && (
+            {side === "SELL" && maxSellShares <= 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                  <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="text-sm text-amber-600 dark:text-amber-400">
+                    You don't have any {selectedOutcome?.name || "shares"} to
+                    sell
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {hasInsufficientBalance && side === "BUY" && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -322,20 +341,25 @@ export function TradingForm(props: TradingFormProps) {
               <button
                 type="button"
                 className={`w-full h-12 font-medium rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  hasInsufficientBalance || shares < minShares
+                  (side === "BUY" && hasInsufficientBalance) ||
+                  (side === "SELL" && maxSellShares <= 0) ||
+                  (side === "BUY" && shares < minShares)
                     ? "bg-muted text-muted-foreground"
                     : side === "BUY"
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
-                      : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                    : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
                 }`}
                 onClick={handleSubmit}
                 disabled={
                   isLoading ||
-                  hasInsufficientBalance ||
+                  (side === "BUY" && hasInsufficientBalance) ||
+                  (side === "SELL" && maxSellShares <= 0) ||
+                  (side === "SELL" && shares > maxSellShares) ||
+                  (side === "SELL" && shares <= 0) ||
                   hasInsufficientAllowance ||
                   hasNoAllowance ||
-                  shares < minShares ||
-                  isBelowMarketableBuyMinNotional ||
+                  (side === "BUY" && shares < minShares) ||
+                  (side === "BUY" && isBelowMarketableBuyMinNotional) ||
                   !selectedOutcome ||
                   !hasValidTokenId ||
                   (orderType === "MARKET" && !canFullyFill)
@@ -350,11 +374,15 @@ export function TradingForm(props: TradingFormProps) {
                   "Trading not available"
                 ) : orderType === "MARKET" && !canFullyFill ? (
                   "Insufficient liquidity"
-                ) : hasInsufficientBalance ? (
+                ) : side === "SELL" && maxSellShares <= 0 ? (
+                  "No position to sell"
+                ) : side === "SELL" && shares > maxSellShares ? (
+                  `Max ${maxSellShares.toFixed(1)} shares`
+                ) : side === "BUY" && hasInsufficientBalance ? (
                   "Insufficient Balance"
-                ) : shares < minShares ? (
+                ) : side === "BUY" && shares < minShares ? (
                   `Minimum shares: ${minShares}`
-                ) : isBelowMarketableBuyMinNotional ? (
+                ) : side === "BUY" && isBelowMarketableBuyMinNotional ? (
                   "Minimum order: $1"
                 ) : (
                   <>
