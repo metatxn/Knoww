@@ -69,7 +69,7 @@ const AccentColorContext = createContext<AccentColorContextType | undefined>(
   undefined
 );
 
-const ACCENT_COLOR_STORAGE_KEY = "polycaster-accent-color";
+const ACCENT_COLOR_STORAGE_KEY = "knoww-accent-color";
 
 export function AccentColorProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColorState] = useState<AccentColor>("default");

@@ -184,7 +184,7 @@ export function Sidebar() {
             <span className="text-xl group-hover:animate-bounce">📊</span>
             {!isCollapsed && (
               <span className="bg-clip-text text-transparent bg-linear-to-r from-gray-900 via-gray-800 to-gray-600 dark:from-foreground dark:via-foreground dark:to-foreground/70 group-hover:from-violet-600 group-hover:to-blue-600 dark:group-hover:from-purple-400 dark:group-hover:to-blue-400 transition-all duration-300">
-                Polycaster
+                Knoww
               </span>
             )}
           </button>

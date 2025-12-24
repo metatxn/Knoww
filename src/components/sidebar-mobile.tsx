@@ -103,7 +103,7 @@ export function SidebarMobile() {
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b">
             <span className="text-xl">📊</span>
-            <SheetTitle className="font-bold text-lg">Polycaster</SheetTitle>
+            <SheetTitle className="font-bold text-lg">Knoww</SheetTitle>
           </div>
 
           {/* Navigation */}

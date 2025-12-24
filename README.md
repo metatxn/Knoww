@@ -1,4 +1,4 @@
-# Polycaster
+# knoww
 
 A **Next.js** prediction markets platform powered by **Polymarket** and **Reown AppKit**, deployable on **Cloudflare Workers**.
 
@@ -102,7 +102,7 @@ pnpm build
 ### Data Flow
 
 ```
-User → Reown AppKit → Wagmi → Polycaster API Routes → Polymarket Gamma API
+User → Reown AppKit → Wagmi → Knoww API Routes → Polymarket Gamma API
 ```
 
 ### Key APIs
@@ -132,7 +132,7 @@ User → Reown AppKit → Wagmi → Polycaster API Routes → Polymarket Gamma A
 ## 📂 Project Structure
 
 ```
-polycaster/
+knoww/
 ├── src/
 │   ├── app/
 │   │   ├── api/              # Next.js API routes
@@ -235,7 +235,7 @@ wrangler login
 
 3. **Configure `wrangler.toml`**
 ```toml
-name = "polycaster"
+name = "knoww"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = ".vercel/output/static"
 

@@ -70,7 +70,7 @@ export function Navbar() {
             className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity"
           >
             <span className="text-xl">📊</span>
-            <span>Polycaster</span>
+            <span>Knoww</span>
           </button>
         </div>
 

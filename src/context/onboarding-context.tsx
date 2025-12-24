@@ -23,7 +23,7 @@ import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 
 // LocalStorage key for tracking completed onboarding
-const ONBOARDING_COMPLETE_KEY = "polycaster_onboarding_complete";
+const ONBOARDING_COMPLETE_KEY = "knoww_onboarding_complete";
 
 /**
  * Check if onboarding is marked as complete for a specific wallet

@@ -359,7 +359,7 @@ function LeaderboardContent() {
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <span className="text-base">📊</span>
-            <span className="font-bold text-foreground">Polycaster</span>
+            <span className="font-bold text-foreground">Knoww</span>
             <span>•</span>
             <span>Powered by Polymarket</span>
           </div>

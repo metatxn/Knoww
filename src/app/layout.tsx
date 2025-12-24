@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Polycaster - Polymarket predictions with Farcaster",
+  title: "Knoww - Polymarket predictions with Farcaster",
   description: "Create and share Polymarket predictions on Farcaster",
 };
 

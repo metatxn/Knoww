@@ -1,10 +1,10 @@
-# Flow Diagram: Polycaster Application
+# Flow Diagram: knoww Application
 
 ## Visual Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    POLYCASTER ARCHITECTURE                       │
+│                        KNOWW ARCHITECTURE                        │
 │                                                                  │
 │  ┌──────────┐        ┌──────────┐        ┌──────────┐         │
 │  │   TAGS   │   →    │  EVENTS  │   →    │ MARKETS  │         │
@@ -416,7 +416,7 @@ Query Cache
 ## File Organization
 
 ```
-polycaster/
+knoww/
 ├── src/
 │   ├── app/
 │   │   ├── api/
