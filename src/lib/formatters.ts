@@ -29,6 +29,25 @@ export function formatCurrency(value: number, showSign = false): string {
 }
 
 /**
+ * Format currency values compactly for large numbers (e.g., $1.2M, $500K)
+ */
+export function formatCurrencyCompact(value: number, showSign = false): string {
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? "-" : value > 0 && showSign ? "+" : "";
+
+  if (absValue >= 1_000_000_000) {
+    return `${sign}$${(absValue / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (absValue >= 1_000_000) {
+    return `${sign}$${(absValue / 1_000_000).toFixed(2)}M`;
+  }
+  if (absValue >= 1_000) {
+    return `${sign}$${(absValue / 1_000).toFixed(2)}K`;
+  }
+  return `${sign}$${absValue.toFixed(2)}`;
+}
+
+/**
  * Format percentage values (e.g., +12.34%)
  */
 export function formatPercent(value: number): string {

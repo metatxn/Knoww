@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ListOrdered, RefreshCw, Trash2 } from "lucide-react";
+import { Coins, ListOrdered, RefreshCw, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatCurrency, formatPrice } from "@/lib/formatters";
 import { EmptyState } from "./empty-state";
 import type { Order } from "./types";
@@ -151,6 +157,25 @@ export function OrdersTable({
                       {order.market.outcome}
                     </span>
                   )}
+                  {order.scoring && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            <Coins className="h-3 w-3" />
+                            <span className="text-[10px] font-bold uppercase">
+                              Scoring
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">
+                            This order is eligible for liquidity rewards.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
               <Button
@@ -234,6 +259,9 @@ export function OrdersTable({
               <TableHead className="text-center min-w-[100px]">
                 Expiration
               </TableHead>
+              <TableHead className="text-center min-w-[80px]">
+                Rewards
+              </TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -315,6 +343,31 @@ export function OrdersTable({
                 </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">
                   {formatExpirationRelative(order.expiration)}
+                </TableCell>
+                <TableCell className="text-center">
+                  {order.scoring ? (
+                    <div className="flex justify-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                              <Coins className="h-3 w-3" />
+                              <span className="text-[10px] font-bold uppercase">
+                                Scoring
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              This order is eligible for liquidity rewards.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground/30">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Button

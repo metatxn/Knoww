@@ -48,6 +48,7 @@ export interface Order {
     icon?: string;
   };
   tokenId: string;
+  scoring?: boolean;
 }
 
 export interface Trade {

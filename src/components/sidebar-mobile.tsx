@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   Copy,
   Cpu,
+  Crown,
   FolderOpen,
   Globe,
   Grid3X3,
@@ -115,7 +116,7 @@ export function SidebarMobile() {
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
                   pathname === "/"
-                    ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
@@ -130,7 +131,7 @@ export function SidebarMobile() {
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
                     pathname === "/portfolio"
-                      ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
+                      ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
@@ -138,11 +139,25 @@ export function SidebarMobile() {
                   Portfolio
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => handleNavigation("/leaderboard")}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                  pathname === "/leaderboard"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                <Crown className="h-5 w-5" />
+                Leaderboard
+              </button>
             </div>
 
             {/* Browse Section */}
             <div className="mt-6">
-              <h3 className="px-3 mb-2 text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+              <h3 className="px-3 mb-2 text-xs font-semibold text-primary uppercase tracking-wider">
                 Browse
               </h3>
               <div className="space-y-0.5">
@@ -156,7 +171,7 @@ export function SidebarMobile() {
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors",
                         isActive
-                          ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium"
+                          ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       )}
                     >

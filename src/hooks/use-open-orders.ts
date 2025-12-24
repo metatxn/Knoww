@@ -20,10 +20,13 @@ export interface OpenOrder {
   status: "LIVE" | "MATCHED" | "CANCELLED";
   createdAt: string;
   expiration: string;
+  scoring?: boolean;
   market?: {
     question: string;
     slug: string;
+    eventSlug: string;
     outcome: string;
+    icon?: string;
   };
 }
 
@@ -130,7 +133,8 @@ function parseExpiration(expiration: string | number | undefined): string {
 export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
   const { address, isConnected } = useConnection();
   const { hasCredentials } = useClobCredentials();
-  const { getOpenOrders, hasProxyWallet, proxyAddress } = useClobClient();
+  const { getOpenOrders, hasProxyWallet, proxyAddress, areOrdersScoring } =
+    useClobClient();
 
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
@@ -189,10 +193,25 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
           })
         );
 
-        // Fetch market info for each unique token ID
+        // Fetch market info and scoring info in parallel
         const uniqueTokenIds = [
           ...new Set(transformedOrders.map((o) => o.tokenId)),
         ];
+        const orderIds = transformedOrders.map((o) => o.id);
+
+        const [marketInfos, scoringInfo] = await Promise.all([
+          Promise.all(
+            uniqueTokenIds.map(async (tokenId) => ({
+              tokenId,
+              info: await fetchMarketInfo(tokenId),
+            }))
+          ),
+          areOrdersScoring(orderIds).catch((err) => {
+            console.error("Failed to fetch scoring info:", err);
+            return {} as Record<string, boolean>;
+          }),
+        ]);
+
         const marketInfoMap = new Map<
           string,
           {
@@ -204,20 +223,17 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
           }
         >();
 
-        // Fetch market info in parallel
-        await Promise.all(
-          uniqueTokenIds.map(async (tokenId) => {
-            const marketInfo = await fetchMarketInfo(tokenId);
-            if (marketInfo) {
-              marketInfoMap.set(tokenId, marketInfo);
-            }
-          })
-        );
+        for (const { tokenId, info } of marketInfos) {
+          if (info) {
+            marketInfoMap.set(tokenId, info);
+          }
+        }
 
-        // Enrich orders with market info
+        // Enrich orders with market info and scoring status
         const enrichedOrders = transformedOrders.map((order) => ({
           ...order,
           market: marketInfoMap.get(order.tokenId) || undefined,
+          scoring: scoringInfo[order.id] || false,
         }));
 
         // Filter by market if specified

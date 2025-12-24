@@ -434,6 +434,44 @@ export function useClobClient() {
     [address]
   );
 
+  /**
+   * Check if an order is scoring for rewards
+   * @see https://docs.polymarket.com/developers/CLOB/orders/check-scoring
+   */
+  const isOrderScoring = useCallback(
+    async (orderId: string): Promise<boolean> => {
+      if (!canTrade) return false;
+      try {
+        const client = await getClient();
+        // SDK uses snake_case: order_id
+        const response = await client.isOrderScoring({ order_id: orderId });
+        return !!response.scoring;
+      } catch (err) {
+        console.error("Failed to check order scoring:", err);
+        return false;
+      }
+    },
+    [canTrade, getClient]
+  );
+
+  /**
+   * Check if multiple orders are scoring for rewards
+   */
+  const areOrdersScoring = useCallback(
+    async (orderIds: string[]): Promise<Record<string, boolean>> => {
+      if (!canTrade || orderIds.length === 0) return {};
+      try {
+        const client = await getClient();
+        // The SDK method might return a dictionary/record of orderId -> scoring
+        return await client.areOrdersScoring({ orderIds });
+      } catch (err) {
+        console.error("Failed to check batch order scoring:", err);
+        return {};
+      }
+    },
+    [canTrade, getClient]
+  );
+
   return {
     // State
     isConnected,
@@ -454,5 +492,7 @@ export function useClobClient() {
     getUsdcBalance,
     getUsdcAllowance,
     getFeeRateBps,
+    isOrderScoring,
+    areOrdersScoring,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Flame, Sparkles, Star, Zap } from "lucide-react";
+import { Activity, Crown, Flame, Sparkles, Star, Zap } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventCard } from "@/components/event-card";
 import { EventFilterBar } from "@/components/event-filter-bar";
@@ -340,14 +341,29 @@ export default function Home() {
             </h1>
           </div>
 
-          {/* Right: Market Count */}
+          {/* Right: Market Count + Leaderboard Button */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-sm">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-sm">
               <span className="font-bold text-foreground">
                 {currentData.events.length}
               </span>
               <span className="text-muted-foreground">active markets</span>
             </div>
+            <Link href="/leaderboard">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50 hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all"
+              >
+                <Crown className="h-4 w-4 text-yellow-500" />
+                <span className="hidden sm:inline font-semibold text-yellow-600 dark:text-yellow-400">
+                  Top Traders
+                </span>
+                <span className="sm:hidden font-semibold text-yellow-600 dark:text-yellow-400">
+                  Top
+                </span>
+              </Button>
+            </Link>
           </div>
         </motion.div>
 
@@ -579,7 +595,7 @@ export default function Home() {
             <span>Powered by Polymarket</span>
           </div>
           <div className="flex items-center gap-4">
-            <span>© 2024</span>
+            <span>© 2025</span>
             <span className="hidden sm:inline">•</span>
             <span className="hidden sm:inline">
               Decentralized & Unstoppable

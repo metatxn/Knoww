@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   Copy,
   Cpu,
+  Crown,
   FolderOpen,
   Globe,
   Landmark,
@@ -125,12 +126,12 @@ export function Sidebar() {
   const displayName = isLoadingProfile
     ? "Loading..."
     : publicProfile?.name && publicProfile.name.length > 0
-      ? publicProfile.name
-      : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
-        ? publicProfile.pseudonym
-        : profileAddress
-          ? formatAddress(profileAddress)
-          : "Connecting...";
+    ? publicProfile.name
+    : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
+    ? publicProfile.pseudonym
+    : profileAddress
+    ? formatAddress(profileAddress)
+    : "Connecting...";
 
   // Get initials for avatar fallback
   const getInitials = (name: string) => {
@@ -208,7 +209,7 @@ export function Sidebar() {
                       "group w-full flex items-center gap-3 py-2.5 text-sm font-bold rounded-xl transition-all duration-300",
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/"
-                        ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
@@ -218,14 +219,14 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/" ? "text-white" : ""
+                        pathname === "/" ? "text-primary-foreground" : ""
                       )}
                     />
                     {!isCollapsed && (
                       <>
                         <span className="flex-1 text-left">All Markets</span>
                         {pathname === "/" && (
-                          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-primary-foreground animate-pulse" />
                         )}
                       </>
                     )}
@@ -251,7 +252,7 @@ export function Sidebar() {
                         "group w-full flex items-center gap-3 py-2.5 text-sm font-bold rounded-xl transition-all duration-300",
                         isCollapsed ? "justify-center px-2" : "px-3",
                         pathname === "/portfolio"
-                          ? "bg-linear-to-r from-violet-500 to-purple-500 text-white shadow-lg shadow-violet-500/20"
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                       )}
                     >
@@ -261,14 +262,16 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          pathname === "/portfolio" ? "text-white" : ""
+                          pathname === "/portfolio"
+                            ? "text-primary-foreground"
+                            : ""
                         )}
                       />
                       {!isCollapsed && (
                         <>
                           <span className="flex-1 text-left">Portfolio</span>
                           {pathname === "/portfolio" && (
-                            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            <span className="w-2 h-2 rounded-full bg-primary-foreground animate-pulse" />
                           )}
                         </>
                       )}
@@ -282,6 +285,50 @@ export function Sidebar() {
                 </Tooltip>
               </li>
             )}
+
+            {/* Leaderboard */}
+            <li>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/leaderboard")}
+                    className={cn(
+                      "group w-full flex items-center gap-3 py-2.5 text-sm font-bold rounded-xl transition-all duration-300",
+                      isCollapsed ? "justify-center px-2" : "px-3",
+                      pathname === "/leaderboard"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
+                    )}
+                  >
+                    <Crown
+                      className={cn(
+                        "transition-transform duration-200 shrink-0",
+                        isCollapsed
+                          ? "h-5 w-5 group-hover:scale-110"
+                          : "h-4 w-4 group-hover:scale-110",
+                        pathname === "/leaderboard"
+                          ? "text-primary-foreground"
+                          : ""
+                      )}
+                    />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">Leaderboard</span>
+                        {pathname === "/leaderboard" && (
+                          <span className="w-2 h-2 rounded-full bg-primary-foreground animate-pulse" />
+                        )}
+                      </>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                {isCollapsed && (
+                  <TooltipContent side="right" sideOffset={10}>
+                    Leaderboard
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </li>
           </ul>
 
           {/* Separator */}
@@ -313,7 +360,7 @@ export function Sidebar() {
                         "group w-full flex items-center gap-2.5 py-2 text-sm rounded-xl transition-all duration-200",
                         isCollapsed ? "justify-center px-2" : "px-3",
                         isActive
-                          ? "bg-linear-to-r from-violet-500 to-purple-500 text-white font-semibold shadow-lg shadow-violet-500/20"
+                          ? "bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30"
                       )}
                     >
@@ -323,7 +370,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          isActive ? "text-white" : ""
+                          isActive ? "text-primary-foreground" : ""
                         )}
                       />
                       {!isCollapsed && (
@@ -332,7 +379,7 @@ export function Sidebar() {
                             {cat.label}
                           </span>
                           {isActive && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
                           )}
                         </>
                       )}
@@ -466,7 +513,7 @@ export function Sidebar() {
               <Button
                 onClick={() => setShowOnboarding(true)}
                 size="sm"
-                className="w-full bg-linear-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-xs h-10 font-bold shadow-lg shadow-violet-500/25 rounded-xl"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-10 font-bold shadow-lg shadow-primary/25 rounded-xl"
               >
                 <Rocket className="mr-1.5 h-4 w-4" />
                 Setup Trading
@@ -483,7 +530,7 @@ export function Sidebar() {
                     className="w-full justify-between h-auto py-2 px-2 rounded-xl hover:bg-muted/60 dark:hover:bg-muted/40"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <Avatar className="h-8 w-8 rounded-xl border-2 border-violet-500/20 shadow-md">
+                      <Avatar className="h-8 w-8 rounded-xl border-2 border-primary/20 shadow-md">
                         {publicProfile?.profileImage ? (
                           <AvatarImage
                             src={publicProfile.profileImage}
@@ -491,7 +538,7 @@ export function Sidebar() {
                             className="object-cover"
                           />
                         ) : null}
-                        <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-xs font-bold">
+                        <AvatarFallback className="rounded-xl bg-primary text-primary-foreground text-xs font-bold">
                           {getInitials(displayName)}
                         </AvatarFallback>
                       </Avatar>
@@ -518,7 +565,7 @@ export function Sidebar() {
                     <>
                       <div className="px-3 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          <Avatar className="h-10 w-10 rounded-xl border-2 border-violet-500/20">
+                          <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/20">
                             {publicProfile.profileImage ? (
                               <AvatarImage
                                 src={publicProfile.profileImage}
@@ -526,7 +573,7 @@ export function Sidebar() {
                                 className="object-cover"
                               />
                             ) : null}
-                            <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-sm font-bold">
+                            <AvatarFallback className="rounded-xl bg-primary text-primary-foreground text-sm font-bold">
                               {getInitials(displayName)}
                             </AvatarFallback>
                           </Avatar>
@@ -583,7 +630,7 @@ export function Sidebar() {
               <Button
                 onClick={() => open()}
                 size="sm"
-                className="w-full h-10 font-bold rounded-xl bg-linear-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-lg shadow-violet-500/20"
+                className="w-full h-10 font-bold rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
               >
                 <Wallet className="mr-2 h-4 w-4" />
                 Connect Wallet
@@ -630,7 +677,7 @@ export function Sidebar() {
                     onClick={() => open()}
                     className="w-full h-10 flex items-center justify-center rounded-xl overflow-hidden"
                   >
-                    <Avatar className="h-10 w-10 rounded-xl border-2 border-violet-500/30 shadow-md">
+                    <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/30 shadow-md">
                       {publicProfile?.profileImage ? (
                         <AvatarImage
                           src={publicProfile.profileImage}
@@ -638,7 +685,7 @@ export function Sidebar() {
                           className="object-cover"
                         />
                       ) : null}
-                      <AvatarFallback className="rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white text-sm font-bold">
+                      <AvatarFallback className="rounded-xl bg-primary text-primary-foreground text-sm font-bold">
                         {getInitials(displayName)}
                       </AvatarFallback>
                     </Avatar>
@@ -659,7 +706,7 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={() => open()}
-                    className="w-full h-10 flex items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-purple-500 text-white shadow-md shadow-violet-500/20"
+                    className="w-full h-10 flex items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20"
                   >
                     <Wallet className="h-4 w-4" />
                   </button>
