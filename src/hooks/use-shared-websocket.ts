@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrderBookStore } from "@/hooks/use-orderbook-store";
+import { filterValidTokenIds } from "@/lib/token-validation";
 import { getWebSocketManager } from "@/lib/websocket-manager";
 import type {
   BookEvent,
@@ -87,7 +88,8 @@ export function useSharedWebSocket(options: UseSharedWebSocketOptions) {
   // Subscribe to events and filter by our asset IDs
   useEffect(() => {
     const manager = getWebSocketManager();
-    const assetIdSet = new Set(assetIds.filter((id) => id && id.length > 10));
+    const validIds = filterValidTokenIds(assetIds);
+    const assetIdSet = new Set(validIds);
 
     if (assetIdSet.size === 0) return;
 

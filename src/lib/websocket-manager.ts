@@ -1,10 +1,18 @@
 "use client";
 
 import { POLYMARKET_API, WEBSOCKET_CONFIG } from "@/constants/polymarket";
+import { filterValidTokenIds } from "@/lib/token-validation";
 import type { ConnectionState, WebSocketEvent } from "@/types/websocket";
 
 /**
  * Singleton WebSocket Manager for Polymarket Market Channel
+ *
+ * Features:
+ * - Single shared connection across all components
+ * - Reference-counted subscriptions
+ * - Automatic reconnection with exponential backoff
+ * - Heartbeat monitoring for connection health
+ * - Graceful cleanup on disconnect
  */
 
 type EventCallback = (event: WebSocketEvent) => void;
@@ -15,6 +23,16 @@ interface Subscription {
   refCount: number;
 }
 
+/**
+ * Heartbeat configuration
+ */
+const HEARTBEAT_CONFIG = {
+  /** Interval between heartbeat checks (30 seconds) */
+  INTERVAL_MS: 30000,
+  /** Time to wait for pong response before considering connection dead (10 seconds) */
+  TIMEOUT_MS: 10000,
+};
+
 class WebSocketManager {
   private static instance: WebSocketManager | null = null;
 
@@ -23,6 +41,9 @@ class WebSocketManager {
   private reconnectAttempt = 0;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatTimeout: NodeJS.Timeout | null = null;
+  private lastPongReceived: number = 0;
+  private awaitingPong: boolean = false;
 
   // Subscriptions with reference counting
   private subscriptions: Map<string, Subscription> = new Map();
@@ -89,7 +110,7 @@ class WebSocketManager {
    * Returns unsubscribe function
    */
   subscribe(assetIds: string[]): () => void {
-    const validIds = assetIds.filter((id) => id && id.length > 10);
+    const validIds = filterValidTokenIds(assetIds);
     if (validIds.length === 0) return () => {};
 
     const newSubscriptions: string[] = [];
@@ -195,11 +216,18 @@ class WebSocketManager {
       };
 
       this.ws.onmessage = (event) => {
-        // Skip non-JSON messages (like PONG heartbeat responses)
+        // Handle non-JSON messages (like PONG heartbeat responses)
         if (typeof event.data === "string") {
-          const msg = event.data.trim();
-          // Skip heartbeat responses and other non-JSON messages
-          if (msg === "PONG" || msg === "pong" || !msg.startsWith("{")) {
+          const msg = event.data.trim().toLowerCase();
+
+          // Handle pong response for heartbeat
+          if (msg === "pong") {
+            this.handlePong();
+            return;
+          }
+
+          // Skip other non-JSON messages
+          if (!event.data.trim().startsWith("{")) {
             return;
           }
         }
@@ -342,21 +370,116 @@ class WebSocketManager {
     }
   }
 
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        // Polymarket may not require explicit pings, but this keeps the connection alive
-        // The interval itself serves to check connection status periodically
-      }
-    }, 30000); // 30 seconds
+  /**
+   * Handle pong response from server
+   */
+  private handlePong(): void {
+    this.lastPongReceived = Date.now();
+    this.awaitingPong = false;
+
+    // Clear the timeout since we got a response
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+
+    console.debug("[WSManager] Heartbeat pong received");
   }
 
+  /**
+   * Send a ping to check connection health
+   */
+  private sendPing(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // If we're still waiting for a pong from the last ping, connection might be dead
+    if (this.awaitingPong) {
+      console.warn(
+        "[WSManager] No pong received for previous ping, connection may be stale"
+      );
+      // Don't immediately reconnect, let the timeout handle it
+    }
+
+    try {
+      // Try sending a ping message
+      // Polymarket WebSocket may respond to "PING" with "PONG"
+      this.ws.send("PING");
+      this.awaitingPong = true;
+
+      // Set a timeout - if we don't get pong within timeout, reconnect
+      this.heartbeatTimeout = setTimeout(() => {
+        if (this.awaitingPong) {
+          console.warn(
+            "[WSManager] Heartbeat timeout - no pong received, reconnecting..."
+          );
+          this.awaitingPong = false;
+          this.reconnect();
+        }
+      }, HEARTBEAT_CONFIG.TIMEOUT_MS);
+    } catch (err) {
+      console.error("[WSManager] Failed to send ping:", err);
+      // Connection is likely broken, trigger reconnect
+      this.reconnect();
+    }
+  }
+
+  /**
+   * Start heartbeat monitoring
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.lastPongReceived = Date.now();
+    this.awaitingPong = false;
+
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.sendPing();
+      }
+    }, HEARTBEAT_CONFIG.INTERVAL_MS);
+
+    console.debug("[WSManager] Heartbeat monitoring started");
+  }
+
+  /**
+   * Stop heartbeat monitoring
+   */
   private stopHeartbeat(): void {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
+
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+
+    this.awaitingPong = false;
+  }
+
+  /**
+   * Get time since last successful heartbeat
+   */
+  getTimeSinceLastHeartbeat(): number {
+    if (this.lastPongReceived === 0) {
+      return Infinity;
+    }
+    return Date.now() - this.lastPongReceived;
+  }
+
+  /**
+   * Check if connection is healthy (received pong recently)
+   */
+  isConnectionHealthy(): boolean {
+    if (!this.isConnected()) {
+      return false;
+    }
+    // Consider unhealthy if no pong in last 2 heartbeat intervals
+    return (
+      this.getTimeSinceLastHeartbeat() < HEARTBEAT_CONFIG.INTERVAL_MS * 2.5
+    );
   }
 }
 

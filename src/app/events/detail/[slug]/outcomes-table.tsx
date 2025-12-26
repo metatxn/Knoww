@@ -86,9 +86,7 @@ interface MarketExpandedContentProps {
   };
   marketOutcomes: { name: string; tokenId: string; price: number }[];
   selectedOutcomeIndex: number;
-  setSelectedMarketId: (val: string) => void;
   setSelectedOutcomeIndex: (val: number) => void;
-  preloadOrderBook: (tokenId: string | undefined) => Promise<void>;
   handlePriceClick: (price: number) => void;
   isSingleMarketEvent: boolean;
   onSellPosition: (position: Position) => void;
@@ -100,9 +98,7 @@ function MarketExpandedContent({
   market,
   marketOutcomes,
   selectedOutcomeIndex,
-  setSelectedMarketId,
   setSelectedOutcomeIndex,
-  preloadOrderBook,
   handlePriceClick,
   isSingleMarketEvent,
   onSellPosition,
@@ -112,16 +108,26 @@ function MarketExpandedContent({
     userPosition ? "position" : "orderbook"
   );
 
-  // Update active tab when userPosition changes (e.g., user gets a position or loses it)
+  // Track previous userPosition to detect changes
+  const [hadPosition, setHadPosition] = useState<boolean>(!!userPosition);
+
+  // Update active tab ONLY when userPosition status changes (appears or disappears)
+  // This allows users to freely switch between tabs while they have a position
   useEffect(() => {
-    if (userPosition && activeTab === "orderbook") {
-      // If user now has a position and we're on orderbook, switch to position
-      setActiveTab("position");
-    } else if (!userPosition && activeTab === "position") {
-      // If user no longer has a position but was on position tab, switch to orderbook
-      setActiveTab("orderbook");
+    const hasPosition = !!userPosition;
+
+    if (hasPosition !== hadPosition) {
+      // Position status changed
+      if (hasPosition && !hadPosition) {
+        // User just got a position - switch to position tab
+        setActiveTab("position");
+      } else if (!hasPosition && hadPosition) {
+        // User just lost their position - switch to orderbook tab
+        setActiveTab("orderbook");
+      }
+      setHadPosition(hasPosition);
     }
-  }, [userPosition, activeTab]);
+  }, [userPosition, hadPosition]);
 
   return (
     <div
@@ -133,12 +139,12 @@ function MarketExpandedContent({
       <div className="overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between px-2 sm:px-6 border-b border-border/50 overflow-x-auto no-scrollbar">
-            <TabsList className="h-auto p-0 bg-transparent gap-0 shrink-0">
+            <TabsList className="h-auto p-0 bg-transparent gap-0 shrink-0 flex">
               {/* Position tab - only show if user has a position */}
               {userPosition && (
                 <TabsTrigger
                   value="position"
-                  className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                  className="h-auto flex-none px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
                 >
                   <User className="h-3.5 w-3.5 mr-2 inline-block" />
                   Position
@@ -146,7 +152,7 @@ function MarketExpandedContent({
               )}
               <TabsTrigger
                 value="orderbook"
-                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium whitespace-nowrap"
+                className="h-auto flex-none px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium whitespace-nowrap"
               >
                 <History className="h-3.5 w-3.5 mr-2 inline-block" />
                 Order Book
@@ -155,7 +161,7 @@ function MarketExpandedContent({
               {!isSingleMarketEvent && (
                 <TabsTrigger
                   value="graph"
-                  className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                  className="h-auto flex-none px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
                 >
                   <LineChart className="h-3.5 w-3.5 mr-2 inline-block" />
                   Graph
@@ -164,14 +170,14 @@ function MarketExpandedContent({
               {/* Top Holders Tab */}
               <TabsTrigger
                 value="holders"
-                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                className="h-auto flex-none px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
               >
                 <Users className="h-3.5 w-3.5 mr-2 inline-block" />
                 Top Holders
               </TabsTrigger>
               <TabsTrigger
                 value="resolution"
-                className="px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
+                className="h-auto flex-none px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs sm:text-sm font-medium"
               >
                 <Info className="h-3.5 w-3.5 mr-2 inline-block" />
                 Resolution
@@ -495,7 +501,7 @@ export function OutcomesTable({
   onSellSuccess,
 }: OutcomesTableProps) {
   const [showClosedMarkets, setShowClosedMarkets] = useState(false);
-  
+
   // Sell position modal state
   const [sellPosition, setSellPosition] = useState<Position | null>(null);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -513,7 +519,9 @@ export function OutcomesTable({
   };
 
   // Convert Position from use-user-positions to portfolio/types Position format
-  const convertToPortfolioPosition = (position: Position | null): PortfolioPosition | null => {
+  const convertToPortfolioPosition = (
+    position: Position | null
+  ): PortfolioPosition | null => {
     if (!position) return null;
     return {
       id: position.id,
@@ -838,9 +846,7 @@ export function OutcomesTable({
                       market={market}
                       marketOutcomes={marketOutcomes}
                       selectedOutcomeIndex={selectedOutcomeIndex}
-                      setSelectedMarketId={setSelectedMarketId}
                       setSelectedOutcomeIndex={setSelectedOutcomeIndex}
-                      preloadOrderBook={preloadOrderBook}
                       handlePriceClick={handlePriceClick}
                       isSingleMarketEvent={isSingleMarketEvent}
                       onSellPosition={handleSellPosition}

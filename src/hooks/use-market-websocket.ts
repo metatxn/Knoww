@@ -1,9 +1,8 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { POLYMARKET_API, WEBSOCKET_CONFIG } from "@/constants/polymarket";
-import type { OrderBookLevel } from "@/types/market";
+import { filterValidTokenIds, isValidTokenId } from "@/lib/token-validation";
 
 import type {
   BookEvent,
@@ -94,7 +93,6 @@ export function useMarketWebSocket(
     onError,
   } = options;
 
-  const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -115,6 +113,9 @@ export function useMarketWebSocket(
   );
 
   // Handle incoming WebSocket messages
+  // Note: This hook only forwards events to callbacks. The Zustand store
+  // (use-orderbook-store.ts) is the single source of truth for order book data.
+  // React Query cache updates have been removed to avoid duplicate state management.
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       try {
@@ -124,127 +125,24 @@ export function useMarketWebSocket(
           case "book": {
             const bookEvent = data as BookEvent;
             onBook?.(bookEvent);
-
-            // Update React Query cache with the new order book
-            queryClient.setQueryData(
-              ["orderBook", bookEvent.asset_id],
-              (oldData: unknown) => ({
-                success: true,
-                tokenID: bookEvent.asset_id,
-                orderBook: {
-                  market: bookEvent.market,
-                  asset_id: bookEvent.asset_id,
-                  timestamp: bookEvent.timestamp,
-                  hash: bookEvent.hash,
-                  bids: bookEvent.bids,
-                  asks: bookEvent.asks,
-                },
-                _source: "websocket",
-                _oldData: oldData,
-              })
-            );
             break;
           }
 
           case "price_change": {
             const priceChangeEvent = data as PriceChangeEvent;
             onPriceChange?.(priceChangeEvent);
-
-            // Update React Query cache for each affected asset
-            for (const change of priceChangeEvent.price_changes) {
-              queryClient.setQueryData(
-                ["orderBook", change.asset_id],
-                (
-                  oldData: {
-                    orderBook?: {
-                      bids?: OrderBookLevel[];
-                      asks?: OrderBookLevel[];
-                    };
-                  } | null
-                ) => {
-                  if (!oldData?.orderBook) return oldData;
-
-                  const { orderBook } = oldData;
-                  const side = change.side === "BUY" ? "bids" : "asks";
-                  const levels = [...(orderBook[side] || [])];
-
-                  // Find and update the price level
-                  const existingIndex = levels.findIndex(
-                    (l) => l.price === change.price
-                  );
-
-                  if (change.size === "0") {
-                    // Remove the level if size is 0
-                    if (existingIndex !== -1) {
-                      levels.splice(existingIndex, 1);
-                    }
-                  } else if (existingIndex !== -1) {
-                    // Update existing level
-                    levels[existingIndex] = {
-                      price: change.price,
-                      size: change.size,
-                    };
-                  } else {
-                    // Add new level
-                    levels.push({ price: change.price, size: change.size });
-                  }
-
-                  // Sort levels (bids descending, asks ascending)
-                  levels.sort((a, b) => {
-                    const priceA = Number.parseFloat(a.price);
-                    const priceB = Number.parseFloat(b.price);
-                    return side === "bids" ? priceB - priceA : priceA - priceB;
-                  });
-
-                  return {
-                    ...oldData,
-                    orderBook: {
-                      ...orderBook,
-                      [side]: levels,
-                    },
-                    _source: "websocket_update",
-                    _lastUpdate: priceChangeEvent.timestamp,
-                  };
-                }
-              );
-
-              // Also update best bid/ask in a separate query for quick access
-              queryClient.setQueryData(["bestPrices", change.asset_id], () => ({
-                bestBid: change.best_bid,
-                bestAsk: change.best_ask,
-                timestamp: priceChangeEvent.timestamp,
-              }));
-            }
             break;
           }
 
           case "last_trade_price": {
             const tradeEvent = data as LastTradePriceEvent;
             onLastTradePrice?.(tradeEvent);
-
-            // Update last trade price in cache
-            queryClient.setQueryData(
-              ["lastTrade", tradeEvent.asset_id],
-              () => ({
-                price: tradeEvent.price,
-                size: tradeEvent.size,
-                side: tradeEvent.side,
-                timestamp: tradeEvent.timestamp,
-              })
-            );
             break;
           }
 
           case "tick_size_change": {
             const tickEvent = data as TickSizeChangeEvent;
             onTickSizeChange?.(tickEvent);
-
-            // Update tick size in cache
-            queryClient.setQueryData(["tickSize", tickEvent.asset_id], () => ({
-              tickSize: tickEvent.new_tick_size,
-              oldTickSize: tickEvent.old_tick_size,
-              timestamp: tickEvent.timestamp,
-            }));
             break;
           }
         }
@@ -256,14 +154,7 @@ export function useMarketWebSocket(
         onError?.(error);
       }
     },
-    [
-      queryClient,
-      onBook,
-      onPriceChange,
-      onLastTradePrice,
-      onTickSizeChange,
-      onError,
-    ]
+    [onBook, onPriceChange, onLastTradePrice, onTickSizeChange, onError]
   );
 
   // Send subscription message
@@ -405,8 +296,8 @@ export function useMarketWebSocket(
   // Subscribe to asset IDs
   const subscribe = useCallback(
     (newAssetIds: string[]) => {
-      const validIds = newAssetIds.filter(
-        (id) => id && id.length > 10 && !subscribedAssetsRef.current.has(id)
+      const validIds = filterValidTokenIds(newAssetIds).filter(
+        (id) => !subscribedAssetsRef.current.has(id)
       );
 
       if (validIds.length === 0) return;
@@ -450,29 +341,33 @@ export function useMarketWebSocket(
     [connectionState, sendSubscription]
   );
 
+  // Filter and memoize valid asset IDs
+  // This prevents unnecessary effect re-runs when array reference changes but content is same
+  const validAssetIds = useMemo(
+    () => filterValidTokenIds(assetIds),
+    [assetIds]
+  );
+
+  // Store validAssetIds in a ref to avoid stale closure issues in effects
+  const validAssetIdsRef = useRef(validAssetIds);
+  validAssetIdsRef.current = validAssetIds;
+
   // Auto-connect and subscribe on mount
   useEffect(() => {
-    if (autoConnect && assetIds.length > 0) {
-      // Filter valid asset IDs (CLOB token IDs are long numeric strings)
-      const validAssetIds = assetIds.filter((id) => id && id.length > 10);
-
-      if (validAssetIds.length > 0) {
-        pendingSubscriptionsRef.current = validAssetIds;
-        connect();
-      }
+    if (autoConnect && validAssetIdsRef.current.length > 0) {
+      pendingSubscriptionsRef.current = [...validAssetIdsRef.current];
+      connect();
     }
 
     return () => {
       disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetIds.filter, assetIds.length, autoConnect, connect, disconnect]);
+  }, [autoConnect, connect, disconnect]);
 
-  // Handle asset ID changes
+  // Handle asset ID changes - re-run when validAssetIds changes
   useEffect(() => {
     if (connectionState !== "connected") return;
 
-    const validAssetIds = assetIds.filter((id) => id && id.length > 10);
     const currentSubscriptions = subscribedAssetsRef.current;
 
     // Find new assets to subscribe
@@ -492,7 +387,7 @@ export function useMarketWebSocket(
     if (toUnsubscribe.length > 0) {
       unsubscribe(toUnsubscribe);
     }
-  }, [assetIds, connectionState, subscribe, unsubscribe]);
+  }, [validAssetIds, connectionState, subscribe, unsubscribe]);
 
   return {
     connectionState,
@@ -517,35 +412,50 @@ export function useMarketOrderBookSubscription(tokenId: string | undefined) {
     bestAsk: string;
   } | null>(null);
 
-  const assetIds = tokenId && tokenId.length > 10 ? [tokenId] : [];
+  // Store tokenId in a ref to avoid stale closure issues in callbacks
+  const tokenIdRef = useRef(tokenId);
+  tokenIdRef.current = tokenId;
+
+  // Memoize asset IDs array to prevent unnecessary re-renders
+  const assetIds = useMemo(
+    () => (isValidTokenId(tokenId) && tokenId ? [tokenId] : []),
+    [tokenId]
+  );
+
+  // Memoize callbacks to prevent unnecessary re-subscriptions
+  const handleBook = useCallback((event: BookEvent) => {
+    if (event.asset_id === tokenIdRef.current) {
+      setOrderBook(event);
+      // Extract best prices from the book
+      const bestBid = event.bids[0]?.price || "0";
+      const bestAsk = event.asks[0]?.price || "1";
+      setBestPrices({ bestBid, bestAsk });
+    }
+  }, []);
+
+  const handlePriceChange = useCallback((event: PriceChangeEvent) => {
+    for (const change of event.price_changes) {
+      if (change.asset_id === tokenIdRef.current) {
+        setBestPrices({
+          bestBid: change.best_bid,
+          bestAsk: change.best_ask,
+        });
+      }
+    }
+  }, []);
+
+  const handleLastTradePrice = useCallback((event: LastTradePriceEvent) => {
+    if (event.asset_id === tokenIdRef.current) {
+      setLastTrade(event);
+    }
+  }, []);
 
   const { connectionState, isConnected } = useMarketWebSocket({
     assetIds,
     autoConnect: assetIds.length > 0,
-    onBook: (event) => {
-      if (event.asset_id === tokenId) {
-        setOrderBook(event);
-        // Extract best prices from the book
-        const bestBid = event.bids[0]?.price || "0";
-        const bestAsk = event.asks[0]?.price || "1";
-        setBestPrices({ bestBid, bestAsk });
-      }
-    },
-    onPriceChange: (event) => {
-      for (const change of event.price_changes) {
-        if (change.asset_id === tokenId) {
-          setBestPrices({
-            bestBid: change.best_bid,
-            bestAsk: change.best_ask,
-          });
-        }
-      }
-    },
-    onLastTradePrice: (event) => {
-      if (event.asset_id === tokenId) {
-        setLastTrade(event);
-      }
-    },
+    onBook: handleBook,
+    onPriceChange: handlePriceChange,
+    onLastTradePrice: handleLastTradePrice,
   });
 
   return {

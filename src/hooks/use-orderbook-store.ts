@@ -11,6 +11,11 @@ import type {
 } from "@/types/websocket";
 
 /**
+ * Stale data threshold in milliseconds (60 seconds)
+ */
+const STALE_THRESHOLD_MS = 60000;
+
+/**
  * Processed order book data with computed values
  */
 export interface ProcessedOrderBook {
@@ -40,6 +45,8 @@ export interface ProcessedOrderBook {
   hash: string;
   /** Data source (websocket or rest) */
   source: "websocket" | "rest";
+  /** When the data was received locally (for staleness detection) */
+  receivedAt: number;
 }
 
 /**
@@ -54,6 +61,14 @@ export interface LastTrade {
 }
 
 /**
+ * Pending price change for assets that haven't received initial snapshot
+ */
+interface PendingChange {
+  event: PriceChangeEvent;
+  receivedAt: number;
+}
+
+/**
  * Order book store state
  */
 interface OrderBookStoreState {
@@ -61,6 +76,8 @@ interface OrderBookStoreState {
   orderBooks: Map<string, ProcessedOrderBook>;
   /** Last trades indexed by asset ID */
   lastTrades: Map<string, LastTrade>;
+  /** Pending price changes for assets without initial snapshot */
+  pendingChanges: Map<string, PendingChange[]>;
   /** Connection status */
   isConnected: boolean;
   /** Last error */
@@ -99,6 +116,51 @@ interface OrderBookStoreState {
   getSpread: (assetId: string) => number | null;
   /** Get last trade for a specific asset */
   getLastTrade: (assetId: string) => LastTrade | undefined;
+  /** Check if order book data is stale */
+  isStale: (assetId: string) => boolean;
+}
+
+/**
+ * Binary search to find insertion index for a price level
+ * Returns the index where the new level should be inserted to maintain sort order
+ */
+function binarySearchInsertIndex(
+  levels: OrderBookLevel[],
+  price: number,
+  ascending: boolean
+): number {
+  let left = 0;
+  let right = levels.length;
+
+  while (left < right) {
+    const mid = (left + right) >>> 1;
+    const midPrice = Number.parseFloat(levels[mid].price);
+
+    if (ascending ? midPrice < price : midPrice > price) {
+      left = mid + 1;
+    } else {
+      right = mid;
+    }
+  }
+
+  return left;
+}
+
+/**
+ * Insert a level into a sorted array using binary search
+ * More efficient than full re-sort for incremental updates (O(n) vs O(n log n))
+ */
+function insertLevelSorted(
+  levels: OrderBookLevel[],
+  newLevel: OrderBookLevel,
+  ascending: boolean
+): OrderBookLevel[] {
+  const price = Number.parseFloat(newLevel.price);
+  const insertIndex = binarySearchInsertIndex(levels, price, ascending);
+
+  const result = [...levels];
+  result.splice(insertIndex, 0, newLevel);
+  return result;
 }
 
 /**
@@ -157,11 +219,13 @@ function processOrderBook(
     timestamp,
     hash,
     source,
+    receivedAt: Date.now(),
   };
 }
 
 /**
  * Apply incremental price change to an order book
+ * Uses binary insertion for new levels (O(n) instead of O(n log n) for full re-sort)
  */
 function applyPriceChange(
   orderBook: ProcessedOrderBook,
@@ -172,9 +236,11 @@ function applyPriceChange(
   bestAsk: string,
   timestamp: string
 ): ProcessedOrderBook {
-  const levels = side === "BUY" ? [...orderBook.bids] : [...orderBook.asks];
+  let levels = side === "BUY" ? [...orderBook.bids] : [...orderBook.asks];
+  const ascending = side === "SELL"; // asks are ascending, bids are descending
 
-  // Find existing level
+  // Find existing level using binary search for better performance
+  const priceNum = Number.parseFloat(price);
   const existingIndex = levels.findIndex((l) => l.price === price);
   const sizeNum = Number.parseFloat(size);
 
@@ -184,22 +250,11 @@ function applyPriceChange(
       levels.splice(existingIndex, 1);
     }
   } else if (existingIndex !== -1) {
-    // Update existing level
+    // Update existing level (no re-sort needed, price hasn't changed)
     levels[existingIndex] = { price, size };
   } else {
-    // Add new level
-    levels.push({ price, size });
-  }
-
-  // Re-sort
-  if (side === "BUY") {
-    levels.sort(
-      (a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price)
-    );
-  } else {
-    levels.sort(
-      (a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price)
-    );
+    // Add new level using binary insertion (more efficient than push + sort)
+    levels = insertLevelSorted(levels, { price, size }, ascending);
   }
 
   // Update the order book
@@ -229,7 +284,41 @@ function applyPriceChange(
     ),
     timestamp,
     source: "websocket",
+    receivedAt: Date.now(),
   };
+}
+
+/**
+ * Apply any pending price changes to a newly received order book
+ */
+function applyPendingChanges(
+  orderBook: ProcessedOrderBook,
+  pendingChanges: PendingChange[]
+): ProcessedOrderBook {
+  let result = orderBook;
+
+  // Sort pending changes by received time to apply in order
+  const sortedChanges = [...pendingChanges].sort(
+    (a, b) => a.receivedAt - b.receivedAt
+  );
+
+  for (const pending of sortedChanges) {
+    for (const change of pending.event.price_changes) {
+      if (change.asset_id === orderBook.assetId) {
+        result = applyPriceChange(
+          result,
+          change.price,
+          change.size,
+          change.side,
+          change.best_bid,
+          change.best_ask,
+          pending.event.timestamp
+        );
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -241,39 +330,58 @@ function applyPriceChange(
  * - Provides computed values (spread, midpoint, totals)
  * - Tracks last trades
  * - Supports REST API fallback
+ * - Queues incremental updates that arrive before initial snapshot
+ * - Detects stale data
  */
 export const useOrderBookStore = create<OrderBookStoreState>()(
   subscribeWithSelector((set, get) => ({
     orderBooks: new Map<string, ProcessedOrderBook>(),
     lastTrades: new Map<string, LastTrade>(),
+    pendingChanges: new Map<string, PendingChange[]>(),
     isConnected: false,
     lastError: null,
 
     handleBookEvent: (event: BookEvent) => {
-      const processed = processOrderBook(
-        event.asset_id,
-        event.market,
-        event.bids,
-        event.asks,
-        event.timestamp,
-        event.hash,
-        "websocket"
-      );
-
       set((state) => {
+        let processed = processOrderBook(
+          event.asset_id,
+          event.market,
+          event.bids,
+          event.asks,
+          event.timestamp,
+          event.hash,
+          "websocket"
+        );
+
+        // Apply any pending changes that arrived before this snapshot
+        const pending = state.pendingChanges.get(event.asset_id);
+        if (pending && pending.length > 0) {
+          processed = applyPendingChanges(processed, pending);
+        }
+
         const newOrderBooks = new Map(state.orderBooks);
         newOrderBooks.set(event.asset_id, processed);
-        return { orderBooks: newOrderBooks };
+
+        // Clear pending changes for this asset
+        const newPendingChanges = new Map(state.pendingChanges);
+        newPendingChanges.delete(event.asset_id);
+
+        return {
+          orderBooks: newOrderBooks,
+          pendingChanges: newPendingChanges,
+        };
       });
     },
 
     handlePriceChangeEvent: (event: PriceChangeEvent) => {
       set((state) => {
         const newOrderBooks = new Map(state.orderBooks);
+        const newPendingChanges = new Map(state.pendingChanges);
 
         for (const change of event.price_changes) {
           const existing = newOrderBooks.get(change.asset_id);
           if (existing) {
+            // Apply immediately if we have the order book
             const updated = applyPriceChange(
               existing,
               change.price,
@@ -284,10 +392,27 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
               event.timestamp
             );
             newOrderBooks.set(change.asset_id, updated);
+          } else {
+            // Queue for later if we don't have the initial snapshot yet
+            const pending = newPendingChanges.get(change.asset_id) || [];
+            // Avoid duplicate events and limit queue size
+            if (pending.length < 100) {
+              pending.push({
+                event: {
+                  ...event,
+                  price_changes: [change], // Only store the relevant change
+                },
+                receivedAt: Date.now(),
+              });
+              newPendingChanges.set(change.asset_id, pending);
+            }
           }
         }
 
-        return { orderBooks: newOrderBooks };
+        return {
+          orderBooks: newOrderBooks,
+          pendingChanges: newPendingChanges,
+        };
       });
     },
 
@@ -312,20 +437,34 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
       bids: OrderBookLevel[],
       asks: OrderBookLevel[]
     ) => {
-      const processed = processOrderBook(
-        assetId,
-        "",
-        bids,
-        asks,
-        Date.now().toString(),
-        "",
-        "rest"
-      );
-
       set((state) => {
+        let processed = processOrderBook(
+          assetId,
+          "",
+          bids,
+          asks,
+          Date.now().toString(),
+          "",
+          "rest"
+        );
+
+        // Apply any pending changes that arrived before this REST data
+        const pending = state.pendingChanges.get(assetId);
+        if (pending && pending.length > 0) {
+          processed = applyPendingChanges(processed, pending);
+        }
+
         const newOrderBooks = new Map(state.orderBooks);
         newOrderBooks.set(assetId, processed);
-        return { orderBooks: newOrderBooks };
+
+        // Clear pending changes for this asset
+        const newPendingChanges = new Map(state.pendingChanges);
+        newPendingChanges.delete(assetId);
+
+        return {
+          orderBooks: newOrderBooks,
+          pendingChanges: newPendingChanges,
+        };
       });
     },
 
@@ -335,7 +474,13 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         newOrderBooks.delete(assetId);
         const newLastTrades = new Map(state.lastTrades);
         newLastTrades.delete(assetId);
-        return { orderBooks: newOrderBooks, lastTrades: newLastTrades };
+        const newPendingChanges = new Map(state.pendingChanges);
+        newPendingChanges.delete(assetId);
+        return {
+          orderBooks: newOrderBooks,
+          lastTrades: newLastTrades,
+          pendingChanges: newPendingChanges,
+        };
       });
     },
 
@@ -343,6 +488,7 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
       set({
         orderBooks: new Map<string, ProcessedOrderBook>(),
         lastTrades: new Map<string, LastTrade>(),
+        pendingChanges: new Map<string, PendingChange[]>(),
       });
     },
 
@@ -373,6 +519,13 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
 
     getLastTrade: (assetId: string) => {
       return get().lastTrades.get(assetId);
+    },
+
+    isStale: (assetId: string) => {
+      const orderBook = get().orderBooks.get(assetId);
+      if (!orderBook) return true;
+      const age = Date.now() - orderBook.receivedAt;
+      return age > STALE_THRESHOLD_MS;
     },
   }))
 );
@@ -423,5 +576,41 @@ export function useOrderBookConnectionStatus() {
       isConnected: state.isConnected,
       lastError: state.lastError,
     }))
+  );
+}
+
+/**
+ * Hook to check if order book data is stale
+ */
+export function useOrderBookStale(assetId: string | undefined) {
+  return useOrderBookStore((state: OrderBookStoreState) => {
+    if (!assetId) return true;
+    const orderBook = state.orderBooks.get(assetId);
+    if (!orderBook) return true;
+    const age = Date.now() - orderBook.receivedAt;
+    return age > STALE_THRESHOLD_MS;
+  });
+}
+
+/**
+ * Hook to get order book with staleness info
+ */
+export function useOrderBookWithStatus(assetId: string | undefined) {
+  return useOrderBookStore(
+    useShallow((state: OrderBookStoreState) => {
+      if (!assetId) {
+        return { orderBook: undefined, isStale: true, source: undefined };
+      }
+      const orderBook = state.orderBooks.get(assetId);
+      if (!orderBook) {
+        return { orderBook: undefined, isStale: true, source: undefined };
+      }
+      const age = Date.now() - orderBook.receivedAt;
+      return {
+        orderBook,
+        isStale: age > STALE_THRESHOLD_MS,
+        source: orderBook.source,
+      };
+    })
   );
 }

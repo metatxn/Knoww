@@ -32,6 +32,10 @@ import {
   type ConnectionState,
   useOrderBookWebSocket,
 } from "@/hooks/use-shared-websocket";
+import {
+  isValidTokenId,
+  isValidTokenIdForRest,
+} from "@/lib/token-validation";
 import { cn } from "@/lib/utils";
 
 /**
@@ -238,9 +242,10 @@ export function OrderBook({
 
   const currentOutcome = outcomes[selectedOutcome];
   const tokenId = currentOutcome?.tokenId || "";
-  // Polymarket `token_id` values are commonly numeric strings and may be short.
-  // Any non-empty tokenId is valid for REST + WS subscriptions.
-  const isValidTokenId = Boolean(tokenId);
+  // Use standardized validation for REST API (more lenient)
+  const isTokenValidForRest = isValidTokenIdForRest(tokenId);
+  // Use stricter validation for WebSocket subscriptions
+  const isTokenValidForWs = isValidTokenId(tokenId);
 
   // Handle outcome tab change
   const handleOutcomeChange = useCallback(
@@ -270,26 +275,26 @@ export function OrderBook({
     queryFn: () => fetchOrderBook(tokenId),
     staleTime: 30000, // Consider data fresh for 30s
     gcTime: 60000, // Keep in cache for 60s (prevents refetch on tab switch)
-    enabled: isValidTokenId, // Always fetch if token is valid
+    enabled: isTokenValidForRest, // Always fetch if token is valid for REST
   });
 
   // STEP 2: Seed the store with REST data when it arrives
   // This ensures we have data to show immediately
   useEffect(() => {
-    if (restOrderBook && isValidTokenId) {
+    if (restOrderBook && isTokenValidForRest) {
       setOrderBookFromRest(
         tokenId,
         restOrderBook.bids || [],
         restOrderBook.asks || []
       );
     }
-  }, [restOrderBook, tokenId, isValidTokenId, setOrderBookFromRest]);
+  }, [restOrderBook, tokenId, isTokenValidForRest, setOrderBookFromRest]);
 
   // STEP 3: Connect to shared WebSocket for real-time incremental updates
   // Uses singleton manager - only ONE connection shared across all OrderBook components
   const assetIds = useMemo(
-    () => (isValidTokenId && useWebSocket ? [tokenId] : []),
-    [isValidTokenId, useWebSocket, tokenId]
+    () => (isTokenValidForWs && useWebSocket ? [tokenId] : []),
+    [isTokenValidForWs, useWebSocket, tokenId]
   );
   const { connectionState } = useOrderBookWebSocket(assetIds);
 
@@ -455,7 +460,7 @@ export function OrderBook({
       )}
 
       {/* No Token ID */}
-      {!isValidTokenId && !isLoading && !error && (
+      {!isTokenValidForRest && !isLoading && !error && (
         <div className="text-center py-8 text-muted-foreground text-sm">
           Select an outcome to view order book
         </div>
@@ -733,12 +738,13 @@ export function OrderBookCompact({
   onPriceClick?: (price: number, side: "BUY" | "SELL") => void;
   useWebSocket?: boolean;
 }) {
-  const isValidTokenId = Boolean(tokenId && tokenId.length > 10);
+  const isTokenValid = isValidTokenId(tokenId);
+  const isTokenValidRest = isValidTokenIdForRest(tokenId);
 
   // WebSocket connection (uses shared singleton manager)
   const assetIds = useMemo(
-    () => (isValidTokenId && useWebSocket ? [tokenId] : []),
-    [isValidTokenId, useWebSocket, tokenId]
+    () => (isTokenValid && useWebSocket ? [tokenId] : []),
+    [isTokenValid, useWebSocket, tokenId]
   );
   const { isConnected } = useOrderBookWebSocket(assetIds);
 
@@ -751,7 +757,7 @@ export function OrderBookCompact({
     queryFn: () => fetchOrderBook(tokenId),
     refetchInterval: !isConnected ? 10000 : false,
     staleTime: 5000,
-    enabled: isValidTokenId && (!useWebSocket || !isConnected),
+    enabled: isTokenValidRest && (!useWebSocket || !isConnected),
   });
 
   // Use WebSocket data if available
