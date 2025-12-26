@@ -1,6 +1,6 @@
-# knoww
+# Knoww
 
-A **Next.js** prediction markets platform powered by **Polymarket** and **Reown AppKit**, deployable on **Cloudflare Workers**.
+A **Next.js** prediction markets platform to **Know your Odds**, powered by **Polymarket**.
 
 ## 🎯 Features
 
@@ -44,6 +44,7 @@ NEXT_PUBLIC_REOWN_PROJECT_ID=your_project_id_here
 ```
 
 **Get your Reown Project ID:**
+
 1. Go to [https://cloud.reown.com/](https://cloud.reown.com/)
 2. Create a new project
 3. Copy your Project ID
@@ -65,22 +66,26 @@ pnpm build
 ## 📱 User Flow
 
 ### Home Page (Default: Trending)
+
 1. User lands on home page
 2. Sees **Trending** events by default (highest volume markets)
 3. Can switch to **Breaking** (last 7 days) or **New** (today's events)
 4. Can browse **All Categories** (Politics, Sports, Finance, etc.)
 
 ### Browse by Category
+
 1. Click a category from navbar or home page
 2. View all markets in that category (e.g., Sports)
 3. Markets fetched using tag-based filtering
 
 ### View Event Detail
+
 1. Click any event card
 2. See event details, stats, and all related markets
 3. Click a market to view trading interface
 
 ### Market Detail
+
 1. View market question and description
 2. See price chart with historical data
 3. View outcome prices and volume
@@ -89,6 +94,7 @@ pnpm build
 ## 🏗️ Architecture
 
 ### Frontend Stack
+
 - **Next.js 15** - App Router with React Server Components
 - **Reown AppKit** - Wallet connection and authentication
 - **Wagmi** - React hooks for Ethereum
@@ -108,22 +114,27 @@ User → Reown AppKit → Wagmi → Knoww API Routes → Polymarket Gamma API
 ### Key APIs
 
 1. **Trending Events** - `/api/events/trending`
+
    - Fetches high-volume events
    - Sorted by volume descending
 
 2. **New Events** - `/api/events/new`
+
    - Fetches events created today
    - Dynamic date calculation
 
 3. **Breaking Events** - `/api/events/breaking`
+
    - Fetches recent high-volume events (last 7 days)
    - Ideal for breaking news markets
 
 4. **Category Markets** - `/api/markets/by-tag`
+
    - 2-step process: Slug → Tag ID → Markets
    - Efficient filtering by category
 
 5. **Event Detail** - `/api/events/[id]`
+
    - Full event data with all markets
 
 6. **Market Detail** - `/api/markets/[id]`
@@ -188,22 +199,26 @@ knoww/
 ## 🎨 UI/UX Features
 
 ### Home Page
+
 - **Dynamic Views**: Trending (default), Breaking, New, All Categories
 - **Instant Switching**: Pre-fetched data for zero-delay transitions
 - **Event Cards**: Images, volume, market count, hover animations
 - **Responsive Grid**: 1-3 columns based on screen size
 
 ### Navigation
+
 - **Navbar**: Category links, wallet connection, account dropdown
 - **Smart Back Buttons**: Use browser history (`router.back()`)
 - **Breadcrumbs**: Clear navigation hierarchy
 
 ### Loading States
+
 - **Skeleton Loaders**: Match actual content layout
 - **Staggered Animations**: Cards fade in with 50ms delays
 - **Progress Indicators**: Loading spinners for async operations
 
 ### Animations
+
 - **Framer Motion**: Smooth page transitions
 - **Hover Effects**: Cards lift and scale on hover
 - **Fade Ins**: Content appears with opacity transitions
@@ -211,11 +226,13 @@ knoww/
 ## 🔐 Security & Privacy
 
 ### Non-Custodial
+
 - **No Private Keys** - Users control their own wallets
 - **Client-Side Signing** - All transactions signed in browser
 - **Reown AppKit** - Secure wallet connection protocol
 
 ### Environment Variables
+
 - `NEXT_PUBLIC_*` - Exposed to browser (safe for client-side)
 - Server-only vars - Never exposed to client
 
@@ -224,16 +241,19 @@ knoww/
 ### Cloudflare Workers
 
 1. **Install Wrangler CLI**
+
 ```bash
 pnpm install -g wrangler
 ```
 
 2. **Login to Cloudflare**
+
 ```bash
 wrangler login
 ```
 
 3. **Configure `wrangler.toml`**
+
 ```toml
 name = "knoww"
 compatibility_date = "2024-01-01"
@@ -244,6 +264,7 @@ vars = { ENVIRONMENT = "production" }
 ```
 
 4. **Deploy**
+
 ```bash
 pnpm run deploy
 ```
@@ -251,6 +272,7 @@ pnpm run deploy
 ### Environment Variables in Production
 
 Set in Cloudflare Workers dashboard:
+
 - `NEXT_PUBLIC_REOWN_PROJECT_ID`
 - `POLY_BUILDER_API_KEY` (optional, for future trading)
 - `POLY_BUILDER_SECRET` (optional)
@@ -311,6 +333,7 @@ Markets (Individual Tradeable Questions)
 ```
 
 Example:
+
 ```
 Tag: "Sports" (slug: sports, id: 1)
     ↓
@@ -322,6 +345,7 @@ Market: "Will the Buffalo Bills win Super Bowl 2026?" (id: 540208)
 ## 🎯 Roadmap
 
 ### Current Features
+
 - ✅ Wallet connection via Reown AppKit
 - ✅ Browse markets by category
 - ✅ View event details
@@ -329,17 +353,18 @@ Market: "Will the Buffalo Bills win Super Bowl 2026?" (id: 540208)
 - ✅ Trending, Breaking, New event feeds
 
 ### Coming Soon
+
 - 🔄 **Trading Interface** - Buy/Sell orders with wallet integration
 - 🔄 **Order Management** - View and cancel open orders
 - 🔄 **Portfolio View** - Track positions and P&L
 - 🔄 **Real-time Updates** - WebSocket integration
 - 🔄 **Search & Filters** - Find specific markets
 - 🔄 **Notifications** - Market alerts and updates
-- 🔄 **Farcaster Integration** - Share predictions
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these guidelines:
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes

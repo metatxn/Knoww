@@ -34,8 +34,10 @@ export interface ProxyWalletData {
 
 /**
  * Fetch wallet data helper
+ * @param eoaAddress - The EOA address to derive the proxy wallet from
+ * @param skipCache - If true, bypass the RPC cache for fresh data
  */
-async function fetchWalletData(eoaAddress: string) {
+async function fetchWalletData(eoaAddress: string, skipCache = false) {
   // Step 1: Derive the Safe address using CREATE2 formula
   // This is deterministic - same EOA always produces same Safe address
   const { getCreate2Address, keccak256, encodeAbiParameters } = await import(
@@ -71,7 +73,8 @@ async function fetchWalletData(eoaAddress: string) {
   }
 
   // Step 3: Safe is deployed - fetch USDC balance
-  const usdcBalance = await rpcFetchUsdcBalance(proxyAddress);
+  // Pass skipCache to bypass RPC cache when needed (e.g., after placing an order)
+  const usdcBalance = await rpcFetchUsdcBalance(proxyAddress, { skipCache });
 
   return {
     proxyAddress,
@@ -96,24 +99,44 @@ export function useProxyWallet() {
   });
 
   /**
-   * Refresh proxy wallet data
+   * Refresh proxy wallet data - clears RPC cache and refetches
+   * This should be called after any transaction that changes the balance
    */
   const refresh = useCallback(async () => {
-    return queryClient.invalidateQueries({
+    // Clear the RPC-level cache first
+    if (query.data?.proxyAddress) {
+      clearBalanceCache(query.data.proxyAddress);
+    }
+    
+    // Then invalidate and refetch the React Query cache
+    await queryClient.invalidateQueries({
       queryKey: [PROXY_WALLET_QUERY_KEY, address],
     });
-  }, [queryClient, address]);
+    
+    // Force a refetch to get fresh data
+    return queryClient.refetchQueries({
+      queryKey: [PROXY_WALLET_QUERY_KEY, address],
+    });
+  }, [queryClient, address, query.data?.proxyAddress]);
 
   /**
-   * Force refresh with cache clearing
+   * Force refresh with full cache clearing (deployment + balance)
    */
   const forceRefresh = useCallback(async () => {
     if (query.data?.proxyAddress) {
       clearDeploymentCache(query.data.proxyAddress);
       clearBalanceCache(query.data.proxyAddress);
     }
-    return refresh();
-  }, [query.data?.proxyAddress, refresh]);
+    
+    // Invalidate and refetch
+    await queryClient.invalidateQueries({
+      queryKey: [PROXY_WALLET_QUERY_KEY, address],
+    });
+    
+    return queryClient.refetchQueries({
+      queryKey: [PROXY_WALLET_QUERY_KEY, address],
+    });
+  }, [queryClient, address, query.data?.proxyAddress]);
 
   return {
     proxyAddress: query.data?.proxyAddress ?? null,

@@ -1,4 +1,4 @@
-# Flow Diagram: knoww Application
+# Flow Diagram: Knoww Application
 
 ## Visual Overview
 

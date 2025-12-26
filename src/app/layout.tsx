@@ -18,8 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Knoww - Polymarket predictions with Farcaster",
-  description: "Create and share Polymarket predictions on Farcaster",
+  title: "Knoww - Know your Odds",
+  description: "Know your Odds",
 };
 
 export default async function RootLayout({

@@ -44,8 +44,8 @@ if (!projectId) {
 
 // Set up metadata
 const metadata = {
-  name: "knoww",
-  description: "Polymarket predictions with Farcaster",
+  name: "Knoww",
+  description: "Know your Odds",
   url: "https://knoww.app", // origin must match your domain & subdomain
   icons: ["https://avatars.githubusercontent.com/u/179229932"],
 };

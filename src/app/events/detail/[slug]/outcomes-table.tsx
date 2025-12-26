@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { OrderBook } from "@/components/order-book";
 import { OrderBookInline } from "@/components/order-book-summary";
+import { SellPositionModal } from "@/components/portfolio/sell-position-modal";
+import type { Position as PortfolioPosition } from "@/components/portfolio/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -66,6 +68,7 @@ interface OutcomesTableProps {
   }) => Position | null;
   handlePriceClick: (price: number) => void;
   isSingleMarketEvent: boolean;
+  onSellSuccess?: () => void;
 }
 
 interface MarketExpandedContentProps {
@@ -79,6 +82,7 @@ interface MarketExpandedContentProps {
     noPrice: string;
     conditionId: string;
     groupItemTitle: string;
+    image?: string;
   };
   marketOutcomes: { name: string; tokenId: string; price: number }[];
   selectedOutcomeIndex: number;
@@ -87,6 +91,7 @@ interface MarketExpandedContentProps {
   preloadOrderBook: (tokenId: string | undefined) => Promise<void>;
   handlePriceClick: (price: number) => void;
   isSingleMarketEvent: boolean;
+  onSellPosition: (position: Position) => void;
 }
 
 function MarketExpandedContent({
@@ -100,6 +105,7 @@ function MarketExpandedContent({
   preloadOrderBook,
   handlePriceClick,
   isSingleMarketEvent,
+  onSellPosition,
 }: MarketExpandedContentProps) {
   // Use controlled tab state to ensure proper default selection
   const [activeTab, setActiveTab] = useState<string>(
@@ -252,13 +258,7 @@ function MarketExpandedContent({
                   className="shrink-0 w-full sm:w-auto font-bold shadow-lg shadow-rose-500/20 transition-all active:scale-95"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedMarketId(market.id);
-                    const outcomeIdx =
-                      userPosition.outcome.toLowerCase() === "yes" ? 0 : 1;
-                    setSelectedOutcomeIndex(outcomeIdx);
-                    void preloadOrderBook(
-                      outcomeIdx === 0 ? market.yesTokenId : market.noTokenId
-                    );
+                    onSellPosition(userPosition);
                   }}
                 >
                   <span className="hidden lg:inline">Sell Position</span>
@@ -492,8 +492,50 @@ export function OutcomesTable({
   getMarketPosition,
   handlePriceClick,
   isSingleMarketEvent,
+  onSellSuccess,
 }: OutcomesTableProps) {
   const [showClosedMarkets, setShowClosedMarkets] = useState(false);
+  
+  // Sell position modal state
+  const [sellPosition, setSellPosition] = useState<Position | null>(null);
+  const [showSellModal, setShowSellModal] = useState(false);
+
+  // Handle sell position - opens the modal
+  const handleSellPosition = (position: Position) => {
+    setSellPosition(position);
+    setShowSellModal(true);
+  };
+
+  // Handle sell success - close modal and trigger refresh
+  const handleSellSuccess = () => {
+    onSellSuccess?.();
+    setSellPosition(null);
+  };
+
+  // Convert Position from use-user-positions to portfolio/types Position format
+  const convertToPortfolioPosition = (position: Position | null): PortfolioPosition | null => {
+    if (!position) return null;
+    return {
+      id: position.id,
+      outcome: position.outcome,
+      size: position.size,
+      avgPrice: position.avgPrice,
+      currentPrice: position.currentPrice,
+      currentValue: position.currentValue,
+      initialValue: position.initialValue,
+      unrealizedPnl: position.unrealizedPnl,
+      unrealizedPnlPercent: position.unrealizedPnlPercent,
+      asset: position.asset,
+      conditionId: position.conditionId,
+      market: {
+        title: position.market.title,
+        slug: position.market.slug,
+        eventSlug: position.market.eventSlug,
+        icon: position.market.icon,
+        endDate: position.market.endDate,
+      },
+    };
+  };
   return (
     <Collapsible
       open={isOutcomeTableExpanded}
@@ -801,6 +843,7 @@ export function OutcomesTable({
                       preloadOrderBook={preloadOrderBook}
                       handlePriceClick={handlePriceClick}
                       isSingleMarketEvent={isSingleMarketEvent}
+                      onSellPosition={handleSellPosition}
                     />
                   </div>
                 );
@@ -901,6 +944,14 @@ export function OutcomesTable({
           </CardContent>
         </CollapsibleContent>
       </Card>
+
+      {/* Sell Position Modal */}
+      <SellPositionModal
+        open={showSellModal}
+        onOpenChange={setShowSellModal}
+        position={convertToPortfolioPosition(sellPosition)}
+        onSellSuccess={handleSellSuccess}
+      />
     </Collapsible>
   );
 }

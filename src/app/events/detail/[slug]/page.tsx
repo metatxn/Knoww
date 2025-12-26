@@ -136,13 +136,31 @@ export default function EventDetailPage() {
   } = useEventDetail(eventSlugOrId);
 
   // Fetch user positions to show "You have a position" indicator
-  const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
+  const { proxyAddress, isDeployed: hasProxyWallet, refresh: refreshProxyWallet } = useProxyWallet();
   const tradingAddress =
     hasProxyWallet && proxyAddress ? proxyAddress : undefined;
-  const { data: positionsData } = useUserPositions({
+  const { data: positionsData, refetch: refetchPositions } = useUserPositions({
     userAddress: tradingAddress,
     enabled: !!tradingAddress,
   });
+
+  // Handle sell success - refresh positions and wallet balance
+  const handleSellSuccess = useCallback(() => {
+    // Immediate refetch
+    refetchPositions();
+    refreshProxyWallet();
+
+    // Multiple delayed refetches to catch backend updates
+    const refetchAll = () => {
+      refetchPositions();
+      refreshProxyWallet();
+    };
+
+    // Refetch at 1s, 3s, and 5s to catch the update
+    setTimeout(refetchAll, 1000);
+    setTimeout(refetchAll, 3000);
+    setTimeout(refetchAll, 5000);
+  }, [refetchPositions, refreshProxyWallet]);
 
   // Build position lookup maps for fast matching
   const { positionsByConditionId, positionsByAsset } = useMemo(() => {
@@ -864,6 +882,7 @@ export default function EventDetailPage() {
                 getMarketPosition={getMarketPosition}
                 handlePriceClick={handlePriceClick}
                 isSingleMarketEvent={isSingleMarketEvent}
+                onSellSuccess={handleSellSuccess}
               />
             </ErrorBoundary>
           </div>

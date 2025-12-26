@@ -344,33 +344,42 @@ export function useTradingFormState({
         onOrderSuccess?.(result.order);
         setShares(initialShares ?? 10);
         if (proxyAddress) {
+          // Clear the RPC-level balance cache FIRST before any refetching
           clearBalanceCache(proxyAddress);
 
-          // Immediate invalidation and refetch
+          // Invalidate all related queries
           await Promise.all([
+            // Use exact query key match for proxy wallet (includes address)
             queryClient.invalidateQueries({
               queryKey: [PROXY_WALLET_QUERY_KEY],
+              exact: false, // Match all queries starting with this key
             }),
             queryClient.invalidateQueries({ queryKey: ["usdcBalance"] }),
             queryClient.invalidateQueries({ queryKey: ["userPositions"] }),
             queryClient.invalidateQueries({ queryKey: ["openOrders"] }),
           ]);
 
-          // Immediate refetch
+          // Immediate refetch after cache is cleared
           await Promise.all([
-            queryClient.refetchQueries({ queryKey: ["userPositions"] }),
-            queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY] }),
+            queryClient.refetchQueries({
+              queryKey: [PROXY_WALLET_QUERY_KEY],
+              exact: false,
+            }),
             queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+            queryClient.refetchQueries({ queryKey: ["userPositions"] }),
           ]);
 
           // Multiple delayed refetches to catch backend updates
+          // Also clear RPC cache again before each refetch to ensure fresh data
           const refetchAll = async () => {
+            clearBalanceCache(proxyAddress);
             await Promise.all([
-              queryClient.refetchQueries({ queryKey: ["userPositions"] }),
               queryClient.refetchQueries({
                 queryKey: [PROXY_WALLET_QUERY_KEY],
+                exact: false,
               }),
               queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+              queryClient.refetchQueries({ queryKey: ["userPositions"] }),
             ]);
           };
 
