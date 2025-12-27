@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["pino-pretty", "lokijs", "encoding"],
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

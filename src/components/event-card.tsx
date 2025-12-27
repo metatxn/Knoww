@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cfImage } from "@/lib/cf-image";
 import { formatVolume } from "@/lib/formatters";
 
 interface EventCardProps {
@@ -95,7 +96,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
           <div className="relative aspect-16/10 w-full overflow-hidden">
             {event.image ? (
               <Image
-                src={event.image}
+                src={cfImage(event.image, { width: 400, format: "auto" })}
                 alt={event.title}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"

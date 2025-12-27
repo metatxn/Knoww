@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { Clock, Share2, Trophy } from "lucide-react";
 import Image from "next/image";
 import { NegRiskBadge } from "@/components/neg-risk-badge";
+import { cfImage } from "@/lib/cf-image";
 import { cn } from "@/lib/utils";
 
 interface HeaderSectionProps {
@@ -90,7 +91,7 @@ export function HeaderSection({
               )}
             >
               <Image
-                src={event.image}
+                src={cfImage(event.image, { width: 160, format: "auto" })}
                 alt={event.title}
                 fill
                 sizes="(max-width: 640px) 48px, 80px"

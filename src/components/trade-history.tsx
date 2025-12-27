@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Trade } from "@/hooks/use-user-trades";
+import { cfImage } from "@/lib/cf-image";
 
 /**
  * Props for the TradeHistory component
@@ -229,7 +230,10 @@ export function TradeHistory({
                       {trade.market.icon && (
                         <div className="relative w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded overflow-hidden">
                           <Image
-                            src={trade.market.icon}
+                            src={cfImage(trade.market.icon, {
+                              width: 48,
+                              format: "auto",
+                            })}
                             alt={trade.market.title}
                             fill
                             sizes="24px"

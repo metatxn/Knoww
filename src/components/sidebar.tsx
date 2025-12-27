@@ -53,6 +53,7 @@ import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 import { useUserPnL } from "@/hooks/use-user-pnl";
+import { cfImage } from "@/lib/cf-image";
 import { cn } from "@/lib/utils";
 
 // Categories with Lucide icons
@@ -126,12 +127,12 @@ export function Sidebar() {
   const displayName = isLoadingProfile
     ? "Loading..."
     : publicProfile?.name && publicProfile.name.length > 0
-    ? publicProfile.name
-    : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
-    ? publicProfile.pseudonym
-    : profileAddress
-    ? formatAddress(profileAddress)
-    : "Connecting...";
+      ? publicProfile.name
+      : publicProfile?.pseudonym && publicProfile.pseudonym.length > 0
+        ? publicProfile.pseudonym
+        : profileAddress
+          ? formatAddress(profileAddress)
+          : "Connecting...";
 
   // Get initials for avatar fallback
   const getInitials = (name: string) => {
@@ -533,7 +534,10 @@ export function Sidebar() {
                       <Avatar className="h-8 w-8 rounded-xl border-2 border-primary/20 shadow-md">
                         {publicProfile?.profileImage ? (
                           <AvatarImage
-                            src={publicProfile.profileImage}
+                            src={cfImage(publicProfile.profileImage, {
+                              width: 80,
+                              format: "auto",
+                            })}
                             alt={displayName}
                             className="object-cover"
                           />
@@ -568,7 +572,10 @@ export function Sidebar() {
                           <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/20">
                             {publicProfile.profileImage ? (
                               <AvatarImage
-                                src={publicProfile.profileImage}
+                                src={cfImage(publicProfile.profileImage, {
+                                  width: 80,
+                                  format: "auto",
+                                })}
                                 alt={displayName}
                                 className="object-cover"
                               />
@@ -680,7 +687,10 @@ export function Sidebar() {
                     <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/30 shadow-md">
                       {publicProfile?.profileImage ? (
                         <AvatarImage
-                          src={publicProfile.profileImage}
+                          src={cfImage(publicProfile.profileImage, {
+                            width: 80,
+                            format: "auto",
+                          })}
                           alt={displayName}
                           className="object-cover"
                         />

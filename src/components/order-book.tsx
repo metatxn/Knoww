@@ -32,10 +32,7 @@ import {
   type ConnectionState,
   useOrderBookWebSocket,
 } from "@/hooks/use-shared-websocket";
-import {
-  isValidTokenId,
-  isValidTokenIdForRest,
-} from "@/lib/token-validation";
+import { isValidTokenId, isValidTokenIdForRest } from "@/lib/token-validation";
 import { cn } from "@/lib/utils";
 
 /**

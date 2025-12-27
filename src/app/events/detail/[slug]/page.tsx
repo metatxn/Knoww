@@ -136,7 +136,11 @@ export default function EventDetailPage() {
   } = useEventDetail(eventSlugOrId);
 
   // Fetch user positions to show "You have a position" indicator
-  const { proxyAddress, isDeployed: hasProxyWallet, refresh: refreshProxyWallet } = useProxyWallet();
+  const {
+    proxyAddress,
+    isDeployed: hasProxyWallet,
+    refresh: refreshProxyWallet,
+  } = useProxyWallet();
   const tradingAddress =
     hasProxyWallet && proxyAddress ? proxyAddress : undefined;
   const { data: positionsData, refetch: refetchPositions } = useUserPositions({
@@ -838,10 +842,10 @@ export default function EventDetailPage() {
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">

@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ConnectionState } from "@/hooks/use-market-websocket";
 import { useTopHolders } from "@/hooks/use-top-holders";
 import type { Position } from "@/hooks/use-user-positions";
+import { cfImage } from "@/lib/cf-image";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -433,7 +434,10 @@ function TopHoldersContent({ conditionId }: { conditionId: string }) {
                       {holder.profileImageOptimized ? (
                         <div className="relative h-5 w-5 sm:h-6 sm:w-6 rounded-full overflow-hidden border border-border/50 shrink-0">
                           <Image
-                            src={holder.profileImageOptimized}
+                            src={cfImage(holder.profileImageOptimized, {
+                              width: 48,
+                              format: "auto",
+                            })}
                             alt={holder.pseudonym || "Holder"}
                             fill
                             className="object-cover"
@@ -569,9 +573,9 @@ export function OutcomesTable({
                       isConnected
                         ? "text-emerald-500"
                         : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500 animate-pulse"
-                        : "text-muted-foreground"
+                            connectionState === "reconnecting"
+                          ? "text-amber-500 animate-pulse"
+                          : "text-muted-foreground"
                     )}
                   />
                   <span
@@ -580,18 +584,18 @@ export function OutcomesTable({
                       isConnected
                         ? "text-emerald-500"
                         : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500"
-                        : "text-muted-foreground"
+                            connectionState === "reconnecting"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
                     )}
                   >
                     {isConnected
                       ? "Live"
                       : connectionState === "connecting"
-                      ? "Connecting..."
-                      : connectionState === "reconnecting"
-                      ? "Reconnecting..."
-                      : "Offline"}
+                        ? "Connecting..."
+                        : connectionState === "reconnecting"
+                          ? "Reconnecting..."
+                          : "Offline"}
                   </span>
                 </div>
                 {/* Collapse/Expand toggle icon */}
@@ -677,7 +681,10 @@ export function OutcomesTable({
                               {market.image && (
                                 <div className="relative w-10 h-10 shrink-0 mt-0.5">
                                   <Image
-                                    src={market.image}
+                                    src={cfImage(market.image, {
+                                      width: 80,
+                                      format: "auto",
+                                    })}
                                     alt={market.groupItemTitle || "Market"}
                                     fill
                                     sizes="40px"
@@ -737,7 +744,10 @@ export function OutcomesTable({
                             {market.image && (
                               <div className="relative w-10 h-10 shrink-0">
                                 <Image
-                                  src={market.image}
+                                  src={cfImage(market.image, {
+                                    width: 80,
+                                    format: "auto",
+                                  })}
                                   alt={market.groupItemTitle || "Market"}
                                   fill
                                   sizes="40px"

@@ -14,6 +14,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { DepositModal } from "@/components/deposit-modal";
 import { useOnboarding } from "@/context/onboarding-context";
+import { cfImage } from "@/lib/cf-image";
 import { formatSlippageDisplay } from "@/lib/slippage";
 import { AllowanceWarning } from "./trading/allowance-warning";
 import { BalanceWarning } from "./trading/balance-warning";
@@ -107,7 +108,7 @@ export function TradingForm(props: TradingFormProps) {
           {marketImage && (
             <div className="relative w-10 h-10 shrink-0">
               <Image
-                src={marketImage}
+                src={cfImage(marketImage, { width: 80, format: "auto" })}
                 alt={marketTitle || "Market"}
                 fill
                 sizes="40px"
@@ -346,8 +347,8 @@ export function TradingForm(props: TradingFormProps) {
                   (side === "BUY" && shares < minShares)
                     ? "bg-muted text-muted-foreground"
                     : side === "BUY"
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
-                    : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                      : "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20"
                 }`}
                 onClick={handleSubmit}
                 disabled={

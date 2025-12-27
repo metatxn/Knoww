@@ -336,8 +336,8 @@ export default function PortfolioPage() {
                 activeTab === "positions"
                   ? "markets"
                   : activeTab === "orders"
-                  ? "orders"
-                  : "history"
+                    ? "orders"
+                    : "history"
               }...`}
               pnlFilter={pnlFilter}
               onPnlFilterChange={setPnlFilter}

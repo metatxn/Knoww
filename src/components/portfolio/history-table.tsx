@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cfImage } from "@/lib/cf-image";
 import { formatCurrency, formatPrice, timeAgo } from "@/lib/formatters";
 import { EmptyState } from "./empty-state";
 import type { Trade } from "./types";
@@ -176,7 +177,10 @@ export function HistoryTable({
                 <div className="relative w-8 h-8 rounded-full overflow-hidden bg-muted shrink-0">
                   {trade.market.icon ? (
                     <Image
-                      src={trade.market.icon}
+                      src={cfImage(trade.market.icon, {
+                        width: 64,
+                        format: "auto",
+                      })}
                       alt={trade.market.title}
                       fill
                       sizes="32px"

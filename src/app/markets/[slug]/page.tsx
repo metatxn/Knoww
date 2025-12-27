@@ -31,6 +31,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
+import { cfImage } from "@/lib/cf-image";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import type { OutcomeData } from "@/types/market";
 
@@ -345,7 +346,7 @@ export default function MarketDetailPage() {
             {market.image && (
               <div className="relative w-16 h-16 md:w-20 md:h-20 shrink-0">
                 <Image
-                  src={market.image}
+                  src={cfImage(market.image, { width: 160, format: "auto" })}
                   alt={market.question}
                   fill
                   sizes="80px"

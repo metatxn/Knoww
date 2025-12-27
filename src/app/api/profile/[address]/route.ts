@@ -45,7 +45,9 @@ interface PnLData {
   volume?: { total?: number };
 }
 
-async function fetchPublicProfile(address: string): Promise<PublicProfile | null> {
+async function fetchPublicProfile(
+  address: string
+): Promise<PublicProfile | null> {
   try {
     const response = await fetch(
       `${POLYMARKET_API.DATA.BASE}/profile/${address}`,
@@ -163,8 +165,7 @@ export async function GET(
     ]);
 
     // Calculate total volume from P&L data or rankings
-    const totalVolume =
-      rankAll?.vol || pnlData?.volume?.total || 0;
+    const totalVolume = rankAll?.vol || pnlData?.volume?.total || 0;
     const totalPnl = pnlData?.pnl?.total || rankAll?.pnl || 0;
 
     const profile: TraderProfile = {
@@ -197,4 +198,3 @@ export async function GET(
     );
   }
 }
-

@@ -107,12 +107,12 @@ export function useProxyWallet() {
     if (query.data?.proxyAddress) {
       clearBalanceCache(query.data.proxyAddress);
     }
-    
+
     // Then invalidate and refetch the React Query cache
     await queryClient.invalidateQueries({
       queryKey: [PROXY_WALLET_QUERY_KEY, address],
     });
-    
+
     // Force a refetch to get fresh data
     return queryClient.refetchQueries({
       queryKey: [PROXY_WALLET_QUERY_KEY, address],
@@ -127,12 +127,12 @@ export function useProxyWallet() {
       clearDeploymentCache(query.data.proxyAddress);
       clearBalanceCache(query.data.proxyAddress);
     }
-    
+
     // Invalidate and refetch
     await queryClient.invalidateQueries({
       queryKey: [PROXY_WALLET_QUERY_KEY, address],
     });
-    
+
     return queryClient.refetchQueries({
       queryKey: [PROXY_WALLET_QUERY_KEY, address],
     });

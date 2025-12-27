@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cfImage } from "@/lib/cf-image";
 import { formatCurrency, formatPrice } from "@/lib/formatters";
 import { EmptyState } from "./empty-state";
 import type { Order } from "./types";
@@ -119,7 +120,10 @@ export function OrdersTable({
                   className="relative w-10 h-10 shrink-0 rounded-full overflow-hidden bg-muted"
                 >
                   <Image
-                    src={order.market.icon}
+                    src={cfImage(order.market.icon, {
+                      width: 80,
+                      format: "auto",
+                    })}
                     alt={order.market?.question || "Market"}
                     fill
                     sizes="40px"
