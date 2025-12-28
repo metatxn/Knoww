@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import type { EventFilterParams } from "./use-paginated-events";
 
 interface NewEvent {
   id: string;
@@ -41,13 +42,39 @@ interface NewEventsResponse {
   error?: string;
 }
 
-export function useNewEvents(limit = 15) {
+export function useNewEvents(
+  limit = 15,
+  filters?: EventFilterParams,
+  enabled = true
+) {
   return useInfiniteQuery({
-    queryKey: ["new-events", limit],
+    queryKey: ["new-events", limit, filters],
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await fetch(
-        `/api/events/new?limit=${limit}&offset=${pageParam}`
-      );
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: pageParam.toString(),
+      });
+
+      if (filters) {
+        if (filters.volume24hrMin)
+          params.set("volume24hr_min", filters.volume24hrMin.toString());
+        if (filters.volumeWeeklyMin)
+          params.set("volume1wk_min", filters.volumeWeeklyMin.toString());
+        if (filters.liquidityMin)
+          params.set("liquidity_min", filters.liquidityMin.toString());
+        if (filters.competitiveMin !== undefined && filters.competitiveMin !== null)
+          params.set("competitive_min", filters.competitiveMin.toString());
+        if (filters.competitiveMax !== undefined && filters.competitiveMax !== null)
+          params.set("competitive_max", filters.competitiveMax.toString());
+        if (filters.live) params.set("live", "true");
+        if (filters.ended) params.set("ended", "true");
+        if (filters.startDateFrom) params.set("start_date_min", filters.startDateFrom);
+        if (filters.startDateTo) params.set("start_date_max", filters.startDateTo);
+        if (filters.endDateFrom) params.set("end_date_min", filters.endDateFrom);
+        if (filters.endDateTo) params.set("end_date_max", filters.endDateTo);
+      }
+
+      const response = await fetch(`/api/events/new?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch new events");
@@ -59,9 +86,13 @@ export function useNewEvents(limit = 15) {
         throw new Error(result.error || "Failed to fetch new events");
       }
 
+      const hasMore =
+        result.pagination?.hasMore ??
+        (result.data ? result.data.length === limit : false);
+
       return {
         events: result.data || [],
-        nextOffset: result.pagination?.hasMore ? pageParam + limit : undefined,
+        nextOffset: hasMore ? pageParam + limit : undefined,
         totalResults: result.pagination?.totalResults || 0,
       };
     },
@@ -69,5 +100,6 @@ export function useNewEvents(limit = 15) {
     initialPageParam: 0,
     staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
+    enabled,
   });
 }

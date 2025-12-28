@@ -53,7 +53,6 @@ import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { usePublicProfile } from "@/hooks/use-public-profile";
 import { useRelayerClient } from "@/hooks/use-relayer-client";
 import { useUserPnL } from "@/hooks/use-user-pnl";
-import { cfImage } from "@/lib/cf-image";
 import { cn } from "@/lib/utils";
 
 // Categories with Lucide icons
@@ -534,10 +533,7 @@ export function Sidebar() {
                       <Avatar className="h-8 w-8 rounded-xl border-2 border-primary/20 shadow-md">
                         {publicProfile?.profileImage ? (
                           <AvatarImage
-                            src={cfImage(publicProfile.profileImage, {
-                              width: 80,
-                              format: "auto",
-                            })}
+                            src={publicProfile.profileImage}
                             alt={displayName}
                             className="object-cover"
                           />
@@ -572,10 +568,7 @@ export function Sidebar() {
                           <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/20">
                             {publicProfile.profileImage ? (
                               <AvatarImage
-                                src={cfImage(publicProfile.profileImage, {
-                                  width: 80,
-                                  format: "auto",
-                                })}
+                                src={publicProfile.profileImage}
                                 alt={displayName}
                                 className="object-cover"
                               />
@@ -687,10 +680,7 @@ export function Sidebar() {
                     <Avatar className="h-10 w-10 rounded-xl border-2 border-primary/30 shadow-md">
                       {publicProfile?.profileImage ? (
                         <AvatarImage
-                          src={cfImage(publicProfile.profileImage, {
-                            width: 80,
-                            format: "auto",
-                          })}
+                          src={publicProfile.profileImage}
                           alt={displayName}
                           className="object-cover"
                         />

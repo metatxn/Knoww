@@ -13,7 +13,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Position } from "@/hooks/use-user-positions";
-import { cfImage } from "@/lib/cf-image";
+
 
 /**
  * Props for the PositionCard component
@@ -71,10 +71,7 @@ export function PositionCard({
             <div className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-lg overflow-hidden bg-muted">
               {position.market.icon ? (
                 <Image
-                  src={cfImage(position.market.icon, {
-                    width: 96,
-                    format: "auto",
-                  })}
+                  src={position.market.icon}
                   alt={position.market.title}
                   fill
                   className="object-cover"
@@ -215,7 +212,7 @@ export function PositionCardCompact({ position }: { position: Position }) {
       <div className="relative w-8 h-8 shrink-0 rounded overflow-hidden bg-muted">
         {position.market.icon ? (
           <Image
-            src={cfImage(position.market.icon, { width: 64, format: "auto" })}
+            src={position.market.icon}
             alt={position.market.title}
             fill
             className="object-cover"

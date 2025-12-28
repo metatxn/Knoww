@@ -33,7 +33,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTraderProfile } from "@/hooks/use-trader-profile";
-import { cfImage } from "@/lib/cf-image";
 import { formatCurrencyCompact } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -346,10 +345,7 @@ export default function ProfilePage() {
             <Avatar className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl border-4 border-violet-500/20 shadow-xl">
               {profile.profileImage && (
                 <AvatarImage
-                  src={cfImage(profile.profileImage, {
-                    width: 192,
-                    format: "auto",
-                  })}
+                  src={profile.profileImage}
                   alt={profile.userName || "Trader"}
                 />
               )}

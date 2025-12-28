@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Crown, Flame, Sparkles, Star, Zap } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/event-card";
 import { EventFilterBar } from "@/components/event-filter-bar";
 import { MarketSearch } from "@/components/market-search";
@@ -45,8 +45,9 @@ interface EventWithDates {
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>("categories");
   const [mounted, setMounted] = useState(false);
-
-  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
+    null
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -119,6 +120,7 @@ export default function Home() {
   );
 
   // Use server-side filtering for paginated events
+  // Only fetch data for the currently active tab to avoid unnecessary API calls
   const {
     data: allPaginatedData,
     isLoading: loadingAllPaginated,
@@ -134,6 +136,7 @@ export default function Home() {
     closed: apiQueryParams.closed,
     tagSlug: apiQueryParams.tagSlug,
     filters: serverFilterParams,
+    enabled: viewMode === "categories",
   });
 
   const {
@@ -143,7 +146,7 @@ export default function Home() {
     hasNextPage: hasNextTrending,
     fetchNextPage: fetchNextTrending,
     isFetchingNextPage: isFetchingNextTrending,
-  } = useTrendingEvents(15);
+  } = useTrendingEvents(20, serverFilterParams, viewMode === "trending");
 
   const {
     data: newPaginatedData,
@@ -152,7 +155,7 @@ export default function Home() {
     hasNextPage: hasNextNew,
     fetchNextPage: fetchNextNew,
     isFetchingNextPage: isFetchingNextNew,
-  } = useNewEvents(15);
+  } = useNewEvents(20, serverFilterParams, viewMode === "new");
 
   const {
     data: breakingPaginatedData,
@@ -161,67 +164,7 @@ export default function Home() {
     hasNextPage: hasNextBreaking,
     fetchNextPage: fetchNextBreaking,
     isFetchingNextPage: isFetchingNextBreaking,
-  } = useBreakingEvents(15);
-
-  // Simple infinite scroll - server handles filtering now
-  useEffect(() => {
-    let hasMore = false;
-    let isFetching = false;
-    let fetchMore: () => void = () => {};
-
-    switch (viewMode) {
-      case "categories":
-        hasMore = hasNextAllPaginated ?? false;
-        isFetching = isFetchingNextAllPaginated;
-        fetchMore = fetchNextAllPaginated;
-        break;
-      case "trending":
-        hasMore = hasNextTrending ?? false;
-        isFetching = isFetchingNextTrending;
-        fetchMore = fetchNextTrending;
-        break;
-      case "new":
-        hasMore = hasNextNew ?? false;
-        isFetching = isFetchingNextNew;
-        fetchMore = fetchNextNew;
-        break;
-      case "breaking":
-        hasMore = hasNextBreaking ?? false;
-        isFetching = isFetchingNextBreaking;
-        fetchMore = fetchNextBreaking;
-        break;
-      default:
-        return;
-    }
-
-    if (!loadMoreRef.current || !hasMore || isFetching) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          fetchMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: "200px" }
-    );
-
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [
-    viewMode,
-    hasNextAllPaginated,
-    isFetchingNextAllPaginated,
-    fetchNextAllPaginated,
-    hasNextTrending,
-    isFetchingNextTrending,
-    fetchNextTrending,
-    hasNextNew,
-    isFetchingNextNew,
-    fetchNextNew,
-    hasNextBreaking,
-    isFetchingNextBreaking,
-    fetchNextBreaking,
-  ]);
+  } = useBreakingEvents(20, serverFilterParams, viewMode === "breaking");
 
   const handleQuickCategoryClick = (mode: ViewMode) => {
     setViewMode(mode);
@@ -252,6 +195,7 @@ export default function Home() {
         const hasMoreTrending =
           (hasNextTrending ?? false) ||
           (totalTrending > 0 && trendingEvents.length < totalTrending);
+
         return {
           events: filteredEvents,
           isLoading: loadingTrending,
@@ -310,6 +254,30 @@ export default function Home() {
 
   const currentData = getCurrentEvents();
 
+  // Infinite scroll - Re-attach when element or currentData state changes
+  useEffect(() => {
+    if (!loadMoreElement) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+
+        if (currentData.hasMore && !currentData.isFetchingMore) {
+          currentData.fetchMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: "400px" }
+    );
+
+    observer.observe(loadMoreElement);
+    return () => observer.disconnect();
+  }, [
+    loadMoreElement,
+    currentData.hasMore,
+    currentData.isFetchingMore,
+    currentData.fetchMore,
+  ]);
+
   return (
     <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
       <PageBackground />
@@ -353,7 +321,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50 hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all"
+                className="gap-2 rounded-xl bg-linear-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50 hover:bg-linear-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all"
               >
                 <Crown className="h-4 w-4 text-yellow-500" />
                 <span className="hidden sm:inline font-semibold text-yellow-600 dark:text-yellow-400">
@@ -374,8 +342,8 @@ export default function Home() {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="flex items-center justify-between gap-4 mb-2"
         >
-          {/* Tab Pills */}
-          <div className="flex items-center gap-1 bg-muted/30 rounded-full p-1">
+          {/* Tab Pills - Scrollable on mobile */}
+          <div className="flex items-center gap-1 bg-muted/30 rounded-full p-1 overflow-x-auto scrollbar-hide">
             {TAB_CATEGORIES.map((tab) => {
               const isActive = viewMode === tab.slug;
               const Icon = tab.icon;
@@ -388,7 +356,7 @@ export default function Home() {
                       ? setViewMode("categories")
                       : handleQuickCategoryClick(tab.slug as ViewMode)
                   }
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
+                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all duration-200 shrink-0 ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -485,17 +453,28 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Infinite Scroll Trigger */}
-                {currentData.hasMore && !currentData.isFetchingMore && (
-                  <div ref={loadMoreRef} className="h-20 w-full" />
+                {/* Universal Infinite Scroll Trigger - Placed inside content to ensure re-detection on tab change */}
+                {currentData.hasMore && (
+                  <div
+                    ref={setLoadMoreElement}
+                    className="h-20 w-full flex items-center justify-center"
+                  >
+                    {currentData.isFetchingMore && (
+                      <div className="flex gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" />
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* End of results message */}
                 {!currentData.hasMore &&
                   !currentData.isFetchingMore &&
                   currentData.events.length > 0 && (
-                    <div className="flex justify-center py-6">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex justify-center py-10 border-t border-border/10 mt-10">
+                      <p className="text-sm text-muted-foreground bg-muted/30 px-4 py-2 rounded-full border border-border/20">
                         {hasActiveFilters
                           ? `Found ${currentData.events.length} markets matching your filters`
                           : `Showing all ${currentData.events.length} markets`}

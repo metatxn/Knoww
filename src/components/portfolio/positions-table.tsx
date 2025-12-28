@@ -25,7 +25,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cfImage } from "@/lib/cf-image";
 import { formatCurrency, formatPercent, formatPrice } from "@/lib/formatters";
 import { EmptyState } from "./empty-state";
 import { SortableHeader } from "./sortable-header";
@@ -160,10 +159,7 @@ export function PositionsTable({
                 <div className="relative w-12 h-12 rounded-full overflow-hidden bg-muted shrink-0">
                   {position.market.icon ? (
                     <Image
-                      src={cfImage(position.market.icon, {
-                        width: 96,
-                        format: "auto",
-                      })}
+                      src={position.market.icon}
                       alt={position.market.title}
                       fill
                       sizes="48px"

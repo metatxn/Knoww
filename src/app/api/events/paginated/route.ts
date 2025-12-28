@@ -86,20 +86,21 @@ export async function GET(request: NextRequest) {
 
     // Add volume filters (Gamma API uses these as minimum thresholds)
     if (volume24hrMin) {
-      params.set("volume24hr", volume24hrMin);
+      params.set("volume_min", volume24hrMin);
     }
     if (volume1wkMin) {
-      params.set("volume1wk", volume1wkMin);
+      // If Gamma doesn't support 1wk specific min, we fallback to volume_min
+      params.set("volume_min", volume1wkMin);
     }
 
     // Add liquidity filter
     if (liquidityMin) {
-      params.set("liquidity", liquidityMin);
+      params.set("liquidity_min", liquidityMin);
     }
 
     // Add competitiveness filters
     if (competitiveMin) {
-      params.set("competitive", competitiveMin);
+      params.set("competitive_min", competitiveMin);
     }
     // Note: Gamma API may not support max competitive filter directly
     // We handle max filtering client-side if needed

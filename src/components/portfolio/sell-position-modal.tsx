@@ -22,7 +22,6 @@ import {
 import { useSellPosition } from "@/hooks/use-sell-position";
 import { formatCurrency, formatPercent, formatPrice } from "@/lib/formatters";
 import type { Position } from "./types";
-import { cfImage } from "@/lib/cf-image";
 
 interface SellPositionModalProps {
   open: boolean;
@@ -107,10 +106,7 @@ export function SellPositionModal({
             <div className="relative w-12 h-12 rounded-full overflow-hidden bg-muted shrink-0">
               {position.market.icon ? (
                 <Image
-                  src={cfImage(position.market.icon, {
-                    width: 96,
-                    format: "auto",
-                  })}
+                  src={position.market.icon}
                   alt={position.market.title}
                   fill
                   sizes="48px"

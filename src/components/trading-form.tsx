@@ -14,7 +14,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { DepositModal } from "@/components/deposit-modal";
 import { useOnboarding } from "@/context/onboarding-context";
-import { cfImage } from "@/lib/cf-image";
 import { formatSlippageDisplay } from "@/lib/slippage";
 import { AllowanceWarning } from "./trading/allowance-warning";
 import { BalanceWarning } from "./trading/balance-warning";
@@ -108,7 +107,7 @@ export function TradingForm(props: TradingFormProps) {
           {marketImage && (
             <div className="relative w-10 h-10 shrink-0">
               <Image
-                src={cfImage(marketImage, { width: 80, format: "auto" })}
+                src={marketImage}
                 alt={marketTitle || "Market"}
                 fill
                 sizes="40px"

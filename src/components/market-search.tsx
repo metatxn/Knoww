@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/use-search";
-import { cfImage } from "@/lib/cf-image";
 import { formatVolume } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -191,10 +190,7 @@ export function MarketSearch({
                         {event.image ? (
                           <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
                             <Image
-                              src={cfImage(event.image, {
-                                width: 80,
-                                format: "auto",
-                              })}
+                              src={event.image}
                               alt={event.title}
                               fill
                               sizes="40px"

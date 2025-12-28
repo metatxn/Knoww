@@ -22,17 +22,48 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") || "15";
     const offset = searchParams.get("offset") || "0";
 
+    // Extract filter parameters explicitly
+    const volume24hrMin = searchParams.get("volume24hr_min");
+    const volume1wkMin = searchParams.get("volume1wk_min");
+    const liquidityMin = searchParams.get("liquidity_min");
+    const competitiveMin = searchParams.get("competitive_min");
+    const tagSlug = searchParams.get("tag_slug");
+    const active = searchParams.get("active");
+    const archived = searchParams.get("archived");
+    const closed = searchParams.get("closed");
+
+    // Build query params with explicit parameters only
     const queryParams = new URLSearchParams();
+
+    // Set base parameters
     queryParams.set("limit", limit);
     queryParams.set("offset", offset);
-    queryParams.set("active", "true");
-    queryParams.set("archived", "false");
-    queryParams.set("closed", "false");
+    queryParams.set("active", active || "true");
+    queryParams.set("archived", archived || "false");
+    queryParams.set("closed", closed || "false");
     queryParams.set("order", "volume"); // Sort by volume (most traded)
     queryParams.set("ascending", "false"); // Highest volume first
+
     // Exclude crypto up/down spam markets
     queryParams.append("exclude_tag_id", "100639");
     queryParams.append("exclude_tag_id", "102169");
+
+    // Map internal filter names to Gamma API names
+    if (volume24hrMin) {
+      queryParams.set("volume_min", volume24hrMin);
+    }
+    if (volume1wkMin) {
+      queryParams.set("volume_min", volume1wkMin);
+    }
+    if (liquidityMin) {
+      queryParams.set("liquidity_min", liquidityMin);
+    }
+    if (competitiveMin) {
+      queryParams.set("competitive_min", competitiveMin);
+    }
+    if (tagSlug) {
+      queryParams.set("tag_slug", tagSlug);
+    }
 
     const response = await fetch(
       `${POLYMARKET_API.GAMMA.EVENTS_PAGINATION}?${queryParams.toString()}`,

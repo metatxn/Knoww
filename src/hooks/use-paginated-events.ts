@@ -67,6 +67,8 @@ interface UsePaginatedEventsParams {
   ascending?: boolean;
   // Server-side filters
   filters?: EventFilterParams;
+  // Enable/disable the query
+  enabled?: boolean;
 }
 
 export function usePaginatedEvents({
@@ -78,6 +80,7 @@ export function usePaginatedEvents({
   order = "volume24hr",
   ascending = false,
   filters,
+  enabled = true,
 }: UsePaginatedEventsParams = {}) {
   return useInfiniteQuery({
     queryKey: [
@@ -186,5 +189,6 @@ export function usePaginatedEvents({
     initialPageParam: 0,
     staleTime: 60000, // 1 minute
     refetchOnWindowFocus: false,
+    enabled,
   });
 }

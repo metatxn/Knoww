@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, Flame, Sparkles, TrendingUp, Zap } from "lucide-react";
+import {
+  AlertCircle,
+  Droplet,
+  Flame,
+  Sparkles,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,7 +17,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cfImage } from "@/lib/cf-image";
 import { formatVolume } from "@/lib/formatters";
 
 interface EventCardProps {
@@ -46,8 +52,8 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
   const href = event.slug
     ? `/events/detail/${event.slug}`
     : event.id
-      ? `/events/detail/${event.id}`
-      : "#";
+    ? `/events/detail/${event.id}`
+    : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
 
@@ -66,6 +72,16 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
   // - HOT badge: weekly volume > $5M (trending market)
   const isHighVolume = volume24hr > 1_000_000; // > $1M 24hr shows lightning
   const isHot = volume1wk > 5_000_000; // > $5M weekly shows HOT badge
+
+  // Parse liquidity - prefer liquidityClob (CLOB liquidity) over liquidity (AMM)
+  const liquidity =
+    typeof event.liquidityClob === "string"
+      ? Number.parseFloat(event.liquidityClob)
+      : typeof event.liquidityClob === "number"
+      ? event.liquidityClob
+      : typeof event.liquidity === "string"
+      ? Number.parseFloat(event.liquidity)
+      : event.liquidity || 0;
 
   return (
     <motion.div
@@ -96,7 +112,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
           <div className="relative aspect-16/10 w-full overflow-hidden">
             {event.image ? (
               <Image
-                src={cfImage(event.image, { width: 400, format: "auto" })}
+                src={event.image}
                 alt={event.title}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"
@@ -179,7 +195,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
               )}
             </div>
 
-            {/* Volume Badge - Floating Pill with Glow */}
+            {/* Volume Badge - Bottom Left */}
             {event.volume && (
               <div className="absolute bottom-3 left-3">
                 <div className="relative group/volume">
@@ -193,6 +209,22 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
                     {isHighVolume && (
                       <Zap className="h-3 w-3 text-yellow-300 dark:text-yellow-400 animate-pulse" />
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Liquidity Badge - Bottom Right */}
+            {liquidity > 0 && (
+              <div className="absolute bottom-3 right-3">
+                <div className="relative group/liquidity">
+                  {/* Glow effect */}
+                  <div className="absolute inset-0 bg-blue-500/30 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/90 dark:bg-black/70 backdrop-blur-xl rounded-full border border-blue-500/30 dark:border-white/10 shadow-lg group-hover/liquidity:border-blue-400/50 transition-all">
+                    <Droplet className="h-3.5 w-3.5 text-blue-100 dark:text-blue-400" />
+                    <span className="text-xs font-black text-white tracking-wide">
+                      {formatVolume(liquidity.toString())}
+                    </span>
                   </div>
                 </div>
               </div>

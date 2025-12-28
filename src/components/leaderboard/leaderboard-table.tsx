@@ -33,7 +33,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { LeaderboardTrader } from "@/hooks/use-leaderboard";
-import { cfImage } from "@/lib/cf-image";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -226,10 +225,7 @@ export function LeaderboardTable({
                       <Avatar className="h-9 w-9 border-2 border-border/50 shrink-0">
                         {trader.profileImage && (
                           <AvatarImage
-                            src={cfImage(trader.profileImage, {
-                              width: 72,
-                              format: "auto",
-                            })}
+                            src={trader.profileImage}
                             alt={trader.userName || "Trader"}
                           />
                         )}
@@ -347,10 +343,7 @@ export function LeaderboardTable({
                 <Avatar className="h-10 w-10 border-2 border-border/50 shrink-0">
                   {trader.profileImage && (
                     <AvatarImage
-                      src={cfImage(trader.profileImage, {
-                        width: 80,
-                        format: "auto",
-                      })}
+                      src={trader.profileImage}
                       alt={trader.userName || "Trader"}
                     />
                   )}

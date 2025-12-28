@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { headers } from "next/headers";
 import { MainContent } from "@/components/main-content";
@@ -17,9 +17,46 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#8b5cf6",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "Knoww - Know your Odds",
-  description: "Know your Odds",
+  title: {
+    default: "Knoww - Know your Odds",
+    template: "%s | Knoww",
+  },
+  description:
+    "Trade on real-world events with Knoww. Explore prediction markets for politics, sports, crypto, and more.",
+  keywords: ["prediction markets", "polymarket", "trading", "crypto", "odds"],
+  metadataBase: new URL("https://knoww.app"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "Knoww",
+    title: "Knoww - Know your Odds",
+    description: "Trade on real-world events with prediction markets",
+    images: [
+      {
+        url: "/vercel.svg", // Placeholder until a proper OG image is added
+        width: 1200,
+        height: 630,
+        alt: "Knoww Prediction Markets",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Knoww - Know your Odds",
+    description: "Trade on real-world events with prediction markets",
+    images: ["/vercel.svg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default async function RootLayout({
@@ -30,8 +67,21 @@ export default async function RootLayout({
   const cookieHeader = await headers();
   const cookies = cookieHeader.get("cookie");
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Knoww",
+    url: "https://knoww.app",
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
