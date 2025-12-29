@@ -62,15 +62,24 @@ export function useBreakingEvents(
           params.set("volume1wk_min", filters.volumeWeeklyMin.toString());
         if (filters.liquidityMin)
           params.set("liquidity_min", filters.liquidityMin.toString());
-        if (filters.competitiveMin !== undefined && filters.competitiveMin !== null)
+        if (
+          filters.competitiveMin !== undefined &&
+          filters.competitiveMin !== null
+        )
           params.set("competitive_min", filters.competitiveMin.toString());
-        if (filters.competitiveMax !== undefined && filters.competitiveMax !== null)
+        if (
+          filters.competitiveMax !== undefined &&
+          filters.competitiveMax !== null
+        )
           params.set("competitive_max", filters.competitiveMax.toString());
         if (filters.live) params.set("live", "true");
         if (filters.ended) params.set("ended", "true");
-        if (filters.startDateFrom) params.set("start_date_min", filters.startDateFrom);
-        if (filters.startDateTo) params.set("start_date_max", filters.startDateTo);
-        if (filters.endDateFrom) params.set("end_date_min", filters.endDateFrom);
+        if (filters.startDateFrom)
+          params.set("start_date_min", filters.startDateFrom);
+        if (filters.startDateTo)
+          params.set("start_date_max", filters.startDateTo);
+        if (filters.endDateFrom)
+          params.set("end_date_min", filters.endDateFrom);
         if (filters.endDateTo) params.set("end_date_max", filters.endDateTo);
       }
 

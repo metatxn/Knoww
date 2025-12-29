@@ -45,15 +45,20 @@ interface EventCardProps {
     tags?: Array<string | { id?: string; slug?: string; label?: string }>;
   };
   index?: number;
+  priority?: boolean;
 }
 
-export function EventCard({ event, index = 0 }: EventCardProps) {
+export function EventCard({
+  event,
+  index = 0,
+  priority = false,
+}: EventCardProps) {
   // Prefer slug for SEO-friendly URLs, fallback to ID
   const href = event.slug
     ? `/events/detail/${event.slug}`
     : event.id
-    ? `/events/detail/${event.id}`
-    : "#";
+      ? `/events/detail/${event.id}`
+      : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
 
@@ -78,10 +83,10 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
     typeof event.liquidityClob === "string"
       ? Number.parseFloat(event.liquidityClob)
       : typeof event.liquidityClob === "number"
-      ? event.liquidityClob
-      : typeof event.liquidity === "string"
-      ? Number.parseFloat(event.liquidity)
-      : event.liquidity || 0;
+        ? event.liquidityClob
+        : typeof event.liquidity === "string"
+          ? Number.parseFloat(event.liquidity)
+          : event.liquidity || 0;
 
   return (
     <motion.div
@@ -115,6 +120,7 @@ export function EventCard({ event, index = 0 }: EventCardProps) {
                 src={event.image}
                 alt={event.title}
                 fill
+                priority={priority}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 20vw"
                 className="object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
               />

@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/table";
 import type { Trade } from "@/hooks/use-user-trades";
 
-
 /**
  * Props for the TradeHistory component
  */

@@ -431,6 +431,7 @@ export default function Home() {
                       key={`${event.id}-${index}`}
                       event={event}
                       index={index}
+                      priority={index < 4}
                     />
                   ))}
                 </div>

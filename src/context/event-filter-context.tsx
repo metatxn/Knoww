@@ -210,6 +210,8 @@ export function EventFilterProvider({ children }: { children: ReactNode }) {
       count++;
     }
     if (filters.dateRange.start || filters.dateRange.end) count++;
+    // Volume window - count if different from default "24h"
+    if (filters.volumeWindow !== "24h") count++;
     return count;
   }, [filters]);
 

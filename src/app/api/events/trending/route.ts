@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import type {
+  GammaEvent,
+  GammaEventsResponse,
+  GammaMarket,
+  GammaTag,
+} from "@/types/gamma-api";
 
 /**
  * GET /api/events/trending
@@ -79,12 +85,41 @@ export async function GET(request: NextRequest) {
       throw new Error(`Gamma API error: ${response.statusText}`);
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
+    const data = (await response.json()) as GammaEventsResponse;
+
+    // Performance Optimization: Strip down event objects to only the fields needed by the UI
+    const slimData = data.data.map((event: GammaEvent) => ({
+      id: event.id,
+      slug: event.slug,
+      title: event.title,
+      description: event.description,
+      image: event.image,
+      volume: event.volume,
+      volume24hr: event.volume24hr,
+      volume1wk: event.volume1wk,
+      volume1mo: event.volume1mo,
+      volume1yr: event.volume1yr,
+      liquidity: event.liquidity,
+      liquidityClob: event.liquidityClob,
+      active: event.active,
+      closed: event.closed,
+      live: event.live,
+      ended: event.ended,
+      competitive: event.competitive,
+      negRisk: event.enableNegRisk || event.negRiskAugmented,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      markets: event.markets?.map((m: GammaMarket) => ({ id: m.id })),
+      tags: event.tags?.map((t: GammaTag | string) =>
+        typeof t === "string" ? t : { id: t.id, slug: t.slug, label: t.label }
+      ),
+    }));
 
     // Return the same structure as /api/events/paginated
     return NextResponse.json({
       success: true,
-      ...data,
+      data: slimData,
+      pagination: data.pagination,
     });
   } catch (error) {
     console.error("Error fetching trending events:", error);

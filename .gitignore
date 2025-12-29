@@ -46,4 +46,4 @@ next-env.d.ts
 !.dev.vars.example
 !.env.example
 lighthouse-output.json
-lighthouse-report.*
+lighthouse-report*

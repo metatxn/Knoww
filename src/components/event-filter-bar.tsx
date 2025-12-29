@@ -349,15 +349,18 @@ export function EventFilterBar() {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Refresh Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={hasActiveFilters ? clearAllFilters : undefined}
-        className="h-8 w-8 shrink-0"
-      >
-        <RefreshCw className="h-4 w-4 text-muted-foreground" />
-      </Button>
+      {/* Clear Filters Button */}
+      {hasActiveFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearAllFilters}
+          className="h-8 px-3 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <RefreshCw className="h-4 w-4 mr-1.5" />
+          Clear
+        </Button>
+      )}
     </div>
   );
 }

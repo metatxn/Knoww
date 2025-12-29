@@ -569,9 +569,9 @@ export function OutcomesTable({
                       isConnected
                         ? "text-emerald-500"
                         : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500 animate-pulse"
-                        : "text-muted-foreground"
+                            connectionState === "reconnecting"
+                          ? "text-amber-500 animate-pulse"
+                          : "text-muted-foreground"
                     )}
                   />
                   <span
@@ -580,18 +580,18 @@ export function OutcomesTable({
                       isConnected
                         ? "text-emerald-500"
                         : connectionState === "connecting" ||
-                          connectionState === "reconnecting"
-                        ? "text-amber-500"
-                        : "text-muted-foreground"
+                            connectionState === "reconnecting"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
                     )}
                   >
                     {isConnected
                       ? "Live"
                       : connectionState === "connecting"
-                      ? "Connecting..."
-                      : connectionState === "reconnecting"
-                      ? "Reconnecting..."
-                      : "Offline"}
+                        ? "Connecting..."
+                        : connectionState === "reconnecting"
+                          ? "Reconnecting..."
+                          : "Offline"}
                   </span>
                 </div>
                 {/* Collapse/Expand toggle icon */}

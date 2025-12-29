@@ -254,10 +254,10 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
         idx === 0
           ? "orange"
           : idx === 1
-          ? "blue"
-          : idx === 2
-          ? "purple"
-          : "green",
+            ? "blue"
+            : idx === 2
+              ? "purple"
+              : "green",
     };
   });
 
@@ -448,10 +448,10 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
                     outcome.color === "orange"
                       ? "bg-orange-500"
                       : outcome.color === "blue"
-                      ? "bg-blue-500"
-                      : outcome.color === "purple"
-                      ? "bg-purple-400"
-                      : "bg-green-500"
+                        ? "bg-blue-500"
+                        : outcome.color === "purple"
+                          ? "bg-purple-400"
+                          : "bg-green-500"
                   }`}
                 />
                 <span className="text-sm">

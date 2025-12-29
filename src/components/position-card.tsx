@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Position } from "@/hooks/use-user-positions";
 
-
 /**
  * Props for the PositionCard component
  */
