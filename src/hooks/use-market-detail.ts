@@ -45,6 +45,8 @@ interface Market {
   bestBid?: number;
   bestAsk?: number;
   spread?: number;
+  /** Condition ID for CTF operations (split/merge/redeem) */
+  conditionId?: string;
 }
 
 interface MarketDetailResponse {

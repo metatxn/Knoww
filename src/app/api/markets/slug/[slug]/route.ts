@@ -65,6 +65,15 @@ export async function GET(
 
     const market = slugData[0];
 
+    // Debug: Log conditionId to verify it's coming from Gamma API
+    console.log("[API /markets/slug] Market data:", {
+      slug: market.slug,
+      question: market.question,
+      conditionId: market.conditionId,
+      hasConditionId: !!market.conditionId,
+      clobTokenIds: market.clobTokenIds,
+    });
+
     return NextResponse.json({
       success: true,
       market,

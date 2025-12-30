@@ -195,38 +195,43 @@ export function useSellPosition({
         if (proxyAddress) {
           clearBalanceCache(proxyAddress);
 
-          // Immediate invalidation and refetch
+          // Immediate invalidation - use exact: false to match all queries with this prefix
           await Promise.all([
             queryClient.invalidateQueries({
               queryKey: [PROXY_WALLET_QUERY_KEY],
+              exact: false,
             }),
-            queryClient.invalidateQueries({ queryKey: ["usdcBalance"] }),
-            queryClient.invalidateQueries({ queryKey: ["userPositions"] }),
-            queryClient.invalidateQueries({ queryKey: ["openOrders"] }),
+            queryClient.invalidateQueries({ queryKey: ["usdcBalance"], exact: false }),
+            queryClient.invalidateQueries({ queryKey: ["userPositions"], exact: false }),
+            queryClient.invalidateQueries({ queryKey: ["openOrders"], exact: false }),
           ]);
 
-          // Immediate refetch
+          // Immediate refetch - force fresh data
           await Promise.all([
-            queryClient.refetchQueries({ queryKey: ["userPositions"] }),
-            queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY] }),
-            queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+            queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY], exact: false }),
+            queryClient.refetchQueries({ queryKey: ["usdcBalance"], exact: false }),
           ]);
 
           // Multiple delayed refetches to catch backend updates
+          // Polymarket's Data API can take 10-30 seconds to update positions
           const refetchAll = async () => {
+            clearBalanceCache(proxyAddress);
             await Promise.all([
-              queryClient.refetchQueries({ queryKey: ["userPositions"] }),
-              queryClient.refetchQueries({
-                queryKey: [PROXY_WALLET_QUERY_KEY],
-              }),
-              queryClient.refetchQueries({ queryKey: ["usdcBalance"] }),
+              queryClient.refetchQueries({ queryKey: ["userPositions"], exact: false }),
+              queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY], exact: false }),
+              queryClient.refetchQueries({ queryKey: ["usdcBalance"], exact: false }),
             ]);
           };
 
-          // Refetch at 1s, 3s, and 5s to catch the update
+          // More aggressive refetch schedule: 1s, 3s, 5s, 10s, 15s, 20s, 30s
+          // Polymarket's backend can be slow to update
           setTimeout(refetchAll, 1000);
           setTimeout(refetchAll, 3000);
           setTimeout(refetchAll, 5000);
+          setTimeout(refetchAll, 10000);
+          setTimeout(refetchAll, 15000);
+          setTimeout(refetchAll, 20000);
+          setTimeout(refetchAll, 30000);
         }
         onSellSuccess?.();
         return { success: true, order: result.order };

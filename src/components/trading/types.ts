@@ -44,4 +44,6 @@ export interface TradingFormProps {
   initialSide?: TradingSide;
   /** Initial number of shares */
   initialShares?: number;
+  /** Condition ID for the market (required for split/merge) */
+  conditionId?: string;
 }

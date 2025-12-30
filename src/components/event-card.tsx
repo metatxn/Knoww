@@ -57,8 +57,8 @@ export function EventCard({
   const href = event.slug
     ? `/events/detail/${event.slug}`
     : event.id
-      ? `/events/detail/${event.id}`
-      : "#";
+    ? `/events/detail/${event.id}`
+    : "#";
   const marketCount = event.markets?.length || 0;
   const isActive = event.active !== false && !event.closed;
 
@@ -83,10 +83,10 @@ export function EventCard({
     typeof event.liquidityClob === "string"
       ? Number.parseFloat(event.liquidityClob)
       : typeof event.liquidityClob === "number"
-        ? event.liquidityClob
-        : typeof event.liquidity === "string"
-          ? Number.parseFloat(event.liquidity)
-          : event.liquidity || 0;
+      ? event.liquidityClob
+      : typeof event.liquidity === "string"
+      ? Number.parseFloat(event.liquidity)
+      : event.liquidity || 0;
 
   return (
     <motion.div

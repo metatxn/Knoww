@@ -5,13 +5,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   Loader2,
+  Merge,
+  MoreHorizontal,
+  Split,
   TrendingDown,
   TrendingUp,
   Wallet,
   Wifi,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DepositModal } from "@/components/deposit-modal";
 import { useOnboarding } from "@/context/onboarding-context";
 import { formatSlippageDisplay } from "@/lib/slippage";
@@ -21,11 +24,13 @@ import { BalanceWarning } from "./trading/balance-warning";
 import { BuySellToggle } from "./trading/buy-sell-toggle";
 import { useTradingFormState } from "./trading/hooks/use-trading-form-state";
 import { LimitExpiration } from "./trading/limit-expiration";
+import { MergeSharesModal } from "./trading/merge-shares-modal";
 import { OrderSummary } from "./trading/order-summary";
 import { OrderTypeToggle } from "./trading/order-type-toggle";
 import { OutcomeSelector } from "./trading/outcome-selector";
 import { PriceInput } from "./trading/price-input";
 import { SharesInput } from "./trading/shares-input";
+import { SplitSharesModal } from "./trading/split-shares-modal";
 // Types & Hooks
 import type { TradingFormProps } from "./trading/types";
 
@@ -45,11 +50,32 @@ export function TradingForm(props: TradingFormProps) {
     yesProbability,
     isLiveData = false,
     maxSlippagePercent = 2,
+    conditionId,
   } = props;
 
   const { open } = useAppKit();
   const { setShowOnboarding } = useOnboarding();
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close more menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        moreMenuRef.current &&
+        !moreMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowMoreMenu(false);
+      }
+    }
+    if (showMoreMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showMoreMenu]);
 
   // Centralized form state and logic
   const {
@@ -89,6 +115,18 @@ export function TradingForm(props: TradingFormProps) {
   } = useTradingFormState(props);
 
   const selectedOutcome = outcomes[selectedOutcomeIndex];
+
+  // Debug: Log split/merge button visibility conditions
+  console.log("[TradingForm] Split/Merge visibility check:", {
+    conditionId,
+    hasConditionId: !!conditionId,
+    hasCredentials,
+    isConnected,
+    willShowButtons: hasCredentials && !!conditionId,
+    outcomesCount: outcomes.length,
+    yesTokenId: outcomes[0]?.tokenId,
+    noTokenId: outcomes[1]?.tokenId,
+  });
 
   // Slippage UI calculation
   const slippageDisplay = slippageResult
@@ -142,7 +180,65 @@ export function TradingForm(props: TradingFormProps) {
 
         {/* Form Controls */}
         <div className="p-4 space-y-3">
-          <OrderTypeToggle orderType={orderType} onChange={setOrderType} />
+          {/* Order Type Toggle with More Menu */}
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <OrderTypeToggle orderType={orderType} onChange={setOrderType} />
+            </div>
+            {/* More Menu - Only show when user has credentials and conditionId is available */}
+            {hasCredentials && conditionId && (
+              <div className="relative shrink-0" ref={moreMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={`w-11 h-[46px] rounded-xl transition-colors flex items-center justify-center border ${
+                    showMoreMenu
+                      ? "bg-background text-foreground shadow-sm border-border/50"
+                      : "bg-muted text-muted-foreground hover:text-foreground border-transparent"
+                  }`}
+                  title="More options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {showMoreMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 z-50 min-w-[140px] rounded-xl bg-card border border-border shadow-lg overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSplitModal(true);
+                          setShowMoreMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Split className="h-4 w-4 text-muted-foreground" />
+                        Split
+                      </button>
+                      <div className="h-px bg-border" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMergeModal(true);
+                          setShowMoreMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Merge className="h-4 w-4 text-muted-foreground" />
+                        Merge
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
 
           <BuySellToggle side={side} onChange={setSide} />
 
@@ -411,6 +507,28 @@ export function TradingForm(props: TradingFormProps) {
         open={showDepositModal}
         onOpenChange={setShowDepositModal}
       />
+
+      {/* Split Shares Modal */}
+      {conditionId && (
+        <SplitSharesModal
+          open={showSplitModal}
+          onOpenChange={setShowSplitModal}
+          conditionId={conditionId}
+          marketTitle={marketTitle}
+        />
+      )}
+
+      {/* Merge Shares Modal */}
+      {conditionId && outcomes.length >= 2 && (
+        <MergeSharesModal
+          open={showMergeModal}
+          onOpenChange={setShowMergeModal}
+          conditionId={conditionId}
+          yesTokenId={outcomes[0]?.tokenId || ""}
+          noTokenId={outcomes[1]?.tokenId || ""}
+          marketTitle={marketTitle}
+        />
+      )}
     </div>
   );
 }

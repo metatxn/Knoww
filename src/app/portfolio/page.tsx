@@ -153,15 +153,20 @@ export default function PortfolioPage() {
     refreshProxyWallet();
 
     // Multiple delayed refetches to catch backend updates
+    // Polymarket's Data API can take 10-30 seconds to update positions
     const refetchAll = () => {
       refetchPositions();
       refreshProxyWallet();
     };
 
-    // Refetch at 1s, 3s, and 5s to catch the update
+    // More aggressive refetch schedule to catch Polymarket backend updates
     setTimeout(refetchAll, 1000);
     setTimeout(refetchAll, 3000);
     setTimeout(refetchAll, 5000);
+    setTimeout(refetchAll, 10000);
+    setTimeout(refetchAll, 15000);
+    setTimeout(refetchAll, 20000);
+    setTimeout(refetchAll, 30000);
 
     setSellPosition(null);
   };

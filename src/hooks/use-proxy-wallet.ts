@@ -94,8 +94,10 @@ export function useProxyWallet() {
       return fetchWalletData(address);
     },
     enabled: !!address && isConnected,
-    // Stale time matches RPC cache roughly, but we can invalidate manually
-    staleTime: 30000,
+    // Shorter stale time for more responsive balance updates after transactions
+    staleTime: 10000, // 10 seconds
+    // Refetch in background to keep balance fresh
+    refetchInterval: 15000, // 15 seconds
   });
 
   /**
