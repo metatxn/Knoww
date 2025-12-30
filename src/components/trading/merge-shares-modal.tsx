@@ -61,7 +61,7 @@ export function MergeSharesModal({
         .then((balances) => {
           // Convert from wei to display units (6 decimals for USDC-backed tokens)
           const minBalanceDisplay =
-            Number(balances.minBalance) / Math.pow(10, USDC_DECIMALS);
+            Number(balances.minBalance) / 10 ** USDC_DECIMALS;
           setAvailableShares(minBalanceDisplay);
         })
         .catch((err) => {

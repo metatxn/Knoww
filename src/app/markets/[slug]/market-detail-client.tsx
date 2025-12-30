@@ -43,15 +43,6 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
   // Fetch market details with TanStack Query (slug-based only, as recommended by API team)
   const { data: market, isLoading: loading, error } = useMarketDetail(slug);
 
-  // Debug: Log market data immediately when available
-  console.log("[MarketDetailClient] Market data received:", {
-    hasMarket: !!market,
-    loading,
-    error: error?.message,
-    conditionId: market?.conditionId,
-    marketKeys: market ? Object.keys(market) : [],
-  });
-
   // Handle order success - must be at top level before any early returns
   const handleOrderSuccess = useCallback((_order: unknown) => {
     // console.log("Order placed successfully:", order);
@@ -267,10 +258,10 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
         idx === 0
           ? "orange"
           : idx === 1
-          ? "blue"
-          : idx === 2
-          ? "purple"
-          : "green",
+            ? "blue"
+            : idx === 2
+              ? "purple"
+              : "green",
     };
   });
 
@@ -306,14 +297,6 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
       };
     });
   })();
-
-  // Debug: Log conditionId to verify it's available for split/merge
-  console.log("[MarketDetail] Market conditionId check:", {
-    slug: market.slug,
-    conditionId: market.conditionId,
-    hasConditionId: !!market.conditionId,
-    marketId: market.id,
-  });
 
   // Prepare token info for the chart
   const chartColors = [
@@ -469,10 +452,10 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
                     outcome.color === "orange"
                       ? "bg-orange-500"
                       : outcome.color === "blue"
-                      ? "bg-blue-500"
-                      : outcome.color === "purple"
-                      ? "bg-purple-400"
-                      : "bg-green-500"
+                        ? "bg-blue-500"
+                        : outcome.color === "purple"
+                          ? "bg-purple-400"
+                          : "bg-green-500"
                   }`}
                 />
                 <span className="text-sm">

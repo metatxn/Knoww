@@ -73,7 +73,8 @@ export function TradingForm(props: TradingFormProps) {
     }
     if (showMoreMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMoreMenu]);
 
@@ -115,18 +116,6 @@ export function TradingForm(props: TradingFormProps) {
   } = useTradingFormState(props);
 
   const selectedOutcome = outcomes[selectedOutcomeIndex];
-
-  // Debug: Log split/merge button visibility conditions
-  console.log("[TradingForm] Split/Merge visibility check:", {
-    conditionId,
-    hasConditionId: !!conditionId,
-    hasCredentials,
-    isConnected,
-    willShowButtons: hasCredentials && !!conditionId,
-    outcomesCount: outcomes.length,
-    yesTokenId: outcomes[0]?.tokenId,
-    noTokenId: outcomes[1]?.tokenId,
-  });
 
   // Slippage UI calculation
   const slippageDisplay = slippageResult

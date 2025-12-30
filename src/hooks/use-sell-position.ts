@@ -201,15 +201,30 @@ export function useSellPosition({
               queryKey: [PROXY_WALLET_QUERY_KEY],
               exact: false,
             }),
-            queryClient.invalidateQueries({ queryKey: ["usdcBalance"], exact: false }),
-            queryClient.invalidateQueries({ queryKey: ["userPositions"], exact: false }),
-            queryClient.invalidateQueries({ queryKey: ["openOrders"], exact: false }),
+            queryClient.invalidateQueries({
+              queryKey: ["usdcBalance"],
+              exact: false,
+            }),
+            queryClient.invalidateQueries({
+              queryKey: ["userPositions"],
+              exact: false,
+            }),
+            queryClient.invalidateQueries({
+              queryKey: ["openOrders"],
+              exact: false,
+            }),
           ]);
 
           // Immediate refetch - force fresh data
           await Promise.all([
-            queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY], exact: false }),
-            queryClient.refetchQueries({ queryKey: ["usdcBalance"], exact: false }),
+            queryClient.refetchQueries({
+              queryKey: [PROXY_WALLET_QUERY_KEY],
+              exact: false,
+            }),
+            queryClient.refetchQueries({
+              queryKey: ["usdcBalance"],
+              exact: false,
+            }),
           ]);
 
           // Multiple delayed refetches to catch backend updates
@@ -217,9 +232,18 @@ export function useSellPosition({
           const refetchAll = async () => {
             clearBalanceCache(proxyAddress);
             await Promise.all([
-              queryClient.refetchQueries({ queryKey: ["userPositions"], exact: false }),
-              queryClient.refetchQueries({ queryKey: [PROXY_WALLET_QUERY_KEY], exact: false }),
-              queryClient.refetchQueries({ queryKey: ["usdcBalance"], exact: false }),
+              queryClient.refetchQueries({
+                queryKey: ["userPositions"],
+                exact: false,
+              }),
+              queryClient.refetchQueries({
+                queryKey: [PROXY_WALLET_QUERY_KEY],
+                exact: false,
+              }),
+              queryClient.refetchQueries({
+                queryKey: ["usdcBalance"],
+                exact: false,
+              }),
             ]);
           };
 

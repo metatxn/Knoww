@@ -35,7 +35,9 @@ export async function GET(
     // Fetch market using slug query (recommended by API team)
     // Always filter closed=false unless specifically requesting historical data
     const slugResponse = await fetch(
-      `${POLYMARKET_API.GAMMA.MARKETS}?slug=${encodeURIComponent(slug)}&closed=false`,
+      `${POLYMARKET_API.GAMMA.MARKETS}?slug=${encodeURIComponent(
+        slug
+      )}&closed=false`,
       {
         headers: {
           "Content-Type": "application/json",
@@ -64,15 +66,6 @@ export async function GET(
     }
 
     const market = slugData[0];
-
-    // Debug: Log conditionId to verify it's coming from Gamma API
-    console.log("[API /markets/slug] Market data:", {
-      slug: market.slug,
-      question: market.question,
-      conditionId: market.conditionId,
-      hasConditionId: !!market.conditionId,
-      clobTokenIds: market.clobTokenIds,
-    });
 
     return NextResponse.json({
       success: true,

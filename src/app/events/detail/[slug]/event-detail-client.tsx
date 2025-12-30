@@ -382,15 +382,6 @@ export default function EventDetailClient({
         .flatMap((m) => [m.yesTokenId, m.noTokenId])
         .filter(Boolean);
 
-      // Debug: Log selected market conditionId
-      console.log("[EventDetail] Selected market data:", {
-        marketId: selected?.id,
-        conditionId: selected?.conditionId,
-        hasConditionId: !!selected?.conditionId,
-        yesTokenId: selected?.yesTokenId,
-        noTokenId: selected?.noTokenId,
-      });
-
       return {
         selectedMarket: selected,
         tradingOutcomes: outcomes,
@@ -851,10 +842,10 @@ export default function EventDetailClient({
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">

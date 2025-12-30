@@ -242,21 +242,16 @@ export function useCtfOperations() {
   const executeCTFOperation = useCallback(
     async (
       operationName: CTFFunction,
-      encodedData: `0x${string}`,
-      logContext: Record<string, unknown>
+      encodedData: `0x${string}`
     ): Promise<OperationResult> => {
       setState({ isLoading: true, error: null, txHash: null });
 
       try {
         const client = await getRelayClient();
 
-        console.log(`[CTF] Executing ${operationName}:`, logContext);
-
         const response = await client.execute([
           { to: CTF_ADDRESS, data: encodedData, value: "0" },
         ]);
-
-        console.log(`[CTF] ${operationName} response:`, response);
 
         const confirmedHash = await pollForConfirmation(
           client,
@@ -329,7 +324,7 @@ export function useCtfOperations() {
     async (
       conditionId: string,
       amount: number,
-      proxyAddress: string
+      _proxyAddress: string
     ): Promise<OperationResult> => {
       const { encodeFunctionData, parseUnits } = await import("viem");
 
@@ -347,12 +342,7 @@ export function useCtfOperations() {
         ],
       });
 
-      return executeCTFOperation("splitPosition", encodedData, {
-        conditionId,
-        amount,
-        amountInWei: amountInWei.toString(),
-        proxyAddress,
-      });
+      return executeCTFOperation("splitPosition", encodedData);
     },
     [executeCTFOperation]
   );
@@ -365,7 +355,7 @@ export function useCtfOperations() {
     async (
       conditionId: string,
       amount: number,
-      proxyAddress: string
+      _proxyAddress: string
     ): Promise<OperationResult> => {
       const { encodeFunctionData, parseUnits } = await import("viem");
 
@@ -383,12 +373,7 @@ export function useCtfOperations() {
         ],
       });
 
-      return executeCTFOperation("mergePositions", encodedData, {
-        conditionId,
-        amount,
-        amountInWei: amountInWei.toString(),
-        proxyAddress,
-      });
+      return executeCTFOperation("mergePositions", encodedData);
     },
     [executeCTFOperation]
   );
@@ -399,7 +384,7 @@ export function useCtfOperations() {
   const redeemPositions = useCallback(
     async (
       conditionId: string,
-      proxyAddress: string
+      _proxyAddress: string
     ): Promise<OperationResult> => {
       const { encodeFunctionData } = await import("viem");
 
@@ -414,10 +399,7 @@ export function useCtfOperations() {
         ],
       });
 
-      return executeCTFOperation("redeemPositions", encodedData, {
-        conditionId,
-        proxyAddress,
-      });
+      return executeCTFOperation("redeemPositions", encodedData);
     },
     [executeCTFOperation]
   );
