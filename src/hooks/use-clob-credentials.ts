@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection, useSignTypedData } from "wagmi";
 import {
   CLOB_AUTH_DOMAIN,
@@ -9,7 +9,7 @@ import {
 } from "@/constants/polymarket";
 
 /**
- * API Key credentials returned by Polymarket
+ * API Key credentials returned by Polymarket (full trading permissions)
  */
 export interface ApiKeyCreds {
   apiKey: string;
@@ -18,20 +18,47 @@ export interface ApiKeyCreds {
 }
 
 /**
- * Storage key for credentials in localStorage
+ * Read-only API key for viewing data without trading permissions
+ * Can be shared with third-party services safely
  */
-const CREDS_STORAGE_KEY = "polymarket_api_creds";
+export interface ReadonlyApiKey {
+  apiKey: string;
+}
 
 /**
- * Get stored credentials from localStorage
+ * Extended ClobClient interface with read-only API key methods
+ * These methods exist in the SDK but TypeScript doesn't resolve them correctly
+ * due to ESM export issues in the package
+ */
+interface ClobClientWithReadonlyMethods {
+  createReadonlyApiKey(): Promise<{ apiKey: string }>;
+  getReadonlyApiKeys(): Promise<string[]>;
+  deleteReadonlyApiKey(key: string): Promise<boolean>;
+  validateReadonlyApiKey(address: string, key: string): Promise<string>;
+}
+
+/**
+ * Storage key prefix for credentials
+ */
+const CREDS_STORAGE_KEY = "polymarket_api_creds";
+const READONLY_KEYS_STORAGE_KEY = "polymarket_readonly_keys";
+
+/**
+ * Get the storage key for a specific address
+ */
+function getStorageKey(address: string): string {
+  return `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`;
+}
+
+/**
+ * Get stored credentials from sessionStorage (cleared when browser closes)
+ * This provides better security than localStorage as credentials don't persist indefinitely
  */
 function getStoredCredentials(address: string): ApiKeyCreds | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const stored = localStorage.getItem(
-      `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`
-    );
+    const stored = sessionStorage.getItem(getStorageKey(address));
     if (stored) {
       return JSON.parse(stored) as ApiKeyCreds;
     }
@@ -42,63 +69,104 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
 }
 
 /**
- * Store credentials in localStorage
+ * Store credentials in sessionStorage (cleared when browser closes)
+ * This provides better security than localStorage as credentials don't persist indefinitely
  */
 function storeCredentials(address: string, creds: ApiKeyCreds): void {
   if (typeof window === "undefined") return;
+  sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
+}
 
+/**
+ * Clear stored credentials from sessionStorage
+ */
+function clearStoredCredentials(address: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(getStorageKey(address));
+}
+
+/**
+ * Get the storage key for read-only keys
+ */
+function getReadonlyKeysStorageKey(address: string): string {
+  return `${READONLY_KEYS_STORAGE_KEY}_${address.toLowerCase()}`;
+}
+
+/**
+ * Get stored read-only API keys from localStorage (persisted across sessions)
+ * Read-only keys are safe to persist as they cannot be used for trading
+ */
+function getStoredReadonlyKeys(address: string): string[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored = localStorage.getItem(getReadonlyKeysStorageKey(address));
+    if (stored) {
+      return JSON.parse(stored) as string[];
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return [];
+}
+
+/**
+ * Store read-only API keys in localStorage
+ */
+function storeReadonlyKeys(address: string, keys: string[]): void {
+  if (typeof window === "undefined") return;
   localStorage.setItem(
-    `${CREDS_STORAGE_KEY}_${address.toLowerCase()}`,
-    JSON.stringify(creds)
+    getReadonlyKeysStorageKey(address),
+    JSON.stringify(keys)
   );
 }
 
 /**
- * Clear stored credentials from localStorage
+ * Clear stored read-only keys from localStorage
  */
-function clearStoredCredentials(address: string): void {
+function clearStoredReadonlyKeys(address: string): void {
   if (typeof window === "undefined") return;
-
-  localStorage.removeItem(`${CREDS_STORAGE_KEY}_${address.toLowerCase()}`);
+  localStorage.removeItem(getReadonlyKeysStorageKey(address));
 }
 
 /**
  * Hook for managing Polymarket CLOB API credentials
  *
  * This hook handles:
- * 1. Checking for existing stored credentials
- * 2. Deriving new credentials via L1 authentication
- * 3. Storing credentials for future use
+ * 1. Checking for existing stored credentials in sessionStorage
+ * 2. Deriving new credentials via the SDK's createOrDeriveApiKey()
+ * 3. Storing credentials in sessionStorage for the current browser session
  *
  * Users need valid API credentials to post orders to the CLOB.
  * Credentials are derived by signing an EIP-712 message.
+ *
+ * Reference: https://docs.polymarket.com/developers/CLOB/clients/methods-l1
  */
 export function useClobCredentials() {
   const { address, isConnected } = useConnection();
   const signTypedData = useSignTypedData();
 
   const [credentials, setCredentials] = useState<ApiKeyCreds | null>(null);
+  const [readonlyKeys, setReadonlyKeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Load stored credentials when address changes
+  // Load stored credentials and read-only keys when address changes
   useEffect(() => {
     if (address) {
       const stored = getStoredCredentials(address);
       setCredentials(stored);
+      const storedReadonlyKeys = getStoredReadonlyKeys(address);
+      setReadonlyKeys(storedReadonlyKeys);
     } else {
       setCredentials(null);
+      setReadonlyKeys([]);
     }
   }, [address]);
 
   /**
-   * Generate L1 authentication signature
-   * This creates an EIP-712 signature that Polymarket uses for authentication
-   *
-   * IMPORTANT: The signature format must match exactly what Polymarket's SDK produces:
-   * - timestamp: string representation of unix seconds
-   * - nonce: number (the SDK uses plain number, wagmi/viem accepts number for uint256)
-   * - message: exact string "This message attests that I control the given wallet"
+   * Generate L1 authentication signature for API fallback
+   * Creates an EIP-712 signature that Polymarket uses for authentication
    */
   const generateL1Signature = useCallback(async (): Promise<{
     signature: string;
@@ -109,11 +177,9 @@ export function useClobCredentials() {
       throw new Error("Wallet not connected");
     }
 
-    // Timestamp should be current unix time in seconds
     const timestamp = Math.floor(Date.now() / 1000);
-    const nonce = 0; // Default nonce is 0
+    const nonce = 0;
 
-    // Sign the EIP-712 typed data
     const signature = await signTypedData.mutateAsync({
       domain: CLOB_AUTH_DOMAIN,
       types: CLOB_AUTH_TYPES,
@@ -128,14 +194,14 @@ export function useClobCredentials() {
 
     return {
       signature,
-      timestamp: `${timestamp}`, // Return as string for headers
-      nonce: `${nonce}`, // Return as string for headers
+      timestamp: `${timestamp}`,
+      nonce: `${nonce}`,
     };
   }, [address, signTypedData]);
 
   /**
-   * Fallback method: Derive credentials via our API route
-   * Used when SDK methods fail (e.g., due to network issues)
+   * Fallback: Derive credentials via server-side API route
+   * Used when SDK methods fail (e.g., due to network issues or CORS)
    */
   const deriveCredentialsViaApi =
     useCallback(async (): Promise<ApiKeyCreds> => {
@@ -143,21 +209,12 @@ export function useClobCredentials() {
         throw new Error("Wallet not connected");
       }
 
-      // Generate L1 signature
       const { signature, timestamp, nonce } = await generateL1Signature();
 
-      // Call our API to derive credentials
       const response = await fetch("/api/auth/derive-api-key", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          address,
-          signature,
-          timestamp,
-          nonce,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, signature, timestamp, nonce }),
       });
 
       const data = (await response.json()) as {
@@ -172,17 +229,8 @@ export function useClobCredentials() {
       };
 
       if (!response.ok || !data.success) {
-        let errorMessage =
+        const errorMessage =
           data.error || data.details || "Failed to derive API credentials";
-
-        if (errorMessage.includes("Could not derive api key")) {
-          errorMessage =
-            "Unable to create trading credentials. Please ensure you have completed all previous setup steps (Deploy wallet & Approve USDC) and try again.";
-        } else if (errorMessage.includes("Invalid signature")) {
-          errorMessage =
-            "Signature verification failed. Please try signing again.";
-        }
-
         throw new Error(errorMessage);
       }
 
@@ -192,7 +240,6 @@ export function useClobCredentials() {
         apiPassphrase: data.credentials?.passphrase || "",
       };
 
-      // Store credentials for future use
       storeCredentials(address, creds);
       setCredentials(creds);
 
@@ -200,13 +247,12 @@ export function useClobCredentials() {
     }, [address, generateL1Signature]);
 
   /**
-   * Create or derive API credentials using the SDK directly
+   * Create or derive API credentials using the SDK
    *
-   * This follows the official Polymarket pattern:
-   * 1. First try deriveApiKey() - works for returning users
-   * 2. If that fails, try createApiKey() - for new users
+   * Uses the recommended createOrDeriveApiKey() method which automatically
+   * handles both returning users (derivation) and new users (creation).
    *
-   * Reference: https://github.com/Polymarket/wagmi-safe-builder-example
+   * Reference: https://docs.polymarket.com/developers/CLOB/clients/methods-l1#createorderiveapikey
    */
   const deriveCredentials = useCallback(async (): Promise<ApiKeyCreds> => {
     if (!address) {
@@ -222,8 +268,10 @@ export function useClobCredentials() {
 
     try {
       // Dynamic imports to avoid SSR issues
-      const { ClobClient } = await import("@polymarket/clob-client");
-      const ethersModule = await import("ethers");
+      const [{ ClobClient }, ethersModule] = await Promise.all([
+        import("@polymarket/clob-client"),
+        import("ethers"),
+      ]);
 
       // Create ethers signer from wallet provider
       const provider = new ethersModule.providers.Web3Provider(
@@ -233,40 +281,26 @@ export function useClobCredentials() {
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
 
-      // Create a temporary CLOB client (no credentials yet)
-      const tempClient = new ClobClient(
+      // Create CLOB client for credential derivation
+      const clobClient = new ClobClient(
         process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
           "https://clob.polymarket.com",
-        137, // Polygon chain ID
+        137,
         signer
       );
 
-      // Try to derive existing credentials first (for returning users)
-      // If that fails, create new credentials (for new users)
       let creds: { key: string; secret: string; passphrase: string };
 
       try {
+        console.log("[ClobCredentials] Using createOrDeriveApiKey...");
+        creds = await clobClient.createOrDeriveApiKey();
+        console.log("[ClobCredentials] Successfully obtained API credentials");
+      } catch (sdkErr) {
         console.log(
-          "[ClobCredentials] Attempting to derive existing API key..."
+          "[ClobCredentials] SDK failed, using API fallback...",
+          sdkErr
         );
-        creds = await tempClient.deriveApiKey();
-        console.log("[ClobCredentials] Successfully derived existing API key");
-      } catch (deriveErr) {
-        console.log(
-          "[ClobCredentials] Derive failed, creating new API key...",
-          deriveErr
-        );
-        try {
-          creds = await tempClient.createApiKey();
-          console.log("[ClobCredentials] Successfully created new API key");
-        } catch (createErr) {
-          // If both SDK methods fail, fall back to our API route
-          console.log(
-            "[ClobCredentials] SDK methods failed, using API fallback...",
-            createErr
-          );
-          return await deriveCredentialsViaApi();
-        }
+        return await deriveCredentialsViaApi();
       }
 
       const apiCreds: ApiKeyCreds = {
@@ -275,7 +309,6 @@ export function useClobCredentials() {
         apiPassphrase: creds.passphrase,
       };
 
-      // Store credentials for future use
       storeCredentials(address, apiCreds);
       setCredentials(apiCreds);
 
@@ -291,7 +324,7 @@ export function useClobCredentials() {
   }, [address, deriveCredentialsViaApi]);
 
   /**
-   * Clear stored credentials
+   * Clear stored credentials and reset state
    */
   const clearCredentials = useCallback(() => {
     if (address) {
@@ -301,7 +334,19 @@ export function useClobCredentials() {
   }, [address]);
 
   /**
-   * Refresh credentials from storage
+   * Clear all credentials including read-only keys
+   */
+  const clearAllCredentials = useCallback(() => {
+    if (address) {
+      clearStoredCredentials(address);
+      clearStoredReadonlyKeys(address);
+      setCredentials(null);
+      setReadonlyKeys([]);
+    }
+  }, [address]);
+
+  /**
+   * Refresh credentials from sessionStorage
    * Useful after completing onboarding to ensure state is up to date
    */
   const refresh = useCallback(() => {
@@ -312,22 +357,224 @@ export function useClobCredentials() {
   }, [address]);
 
   /**
-   * Check if credentials exist and are valid
+   * Check if credentials exist
    */
-  const hasCredentials = credentials !== null;
+  const hasCredentials = useMemo(() => credentials !== null, [credentials]);
+
+  /**
+   * Helper to get an authenticated CLOB client
+   * Used internally for read-only key operations
+   */
+  const getAuthenticatedClient = useCallback(async () => {
+    if (!credentials) {
+      throw new Error(
+        "Full credentials required. Please derive credentials first."
+      );
+    }
+
+    if (typeof window === "undefined" || !window.ethereum) {
+      throw new Error("No wallet provider found");
+    }
+
+    const [{ ClobClient }, ethersModule] = await Promise.all([
+      import("@polymarket/clob-client"),
+      import("ethers"),
+    ]);
+
+    const provider = new ethersModule.providers.Web3Provider(
+      // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
+      window.ethereum as any
+    );
+    await provider.send("eth_requestAccounts", []);
+    const signer = provider.getSigner();
+
+    const creds = {
+      key: credentials.apiKey,
+      secret: credentials.apiSecret,
+      passphrase: credentials.apiPassphrase,
+    };
+
+    return new ClobClient(
+      process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com",
+      137,
+      signer,
+      creds
+    ) as InstanceType<typeof ClobClient> & ClobClientWithReadonlyMethods;
+  }, [credentials]);
+
+  /**
+   * Create a new read-only API key
+   *
+   * Read-only keys can be safely shared with third-party services
+   * to view portfolio data without trading permissions.
+   *
+   * Requires full credentials to be derived first.
+   */
+  const createReadonlyApiKey = useCallback(async (): Promise<string> => {
+    if (!address) {
+      throw new Error("Wallet not connected");
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = await getAuthenticatedClient();
+      console.log("[ClobCredentials] Creating read-only API key...");
+
+      const response = await client.createReadonlyApiKey();
+      const newKey = response.apiKey;
+
+      console.log("[ClobCredentials] Successfully created read-only API key");
+
+      // Update local state and storage
+      const updatedKeys = [...readonlyKeys, newKey];
+      setReadonlyKeys(updatedKeys);
+      storeReadonlyKeys(address, updatedKeys);
+
+      return newKey;
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err
+          : new Error("Failed to create read-only API key");
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [address, getAuthenticatedClient, readonlyKeys]);
+
+  /**
+   * Get all read-only API keys from the server
+   *
+   * Syncs local state with server state.
+   */
+  const getReadonlyApiKeys = useCallback(async (): Promise<string[]> => {
+    if (!address) {
+      throw new Error("Wallet not connected");
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = await getAuthenticatedClient();
+      console.log("[ClobCredentials] Fetching read-only API keys...");
+
+      const keys = await client.getReadonlyApiKeys();
+
+      console.log(`[ClobCredentials] Found ${keys.length} read-only API keys`);
+
+      // Update local state and storage
+      setReadonlyKeys(keys);
+      storeReadonlyKeys(address, keys);
+
+      return keys;
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err
+          : new Error("Failed to fetch read-only API keys");
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [address, getAuthenticatedClient]);
+
+  /**
+   * Delete a read-only API key
+   *
+   * Revokes access for any third-party service using this key.
+   */
+  const deleteReadonlyApiKey = useCallback(
+    async (keyToDelete: string): Promise<boolean> => {
+      if (!address) {
+        throw new Error("Wallet not connected");
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const client = await getAuthenticatedClient();
+        console.log("[ClobCredentials] Deleting read-only API key...");
+
+        const success = await client.deleteReadonlyApiKey(keyToDelete);
+
+        if (success) {
+          console.log(
+            "[ClobCredentials] Successfully deleted read-only API key"
+          );
+
+          // Update local state and storage
+          const updatedKeys = readonlyKeys.filter((k) => k !== keyToDelete);
+          setReadonlyKeys(updatedKeys);
+          storeReadonlyKeys(address, updatedKeys);
+        }
+
+        return success;
+      } catch (err) {
+        const error =
+          err instanceof Error
+            ? err
+            : new Error("Failed to delete read-only API key");
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [address, getAuthenticatedClient, readonlyKeys]
+  );
+
+  /**
+   * Validate a read-only API key for a given address
+   *
+   * Can be used to verify if a key is still valid.
+   * This method does not require authentication.
+   */
+  const validateReadonlyApiKey = useCallback(
+    async (targetAddress: string, key: string): Promise<boolean> => {
+      try {
+        const { ClobClient } = await import("@polymarket/clob-client");
+
+        // Create unauthenticated client for validation
+        const client = new ClobClient(
+          process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
+            "https://clob.polymarket.com",
+          137
+        ) as InstanceType<typeof ClobClient> & ClobClientWithReadonlyMethods;
+
+        const result = await client.validateReadonlyApiKey(targetAddress, key);
+        return !!result;
+      } catch {
+        return false;
+      }
+    },
+    []
+  );
 
   return {
     // State
     credentials,
     hasCredentials,
+    readonlyKeys,
     isConnected,
     isLoading,
     error,
 
-    // Actions
+    // Full credential actions
     deriveCredentials,
     clearCredentials,
-    generateL1Signature,
+    clearAllCredentials,
     refresh,
+
+    // Read-only API key actions
+    createReadonlyApiKey,
+    getReadonlyApiKeys,
+    deleteReadonlyApiKey,
+    validateReadonlyApiKey,
   };
 }
