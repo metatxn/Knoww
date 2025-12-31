@@ -27,6 +27,7 @@ import {
   Vote,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConnection, useDisconnect } from "wagmi";
@@ -181,7 +182,13 @@ export function Sidebar() {
             onClick={() => router.push("/")}
             className="group flex items-center gap-2 font-black text-lg hover:opacity-80 transition-all"
           >
-            <span className="text-xl group-hover:animate-bounce">📊</span>
+            <Image
+              src="/logo-256x256.png"
+              alt="Knoww"
+              width={28}
+              height={28}
+              className="group-hover:scale-110 transition-transform duration-300"
+            />
             {!isCollapsed && (
               <span className="bg-clip-text text-transparent bg-linear-to-r from-gray-900 via-gray-800 to-gray-600 dark:from-foreground dark:via-foreground dark:to-foreground/70 group-hover:from-violet-600 group-hover:to-blue-600 dark:group-hover:from-purple-400 dark:group-hover:to-blue-400 transition-all duration-300">
                 Knoww

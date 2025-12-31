@@ -21,6 +21,7 @@ import {
   Vote,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConnection } from "wagmi";
@@ -102,7 +103,12 @@ export function SidebarMobile() {
         <SheetContent side="left" className="w-72 p-0 flex flex-col">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b">
-            <span className="text-xl">📊</span>
+            <Image
+              src="/logo-256x256.png"
+              alt="Knoww"
+              width={28}
+              height={28}
+            />
             <SheetTitle className="font-bold text-lg">Knoww</SheetTitle>
           </div>
 

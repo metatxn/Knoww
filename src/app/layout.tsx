@@ -32,6 +32,22 @@ export const metadata: Metadata = {
     "Trade on real-world events with Knoww. Explore prediction markets for politics, sports, crypto, and more.",
   keywords: ["prediction markets", "polymarket", "trading", "crypto", "odds"],
   metadataBase: new URL("https://knoww.app"),
+  icons: {
+    icon: [
+      // Small screens (mobile) - 16x16
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      // Medium screens (tablet) - 32x32
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      // Large screens (desktop) - 48x48
+      { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: [
+      // Apple touch icon
+      { url: "/logo-256x256.png", sizes: "256x256", type: "image/png" },
+    ],
+    shortcut: "/favicon-32x32.png",
+  },
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -40,9 +56,9 @@ export const metadata: Metadata = {
     description: "Trade on real-world events with prediction markets",
     images: [
       {
-        url: "/vercel.svg", // Placeholder until a proper OG image is added
-        width: 1200,
-        height: 630,
+        url: "/logo-512x512.png",
+        width: 512,
+        height: 512,
         alt: "Knoww Prediction Markets",
       },
     ],
@@ -51,7 +67,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Knoww - Know your Odds",
     description: "Trade on real-world events with prediction markets",
-    images: ["/vercel.svg"],
+    images: ["/logo-512x512.png"],
   },
   robots: {
     index: true,

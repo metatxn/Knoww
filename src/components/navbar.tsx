@@ -9,6 +9,7 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useBalance, useConnection, useDisconnect } from "wagmi";
@@ -69,7 +70,13 @@ export function Navbar() {
             onClick={() => router.push("/")}
             className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity"
           >
-            <span className="text-xl">📊</span>
+            <Image
+              src="/logo-256x256.png"
+              alt="Knoww"
+              width={24}
+              height={24}
+              className="sm:w-7 sm:h-7"
+            />
             <span>Knoww</span>
           </button>
         </div>
