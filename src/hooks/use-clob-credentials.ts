@@ -93,14 +93,13 @@ function getReadonlyKeysStorageKey(address: string): string {
 }
 
 /**
- * Get stored read-only API keys from localStorage (persisted across sessions)
- * Read-only keys are safe to persist as they cannot be used for trading
+ * Get stored read-only API keys from sessionStorage (cleared when browser closes)
  */
 function getStoredReadonlyKeys(address: string): string[] {
   if (typeof window === "undefined") return [];
 
   try {
-    const stored = localStorage.getItem(getReadonlyKeysStorageKey(address));
+    const stored = sessionStorage.getItem(getReadonlyKeysStorageKey(address));
     if (stored) {
       return JSON.parse(stored) as string[];
     }
@@ -111,22 +110,22 @@ function getStoredReadonlyKeys(address: string): string[] {
 }
 
 /**
- * Store read-only API keys in localStorage
+ * Store read-only API keys in sessionStorage (cleared when browser closes)
  */
 function storeReadonlyKeys(address: string, keys: string[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(
+  sessionStorage.setItem(
     getReadonlyKeysStorageKey(address),
     JSON.stringify(keys)
   );
 }
 
 /**
- * Clear stored read-only keys from localStorage
+ * Clear stored read-only keys from sessionStorage
  */
 function clearStoredReadonlyKeys(address: string): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(getReadonlyKeysStorageKey(address));
+  sessionStorage.removeItem(getReadonlyKeysStorageKey(address));
 }
 
 /**
