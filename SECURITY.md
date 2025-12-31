@@ -13,11 +13,11 @@ If you discover a potential security vulnerability, please follow the responsibl
 
 Security updates are provided **only** for actively maintained versions.
 
-| Version | Supported |
-| ------ | --------- |
-| `main` / latest | ✅ Yes |
-| Older tagged releases | ❌ No |
-| Forks / downstream builds | ❌ No |
+| Version                   | Supported |
+| ------------------------- | --------- |
+| `main` / latest           | ✅ Yes    |
+| Older tagged releases     | ❌ No     |
+| Forks / downstream builds | ❌ No     |
 
 > ⚠️ Security fixes are applied only to the latest version on the `main` branch.  
 > Users are strongly encouraged to stay up to date.
@@ -46,6 +46,7 @@ Private reporting helps prevent exploitation before a fix is released.
 ### ❌ What NOT to Do
 
 Please **do not**:
+
 - Disclose the vulnerability publicly before it is fixed
 - Open a public GitHub issue for security-sensitive bugs
 - Share exploit details on social media or public forums
@@ -102,6 +103,7 @@ Not all reported issues will be classified as security vulnerabilities.
 This project uses automated tooling such as **Dependabot** to monitor dependencies.
 
 Please note:
+
 - Vulnerabilities in **unused or non-runtime dependencies** (e.g. development-only packages) may be dismissed
 - Some alerts may be **non-exploitable** due to Cloudflare Workers, sandboxing, or architectural constraints
 - We assess issues based on **real-world impact**, not scanner output alone
@@ -123,6 +125,7 @@ We will not pursue legal action against researchers who:
 ## Security Best Practices (For Contributors)
 
 Contributors are expected to:
+
 - Avoid introducing new dependencies unnecessarily
 - Follow secure coding practices
 - Never commit secrets, private keys, or credentials
@@ -136,7 +139,6 @@ Pull requests that weaken security may be rejected.
 
 For security-related questions or reports:
 
-- **Security Contact:** `security@[your-domain].com`
 - **GitHub:** Use the repository’s **Security Advisory** feature
 
-Thank you for helping keep **grow** secure 🙏
+Thank you for helping keep **knoww** secure 🙏
