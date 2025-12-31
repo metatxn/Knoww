@@ -16,6 +16,7 @@
   "dependencies": {
     "@metamask/sdk": "~0.34.0",
     "@opennextjs/cloudflare": "^1.14.7",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@polymarket/builder-relayer-client": "^0.0.8",
     "@polymarket/builder-signing-sdk": "^0.0.8",
     "@polymarket/clob-client": "^4.22.8",
@@ -37,6 +38,7 @@
     "@reown/appkit-adapter-wagmi": "^1.8.15",
     "@tanstack/react-query": "^5.90.14",
     "@walletconnect/ethereum-provider": "~2.23.1",
+    "ai": "^6.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

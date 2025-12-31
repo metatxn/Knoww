@@ -100,20 +100,20 @@ export function HeaderSection({
           )}
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div
-                className={cn(
-                  "flex-1 min-w-0",
-                  // On md (tablet): Always use flex layout for bottom alignment
-                  // On lg (desktop): Only use flex layout when not scrolled
-                  "md:h-20 md:flex md:flex-col md:justify-between",
-                  isScrolled && "lg:h-auto lg:block"
-                )}
-              >
-                <div className="min-w-0">
+            <div
+              className={cn(
+                "flex-1 min-w-0",
+                // On md (tablet): Always use flex layout for bottom alignment
+                // On lg (desktop): Only use flex layout when not scrolled
+                "md:h-20 md:flex md:flex-col md:justify-between",
+                isScrolled && "lg:h-auto lg:block"
+              )}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
                   <h1
                     className={cn(
-                      "font-bold leading-tight transition-all duration-300",
+                      "font-bold leading-tight transition-all duration-300 flex-1 min-w-0",
                       isScrolled
                         ? "lg:text-2xl text-xl sm:text-2xl md:text-3xl"
                         : "text-xl sm:text-2xl md:text-3xl"
@@ -121,6 +121,40 @@ export function HeaderSection({
                   >
                     {event.title}
                   </h1>
+
+                  {/* Action Buttons - Icon only on mobile/tablet, with text on desktop */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 shrink-0 transition-all duration-300",
+                      isScrolled ? "lg:scale-90 scale-100" : "scale-100"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+                        "h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
+                      )}
+                      onClick={async () => {
+                        if (typeof window !== "undefined" && navigator.share) {
+                          try {
+                            await navigator.share({
+                              title: event.title,
+                              url: window.location.href,
+                            });
+                          } catch (err) {
+                            if ((err as Error).name !== "AbortError") {
+                              console.error("Share failed:", err);
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      <span className="hidden lg:inline">Share</span>
+                    </button>
+                  </div>
+                </div>
                   <div
                     className={cn(
                       "flex flex-wrap items-center gap-2 transition-all duration-300",
@@ -209,41 +243,6 @@ export function HeaderSection({
                       className="text-xs sm:text-sm"
                     />
                   )}
-                </div>
-              </div>
-
-              {/* Action Buttons - Icon only on mobile/tablet, with text on desktop */}
-              <div
-                className={cn(
-                  "flex items-center gap-1.5 shrink-0 transition-all duration-300",
-                  isScrolled ? "lg:scale-90 scale-100" : "scale-100",
-                  !isScrolled && "md:mt-1"
-                )}
-              >
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-                    "h-8 w-8 lg:h-9 lg:w-auto lg:px-3 lg:gap-2"
-                  )}
-                  onClick={async () => {
-                    if (typeof window !== "undefined" && navigator.share) {
-                      try {
-                        await navigator.share({
-                          title: event.title,
-                          url: window.location.href,
-                        });
-                      } catch (err) {
-                        if ((err as Error).name !== "AbortError") {
-                          console.error("Share failed:", err);
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <Share2 className="h-4 w-4" />
-                  <span className="hidden lg:inline">Share</span>
-                </button>
               </div>
             </div>
           </div>

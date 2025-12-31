@@ -10,3 +10,5 @@ export default function robots(): MetadataRoute.Robots {
     sitemap: "https://knoww.app/sitemap.xml",
   };
 }
+
+
