@@ -32,6 +32,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConnection, useDisconnect } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
+import { NotificationBell } from "@/components/notifications";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -336,6 +337,13 @@ export function Sidebar() {
                 )}
               </Tooltip>
             </li>
+
+            {/* Notifications - Only show when connected */}
+            {isConnected && (
+              <li>
+                <NotificationBell isCollapsed={isCollapsed} />
+              </li>
+            )}
           </ul>
 
           {/* Separator */}

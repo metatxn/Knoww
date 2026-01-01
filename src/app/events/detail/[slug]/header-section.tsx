@@ -155,94 +155,91 @@ export function HeaderSection({
                     </button>
                   </div>
                 </div>
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center gap-2 transition-all duration-300",
+                    isScrolled ? "lg:mt-1 mt-1.5" : "mt-1.5"
+                  )}
+                >
+                  {event.negRisk && <NegRiskBadge />}
+
+                  {/* Compact Stats Row - visible only when scrolled on large desktop (lg+) */}
                   <div
                     className={cn(
-                      "flex flex-wrap items-center gap-2 transition-all duration-300",
-                      isScrolled ? "lg:mt-1 mt-1.5" : "mt-1.5"
+                      "flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
+                      isScrolled
+                        ? "lg:opacity-100 lg:translate-x-0 lg:w-auto lg:h-auto lg:overflow-visible lg:pointer-events-auto opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
+                        : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                     )}
                   >
-                    {event.negRisk && <NegRiskBadge />}
-
-                    {/* Compact Stats Row - visible only when scrolled on large desktop (lg+) */}
-                    <div
-                      className={cn(
-                        "flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
-                        isScrolled
-                          ? "lg:opacity-100 lg:translate-x-0 lg:w-auto lg:h-auto lg:overflow-visible lg:pointer-events-auto opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-                          : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-                      )}
-                    >
+                    <StatItem
+                      icon={Trophy}
+                      value={formatVolume(event.volume)}
+                      compact
+                    />
+                    {event.endDate && (
                       <StatItem
-                        icon={Trophy}
-                        value={formatVolume(event.volume)}
+                        icon={Clock}
+                        value={new Date(event.endDate).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                          }
+                        )}
                         compact
                       />
-                      {event.endDate && (
-                        <StatItem
-                          icon={Clock}
-                          value={new Date(event.endDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                            }
-                          )}
-                          compact
-                        />
-                      )}
-                      <StatItem value={`${totalMarketsCount} mkts`} compact />
-                      {closedMarkets.length > 0 && (
-                        <StatItem
-                          value={`${openMarkets.length} open · ${closedMarkets.length} closed`}
-                          compact
-                        />
-                      )}
-                    </div>
+                    )}
+                    <StatItem value={`${totalMarketsCount} mkts`} compact />
+                    {closedMarkets.length > 0 && (
+                      <StatItem
+                        value={`${openMarkets.length} open · ${closedMarkets.length} closed`}
+                        compact
+                      />
+                    )}
                   </div>
                 </div>
+              </div>
 
-                {/* Full Stats Row for Tablet and Desktop - bottom-aligned with avatar
+              {/* Full Stats Row for Tablet and Desktop - bottom-aligned with avatar
                     - On md (tablet): Always visible (no sticky header)
                     - On lg (desktop): Hidden when scrolled (compact stats appear in sticky header instead)
                 */}
-                <div
-                  className={cn(
-                    "hidden md:flex flex-wrap items-center gap-2 mt-2 text-muted-foreground",
-                    isScrolled && "lg:hidden"
-                  )}
-                >
+              <div
+                className={cn(
+                  "hidden md:flex flex-wrap items-center gap-2 mt-2 text-muted-foreground",
+                  isScrolled && "lg:hidden"
+                )}
+              >
+                <StatItem
+                  icon={Trophy}
+                  value={formatVolume(event.volume)}
+                  label="Vol."
+                  className="text-xs sm:text-sm"
+                />
+                {event.endDate && (
                   <StatItem
-                    icon={Trophy}
-                    value={formatVolume(event.volume)}
-                    label="Vol."
+                    icon={Clock}
+                    value={new Date(event.endDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
                     className="text-xs sm:text-sm"
                   />
-                  {event.endDate && (
-                    <StatItem
-                      icon={Clock}
-                      value={new Date(event.endDate).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        }
-                      )}
-                      className="text-xs sm:text-sm"
-                    />
-                  )}
+                )}
+                <StatItem
+                  value={`${totalMarketsCount} market${
+                    totalMarketsCount !== 1 ? "s" : ""
+                  }`}
+                  className="text-xs sm:text-sm"
+                />
+                {closedMarkets.length > 0 && (
                   <StatItem
-                    value={`${totalMarketsCount} market${
-                      totalMarketsCount !== 1 ? "s" : ""
-                    }`}
+                    value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
                     className="text-xs sm:text-sm"
                   />
-                  {closedMarkets.length > 0 && (
-                    <StatItem
-                      value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
-                      className="text-xs sm:text-sm"
-                    />
-                  )}
+                )}
               </div>
             </div>
           </div>

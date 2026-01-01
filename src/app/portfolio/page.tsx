@@ -232,50 +232,49 @@ export default function PortfolioPage() {
         className="relative z-10 container max-w-5xl mx-auto px-4 py-6"
       >
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Portfolio
-            </h1>
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-3">
+            Portfolio
+          </h1>
+          {/* Address and Action Buttons Row */}
+          <div className="flex items-center justify-between gap-3">
             {proxyAddress && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 hover:bg-muted transition-colors group border border-border/50"
-                >
-                  <code className="text-[10px] sm:text-xs font-mono text-muted-foreground group-hover:text-foreground">
-                    {formatAddress(proxyAddress)}
-                  </code>
-                  {copied ? (
-                    <Check className="h-3 w-3 text-emerald-500" />
-                  ) : (
-                    <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {hasProxyWallet && proxyAddress && (
-              <Button
-                onClick={() => setShowDepositModal(true)}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 h-9 sm:h-10 px-4 sm:px-6 font-bold transition-all active:scale-95"
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 hover:bg-muted transition-colors group border border-border/50"
               >
-                <ArrowDownToLine className="h-4 w-4 mr-2" />
-                Deposit
-              </Button>
+                <code className="text-[10px] sm:text-xs font-mono text-muted-foreground group-hover:text-foreground">
+                  {formatAddress(proxyAddress)}
+                </code>
+                {copied ? (
+                  <Check className="h-3 w-3 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
+                )}
+              </button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              className="h-9 sm:h-10 px-3 sm:px-4 border-2 font-bold transition-all active:scale-95"
-            >
-              <RefreshCw className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasProxyWallet && proxyAddress && (
+                <Button
+                  onClick={() => setShowDepositModal(true)}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 h-9 px-3 sm:px-4 font-bold transition-all active:scale-95"
+                >
+                  <ArrowDownToLine className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Deposit</span>
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                className="h-9 px-3 border-2 font-bold transition-all active:scale-95"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="sr-only">Refresh</span>
+              </Button>
+            </div>
           </div>
         </div>
 

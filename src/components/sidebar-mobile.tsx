@@ -5,7 +5,6 @@ import {
   BarChart2,
   Bitcoin,
   CircleDollarSign,
-  Copy,
   Cpu,
   Crown,
   FolderOpen,
@@ -56,10 +55,9 @@ const categories = [
 export function SidebarMobile() {
   const router = useRouter();
   const pathname = usePathname();
-  const { address, isConnected } = useConnection();
+  const { isConnected } = useConnection();
   const { open } = useAppKit();
   const [isOpen, setIsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
 
   const {
@@ -75,15 +73,6 @@ export function SidebarMobile() {
 
   const proxyAddress = relayerProxyAddress || proxyWalletAddress;
   const hasProxyWallet = hasDeployedSafeFromRelayer || hasProxyWalletFromHook;
-
-  const formatAddress = (addr: string) =>
-    `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleNavigation = (href: string) => {
     router.push(href);
@@ -103,12 +92,7 @@ export function SidebarMobile() {
         <SheetContent side="left" className="w-72 p-0 flex flex-col">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b">
-            <Image
-              src="/logo-256x256.png"
-              alt="Knoww"
-              width={28}
-              height={28}
-            />
+            <Image src="/logo-256x256.png" alt="Knoww" width={28} height={28} />
             <SheetTitle className="font-bold text-lg">Knoww</SheetTitle>
           </div>
 
@@ -192,23 +176,18 @@ export function SidebarMobile() {
 
           {/* Bottom Section */}
           <div className="border-t p-3 space-y-3 bg-muted/30">
-            {/* Balance Card */}
+            {/* Balance Card - Simplified for mobile (no address shown) */}
             {isConnected && hasProxyWallet && proxyAddress && (
               <div className="relative overflow-hidden p-4 rounded-2xl bg-gray-900 border border-gray-800 shadow-xl">
                 {/* Subtle gradient overlay */}
                 <div className="absolute inset-0 bg-linear-to-br from-gray-800/50 via-transparent to-gray-900/50 pointer-events-none" />
 
                 <div className="relative space-y-3">
-                  {/* Header: Balance label + percentage */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-400">
-                        Balance
-                      </span>
-                    </div>
-                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                      +12.5%
+                  {/* Header: Balance label */}
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-400">
+                      Balance
                     </span>
                   </div>
 
@@ -220,24 +199,6 @@ export function SidebarMobile() {
                       maximumFractionDigits: 2,
                     })}
                   </p>
-
-                  {/* Wallet Address */}
-                  <div className="flex items-center gap-1.5">
-                    <code className="text-xs text-gray-500 font-mono">
-                      {formatAddress(proxyAddress)}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(proxyAddress)}
-                      className="text-gray-500 hover:text-gray-300 transition-colors"
-                    >
-                      {copied ? (
-                        <span className="text-xs text-emerald-400">✓</span>
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
 
                   {/* Deposit Button */}
                   <button
@@ -254,28 +215,19 @@ export function SidebarMobile() {
               </div>
             )}
 
-            {/* Account Section */}
+            {/* Account Section - Simplified (no address shown) */}
             {isConnected ? (
-              <div className="flex items-center justify-between px-2 py-2 rounded-lg bg-white dark:bg-card border">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
-                    0x
-                  </div>
-                  <span className="text-sm font-mono">
-                    {formatAddress(address || "")}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    open();
-                    setIsOpen(false);
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  open();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-white dark:bg-card border text-sm font-medium hover:bg-muted transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+                Wallet Settings
+              </button>
             ) : (
               <Button
                 onClick={() => {

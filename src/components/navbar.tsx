@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
+import { NotificationBellMobile } from "@/components/notifications";
 import { SidebarMobile } from "@/components/sidebar-mobile";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,9 @@ export function Navbar() {
 
           {isConnected ? (
             <>
+              {/* Notification Bell - Mobile */}
+              <NotificationBellMobile />
+
               {/* Setup Trading Account Button - Show when user hasn't completed setup */}
               {needsTradingSetup && (
                 <Button
@@ -101,15 +105,15 @@ export function Navbar() {
                 </Button>
               )}
 
-              {/* Deposit Button - Eye-catching for users with proxy wallet */}
+              {/* Deposit Button - Hidden on mobile, shown on tablet+ */}
               {hasProxyWallet && proxyAddress && !needsTradingSetup && (
                 <Button
                   onClick={() => setShowDepositModal(true)}
                   size="sm"
-                  className="bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
+                  className="hidden sm:flex bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/25"
                 >
                   <ArrowDownToLine className="mr-1 h-4 w-4" />
-                  <span className="hidden sm:inline">Deposit</span>
+                  Deposit
                 </Button>
               )}
 

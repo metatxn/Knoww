@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { BottomNav } from "@/components/bottom-nav";
 import { useSidebar } from "@/context/sidebar-context";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,10 @@ export function MainContent({ children }: MainContentProps) {
         isCollapsed ? "xl:ml-16" : "xl:ml-56"
       )}
     >
-      {children}
+      {/* Add bottom padding on mobile to account for bottom nav */}
+      <div className="pb-20 xl:pb-0">{children}</div>
+      {/* Bottom navigation for mobile */}
+      <BottomNav />
     </div>
   );
 }

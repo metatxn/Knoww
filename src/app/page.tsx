@@ -3,7 +3,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Crown, Flame, Sparkles, Star, Zap } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/event-card";
 import { EventFilterBar } from "@/components/event-filter-bar";
 import { MarketSearch } from "@/components/market-search";
@@ -42,7 +43,10 @@ interface EventWithDates {
   endDate?: string;
 }
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view") as ViewMode | null;
+
   const [viewMode, setViewMode] = useState<ViewMode>("categories");
   const [mounted, setMounted] = useState(false);
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
@@ -51,11 +55,19 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    const saved = sessionStorage.getItem("homeViewMode");
-    if (saved) {
-      setViewMode(saved as ViewMode);
+    // Check URL param first, then sessionStorage
+    if (
+      viewParam &&
+      ["categories", "trending", "breaking", "new"].includes(viewParam)
+    ) {
+      setViewMode(viewParam);
+    } else {
+      const saved = sessionStorage.getItem("homeViewMode");
+      if (saved) {
+        setViewMode(saved as ViewMode);
+      }
     }
-  }, []);
+  }, [viewParam]);
 
   useEffect(() => {
     if (mounted) {
@@ -584,5 +596,23 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" />
+          </div>
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }
