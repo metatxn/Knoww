@@ -402,7 +402,7 @@ export function TradingOnboarding({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto relative overflow-hidden">
+    <Card className="w-full max-w-md mx-auto relative overflow-hidden border-0 shadow-none rounded-none">
       {/* Celebration Animation Overlay */}
       <AnimatePresence>
         {showCelebration && (

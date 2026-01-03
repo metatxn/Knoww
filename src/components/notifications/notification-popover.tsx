@@ -14,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useOnboarding } from "@/context/onboarding-context";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { NotificationList } from "./notification-list";
@@ -56,8 +57,16 @@ export function NotificationPopover({
   align = "start",
   needsSetup = false,
 }: NotificationPopoverProps) {
+  const { setShowOnboarding } = useOnboarding();
   const hasMore = notifications.length > MAX_POPOVER_ITEMS;
   const hasNotifications = notifications.length > 0;
+
+  const handleSetupClick = () => {
+    // Close the popover first
+    onOpenChange?.(false);
+    // Then open the onboarding modal
+    setShowOnboarding(true);
+  };
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -113,12 +122,10 @@ export function NotificationPopover({
               Complete your trading account setup to receive notifications about
               your orders and positions.
             </p>
-            <Link href="/portfolio">
-              <Button size="sm" className="gap-2">
-                <Settings className="h-3.5 w-3.5" />
-                Setup Trading Account
-              </Button>
-            </Link>
+            <Button size="sm" className="gap-2" onClick={handleSetupClick}>
+              <Settings className="h-3.5 w-3.5" />
+              Setup Trading Account
+            </Button>
           </div>
         ) : (
           <>
