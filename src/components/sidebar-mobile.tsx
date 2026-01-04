@@ -13,7 +13,6 @@ import {
   Landmark,
   Menu,
   MessageSquare,
-  Settings,
   TrendingUp,
   Trophy,
   Users,
@@ -215,20 +214,8 @@ export function SidebarMobile() {
               </div>
             )}
 
-            {/* Account Section - Simplified (no address shown) */}
-            {isConnected ? (
-              <button
-                type="button"
-                onClick={() => {
-                  open();
-                  setIsOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-white dark:bg-card border text-sm font-medium hover:bg-muted transition-colors"
-              >
-                <Settings className="h-4 w-4" />
-                Wallet Settings
-              </button>
-            ) : (
+            {/* Connect Wallet Button - Only show when not connected */}
+            {!isConnected && (
               <Button
                 onClick={() => {
                   open();

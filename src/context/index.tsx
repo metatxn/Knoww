@@ -22,6 +22,7 @@ const ALL_THEMES = [
   "midnight",
   "ocean",
   "slate",
+  "softpop",
   "sunset",
   "forest",
   "lavender",

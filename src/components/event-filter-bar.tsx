@@ -5,12 +5,11 @@ import {
   ChevronDown,
   Clock,
   Droplets,
-  RefreshCw,
   SlidersHorizontal,
   Tag,
+  X,
 } from "lucide-react";
 import { useCallback, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -28,7 +27,55 @@ import {
 import { useTags } from "@/hooks/use-tags";
 import { cn } from "@/lib/utils";
 
-export function EventFilterBar() {
+// Reusable filter chip component - exported for use in combined filter row
+export function FilterChip({
+  icon: Icon,
+  label,
+  value,
+  isActive,
+  children,
+  compact = false,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  isActive?: boolean;
+  children: React.ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1.5 font-medium transition-all",
+            "active:scale-[0.97] shrink-0",
+            compact 
+              ? "px-2.5 py-1.5 text-[13px] rounded-lg hover:bg-white/70 dark:hover:bg-white/10" 
+              : "px-3.5 py-2 text-sm rounded-full border border-border/60 hover:border-border bg-background hover:bg-muted/50",
+            isActive 
+              ? compact 
+                ? "bg-white dark:bg-white/15 text-primary dark:text-primary shadow-sm dark:shadow-none" 
+                : "bg-primary/10 border-primary/30 text-primary hover:bg-primary/15"
+              : compact 
+                ? "text-gray-600 dark:text-white/70" 
+                : ""
+          )}
+        >
+          <Icon className={cn(compact ? "h-3.5 w-3.5" : "h-4 w-4", isActive ? "text-primary" : compact ? "text-gray-500 dark:text-white/60" : "text-muted-foreground")} />
+          {!compact && <span className="hidden xs:inline text-muted-foreground">{label}:</span>}
+          <span className={cn("font-semibold", isActive ? "text-primary" : compact ? "dark:text-white/90" : "")}>{value}</span>
+          <ChevronDown className={cn(compact ? "h-3 w-3" : "h-3.5 w-3.5", isActive ? "text-primary/70" : compact ? "text-gray-500 dark:text-white/50" : "text-muted-foreground/60")} />
+        </button>
+      </DropdownMenuTrigger>
+      {children}
+    </DropdownMenu>
+  );
+}
+
+// Hook to get filter state and handlers - exported for use in combined filter row
+export function useFilterBarState() {
   const {
     filters,
     setVolumeWindow,
@@ -58,7 +105,7 @@ export function EventFilterBar() {
         ? "None"
         : filters.status.length === 1
           ? STATUS_OPTIONS.find((s) => s.value === filters.status[0])?.label
-          : `${filters.status.length} selected`;
+          : `${filters.status.length}`;
 
   // Tags display
   const tagsLabel =
@@ -67,30 +114,30 @@ export function EventFilterBar() {
       : filters.tagSlugs.length === 1
         ? tags?.find((t) => t.slug === filters.tagSlugs[0])?.label ||
           filters.tagSlugs[0]
-        : `${filters.tagSlugs.length} tags`;
+        : `${filters.tagSlugs.length}`;
 
   // Date range display
-  // "All time" = no date range set (both null)
-  // "24h", "7 days", "30 days" = both start and end are set
-  // "Custom" = only one of start/end is set (partial range)
   const dateRangeLabel = useMemo(() => {
     const { start, end } = filters.dateRange;
-    // No dates set = All time
-    if (!start && !end) return "All time";
-    // Both dates set - check which preset it matches
+    if (!start && !end) return "All";
     if (start && end) {
       const now = Date.now();
       const diffMs = now - start.getTime();
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      // Check for approximate matches (within a few hours tolerance)
       if (diffDays <= 1.1) return "24h";
-      if (diffDays <= 7.5 && diffDays >= 6.5) return "7 days";
-      if (diffDays <= 31 && diffDays >= 28) return "30 days";
+      if (diffDays <= 7.5 && diffDays >= 6.5) return "7d";
+      if (diffDays <= 31 && diffDays >= 28) return "30d";
       return "Custom";
     }
-    // Only one date set = Custom range
     return "Custom";
   }, [filters.dateRange]);
+
+  // Check if individual filters are active (non-default)
+  const isDateActive = dateRangeLabel !== "All";
+  const isLiquidityActive = filters.liquidity !== null;
+  const isStatusActive = filters.status.length !== STATUS_OPTIONS.length;
+  const isTagsActive = filters.tagSlugs.length > 0;
+  const isVolumeActive = filters.volumeWindow !== "24h";
 
   // Handle volume window selection
   const handleVolumeWindowChange = useCallback(
@@ -149,75 +196,104 @@ export function EventFilterBar() {
     [setDateRange]
   );
 
+  return {
+    filters,
+    tags,
+    liquidityLabel,
+    volumeWindowLabel,
+    statusLabel,
+    tagsLabel,
+    dateRangeLabel,
+    isDateActive,
+    isLiquidityActive,
+    isStatusActive,
+    isTagsActive,
+    isVolumeActive,
+    hasActiveFilters,
+    handleVolumeWindowChange,
+    handleLiquidityChange,
+    handleTagToggle,
+    handleDatePreset,
+    toggleStatus,
+    setTagSlugs,
+    clearAllFilters,
+  };
+}
+
+interface EventFilterBarProps {
+  className?: string;
+}
+
+export function EventFilterBar({ className }: EventFilterBarProps) {
+  const {
+    filters,
+    tags,
+    liquidityLabel,
+    volumeWindowLabel,
+    statusLabel,
+    tagsLabel,
+    dateRangeLabel,
+    isDateActive,
+    isLiquidityActive,
+    isStatusActive,
+    isTagsActive,
+    isVolumeActive,
+    hasActiveFilters,
+    handleVolumeWindowChange,
+    handleLiquidityChange,
+    handleTagToggle,
+    handleDatePreset,
+    toggleStatus,
+    setTagSlugs,
+    clearAllFilters,
+  } = useFilterBarState();
+
   return (
-    <div className="flex items-center gap-8 py-4 px-1 border-t border-border/40 overflow-x-auto scrollbar-hide">
-      {/* Created At Filter */}
-      <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Created At
-        </span>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50"
-            >
-              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{dateRangeLabel}</span>
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
+    <div className={cn("relative", className)}>
+      <div className="flex items-center gap-2 py-3 overflow-x-auto scrollbar-hide">
+        {/* Created At Filter */}
+        <FilterChip
+          icon={Clock}
+          label="Created"
+          value={dateRangeLabel}
+          isActive={isDateActive}
+        >
           <DropdownMenuContent align="start" className="w-36">
             <DropdownMenuCheckboxItem
-              checked={dateRangeLabel === "24h"}
-              onCheckedChange={() => handleDatePreset("24h")}
-            >
-              24h
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={dateRangeLabel === "7 days"}
-              onCheckedChange={() => handleDatePreset("week")}
-            >
-              7 days
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={dateRangeLabel === "30 days"}
-              onCheckedChange={() => handleDatePreset("month")}
-            >
-              30 days
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={dateRangeLabel === "All time"}
+              checked={dateRangeLabel === "All"}
               onCheckedChange={() => handleDatePreset("all")}
             >
               All time
             </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Liquidity Filter */}
-      <div className="flex flex-col gap-1.5 w-[110px] shrink-0">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Liquidity
-        </span>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.liquidity !== null && "text-primary"
-              )}
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={dateRangeLabel === "24h"}
+              onCheckedChange={() => handleDatePreset("24h")}
             >
-              <Droplets className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{liquidityLabel}</span>
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
+              Last 24h
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={dateRangeLabel === "7d"}
+              onCheckedChange={() => handleDatePreset("week")}
+            >
+              Last 7 days
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={dateRangeLabel === "30d"}
+              onCheckedChange={() => handleDatePreset("month")}
+            >
+              Last 30 days
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </FilterChip>
+
+        {/* Liquidity Filter */}
+        <FilterChip
+          icon={Droplets}
+          label="Liquidity"
+          value={liquidityLabel}
+          isActive={isLiquidityActive}
+        >
           <DropdownMenuContent align="start" className="w-36">
             {LIQUIDITY_PRESETS.map((preset) => (
               <DropdownMenuCheckboxItem
@@ -229,31 +305,15 @@ export function EventFilterBar() {
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </FilterChip>
 
-      {/* Status Filter */}
-      <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Status
-        </span>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                (filters.status.length !== 1 ||
-                  !filters.status.includes("active")) &&
-                  "text-primary"
-              )}
-            >
-              <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{statusLabel}</span>
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
+        {/* Status Filter */}
+        <FilterChip
+          icon={Activity}
+          label="Status"
+          value={statusLabel || "All"}
+          isActive={isStatusActive}
+        >
           <DropdownMenuContent align="start" className="w-36">
             {STATUS_OPTIONS.map((option) => (
               <DropdownMenuCheckboxItem
@@ -265,29 +325,15 @@ export function EventFilterBar() {
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </FilterChip>
 
-      {/* Tags Filter */}
-      <div className="flex flex-col gap-1.5 w-[100px] shrink-0">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Tags
-        </span>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.tagSlugs.length > 0 && "text-primary"
-              )}
-            >
-              <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{tagsLabel}</span>
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
+        {/* Tags Filter */}
+        <FilterChip
+          icon={Tag}
+          label="Tags"
+          value={tagsLabel}
+          isActive={isTagsActive}
+        >
           <DropdownMenuContent
             align="start"
             className="w-48 max-h-64 overflow-y-auto"
@@ -296,7 +342,7 @@ export function EventFilterBar() {
               checked={filters.tagSlugs.length === 0}
               onCheckedChange={() => setTagSlugs([])}
             >
-              All
+              All tags
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             {tags?.slice(0, 15).map((tag) => (
@@ -309,29 +355,15 @@ export function EventFilterBar() {
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </FilterChip>
 
-      {/* Volume Filter */}
-      <div className="flex flex-col gap-1.5 w-[100px] shrink-0">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Volume
-        </span>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 w-full justify-start gap-2 px-2 font-medium text-sm hover:bg-muted/50",
-                filters.volumeWindow !== "24h" && "text-primary"
-              )}
-            >
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{volumeWindowLabel}</span>
-              <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
+        {/* Volume Filter */}
+        <FilterChip
+          icon={SlidersHorizontal}
+          label="Volume"
+          value={volumeWindowLabel}
+          isActive={isVolumeActive}
+        >
           <DropdownMenuContent align="start" className="w-36">
             {VOLUME_WINDOW_OPTIONS.map((option) => (
               <DropdownMenuCheckboxItem
@@ -343,24 +375,20 @@ export function EventFilterBar() {
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </FilterChip>
+
+        {/* Clear Filters Button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium text-destructive bg-destructive/10 hover:bg-destructive/15 border border-destructive/20 transition-all active:scale-[0.97] shrink-0"
+          >
+            <X className="h-4 w-4" />
+            <span className="hidden sm:inline">Clear</span>
+          </button>
+        )}
       </div>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Clear Filters Button */}
-      {hasActiveFilters && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={clearAllFilters}
-          className="h-8 px-3 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-        >
-          <RefreshCw className="h-4 w-4 mr-1.5" />
-          Clear
-        </Button>
-      )}
     </div>
   );
 }

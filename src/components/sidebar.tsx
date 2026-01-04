@@ -158,17 +158,17 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "hidden xl:flex fixed left-0 top-0 z-40 h-screen flex-col border-r border-gray-200 dark:border-border/40 bg-linear-to-b from-white via-slate-50/50 to-slate-100/50 dark:from-background dark:via-background dark:to-muted/10 transition-all duration-300",
+          "hidden xl:flex fixed left-0 top-0 z-40 h-screen flex-col border-r border-gray-200 dark:border-border/40 bg-white dark:bg-background transition-all duration-300",
           isCollapsed ? "w-16" : "w-56"
         )}
       >
-        {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-linear-to-br from-violet-500/3 via-transparent to-blue-500/3 pointer-events-none" />
+        {/* Subtle gradient overlay - only in dark mode */}
+        <div className="absolute inset-0 bg-linear-to-br from-transparent via-transparent to-transparent dark:from-violet-500/3 dark:via-transparent dark:to-blue-500/3 pointer-events-none" />
 
-        {/* Animated gradient accent */}
+        {/* Animated gradient accent - only in dark mode */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-32 -left-32 w-64 h-64 bg-violet-400/4 dark:bg-purple-500/6 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-48 h-48 bg-sky-400/3 dark:bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute -top-32 -left-32 w-64 h-64 bg-transparent dark:bg-purple-500/6 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-48 h-48 bg-transparent dark:bg-blue-500/5 rounded-full blur-3xl" />
         </div>
 
         {/* Logo */}

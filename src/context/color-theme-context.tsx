@@ -18,7 +18,8 @@ export type BaseTheme =
   | "forest"
   | "ocean"
   | "lavender"
-  | "slate";
+  | "slate"
+  | "softpop";
 
 export const BASE_THEMES: {
   value: BaseTheme;
@@ -31,6 +32,7 @@ export const BASE_THEMES: {
   { value: "midnight", label: "Midnight", preview: "#1a1a2e", isDark: true },
   { value: "ocean", label: "Ocean", preview: "#0d1b2a", isDark: true },
   { value: "slate", label: "Slate", preview: "#1e293b", isDark: true },
+  { value: "softpop", label: "Soft Pop", preview: "#051414", isDark: true },
   { value: "sunset", label: "Sunset", preview: "#fef3e2", isDark: false },
   { value: "forest", label: "Forest", preview: "#ecfdf5", isDark: false },
   { value: "lavender", label: "Lavender", preview: "#f5f3ff", isDark: false },

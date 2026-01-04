@@ -126,6 +126,10 @@ export function HeaderSection({
                       isScrolled ? "lg:scale-90 scale-100" : "scale-100"
                     )}
                   >
+                    {/* Neg Risk Icon - Only on mobile (md and below) */}
+                    {event.negRisk && (
+                      <NegRiskBadge iconOnly className="md:hidden" />
+                    )}
                     <button
                       type="button"
                       className={cn(
@@ -271,7 +275,7 @@ export function HeaderSection({
                 className="text-[11px] xs:text-xs sm:text-sm shrink-0"
               />
             )}
-            {event.negRisk && <NegRiskBadge />}
+            {/* NegRiskBadge is shown next to share button on mobile, so hide it here */}
           </div>
         </div>
       </div>
