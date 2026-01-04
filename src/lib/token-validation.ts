@@ -67,3 +67,4 @@ export function normalizeTokenId(tokenId: string | null | undefined): string {
   if (!tokenId || typeof tokenId !== "string") return "";
   return tokenId.trim();
 }
+

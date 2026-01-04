@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, Home, Search, Wallet } from "lucide-react";
+import { Home, Search, Wallet, Zap } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useConnection } from "wagmi";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
   {
     label: "Breaking",
     href: "/?view=breaking",
-    icon: Flame,
+    icon: Zap,
     viewParam: "breaking",
   },
   {
