@@ -20,6 +20,7 @@ export const POLYMARKET_API = {
     MARKETS: "https://gamma-api.polymarket.com/markets",
     EVENTS: "https://gamma-api.polymarket.com/events",
     EVENTS_PAGINATION: "https://gamma-api.polymarket.com/events/pagination",
+    COMMENTS: "https://gamma-api.polymarket.com/comments",
   },
   CLOB: {
     BASE: "https://clob.polymarket.com",

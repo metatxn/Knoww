@@ -126,7 +126,7 @@ export function Navbar() {
               )}
 
               {/* Account Dropdown */}
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Wallet className="h-4 w-4" />

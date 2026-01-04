@@ -396,9 +396,88 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground;
+    overflow-x: clip;
+    width: 100%;
   }
+}
+
+/* Scrollbar styling for all dark themes - must be outside @layer for specificity */
+html.dark,
+html.midnight,
+html.ocean,
+html.slate {
+  color-scheme: dark;
+}
+
+/* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
+html.dark::-webkit-scrollbar,
+html.midnight::-webkit-scrollbar,
+html.ocean::-webkit-scrollbar,
+html.slate::-webkit-scrollbar,
+.dark ::-webkit-scrollbar,
+.midnight ::-webkit-scrollbar,
+.ocean ::-webkit-scrollbar,
+.slate ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: var(--background);
+}
+
+html.dark::-webkit-scrollbar-track,
+html.midnight::-webkit-scrollbar-track,
+html.ocean::-webkit-scrollbar-track,
+html.slate::-webkit-scrollbar-track,
+.dark ::-webkit-scrollbar-track,
+.midnight ::-webkit-scrollbar-track,
+.ocean ::-webkit-scrollbar-track,
+.slate ::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+html.dark::-webkit-scrollbar-thumb,
+html.midnight::-webkit-scrollbar-thumb,
+html.ocean::-webkit-scrollbar-thumb,
+html.slate::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb,
+.midnight ::-webkit-scrollbar-thumb,
+.ocean ::-webkit-scrollbar-thumb,
+.slate ::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.01 250);
+  border-radius: 4px;
+  border: 2px solid var(--background);
+}
+
+html.dark::-webkit-scrollbar-thumb:hover,
+html.midnight::-webkit-scrollbar-thumb:hover,
+html.ocean::-webkit-scrollbar-thumb:hover,
+html.slate::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover,
+.midnight ::-webkit-scrollbar-thumb:hover,
+.ocean ::-webkit-scrollbar-thumb:hover,
+.slate ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.01 250);
+}
+
+/* Firefox scrollbar styling */
+html.dark,
+html.midnight,
+html.ocean,
+html.slate {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.35 0.01 250) var(--background);
+}
+
+.dark,
+.midnight,
+.ocean,
+.slate {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.35 0.01 250) var(--background);
 }
 
 @layer utilities {

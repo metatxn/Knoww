@@ -40,7 +40,7 @@ export function ThemeToggle() {
   const themeName = currentTheme?.label ?? "System";
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

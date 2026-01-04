@@ -143,7 +143,7 @@ export default function NotificationsPage() {
           )}
 
           {/* Filter Dropdown */}
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Filter className="h-4 w-4" />

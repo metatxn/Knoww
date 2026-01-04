@@ -65,9 +65,6 @@ export function HeaderSection({
   openMarkets,
   closedMarkets,
 }: HeaderSectionProps) {
-  const statsCount =
-    2 + (event.endDate ? 1 : 0) + (closedMarkets.length > 0 ? 1 : 0);
-
   return (
     <div
       className={cn(
@@ -155,49 +152,41 @@ export function HeaderSection({
                     </button>
                   </div>
                 </div>
+                {/* Compact Stats Row - visible only when scrolled on large desktop (lg+) */}
                 <div
                   className={cn(
-                    "flex flex-wrap items-center gap-2 transition-all duration-300",
-                    isScrolled ? "lg:mt-1 mt-1.5" : "mt-1.5"
+                    "flex flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
+                    isScrolled
+                      ? "lg:opacity-100 lg:translate-x-0 lg:w-auto lg:h-auto lg:overflow-visible lg:pointer-events-auto lg:mt-1 mt-1.5 opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
+                      : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                   )}
                 >
-                  {event.negRisk && <NegRiskBadge />}
-
-                  {/* Compact Stats Row - visible only when scrolled on large desktop (lg+) */}
-                  <div
-                    className={cn(
-                      "flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 transition-all duration-300",
-                      isScrolled
-                        ? "lg:opacity-100 lg:translate-x-0 lg:w-auto lg:h-auto lg:overflow-visible lg:pointer-events-auto opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-                        : "opacity-0 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-                    )}
-                  >
+                  <StatItem
+                    icon={Trophy}
+                    value={formatVolume(event.volume)}
+                    compact
+                  />
+                  {event.endDate && (
                     <StatItem
-                      icon={Trophy}
-                      value={formatVolume(event.volume)}
+                      icon={Clock}
+                      value={new Date(event.endDate).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )}
                       compact
                     />
-                    {event.endDate && (
-                      <StatItem
-                        icon={Clock}
-                        value={new Date(event.endDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                          }
-                        )}
-                        compact
-                      />
-                    )}
-                    <StatItem value={`${totalMarketsCount} mkts`} compact />
-                    {closedMarkets.length > 0 && (
-                      <StatItem
-                        value={`${openMarkets.length} open · ${closedMarkets.length} closed`}
-                        compact
-                      />
-                    )}
-                  </div>
+                  )}
+                  <StatItem value={`${totalMarketsCount} mkts`} compact />
+                  {closedMarkets.length > 0 && (
+                    <StatItem
+                      value={`${openMarkets.length} open · ${closedMarkets.length} closed`}
+                      compact
+                    />
+                  )}
+                  {event.negRisk && <NegRiskBadge />}
                 </div>
               </div>
 
@@ -240,6 +229,7 @@ export function HeaderSection({
                     className="text-xs sm:text-sm"
                   />
                 )}
+                {event.negRisk && <NegRiskBadge />}
               </div>
             </div>
           </div>
@@ -249,20 +239,14 @@ export function HeaderSection({
         <div className="md:hidden">
           <div
             className={cn(
-              "text-muted-foreground",
-              statsCount === 4
-                ? "grid grid-cols-2 gap-2"
-                : "flex flex-nowrap items-center gap-1.5 overflow-x-auto"
+              "text-muted-foreground flex flex-wrap items-center gap-1.5"
             )}
           >
             <StatItem
               icon={Trophy}
               value={formatVolume(event.volume)}
               label="Vol."
-              className={cn(
-                "text-[11px] xs:text-xs sm:text-sm",
-                statsCount === 4 ? "w-full" : "shrink-0"
-              )}
+              className="text-[11px] xs:text-xs sm:text-sm shrink-0"
             />
             {event.endDate && (
               <StatItem
@@ -272,30 +256,22 @@ export function HeaderSection({
                   day: "numeric",
                   year: "numeric",
                 })}
-                className={cn(
-                  "text-[11px] xs:text-xs sm:text-sm",
-                  statsCount === 4 ? "w-full" : "shrink-0"
-                )}
+                className="text-[11px] xs:text-xs sm:text-sm shrink-0"
               />
             )}
             <StatItem
               value={`${totalMarketsCount} market${
                 totalMarketsCount !== 1 ? "s" : ""
               }`}
-              className={cn(
-                "text-[11px] xs:text-xs sm:text-sm",
-                statsCount === 4 ? "w-full" : "shrink-0"
-              )}
+              className="text-[11px] xs:text-xs sm:text-sm shrink-0"
             />
             {closedMarkets.length > 0 && (
               <StatItem
                 value={`${openMarkets.length} open • ${closedMarkets.length} closed`}
-                className={cn(
-                  "text-[11px] xs:text-xs sm:text-sm",
-                  statsCount === 4 ? "w-full" : "shrink-0"
-                )}
+                className="text-[11px] xs:text-xs sm:text-sm shrink-0"
               />
             )}
+            {event.negRisk && <NegRiskBadge />}
           </div>
         </div>
       </div>

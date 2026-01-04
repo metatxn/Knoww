@@ -156,7 +156,7 @@ export function EventFilterBar() {
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Created At
         </span>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -203,7 +203,7 @@ export function EventFilterBar() {
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Liquidity
         </span>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -237,7 +237,7 @@ export function EventFilterBar() {
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Status
         </span>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -273,7 +273,7 @@ export function EventFilterBar() {
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Tags
         </span>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -317,7 +317,7 @@ export function EventFilterBar() {
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Volume
         </span>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"

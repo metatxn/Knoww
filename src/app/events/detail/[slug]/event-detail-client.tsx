@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CommentsSection } from "@/components/comments";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
@@ -21,8 +22,8 @@ import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
 import { formatVolume } from "@/lib/formatters";
+import type { TokenMarketMap } from "@/types/comments";
 import type { OutcomeData, TradingSide } from "@/types/market";
-
 import { HeaderSection } from "./header-section";
 import { OutcomesTable } from "./outcomes-table";
 
@@ -270,125 +271,152 @@ export default function EventDetailClient({
   const isSingleMarketEvent = totalMarketsCount === 1;
 
   // Compute selected market and trading outcomes
-  const { selectedMarket, tradingOutcomes, currentTokenId, allTokenIds } =
-    useMemo(() => {
-      if (!event || openMarkets.length === 0) {
-        return {
-          selectedMarket: null,
-          tradingOutcomes: [] as OutcomeData[],
-          currentTokenId: "",
-          allTokenIds: [] as string[],
-        };
-      }
+  const {
+    selectedMarket,
+    tradingOutcomes,
+    currentTokenId,
+    allTokenIds,
+    tokenMarketMap,
+  } = useMemo(() => {
+    if (!event || openMarkets.length === 0) {
+      return {
+        selectedMarket: null,
+        tradingOutcomes: [] as OutcomeData[],
+        currentTokenId: "",
+        allTokenIds: [] as string[],
+        tokenMarketMap: new Map() as TokenMarketMap,
+      };
+    }
 
-      // Build market data
-      const marketData = openMarkets.map((market, idx) => {
-        const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
-        const prices = market.outcomePrices
-          ? JSON.parse(market.outcomePrices)
-          : [];
-        const tokens = market.tokens || [];
-        const clobTokenIds = market.clobTokenIds
-          ? JSON.parse(market.clobTokenIds)
-          : [];
-
-        const yesIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("yes")
-        );
-        const noIndex = outcomes.findIndex((o: string) =>
-          o.toLowerCase().includes("no")
-        );
-
-        const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
-        const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
-
-        let yesTokenId = "";
-        let noTokenId = "";
-
-        if (tokens.length > 0) {
-          const yesToken = tokens.find(
-            (t) => t.outcome?.toLowerCase() === "yes"
-          );
-          const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
-          yesTokenId = yesToken?.token_id || "";
-          noTokenId = noToken?.token_id || "";
-        } else if (clobTokenIds.length > 0) {
-          yesTokenId =
-            yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
-          noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
-        }
-
-        const yesProbability = yesPrice
-          ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
-          : 0;
-        const change = ((Math.random() - 0.5) * 10).toFixed(1);
-        const colors = ["orange", "blue", "purple", "green"];
-
-        const rawMinSize = market.orderMinSize ?? market.order_min_size;
-        const orderMinSize =
-          typeof rawMinSize === "number"
-            ? rawMinSize
-            : Number.parseFloat(String(rawMinSize ?? "1")) || 1;
-
-        return {
-          id: market.id,
-          conditionId: market.conditionId || "",
-          question: market.question,
-          groupItemTitle: market.groupItemTitle || market.question,
-          yesProbability,
-          yesPrice: yesPrice || "0",
-          noPrice: noPrice || "0",
-          yesTokenId: yesTokenId || "",
-          noTokenId: noTokenId || "",
-          negRisk: market.negRisk || false,
-          orderMinSize,
-          change: Number.parseFloat(change),
-          volume: market.volume || "0",
-          color: colors[idx % colors.length],
-          image: market.image,
-        };
-      });
-
-      const sortedMarketData = [...marketData].sort(
-        (a, b) => b.yesProbability - a.yesProbability
-      );
-
-      const selected =
-        sortedMarketData.find((m) => m.id === selectedMarketId) ||
-        sortedMarketData[0];
-
-      // Build trading outcomes
-      const outcomes: OutcomeData[] = selected
-        ? [
-            {
-              name: "Yes",
-              tokenId: selected.yesTokenId,
-              price: Number.parseFloat(selected.yesPrice) || 0.5,
-              probability: (Number.parseFloat(selected.yesPrice) || 0.5) * 100,
-            },
-            {
-              name: "No",
-              tokenId: selected.noTokenId,
-              price: Number.parseFloat(selected.noPrice) || 0.5,
-              probability: (Number.parseFloat(selected.noPrice) || 0.5) * 100,
-            },
-          ]
+    // Build market data
+    const marketData = openMarkets.map((market, idx) => {
+      const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
+      const prices = market.outcomePrices
+        ? JSON.parse(market.outcomePrices)
+        : [];
+      const tokens = market.tokens || [];
+      const clobTokenIds = market.clobTokenIds
+        ? JSON.parse(market.clobTokenIds)
         : [];
 
-      const tokenId = outcomes[selectedOutcomeIndex]?.tokenId || "";
+      const yesIndex = outcomes.findIndex((o: string) =>
+        o.toLowerCase().includes("yes")
+      );
+      const noIndex = outcomes.findIndex((o: string) =>
+        o.toLowerCase().includes("no")
+      );
 
-      // Collect all valid token IDs for WebSocket subscription
-      const tokenIds = marketData
-        .flatMap((m) => [m.yesTokenId, m.noTokenId])
-        .filter(Boolean);
+      const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
+      const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
+
+      let yesTokenId = "";
+      let noTokenId = "";
+
+      if (tokens.length > 0) {
+        const yesToken = tokens.find((t) => t.outcome?.toLowerCase() === "yes");
+        const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
+        yesTokenId = yesToken?.token_id || "";
+        noTokenId = noToken?.token_id || "";
+      } else if (clobTokenIds.length > 0) {
+        yesTokenId = yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
+        noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
+      }
+
+      const yesProbability = yesPrice
+        ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
+        : 0;
+      const change = ((Math.random() - 0.5) * 10).toFixed(1);
+      const colors = ["orange", "blue", "purple", "green"];
+
+      const rawMinSize = market.orderMinSize ?? market.order_min_size;
+      const orderMinSize =
+        typeof rawMinSize === "number"
+          ? rawMinSize
+          : Number.parseFloat(String(rawMinSize ?? "1")) || 1;
 
       return {
-        selectedMarket: selected,
-        tradingOutcomes: outcomes,
-        currentTokenId: tokenId,
-        allTokenIds: tokenIds,
+        id: market.id,
+        conditionId: market.conditionId || "",
+        question: market.question,
+        groupItemTitle: market.groupItemTitle || market.question,
+        yesProbability,
+        yesPrice: yesPrice || "0",
+        noPrice: noPrice || "0",
+        yesTokenId: yesTokenId || "",
+        noTokenId: noTokenId || "",
+        negRisk: market.negRisk || false,
+        orderMinSize,
+        change: Number.parseFloat(change),
+        volume: market.volume || "0",
+        color: colors[idx % colors.length],
+        image: market.image,
       };
-    }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
+    });
+
+    const sortedMarketData = [...marketData].sort(
+      (a, b) => b.yesProbability - a.yesProbability
+    );
+
+    const selected =
+      sortedMarketData.find((m) => m.id === selectedMarketId) ||
+      sortedMarketData[0];
+
+    // Build trading outcomes
+    const outcomes: OutcomeData[] = selected
+      ? [
+          {
+            name: "Yes",
+            tokenId: selected.yesTokenId,
+            price: Number.parseFloat(selected.yesPrice) || 0.5,
+            probability: (Number.parseFloat(selected.yesPrice) || 0.5) * 100,
+          },
+          {
+            name: "No",
+            tokenId: selected.noTokenId,
+            price: Number.parseFloat(selected.noPrice) || 0.5,
+            probability: (Number.parseFloat(selected.noPrice) || 0.5) * 100,
+          },
+        ]
+      : [];
+
+    const tokenId = outcomes[selectedOutcomeIndex]?.tokenId || "";
+
+    // Collect all valid token IDs for WebSocket subscription
+    const tokenIds = marketData
+      .flatMap((m) => [m.yesTokenId, m.noTokenId])
+      .filter(Boolean);
+
+    // Build token to market mapping for comments position display
+    const tokenMap: TokenMarketMap = new Map();
+    for (const market of marketData) {
+      // Get a short market name from groupItemTitle
+      // e.g., "Will Arsenal win?" -> "Arsenal"
+      const marketName = market.groupItemTitle || market.question || "Unknown";
+
+      if (market.yesTokenId) {
+        tokenMap.set(market.yesTokenId, {
+          tokenId: market.yesTokenId,
+          marketName,
+          outcome: "Yes",
+        });
+      }
+      if (market.noTokenId) {
+        tokenMap.set(market.noTokenId, {
+          tokenId: market.noTokenId,
+          marketName,
+          outcome: "No",
+        });
+      }
+    }
+
+    return {
+      selectedMarket: selected,
+      tradingOutcomes: outcomes,
+      currentTokenId: tokenId,
+      allTokenIds: tokenIds,
+      tokenMarketMap: tokenMap,
+    };
+  }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
 
   // Auto-expand the order book upfront when the event has exactly one market.
   useEffect(() => {
@@ -889,6 +917,20 @@ export default function EventDetailClient({
                 onSellSuccess={handleSellSuccess}
               />
             </ErrorBoundary>
+
+            {/* Comments Section */}
+            {event?.id && (
+              <ErrorBoundary name="Comments Section">
+                <CommentsSection
+                  eventId={Number.parseInt(event.id, 10)}
+                  variant="card"
+                  tokenMarketMap={tokenMarketMap}
+                  // TODO: Uncomment when POST comments API is available
+                  // isConnected={hasProxyWallet}
+                  // userAddress={proxyAddress}
+                />
+              </ErrorBoundary>
+            )}
           </div>
 
           {/* Trading Panel */}
