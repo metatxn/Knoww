@@ -56,6 +56,7 @@ export default function EventDetailClient({
   const urlSide = searchParams?.get("side") as TradingSide | null;
   const urlShares = searchParams?.get("shares");
   const urlOutcome = searchParams?.get("outcome");
+  const urlConditionId = searchParams?.get("conditionId");
 
   // Parse initial values from URL
   const initialSide: TradingSide | undefined =
@@ -433,6 +434,21 @@ export default function EventDetailClient({
       void preloadOrderBook(selectedMarket.noTokenId);
     }
   }, [isSingleMarketEvent, openMarkets, preloadOrderBook, selectedMarket]);
+
+  // Pre-select market based on conditionId from URL (for "Modify Order" from sell modal)
+  useEffect(() => {
+    if (!urlConditionId || openMarkets.length === 0) return;
+
+    // Find the market that matches the conditionId
+    const matchingMarket = openMarkets.find(
+      (market) => market.conditionId === urlConditionId
+    );
+
+    if (matchingMarket) {
+      setSelectedMarketId(matchingMarket.id);
+      setExpandedOrderBookMarketId(matchingMarket.id);
+    }
+  }, [urlConditionId, openMarkets]);
 
   // Set outcome index based on URL param (for "Modify Order" from sell modal)
   useEffect(() => {
@@ -870,10 +886,10 @@ export default function EventDetailClient({
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                                ? "bg-blue-500"
-                                : idx === 2
-                                  ? "bg-purple-400"
-                                  : "bg-green-500"
+                              ? "bg-blue-500"
+                              : idx === 2
+                              ? "bg-purple-400"
+                              : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">

@@ -79,6 +79,10 @@ export function SellPositionModal({
       shares: shares.toString(),
       outcome: position.outcome.toLowerCase(),
     });
+    // Add conditionId to select the correct market on the event page
+    if (position.conditionId) {
+      params.set("conditionId", position.conditionId);
+    }
     router.push(
       `/events/detail/${position.market.eventSlug}?${params.toString()}`
     );
@@ -165,8 +169,8 @@ export function SellPositionModal({
                     position.currentPrice > position.avgPrice
                       ? "text-emerald-500"
                       : position.currentPrice < position.avgPrice
-                        ? "text-red-500"
-                        : ""
+                      ? "text-red-500"
+                      : ""
                   }`}
                 >
                   {formatPrice(position.currentPrice)}
