@@ -849,8 +849,8 @@ export default function EventDetailClient({
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Left Column: Chart + Outcomes Table */}
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6 order-1">
+          {/* Left Column: Chart + Outcomes Table + Comments */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Chart */}
             <Card>
               <CardHeader className="pb-3">
@@ -886,10 +886,10 @@ export default function EventDetailClient({
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                                ? "bg-blue-500"
-                                : idx === 2
-                                  ? "bg-purple-400"
-                                  : "bg-green-500"
+                              ? "bg-blue-500"
+                              : idx === 2
+                              ? "bg-purple-400"
+                              : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">
@@ -933,10 +933,24 @@ export default function EventDetailClient({
                 onSellSuccess={handleSellSuccess}
               />
             </ErrorBoundary>
+
+            {/* Comments Section - Now inside the left column on desktop */}
+            {event?.id && (
+              <ErrorBoundary name="Comments Section">
+                <CommentsSection
+                  eventId={Number.parseInt(event.id, 10)}
+                  variant="card"
+                  tokenMarketMap={tokenMarketMap}
+                  // TODO: Uncomment when POST comments API is available
+                  // isConnected={hasProxyWallet}
+                  // userAddress={proxyAddress}
+                />
+              </ErrorBoundary>
+            )}
           </div>
 
-          {/* Trading Panel */}
-          <div className="lg:col-span-1 order-2">
+          {/* Trading Panel - Sticky on desktop */}
+          <div className="lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
             {/* Trading Form with Merged Header */}
             {selectedMarket && tradingOutcomes.length > 0 && (
               <ErrorBoundary name="Trading Form">
@@ -965,22 +979,6 @@ export default function EventDetailClient({
               </ErrorBoundary>
             )}
           </div>
-
-          {/* Comments Section - shows after trading form on mobile, in left column on desktop */}
-          {event?.id && (
-            <div className="lg:col-span-2 order-3">
-              <ErrorBoundary name="Comments Section">
-                <CommentsSection
-                  eventId={Number.parseInt(event.id, 10)}
-                  variant="card"
-                  tokenMarketMap={tokenMarketMap}
-                  // TODO: Uncomment when POST comments API is available
-                  // isConnected={hasProxyWallet}
-                  // userAddress={proxyAddress}
-                />
-              </ErrorBoundary>
-            </div>
-          )}
         </div>
       </main>
     </div>

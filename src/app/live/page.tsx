@@ -167,22 +167,46 @@ export default function LiveMarketsPage() {
                   ))}
                 </div>
 
-                {/* Load More Trigger */}
+                {/* Loading More - Skeleton Grid */}
+                {isFetchingNextPage && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 mt-3 sm:mt-5">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={`loading-${i}`}
+                        className="rounded-2xl sm:rounded-3xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden animate-pulse"
+                      >
+                        <div className="aspect-16/10 w-full bg-muted/30" />
+                        <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
+                          <div className="h-5 sm:h-6 w-4/5 rounded-lg sm:rounded-xl bg-muted/30" />
+                          <div className="h-3 sm:h-4 w-full rounded-md sm:rounded-lg bg-muted/20" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Infinite Scroll Trigger */}
                 {hasNextPage && (
                   <div
                     ref={setLoadMoreElement}
-                    className="flex justify-center py-8"
+                    className="h-20 w-full flex items-center justify-center"
                   >
-                    {isFetchingNextPage ? (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        <span className="text-sm">Loading more...</span>
+                    {isFetchingNextPage && (
+                      <div className="flex gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" />
                       </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Scroll for more
-                      </span>
                     )}
+                  </div>
+                )}
+
+                {/* End of results message */}
+                {!hasNextPage && !isFetchingNextPage && events.length > 0 && (
+                  <div className="flex justify-center py-10 border-t border-border/10 mt-10">
+                    <p className="text-sm text-muted-foreground bg-muted/30 px-4 py-2 rounded-full border border-border/20">
+                      Showing all {events.length} live markets
+                    </p>
                   </div>
                 )}
               </>
