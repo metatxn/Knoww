@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
+export interface TopOutcome {
+  name: string;
+  price: number; // 0-1 representing percentage
+}
+
 export interface SearchEvent {
   id: string;
   slug?: string;
@@ -15,11 +20,14 @@ export interface SearchEvent {
   live?: boolean;
   ended?: boolean;
   competitive?: number;
+  topOutcome?: TopOutcome;
   markets?: Array<{
     id: string;
     question: string;
     slug?: string;
     outcomePrices?: string;
+    outcomes?: string;
+    groupItemTitle?: string;
   }>;
   tags?: Array<{
     id: string;

@@ -13,7 +13,10 @@ interface NegRiskBadgeProps {
   className?: string;
 }
 
-export function NegRiskBadge({ iconOnly = false, className }: NegRiskBadgeProps) {
+export function NegRiskBadge({
+  iconOnly = false,
+  className,
+}: NegRiskBadgeProps) {
   return (
     <TooltipProvider>
       <Tooltip delayDuration={200}>
@@ -30,7 +33,10 @@ export function NegRiskBadge({ iconOnly = false, className }: NegRiskBadgeProps)
           ) : (
             <Badge
               variant="destructive"
-              className={cn("text-xs cursor-help flex items-center gap-1", className)}
+              className={cn(
+                "text-xs cursor-help flex items-center gap-1",
+                className
+              )}
             >
               Neg Risk
               <Info className="h-3 w-3" />

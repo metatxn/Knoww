@@ -1,7 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *, .midnight *, .ocean *, .slate *, .softpop *));
+@custom-variant dark (&:is(
+    .dark *,
+    .midnight *,
+    .ocean *,
+    .slate *,
+    .softpop *
+  ));
 
 @theme inline {
   --color-background: var(--background);
@@ -435,7 +441,7 @@
   --chart-4: oklch(0.62 0.24 15);
   --chart-5: oklch(0.75 0.12 160);
   /* Sidebar */
-  --sidebar: oklch(0.10 0.02 175);
+  --sidebar: oklch(0.1 0.02 175);
   --sidebar-foreground: oklch(0.97 0.005 250);
   --sidebar-primary: oklch(0.88 0.18 175);
   --sidebar-primary-foreground: oklch(0.12 0.02 175);
@@ -582,43 +588,43 @@ html.softpop {
   .safe-area-pb {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  
+
   .safe-area-pt {
     padding-top: env(safe-area-inset-top, 0px);
   }
-  
+
   .safe-area-inset-bottom {
     bottom: env(safe-area-inset-bottom, 0px);
   }
-  
+
   /* Touch-friendly minimum tap target */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Smooth momentum scrolling for iOS */
   .scroll-smooth-touch {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
-  
+
   /* Prevent text selection on interactive elements */
   .no-select {
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
   }
-  
+
   /* Snap scroll for horizontal carousels */
   .snap-x {
     scroll-snap-type: x mandatory;
   }
-  
+
   .snap-start {
     scroll-snap-align: start;
   }
-  
+
   .snap-center {
     scroll-snap-align: center;
   }

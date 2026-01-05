@@ -24,16 +24,6 @@ import {
   useFilterBarState,
 } from "@/components/event-filter-bar";
 import { MarketSearch } from "@/components/market-search";
-import {
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
-  LIQUIDITY_PRESETS,
-  STATUS_OPTIONS,
-  VOLUME_WINDOW_OPTIONS,
-} from "@/context/event-filter-context";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Button } from "@/components/ui/button";
@@ -43,8 +33,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEventFilters } from "@/context/event-filter-context";
+import {
+  LIQUIDITY_PRESETS,
+  STATUS_OPTIONS,
+  useEventFilters,
+  VOLUME_WINDOW_OPTIONS,
+} from "@/context/event-filter-context";
 import { useBreakingEvents } from "@/hooks/use-breaking-events";
 import { useNewEvents } from "@/hooks/use-new-events";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
@@ -495,52 +495,52 @@ function HomeContent() {
 
       <Navbar />
 
-      {/* Main Content - Added bottom padding for mobile nav */}
+      {/* Main Content - Added bottom padding for mobile nav, pt aligned with 60px grid */}
       <main className="relative z-10 px-3 sm:px-4 md:px-6 lg:px-8 pt-4 sm:pt-6 pb-24 xl:pb-8">
         {/* Header Row: Title + Live Badge + Leaderboard Button */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="flex items-center justify-between mb-4 sm:mb-6"
+          className="flex items-end justify-between mb-4 sm:mb-6"
         >
           {/* Left: Title */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-none">
             Explore Markets
           </h1>
 
-          {/* Right: Live Badge (hidden on mobile) + Market Count + Leaderboard Button */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Live Badge - hidden on small screens */}
-            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Live Markets
-              </span>
-            </div>
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-sm">
-              <span className="font-bold text-foreground">
+          {/* Right: Live Badge + Leaderboard Button - All capsule shaped, aligned to baseline */}
+          <div className="flex items-end gap-2 sm:gap-2.5">
+            {/* Live Markets Badge - Clickable - Visible on all screens */}
+            <Link href="/live">
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all cursor-pointer active:scale-95">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Live
+                </span>
+              </div>
+            </Link>
+
+            {/* Active Markets Count - Hidden for now, no meaningful purpose */}
+            {/* <div className="hidden md:flex items-center gap-2 h-10 px-4 rounded-full bg-muted/50 border border-border/50">
+              <span className="text-sm font-bold text-foreground">
                 {currentData.events.length}
               </span>
-              <span className="text-muted-foreground">active markets</span>
-            </div>
+              <span className="text-sm text-muted-foreground">active markets</span>
+            </div> */}
+
+            {/* Top Traders Badge - Shows "Top" on mobile, "Top Traders" on larger screens */}
             <Link href="/leaderboard">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 sm:gap-2 rounded-xl bg-linear-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:border-yellow-500/50 hover:bg-linear-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all active:scale-95"
-              >
-                <Crown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500" />
-                <span className="hidden sm:inline font-semibold text-yellow-600 dark:text-yellow-400">
-                  Top Traders
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer active:scale-95">
+                <Crown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
+                <span className="text-xs sm:text-sm font-semibold text-amber-600 dark:text-amber-400">
+                  <span className="sm:hidden">Top</span>
+                  <span className="hidden sm:inline">Top Traders</span>
                 </span>
-                <span className="sm:hidden font-semibold text-xs text-yellow-600 dark:text-yellow-400">
-                  Top
-                </span>
-              </Button>
+              </div>
             </Link>
           </div>
         </motion.div>

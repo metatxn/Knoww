@@ -19,6 +19,7 @@ import {
   PanelLeftOpen,
   Plus,
   Rocket,
+  Search,
   Settings,
   Target,
   TrendingUp,
@@ -293,6 +294,48 @@ export function Sidebar() {
                 </Tooltip>
               </li>
             )}
+
+            {/* Search */}
+            <li>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/search")}
+                    className={cn(
+                      "group w-full flex items-center gap-3 py-2.5 text-sm font-bold rounded-xl transition-all duration-300",
+                      isCollapsed ? "justify-center px-2" : "px-3",
+                      pathname === "/search"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
+                    )}
+                  >
+                    <Search
+                      className={cn(
+                        "transition-transform duration-200 shrink-0",
+                        isCollapsed
+                          ? "h-5 w-5 group-hover:scale-110"
+                          : "h-4 w-4 group-hover:scale-110",
+                        pathname === "/search" ? "text-primary-foreground" : ""
+                      )}
+                    />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">Search</span>
+                        {pathname === "/search" && (
+                          <span className="w-2 h-2 rounded-full bg-primary-foreground animate-pulse" />
+                        )}
+                      </>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                {isCollapsed && (
+                  <TooltipContent side="right" sideOffset={10}>
+                    Search
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </li>
 
             {/* Leaderboard */}
             <li>

@@ -78,7 +78,7 @@ export function BottomNav() {
     <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/30 safe-area-pb">
       {/* Subtle top gradient line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-      
+
       <div className="flex items-center justify-around h-16 px-1">
         {visibleItems.map((item) => {
           const isActive = isItemActive(item);
@@ -106,7 +106,7 @@ export function BottomNav() {
                   transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 />
               )}
-              
+
               {/* Active indicator dot */}
               {isActive && (
                 <motion.span
@@ -115,16 +115,16 @@ export function BottomNav() {
                   className="absolute -top-0.5 w-1.5 h-1.5 rounded-full bg-primary shadow-lg shadow-primary/50"
                 />
               )}
-              
+
               <div className="relative z-10">
-                <Icon 
+                <Icon
                   className={cn(
-                    "h-5 w-5 transition-transform duration-200", 
+                    "h-5 w-5 transition-transform duration-200",
                     isActive && "scale-110"
-                  )} 
+                  )}
                 />
               </div>
-              
+
               {/* Show balance for portfolio, label for others */}
               {item.showBalance && isConnected && hasProxyWallet ? (
                 <span

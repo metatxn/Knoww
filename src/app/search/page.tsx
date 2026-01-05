@@ -1,14 +1,24 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Search, Sparkles, Tag, TrendingUp, X } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  Droplets,
+  Loader2,
+  Search,
+  Sparkles,
+  Tag,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Input } from "@/components/ui/input";
-import { useSearch } from "@/hooks/use-search";
+import { type SearchEvent, useSearch } from "@/hooks/use-search";
 import { formatVolume } from "@/lib/formatters";
 
 // Custom hook for debouncing values
@@ -31,6 +41,43 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 // Recent searches stored in localStorage
 const RECENT_SEARCHES_KEY = "knoww-recent-searches";
 const MAX_RECENT_SEARCHES = 5;
+
+// Last searched markets stored in localStorage
+const LAST_SEARCH_MARKETS_KEY = "KNOWW_USER_LAST_SEARCH_MARKET";
+const MAX_LAST_MARKETS = 4;
+
+interface LastSearchedMarket {
+  id: string;
+  slug: string;
+  title: string;
+  image?: string;
+  volume24hr?: number;
+  liquidity?: number;
+  live?: boolean;
+}
+
+function getLastSearchedMarkets(): LastSearchedMarket[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(LAST_SEARCH_MARKETS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addLastSearchedMarket(market: LastSearchedMarket) {
+  if (typeof window === "undefined" || !market.id) return;
+  try {
+    const recent = getLastSearchedMarkets();
+    // Remove if already exists (to move to front)
+    const filtered = recent.filter((m) => m.id !== market.id);
+    const updated = [market, ...filtered].slice(0, MAX_LAST_MARKETS);
+    localStorage.setItem(LAST_SEARCH_MARKETS_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
 
 function getRecentSearches(): string[] {
   if (typeof window === "undefined") return [];
@@ -76,11 +123,15 @@ function SearchContent() {
 
   const [query, setQuery] = useState(initialQuery);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [lastSearchedMarkets, setLastSearchedMarkets] = useState<
+    LastSearchedMarket[]
+  >([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load recent searches on mount
+  // Load recent searches and last searched markets on mount
   useEffect(() => {
     setRecentSearches(getRecentSearches());
+    setLastSearchedMarkets(getLastSearchedMarkets());
   }, []);
 
   // Focus input on mount
@@ -110,13 +161,30 @@ function SearchContent() {
   }, []);
 
   const handleEventClick = useCallback(
-    (slug: string) => {
+    (event: SearchEvent) => {
       if (query.trim()) {
         addRecentSearch(query.trim());
       }
-      router.push(`/events/detail/${slug}`);
+      // Save to last searched markets
+      addLastSearchedMarket({
+        id: event.id,
+        slug: event.slug || event.id,
+        title: event.title,
+        image: event.image,
+        volume24hr: event.volume24hr,
+        liquidity: event.liquidity,
+        live: event.live,
+      });
+      router.push(`/events/detail/${event.slug || event.id}`);
     },
     [router, query]
+  );
+
+  const handleLastMarketClick = useCallback(
+    (market: LastSearchedMarket) => {
+      router.push(`/events/detail/${market.slug}`);
+    },
+    [router]
   );
 
   const handleTagClick = useCallback(
@@ -144,6 +212,8 @@ function SearchContent() {
 
   const showResults = query.length >= 2;
   const showRecentSearches = !showResults && recentSearches.length > 0;
+  const showLastSearchedMarkets =
+    !showResults && lastSearchedMarkets.length > 0;
 
   return (
     <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
@@ -185,6 +255,76 @@ function SearchContent() {
             )}
           </div>
         </motion.div>
+
+        {/* Last Searched Markets */}
+        <AnimatePresence mode="wait">
+          {showLastSearchedMarkets && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="max-w-4xl mx-auto mb-8"
+            >
+              <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Recently Viewed Markets
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lastSearchedMarkets.map((market, index) => (
+                  <motion.button
+                    key={market.id}
+                    type="button"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => handleLastMarketClick(market)}
+                    className="flex items-start gap-4 p-4 rounded-2xl bg-card/50 hover:bg-card border border-border/50 hover:border-border transition-all text-left group"
+                  >
+                    {/* Market Image */}
+                    {market.image ? (
+                      <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-muted">
+                        <Image
+                          src={market.image}
+                          alt={market.title}
+                          fill
+                          sizes="56px"
+                          className="object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {/* Market Details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm line-clamp-2 leading-snug mb-2 group-hover:text-primary transition-colors">
+                        {market.title}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {market.volume24hr && (
+                          <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+                            {formatVolume(market.volume24hr)} 24h
+                          </span>
+                        )}
+                        {market.live && (
+                          <span className="text-[10px] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
+                            </span>
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Recent Searches */}
         <AnimatePresence mode="wait">
@@ -302,44 +442,88 @@ function SearchContent() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.03 }}
-                            onClick={() =>
-                              handleEventClick(event.slug || event.id)
-                            }
-                            className="flex items-start gap-4 p-4 rounded-2xl bg-card/50 hover:bg-card border border-border/50 hover:border-border transition-all text-left group"
+                            onClick={() => handleEventClick(event)}
+                            className="relative overflow-hidden rounded-2xl bg-card hover:bg-card/80 border border-border/50 hover:border-border hover:shadow-lg transition-all text-left group"
                           >
-                            {/* Event Image */}
-                            {event.image ? (
-                              <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-muted">
-                                <Image
-                                  src={event.image}
-                                  alt={event.title}
-                                  fill
-                                  sizes="64px"
-                                  className="object-cover group-hover:scale-105 transition-transform"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                                <TrendingUp className="h-6 w-6 text-muted-foreground" />
-                              </div>
+                            {/* Top Outcome Progress Bar Background */}
+                            {event.topOutcome && (
+                              <div
+                                className="absolute inset-0 bg-gradient-to-r from-primary/8 to-transparent dark:from-primary/12"
+                                style={{
+                                  width: `${Math.round(event.topOutcome.price * 100)}%`,
+                                }}
+                              />
                             )}
 
-                            {/* Event Details */}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm line-clamp-2 leading-snug mb-2 group-hover:text-primary transition-colors">
-                                {event.title}
-                              </p>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {event.volume24hr && (
-                                  <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
-                                    {formatVolume(event.volume24hr)} 24h
-                                  </span>
+                            <div className="relative flex items-center gap-4 p-4">
+                              {/* Event Image */}
+                              {event.image ? (
+                                <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-muted ring-2 ring-background shadow-md">
+                                  <Image
+                                    src={event.image}
+                                    alt={event.title}
+                                    fill
+                                    sizes="56px"
+                                    className="object-cover group-hover:scale-105 transition-transform"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0 ring-2 ring-background shadow-md">
+                                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                              )}
+
+                              {/* Event Details */}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm line-clamp-2 leading-snug mb-1.5 group-hover:text-primary transition-colors">
+                                  {event.title}
+                                </p>
+
+                                {/* Top Outcome - Leading Position */}
+                                {event.topOutcome && (
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg font-bold text-primary">
+                                      {Math.round(event.topOutcome.price * 100)}
+                                      %
+                                    </span>
+                                    <span className="text-xs text-muted-foreground truncate">
+                                      {event.topOutcome.name}
+                                    </span>
+                                  </div>
                                 )}
-                                {event.live && (
-                                  <span className="text-[10px] px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold">
-                                    LIVE
-                                  </span>
-                                )}
+
+                                {/* Stats Row */}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {event.volume24hr !== undefined &&
+                                    event.volume24hr > 0 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                        <Activity className="h-2.5 w-2.5" />
+                                        {formatVolume(event.volume24hr)}
+                                      </span>
+                                    )}
+                                  {event.liquidity !== undefined &&
+                                    event.liquidity > 0 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
+                                        <Droplets className="h-2.5 w-2.5" />
+                                        {formatVolume(event.liquidity)}
+                                      </span>
+                                    )}
+                                  {event.live && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                                      <span className="relative flex h-1.5 w-1.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
+                                      </span>
+                                      LIVE
+                                    </span>
+                                  )}
+                                  {event.competitive !== undefined &&
+                                    event.competitive >= 0.4 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+                                        🔥 Hot
+                                      </span>
+                                    )}
+                                </div>
                               </div>
                             </div>
                           </motion.button>
@@ -365,8 +549,8 @@ function SearchContent() {
           )}
         </AnimatePresence>
 
-        {/* Empty State - No query */}
-        {!showResults && !showRecentSearches && (
+        {/* Empty State - No query and no recent data */}
+        {!showResults && !showRecentSearches && !showLastSearchedMarkets && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

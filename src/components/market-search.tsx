@@ -1,12 +1,20 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Search, Tag, TrendingUp, X } from "lucide-react";
+import {
+  Activity,
+  Droplets,
+  Loader2,
+  Search,
+  Tag,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { useSearch } from "@/hooks/use-search";
+import { type SearchEvent, useSearch } from "@/hooks/use-search";
 import { formatVolume } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +33,34 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   }, [value, delay]);
 
   return debouncedValue;
+}
+
+// Last searched markets stored in localStorage (shared with search page)
+const LAST_SEARCH_MARKETS_KEY = "KNOWW_USER_LAST_SEARCH_MARKET";
+const MAX_LAST_MARKETS = 4;
+
+interface LastSearchedMarket {
+  id: string;
+  slug: string;
+  title: string;
+  image?: string;
+  volume24hr?: number;
+  liquidity?: number;
+  live?: boolean;
+}
+
+function addLastSearchedMarket(market: LastSearchedMarket) {
+  if (typeof window === "undefined" || !market.id) return;
+  try {
+    const stored = localStorage.getItem(LAST_SEARCH_MARKETS_KEY);
+    const recent: LastSearchedMarket[] = stored ? JSON.parse(stored) : [];
+    // Remove if already exists (to move to front)
+    const filtered = recent.filter((m) => m.id !== market.id);
+    const updated = [market, ...filtered].slice(0, MAX_LAST_MARKETS);
+    localStorage.setItem(LAST_SEARCH_MARKETS_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 interface MarketSearchProps {
@@ -94,10 +130,21 @@ export function MarketSearch({
   }, []);
 
   const handleEventClick = useCallback(
-    (slug: string) => {
+    (event: SearchEvent) => {
+      // Save to last searched markets in localStorage
+      addLastSearchedMarket({
+        id: event.id,
+        slug: event.slug || event.id,
+        title: event.title,
+        image: event.image,
+        volume24hr: event.volume24hr,
+        liquidity: event.liquidity,
+        live: event.live,
+      });
+
       setIsOpen(false);
       setQuery("");
-      router.push(`/events/detail/${slug}`);
+      router.push(`/events/detail/${event.slug || event.id}`);
     },
     [router]
   );
@@ -183,42 +230,90 @@ export function MarketSearch({
                       <button
                         type="button"
                         key={event.id}
-                        onClick={() => handleEventClick(event.slug || event.id)}
-                        className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                        onClick={() => handleEventClick(event)}
+                        className="relative w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left overflow-hidden group"
                       >
-                        {/* Event Image */}
-                        {event.image ? (
-                          <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
-                            <Image
-                              src={event.image}
-                              alt={event.title}
-                              fill
-                              sizes="40px"
-                              className="object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          </div>
+                        {/* Top Outcome Progress Bar Background */}
+                        {event.topOutcome && (
+                          <div
+                            className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent dark:from-primary/10"
+                            style={{
+                              width: `${Math.round(event.topOutcome.price * 100)}%`,
+                            }}
+                          />
                         )}
 
+                        {/* Event Image */}
+                        <div className="relative z-10">
+                          {event.image ? (
+                            <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-muted ring-1 ring-border/50">
+                              <Image
+                                src={event.image}
+                                alt={event.title}
+                                fill
+                                sizes="40px"
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 ring-1 ring-border/50">
+                              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+
                         {/* Event Details */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm line-clamp-2 leading-tight">
+                        <div className="relative z-10 flex-1 min-w-0">
+                          <p className="font-medium text-sm line-clamp-1 leading-tight group-hover:text-primary transition-colors">
                             {event.title}
                           </p>
+
+                          {/* Top Outcome + Stats Row */}
                           <div className="flex items-center gap-2 mt-1">
-                            {event.volume24hr && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                                {formatVolume(event.volume24hr)} 24h
-                              </span>
+                            {/* Top Outcome */}
+                            {event.topOutcome && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-sm font-bold text-primary">
+                                  {Math.round(event.topOutcome.price * 100)}%
+                                </span>
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                  {event.topOutcome.name}
+                                </span>
+                              </div>
                             )}
-                            {event.live && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                                LIVE
-                              </span>
-                            )}
+
+                            {/* Divider */}
+                            {event.topOutcome &&
+                              (event.volume24hr || event.liquidity) && (
+                                <span className="text-border">•</span>
+                              )}
+
+                            {/* Stats */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {event.volume24hr !== undefined &&
+                                event.volume24hr > 0 && (
+                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-0.5">
+                                    <Activity className="h-2.5 w-2.5" />
+                                    {formatVolume(event.volume24hr)}
+                                  </span>
+                                )}
+                              {event.liquidity !== undefined &&
+                                event.liquidity > 0 && (
+                                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium flex items-center gap-0.5">
+                                    <Droplets className="h-2.5 w-2.5" />
+                                    {formatVolume(event.liquidity)}
+                                  </span>
+                                )}
+                              {event.live && (
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-0.5">
+                                  <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
+                                  </span>
+                                  LIVE
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </button>

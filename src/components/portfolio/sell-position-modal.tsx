@@ -169,8 +169,8 @@ export function SellPositionModal({
                     position.currentPrice > position.avgPrice
                       ? "text-emerald-500"
                       : position.currentPrice < position.avgPrice
-                      ? "text-red-500"
-                      : ""
+                        ? "text-red-500"
+                        : ""
                   }`}
                 >
                   {formatPrice(position.currentPrice)}

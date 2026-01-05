@@ -51,22 +51,51 @@ export function FilterChip({
           className={cn(
             "inline-flex items-center gap-1.5 font-medium transition-all",
             "active:scale-[0.97] shrink-0",
-            compact 
-              ? "px-2.5 py-1.5 text-[13px] rounded-lg hover:bg-white/70 dark:hover:bg-white/10" 
+            compact
+              ? "px-2.5 py-1.5 text-[13px] rounded-lg hover:bg-white/70 dark:hover:bg-white/10"
               : "px-3.5 py-2 text-sm rounded-full border border-border/60 hover:border-border bg-background hover:bg-muted/50",
-            isActive 
-              ? compact 
-                ? "bg-white dark:bg-white/15 text-primary dark:text-primary shadow-sm dark:shadow-none" 
+            isActive
+              ? compact
+                ? "bg-white dark:bg-white/15 text-primary dark:text-primary shadow-sm dark:shadow-none"
                 : "bg-primary/10 border-primary/30 text-primary hover:bg-primary/15"
-              : compact 
-                ? "text-gray-600 dark:text-white/70" 
+              : compact
+                ? "text-gray-600 dark:text-white/70"
                 : ""
           )}
         >
-          <Icon className={cn(compact ? "h-3.5 w-3.5" : "h-4 w-4", isActive ? "text-primary" : compact ? "text-gray-500 dark:text-white/60" : "text-muted-foreground")} />
-          {!compact && <span className="hidden xs:inline text-muted-foreground">{label}:</span>}
-          <span className={cn("font-semibold", isActive ? "text-primary" : compact ? "dark:text-white/90" : "")}>{value}</span>
-          <ChevronDown className={cn(compact ? "h-3 w-3" : "h-3.5 w-3.5", isActive ? "text-primary/70" : compact ? "text-gray-500 dark:text-white/50" : "text-muted-foreground/60")} />
+          <Icon
+            className={cn(
+              compact ? "h-3.5 w-3.5" : "h-4 w-4",
+              isActive
+                ? "text-primary"
+                : compact
+                  ? "text-gray-500 dark:text-white/60"
+                  : "text-muted-foreground"
+            )}
+          />
+          {!compact && (
+            <span className="hidden xs:inline text-muted-foreground">
+              {label}:
+            </span>
+          )}
+          <span
+            className={cn(
+              "font-semibold",
+              isActive ? "text-primary" : compact ? "dark:text-white/90" : ""
+            )}
+          >
+            {value}
+          </span>
+          <ChevronDown
+            className={cn(
+              compact ? "h-3 w-3" : "h-3.5 w-3.5",
+              isActive
+                ? "text-primary/70"
+                : compact
+                  ? "text-gray-500 dark:text-white/50"
+                  : "text-muted-foreground/60"
+            )}
+          />
         </button>
       </DropdownMenuTrigger>
       {children}
