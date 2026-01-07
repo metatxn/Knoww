@@ -886,10 +886,10 @@ export default function EventDetailClient({
                             idx === 0
                               ? "bg-orange-500"
                               : idx === 1
-                              ? "bg-blue-500"
-                              : idx === 2
-                              ? "bg-purple-400"
-                              : "bg-green-500"
+                                ? "bg-blue-500"
+                                : idx === 2
+                                  ? "bg-purple-400"
+                                  : "bg-green-500"
                           }`}
                         />
                         <span className="text-xs md:text-sm truncate max-w-[120px] sm:max-w-[150px] md:max-w-[200px]">

@@ -1,8 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Radio, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Radio, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/event-card";
 import { EventFilterBar } from "@/components/event-filter-bar";
 import { Navbar } from "@/components/navbar";
@@ -14,14 +14,69 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEventFilters } from "@/context/event-filter-context";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
+
+interface EventWithDates {
+  id: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 export default function LiveMarketsPage() {
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
     null
   );
 
-  // Fetch only active (live) markets
+  // Get filter context with server-side filter params
+  const { filters, serverFilterParams, apiQueryParams } = useEventFilters();
+
+  // Map volume window to API order field
+  const volumeOrderField = useMemo(() => {
+    switch (filters.volumeWindow) {
+      case "1wk":
+        return "volume1wk";
+      case "1mo":
+        return "volume1mo";
+      case "1yr":
+        return "volume1yr";
+      default:
+        return "volume24hr";
+    }
+  }, [filters.volumeWindow]);
+
+  // Client-side date filter as fallback (in case API doesn't support date filtering)
+  const applyDateFilter = useCallback(
+    <T extends EventWithDates>(events: T[]): T[] => {
+      // Only apply client-side date filtering if date range is set
+      if (!filters.dateRange.start && !filters.dateRange.end) {
+        return events;
+      }
+
+      return events.filter((event) => {
+        const eventStartDate = event.startDate
+          ? new Date(event.startDate)
+          : null;
+        const eventEndDate = event.endDate ? new Date(event.endDate) : null;
+
+        // If filtering by start date: event must end after the filter start date
+        if (filters.dateRange.start && eventEndDate) {
+          if (eventEndDate < filters.dateRange.start) return false;
+        }
+
+        // If filtering by end date: event must start before the filter end date
+        if (filters.dateRange.end && eventStartDate) {
+          if (eventStartDate > filters.dateRange.end) return false;
+        }
+
+        return true;
+      });
+    },
+    [filters.dateRange]
+  );
+
+  // Fetch live markets with filter context
   const {
     data: paginatedData,
     isLoading,
@@ -31,15 +86,18 @@ export default function LiveMarketsPage() {
     isFetchingNextPage,
   } = usePaginatedEvents({
     limit: 20,
-    order: "volume24hr",
+    order: volumeOrderField,
     ascending: false,
-    active: true,
-    closed: false,
+    active: apiQueryParams.active || true, // Default to active for live markets
+    closed: apiQueryParams.closed,
+    tagSlug: apiQueryParams.tagSlug,
+    filters: serverFilterParams,
   });
 
-  // Flatten paginated data
-  const events =
+  // Flatten paginated data and apply client-side date filter as fallback
+  const rawEvents =
     paginatedData?.pages.flatMap((page) => page.events || page) || [];
+  const events = applyDateFilter(rawEvents);
 
   // Infinite scroll
   useEffect(() => {
