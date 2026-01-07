@@ -39,7 +39,7 @@ const CHAIN_CONFIG: Record<string, { icon: string; gradient: string }> = {
 
 export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   const { address, isConnected } = useConnection();
-  const { proxyAddress, usdcBalance: polymarketBalance } = useProxyWallet();
+  const { usdcBalance: polymarketBalance } = useProxyWallet();
   const {
     tokens: walletTokens,
     isLoading: loadingTokens,
@@ -268,6 +268,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       const amountInWei = parseUnits(amount, selectedToken.decimals);
       const walletClient = createWalletClient({
         chain: polygon,
+        // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is not typed
         transport: custom(window.ethereum as any),
       });
       const [account] = await walletClient.requestAddresses();

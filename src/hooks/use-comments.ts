@@ -83,7 +83,8 @@ export function buildCommentTree(comments: Comment[]): CommentWithReplies[] {
 
   // Second pass: organize into tree structure
   for (const comment of comments) {
-    const commentWithReplies = commentMap.get(comment.id)!;
+    const commentWithReplies = commentMap.get(comment.id);
+    if (!commentWithReplies) continue;
 
     if (comment.parentCommentID) {
       // This is a reply - add to parent's replies

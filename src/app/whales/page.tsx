@@ -26,7 +26,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// Select imports removed - using pill buttons instead
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -103,6 +109,21 @@ function getInitials(name: string | null, address: string) {
     return name.slice(0, 2).toUpperCase();
   }
   return address.slice(2, 4).toUpperCase();
+}
+
+function getPeriodLabel(value: string): string {
+  switch (value) {
+    case "24h":
+      return "24H";
+    case "7d":
+      return "7D";
+    case "30d":
+      return "30D";
+    case "all":
+      return "All";
+    default:
+      return value;
+  }
 }
 
 // Aggregate activities by market to find "hot markets"
@@ -403,7 +424,7 @@ function BuySellAreaChart({
         />
         {/* Center marker */}
         <div className="relative flex items-center justify-center px-2">
-          <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-foreground/60" />
+          <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-8 border-l-transparent border-r-transparent border-t-foreground/60" />
         </div>
         {/* Sell side */}
         <div
@@ -586,25 +607,25 @@ function HotMarketCard({
             <div className="h-3 rounded-full overflow-hidden flex mb-2">
               {/* Buy bar - green from left */}
               <div
-                className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 dark:from-emerald-500 dark:to-emerald-400"
+                className="h-full bg-linear-to-r from-emerald-600 to-emerald-500 dark:from-emerald-500 dark:to-emerald-400"
                 style={{ width: `${market.buyRatio * 100}%` }}
               />
               {/* Sell bar - red from right */}
               <div
-                className="h-full bg-gradient-to-l from-red-600 to-red-500 dark:from-red-500 dark:to-red-400"
+                className="h-full bg-linear-to-l from-red-600 to-red-500 dark:from-red-500 dark:to-red-400"
                 style={{ width: `${sellRatio * 100}%` }}
               />
             </div>
 
             {/* Buy/Sell Split */}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+            <div className="flex items-center text-sm">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex-1 text-left">
                 Buy {formatCurrencyCompact(market.buyVolume)}
               </span>
               <Badge
                 variant="outline"
                 className={cn(
-                  "text-xs px-2 py-0.5 font-semibold",
+                  "text-xs px-2 py-0.5 font-semibold shrink-0 mx-2",
                   isBullish &&
                     "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-400",
                   isBearish &&
@@ -620,7 +641,7 @@ function HotMarketCard({
                   ? "🐻 Bearish"
                   : "⚖️ Neutral"}
               </Badge>
-              <span className="text-red-600 dark:text-red-400 font-bold">
+              <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
               </span>
             </div>
@@ -656,7 +677,7 @@ function TopWhaleCard({
                   alt={whale.name || "Whale"}
                 />
               )}
-              <AvatarFallback className="bg-gradient-to-br from-amber-500 to-orange-500 text-white text-xs font-bold">
+              <AvatarFallback className="bg-linear-to-br from-amber-500 to-orange-500 text-white text-xs font-bold">
                 {getInitials(whale.name, whale.address)}
               </AvatarFallback>
             </Avatar>
@@ -865,7 +886,7 @@ export default function WhalesPage() {
           className="mb-6"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/25">
+            <div className="p-3 rounded-2xl bg-linear-to-br from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/25">
               <Fish className="h-7 w-7 text-white" />
             </div>
             <div>
@@ -879,56 +900,98 @@ export default function WhalesPage() {
           </div>
 
           {/* Filters Bar - More Prominent */}
-          <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm">
-            {/* Time Period Pills */}
-            <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              {TIME_PERIODS.map((period) => (
-                <button
-                  key={period.value}
-                  type="button"
-                  onClick={() => setTimePeriod(period.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
-                    timePeriod === period.value
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
-                  )}
-                >
-                  {period.value === "24h"
-                    ? "24H"
-                    : period.value === "7d"
-                    ? "7D"
-                    : period.value === "30d"
-                    ? "30D"
-                    : "All"}
-                </button>
-              ))}
+          <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm">
+            {/* Mobile: Dropdowns with labels */}
+            <div className="flex items-center gap-3 sm:hidden">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-foreground/60 font-medium">
+                  Period:
+                </span>
+                <Select value={timePeriod} onValueChange={setTimePeriod}>
+                  <SelectTrigger
+                    className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
+                    aria-label="Period"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_PERIODS.map((period) => (
+                      <SelectItem key={period.value} value={period.value}>
+                        {getPeriodLabel(period.value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-foreground/60 font-medium">
+                  Min:
+                </span>
+                <Select value={minTradeSize} onValueChange={setMinTradeSize}>
+                  <SelectTrigger
+                    className="h-9 px-3 bg-cyan-500 text-white border-cyan-500 rounded-xl font-semibold"
+                    aria-label="Minimum trade size"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_SIZE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Divider */}
-            <div className="h-10 w-px bg-slate-300 dark:bg-slate-600 hidden sm:block" />
-
-            {/* Min Trade Size */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-foreground/80 font-semibold">
-                Min Trade:
-              </span>
+            {/* Desktop: Pill buttons */}
+            <div className="hidden sm:flex items-center gap-4">
+              {/* Time Period Pills */}
               <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                {TRADE_SIZE_OPTIONS.map((option) => (
+                {TIME_PERIODS.map((period) => (
                   <button
-                    key={option.value}
+                    key={period.value}
                     type="button"
-                    onClick={() => setMinTradeSize(option.value)}
+                    onClick={() => setTimePeriod(period.value)}
                     className={cn(
-                      "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
-                      minTradeSize === option.value
-                        ? "bg-cyan-500 text-white shadow-md"
+                      "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+                      timePeriod === period.value
+                        ? "bg-primary text-primary-foreground shadow-md"
                         : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                     )}
                   >
-                    {option.label}
+                    {getPeriodLabel(period.value)}
                   </button>
                 ))}
+              </div>
+
+              {/* Divider */}
+              <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
+
+              {/* Min Trade Size */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
+                  Min Trade:
+                </span>
+                <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                  {TRADE_SIZE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setMinTradeSize(option.value)}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                        minTradeSize === option.value
+                          ? "bg-cyan-500 text-white shadow-md"
+                          : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1223,7 +1286,7 @@ export default function WhalesPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-cyan-100/80 to-blue-100/80 dark:from-cyan-900/30 dark:to-blue-900/30 border border-cyan-300 dark:border-cyan-700 shadow-sm"
+              className="mt-8 p-6 rounded-2xl bg-linear-to-br from-cyan-100/80 to-blue-100/80 dark:from-cyan-900/30 dark:to-blue-900/30 border border-cyan-300 dark:border-cyan-700 shadow-sm"
             >
               <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-foreground">
                 <Fish className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
