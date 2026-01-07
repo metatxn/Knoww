@@ -6,6 +6,7 @@ import {
   Clock,
   Crown,
   Droplets,
+  Fish,
   Flame,
   SlidersHorizontal,
   Sparkles,
@@ -14,6 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -532,6 +534,17 @@ function HomeContent() {
               <span className="text-sm text-muted-foreground">active markets</span>
             </div> */}
 
+            {/* Whale Tracker Badge */}
+            <Link href="/whales">
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-500/40 transition-all cursor-pointer active:scale-95">
+                <Fish className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-500" />
+                <span className="text-xs sm:text-sm font-semibold text-cyan-600 dark:text-cyan-400">
+                  <span className="sm:hidden">🐋</span>
+                  <span className="hidden sm:inline">Whales</span>
+                </span>
+              </div>
+            </Link>
+
             {/* Top Traders Badge - Shows "Top" on mobile, "Top Traders" on larger screens */}
             <Link href="/leaderboard">
               <div className="flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer active:scale-95">
@@ -834,7 +847,13 @@ function HomeContent() {
       <footer className="relative z-10 border-t border-border/30 py-6 sm:py-8 bg-background/50 backdrop-blur-xl hidden xl:block">
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <span className="text-base">📊</span>
+            <Image
+              src="/logo-256x256.png"
+              alt="Knoww Logo"
+              width={24}
+              height={24}
+              className="rounded-md"
+            />
             <span className="font-bold text-foreground">Knoww</span>
             <span>•</span>
             <span>Powered by Polymarket</span>

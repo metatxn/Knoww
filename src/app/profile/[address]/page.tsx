@@ -16,6 +16,7 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -258,7 +259,13 @@ export default function ProfilePage() {
         <footer className="relative z-10 border-t border-border/30 py-6 bg-background/50 backdrop-blur-xl">
           <div className="px-3 sm:px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <span className="text-base">📊</span>
+              <Image
+                src="/logo-256x256.png"
+                alt="Knoww Logo"
+                width={24}
+                height={24}
+                className="rounded-md"
+              />
               <span className="font-bold text-foreground">Knoww</span>
               <span>•</span>
               <span>Powered by Polymarket</span>
@@ -297,7 +304,13 @@ export default function ProfilePage() {
         <footer className="relative z-10 border-t border-border/30 py-6 bg-background/50 backdrop-blur-xl">
           <div className="px-3 sm:px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <span className="text-base">📊</span>
+              <Image
+                src="/logo-256x256.png"
+                alt="Knoww Logo"
+                width={24}
+                height={24}
+                className="rounded-md"
+              />
               <span className="font-bold text-foreground">Knoww</span>
               <span>•</span>
               <span>Powered by Polymarket</span>
@@ -509,7 +522,13 @@ export default function ProfilePage() {
       <footer className="relative z-10 border-t border-border/30 py-6 bg-background/50 backdrop-blur-xl">
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <span className="text-base">📊</span>
+            <Image
+              src="/logo-256x256.png"
+              alt="Knoww Logo"
+              width={24}
+              height={24}
+              className="rounded-md"
+            />
             <span className="font-bold text-foreground">Knoww</span>
             <span>•</span>
             <span>Powered by Polymarket</span>
