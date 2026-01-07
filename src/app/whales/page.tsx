@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -73,7 +73,9 @@ const TRADE_SIZE_OPTIONS = [
   { value: "5000", label: "$5K+" },
 ];
 
-function formatAddress(address: string) {
+function formatAddress(address: string | null | undefined) {
+  if (!address) return "";
+  if (address.length <= 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
@@ -171,8 +173,8 @@ function getHotMarkets(activities: WhaleActivity[]) {
         buyRatio > 0.65
           ? ("bullish" as const)
           : buyRatio < 0.35
-            ? ("bearish" as const)
-            : ("neutral" as const),
+          ? ("bearish" as const)
+          : ("neutral" as const),
     };
   });
 
@@ -352,6 +354,10 @@ function BuySellAreaChart({
   sellCount: number;
   className?: string;
 }) {
+  const instanceId = useId();
+  const buyGradientId = `buyGradient-${instanceId}`;
+  const sellGradientId = `sellGradient-${instanceId}`;
+
   const { buyData, sellData, maxVolume } = useMemo(
     () => generateTimeSeriesData(activities),
     [activities]
@@ -439,7 +445,7 @@ function BuySellAreaChart({
           >
             <defs>
               <linearGradient
-                id="buyGradient"
+                id={buyGradientId}
                 x1="0%"
                 y1="0%"
                 x2="0%"
@@ -462,7 +468,7 @@ function BuySellAreaChart({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8 }}
               d={generatePath(buyData, true)}
-              fill="url(#buyGradient)"
+              fill={`url(#${buyGradientId})`}
               stroke="rgb(16, 185, 129)"
               strokeWidth="1"
             />
@@ -487,7 +493,7 @@ function BuySellAreaChart({
           >
             <defs>
               <linearGradient
-                id="sellGradient"
+                id={sellGradientId}
                 x1="0%"
                 y1="0%"
                 x2="0%"
@@ -510,7 +516,7 @@ function BuySellAreaChart({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8 }}
               d={generatePath(sellData, false)}
-              fill="url(#sellGradient)"
+              fill={`url(#${sellGradientId})`}
               stroke="rgb(239, 68, 68)"
               strokeWidth="1"
             />
@@ -611,8 +617,8 @@ function HotMarketCard({
                 {isBullish
                   ? "🐂 Bullish"
                   : isBearish
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"}
+                  ? "🐻 Bearish"
+                  : "⚖️ Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -829,10 +835,7 @@ export default function WhalesPage() {
 
   // For the selected time period, we use all activities from the API
   // since the API already filters by the correct time period
-  const filteredActivities = useMemo(() => {
-    if (!data?.activities || data.activities.length === 0) return [];
-    return data.activities;
-  }, [data?.activities]);
+  const filteredActivities = data?.activities ?? [];
 
   // Compute derived data
   const stats = useMemo(
@@ -894,10 +897,10 @@ export default function WhalesPage() {
                   {period.value === "24h"
                     ? "24H"
                     : period.value === "7d"
-                      ? "7D"
-                      : period.value === "30d"
-                        ? "30D"
-                        : "All"}
+                    ? "7D"
+                    : period.value === "30d"
+                    ? "30D"
+                    : "All"}
                 </button>
               ))}
             </div>
@@ -1036,8 +1039,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "🐂 Bullish"
                     : stats.sentiment === "bearish"
-                      ? "🐻 Bearish"
-                      : "⚖️ Neutral"
+                    ? "🐻 Bearish"
+                    : "⚖️ Neutral"
                 }
                 subtitle={`${(stats.buyRatio * 100).toFixed(
                   0
@@ -1047,8 +1050,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "up"
                     : stats.sentiment === "bearish"
-                      ? "down"
-                      : "neutral"
+                    ? "down"
+                    : "neutral"
                 }
               />
             </motion.div>
@@ -1283,7 +1286,7 @@ export default function WhalesPage() {
             <span>•</span>
             <span>Powered by Polymarket</span>
           </div>
-          <span className="font-medium">© 2025</span>
+          <span className="font-medium">© {new Date().getFullYear()}</span>
         </div>
       </footer>
     </div>

@@ -52,11 +52,11 @@ export interface WhaleActivityResponse {
 }
 
 export interface UseWhaleActivityOptions {
-  /** Number of top traders to track (default: 15, max: 50) */
+  /** Number of top traders to track (default: 15, max: 100) */
   whaleCount?: number;
   /** Minimum trade size in USDC to include (default: 100) */
   minTradeSize?: number;
-  /** Number of recent trades per whale (default: 5, max: 20) */
+  /** Number of recent trades per whale (default: 5, max: 100) */
   tradesPerWhale?: number;
   /** Time period for leaderboard: DAY, WEEK, MONTH, ALL */
   timePeriod?: "DAY" | "WEEK" | "MONTH" | "ALL";

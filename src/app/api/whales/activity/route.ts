@@ -92,7 +92,8 @@ async function fetchTopTraders(
     );
 
     if (!response.ok) return [];
-    return response.json();
+    const data: LeaderboardTrader[] = await response.json();
+    return data;
   } catch {
     return [];
   }
@@ -118,7 +119,8 @@ async function fetchTraderActivity(
     );
 
     if (!response.ok) return [];
-    return response.json();
+    const data: TradeActivity[] = await response.json();
+    return data;
   } catch {
     return [];
   }
@@ -133,9 +135,13 @@ export async function GET(request: NextRequest) {
       Math.max(Number.parseInt(searchParams.get("whaleCount") || "25", 10), 5),
       100
     );
-    const minTradeSize = Number.parseFloat(
+    const parsedMinTradeSize = Number.parseFloat(
       searchParams.get("minTradeSize") || "100"
     );
+    const minTradeSize =
+      Number.isNaN(parsedMinTradeSize) || parsedMinTradeSize < 0
+        ? 100
+        : parsedMinTradeSize;
     const tradesPerWhale = Math.min(
       Math.max(
         Number.parseInt(searchParams.get("tradesPerWhale") || "50", 10),
