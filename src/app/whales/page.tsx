@@ -111,6 +111,21 @@ function getInitials(name: string | null, address: string) {
   return address.slice(2, 4).toUpperCase();
 }
 
+function getPeriodLabel(value: string): string {
+  switch (value) {
+    case "24h":
+      return "24H";
+    case "7d":
+      return "7D";
+    case "30d":
+      return "30D";
+    case "all":
+      return "All";
+    default:
+      return value;
+  }
+}
+
 // Aggregate activities by market to find "hot markets"
 function getHotMarkets(activities: WhaleActivity[]) {
   const marketMap = new Map<
@@ -179,8 +194,8 @@ function getHotMarkets(activities: WhaleActivity[]) {
         buyRatio > 0.65
           ? ("bullish" as const)
           : buyRatio < 0.35
-            ? ("bearish" as const)
-            : ("neutral" as const),
+          ? ("bearish" as const)
+          : ("neutral" as const),
     };
   });
 
@@ -623,8 +638,8 @@ function HotMarketCard({
                 {isBullish
                   ? "🐂 Bullish"
                   : isBearish
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"}
+                  ? "🐻 Bearish"
+                  : "⚖️ Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -893,19 +908,16 @@ export default function WhalesPage() {
                   Period:
                 </span>
                 <Select value={timePeriod} onValueChange={setTimePeriod}>
-                  <SelectTrigger className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold">
+                  <SelectTrigger
+                    className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
+                    aria-label="Period"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TIME_PERIODS.map((period) => (
                       <SelectItem key={period.value} value={period.value}>
-                        {period.value === "24h"
-                          ? "24H"
-                          : period.value === "7d"
-                            ? "7D"
-                            : period.value === "30d"
-                              ? "30D"
-                              : "All"}
+                        {getPeriodLabel(period.value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -917,7 +929,10 @@ export default function WhalesPage() {
                   Min:
                 </span>
                 <Select value={minTradeSize} onValueChange={setMinTradeSize}>
-                  <SelectTrigger className="h-9 px-3 bg-cyan-500 text-white border-cyan-500 rounded-xl font-semibold">
+                  <SelectTrigger
+                    className="h-9 px-3 bg-cyan-500 text-white border-cyan-500 rounded-xl font-semibold"
+                    aria-label="Minimum trade size"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -947,13 +962,7 @@ export default function WhalesPage() {
                         : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                     )}
                   >
-                    {period.value === "24h"
-                      ? "24H"
-                      : period.value === "7d"
-                        ? "7D"
-                        : period.value === "30d"
-                          ? "30D"
-                          : "All"}
+                    {getPeriodLabel(period.value)}
                   </button>
                 ))}
               </div>
@@ -1093,8 +1102,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "🐂 Bullish"
                     : stats.sentiment === "bearish"
-                      ? "🐻 Bearish"
-                      : "⚖️ Neutral"
+                    ? "🐻 Bearish"
+                    : "⚖️ Neutral"
                 }
                 subtitle={`${(stats.buyRatio * 100).toFixed(
                   0
@@ -1104,8 +1113,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "up"
                     : stats.sentiment === "bearish"
-                      ? "down"
-                      : "neutral"
+                    ? "down"
+                    : "neutral"
                 }
               />
             </motion.div>
