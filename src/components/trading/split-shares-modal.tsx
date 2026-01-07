@@ -27,7 +27,6 @@ export function SplitSharesModal({
   open,
   onOpenChange,
   conditionId,
-  marketTitle,
   onSuccess,
 }: SplitSharesModalProps) {
   const {

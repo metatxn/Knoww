@@ -240,7 +240,6 @@ function applyPriceChange(
   const ascending = side === "SELL"; // asks are ascending, bids are descending
 
   // Find existing level using binary search for better performance
-  const priceNum = Number.parseFloat(price);
   const existingIndex = levels.findIndex((l) => l.price === price);
   const sizeNum = Number.parseFloat(size);
 

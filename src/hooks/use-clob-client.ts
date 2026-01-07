@@ -257,6 +257,7 @@ export function useClobClient() {
 
       const approve = async (spender: `0x${string}`) => {
         const hash = await walletClient.writeContract({
+          account: address,
           address: USDC_ADDRESS,
           abi: ERC20_ABI,
           functionName: "approve",

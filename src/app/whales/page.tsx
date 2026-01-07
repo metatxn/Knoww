@@ -179,8 +179,8 @@ function getHotMarkets(activities: WhaleActivity[]) {
         buyRatio > 0.65
           ? ("bullish" as const)
           : buyRatio < 0.35
-          ? ("bearish" as const)
-          : ("neutral" as const),
+            ? ("bearish" as const)
+            : ("neutral" as const),
     };
   });
 
@@ -623,8 +623,8 @@ function HotMarketCard({
                 {isBullish
                   ? "🐂 Bullish"
                   : isBearish
-                  ? "🐻 Bearish"
-                  : "⚖️ Neutral"}
+                    ? "🐻 Bearish"
+                    : "⚖️ Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -902,10 +902,10 @@ export default function WhalesPage() {
                         {period.value === "24h"
                           ? "24H"
                           : period.value === "7d"
-                          ? "7D"
-                          : period.value === "30d"
-                          ? "30D"
-                          : "All"}
+                            ? "7D"
+                            : period.value === "30d"
+                              ? "30D"
+                              : "All"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -950,10 +950,10 @@ export default function WhalesPage() {
                     {period.value === "24h"
                       ? "24H"
                       : period.value === "7d"
-                      ? "7D"
-                      : period.value === "30d"
-                      ? "30D"
-                      : "All"}
+                        ? "7D"
+                        : period.value === "30d"
+                          ? "30D"
+                          : "All"}
                   </button>
                 ))}
               </div>
@@ -1093,8 +1093,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "🐂 Bullish"
                     : stats.sentiment === "bearish"
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"
+                      ? "🐻 Bearish"
+                      : "⚖️ Neutral"
                 }
                 subtitle={`${(stats.buyRatio * 100).toFixed(
                   0
@@ -1104,8 +1104,8 @@ export default function WhalesPage() {
                   stats.sentiment === "bullish"
                     ? "up"
                     : stats.sentiment === "bearish"
-                    ? "down"
-                    : "neutral"
+                      ? "down"
+                      : "neutral"
                 }
               />
             </motion.div>

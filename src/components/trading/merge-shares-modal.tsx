@@ -34,7 +34,6 @@ export function MergeSharesModal({
   conditionId,
   yesTokenId,
   noTokenId,
-  marketTitle,
   onSuccess,
 }: MergeSharesModalProps) {
   const { proxyAddress, refresh: refreshWallet } = useProxyWallet();
