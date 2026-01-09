@@ -190,7 +190,7 @@ export function PriceAlertItem({ alert, onSeen }: PriceAlertItemProps) {
               )}
               {alert.type === "ARB_OPPORTUNITY" && (
                 <span className="text-sm font-bold text-yellow-500">
-                  {magnitudePercent}¢ gap
+                  {(alert.magnitude * 100).toFixed(0)}¢ gap
                 </span>
               )}
               {alert.type === "SPREAD_WARNING" && (

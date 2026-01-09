@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
@@ -307,16 +307,19 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
 export function usePriceAlertDetection(assetIds: string[]) {
   const { config, addAlert, canAlertForAsset } = useAlertStore();
 
-  // Subscribe only to relevant assets using useShallow for shallow comparison
-  // This prevents re-renders when other assets update (performance optimization)
-  const relevantData = useOrderBookStore(
-    useShallow((state) =>
+  // Get raw maps from store - these are stable references
+  const priceVelocity = useOrderBookStore((state) => state.priceVelocity);
+  const orderBooks = useOrderBookStore((state) => state.orderBooks);
+
+  // Derive relevant data in useMemo to avoid creating new objects on every render
+  const relevantData = useMemo(
+    () =>
       assetIds.map((id) => ({
         assetId: id,
-        velocity: state.priceVelocity.get(id),
-        orderBook: state.orderBooks.get(id),
-      }))
-    )
+        velocity: priceVelocity.get(id),
+        orderBook: orderBooks.get(id),
+      })),
+    [assetIds, priceVelocity, orderBooks]
   );
 
   // Track last known prices to calculate changes

@@ -225,8 +225,8 @@ function getHotMarkets(activities: WhaleActivity[]) {
         buyRatio > 0.65
           ? ("bullish" as const)
           : buyRatio < 0.35
-            ? ("bearish" as const)
-            : ("neutral" as const),
+          ? ("bearish" as const)
+          : ("neutral" as const),
     };
   });
 
@@ -669,8 +669,8 @@ function HotMarketCard({
                 {isBullish
                   ? "🐂 Bullish"
                   : isBearish
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"}
+                  ? "🐻 Bearish"
+                  : "⚖️ Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -1542,8 +1542,8 @@ export default function WhalesPage() {
                       stats.sentiment === "bullish"
                         ? "🐂 Bullish"
                         : stats.sentiment === "bearish"
-                          ? "🐻 Bearish"
-                          : "⚖️ Neutral"
+                        ? "🐻 Bearish"
+                        : "⚖️ Neutral"
                     }
                     subtitle={`${(stats.buyRatio * 100).toFixed(
                       0
@@ -1553,8 +1553,8 @@ export default function WhalesPage() {
                       stats.sentiment === "bullish"
                         ? "up"
                         : stats.sentiment === "bearish"
-                          ? "down"
-                          : "neutral"
+                        ? "down"
+                        : "neutral"
                     }
                   />
                 </motion.div>
@@ -1949,9 +1949,7 @@ export default function WhalesPage() {
                         •
                       </span>
                       <span>
-                        <strong className="text-foreground text-red-500">
-                          ⚠️ Disclaimer
-                        </strong>{" "}
+                        <strong className="text-red-500">⚠️ Disclaimer</strong>{" "}
                         — This is for informational purposes only. Not all
                         flagged activity is malicious.
                       </span>
