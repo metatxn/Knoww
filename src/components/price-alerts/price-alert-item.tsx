@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Fish, TrendingDown, TrendingUp } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { AlertType, PriceAlert } from "@/hooks/use-price-alerts";
 import { cn } from "@/lib/utils";
 
@@ -103,13 +103,17 @@ function getDisplayTitle(alert: PriceAlert): string {
 }
 
 export function PriceAlertItem({ alert, onSeen }: PriceAlertItemProps) {
+  // Use ref to store the latest onSeen callback without causing effect re-runs
+  const onSeenRef = useRef(onSeen);
+  onSeenRef.current = onSeen;
+
   // Mark as seen after 2 seconds of being visible
   useEffect(() => {
     if (!alert.seen) {
-      const timer = setTimeout(onSeen, 2000);
+      const timer = setTimeout(() => onSeenRef.current(), 2000);
       return () => clearTimeout(timer);
     }
-  }, [alert.seen, onSeen]);
+  }, [alert.seen]);
 
   const magnitudePercent = (alert.magnitude * 100).toFixed(1);
   const styles = alertStyles[alert.type];
@@ -161,15 +165,39 @@ export function PriceAlertItem({ alert, onSeen }: PriceAlertItemProps) {
               {displayTitle}
             </p>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span
-                className={cn(
-                  "text-sm font-bold",
-                  alert.type === "DIP" ? "text-red-500" : "text-emerald-500"
-                )}
-              >
-                {alert.type === "DIP" ? "↓" : "↑"}
-                {magnitudePercent}%
-              </span>
+              {/* Only show arrow/magnitude for price-related alerts (DIP/SPIKE) */}
+              {(alert.type === "DIP" || alert.type === "SPIKE") && (
+                <span
+                  className={cn(
+                    "text-sm font-bold",
+                    alert.type === "DIP" ? "text-red-500" : "text-emerald-500"
+                  )}
+                >
+                  {alert.type === "DIP" ? "↓" : "↑"}
+                  {magnitudePercent}%
+                </span>
+              )}
+              {/* Show contextual info for non-price alerts */}
+              {alert.type === "WHALE_ENTRY" && alert.metadata?.tradeSize && (
+                <span className="text-sm font-bold text-blue-500">
+                  +${alert.metadata.tradeSize.toLocaleString()}
+                </span>
+              )}
+              {alert.type === "WHALE_EXIT" && alert.metadata?.tradeSize && (
+                <span className="text-sm font-bold text-orange-500">
+                  -${alert.metadata.tradeSize.toLocaleString()}
+                </span>
+              )}
+              {alert.type === "ARB_OPPORTUNITY" && (
+                <span className="text-sm font-bold text-yellow-500">
+                  {magnitudePercent}¢ gap
+                </span>
+              )}
+              {alert.type === "SPREAD_WARNING" && (
+                <span className="text-sm font-bold text-amber-500">
+                  {magnitudePercent}% spread
+                </span>
+              )}
               <span className="text-xs text-muted-foreground">
                 ${alert.currentPrice.toFixed(2)}
               </span>

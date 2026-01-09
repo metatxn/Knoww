@@ -208,17 +208,33 @@ export const useAlertStore = create<AlertStoreState>()(
 // Notification Helpers
 // ============================================
 
+// Singleton AudioContext to avoid accumulation (browsers limit to ~6 contexts)
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined" || !window.AudioContext) return null;
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+  return audioContext;
+}
+
 function playAlertSound(type: AlertType) {
   // Use Web Audio API for a simple beep sound
   try {
-    if (typeof window === "undefined" || !window.AudioContext) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
-    const audioContext = new AudioContext();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    // Resume if suspended (autoplay policy)
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
 
     oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    gainNode.connect(ctx.destination);
 
     // Different frequencies for different alert types
     const frequencies: Record<AlertType, number> = {
@@ -233,14 +249,11 @@ function playAlertSound(type: AlertType) {
     oscillator.frequency.value = frequencies[type];
     oscillator.type = "sine";
 
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(
-      0.01,
-      audioContext.currentTime + 0.3
-    );
+    gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
   } catch {
     // Ignore audio errors
   }
@@ -293,18 +306,25 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
  */
 export function usePriceAlertDetection(assetIds: string[]) {
   const { config, addAlert, canAlertForAsset } = useAlertStore();
-  const priceVelocity = useOrderBookStore((state) => state.priceVelocity);
-  const orderBooks = useOrderBookStore((state) => state.orderBooks);
+
+  // Subscribe only to relevant assets using useShallow for shallow comparison
+  // This prevents re-renders when other assets update (performance optimization)
+  const relevantData = useOrderBookStore(
+    useShallow((state) =>
+      assetIds.map((id) => ({
+        assetId: id,
+        velocity: state.priceVelocity.get(id),
+        orderBook: state.orderBooks.get(id),
+      }))
+    )
+  );
 
   // Track last known prices to calculate changes
   const lastPricesRef = useRef<Map<string, number>>(new Map());
 
   // Check for alerts on each price update
   useEffect(() => {
-    for (const assetId of assetIds) {
-      const velocity = priceVelocity.get(assetId);
-      const orderBook = orderBooks.get(assetId);
-
+    for (const { assetId, velocity, orderBook } of relevantData) {
       if (!velocity || !orderBook) continue;
 
       // Check cooldown
@@ -342,7 +362,7 @@ export function usePriceAlertDetection(assetIds: string[]) {
       // Update last known price
       lastPricesRef.current.set(assetId, currentPrice);
     }
-  }, [assetIds, priceVelocity, orderBooks, config, addAlert, canAlertForAsset]);
+  }, [relevantData, config, addAlert, canAlertForAsset]);
 }
 
 // ============================================

@@ -384,9 +384,12 @@ export default function EventDetailClient({
     const tokenId = outcomes[selectedOutcomeIndex]?.tokenId || "";
 
     // Collect all valid token IDs for WebSocket subscription
-    const tokenIds = marketData
-      .flatMap((m) => [m.yesTokenId, m.noTokenId])
-      .filter(Boolean);
+    // Dedupe token IDs to avoid duplicate processing in usePriceAlertDetection
+    const tokenIds = Array.from(
+      new Set(
+        marketData.flatMap((m) => [m.yesTokenId, m.noTokenId]).filter(Boolean)
+      )
+    );
 
     // Build token to market mapping for comments position display
     const tokenMap: TokenMarketMap = new Map();

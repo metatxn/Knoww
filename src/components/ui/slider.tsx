@@ -13,21 +13,28 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
+  // Compute the values for rendering thumbs
+  // Default to single thumb at min position when uncontrolled without defaultValue
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
         ? value
         : Array.isArray(defaultValue)
           ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
+          : [min],
+    [value, defaultValue, min]
   );
+
+  // Determine if controlled or uncontrolled
+  const isControlled = value !== undefined;
 
   return (
     <SliderPrimitive.Root
       data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
+      // Only pass defaultValue when uncontrolled, and ensure it matches _values
+      defaultValue={!isControlled ? (defaultValue ?? [min]) : undefined}
+      // Only pass value when controlled
+      value={isControlled ? value : undefined}
       min={min}
       max={max}
       className={cn(

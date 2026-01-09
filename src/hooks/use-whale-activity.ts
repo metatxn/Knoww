@@ -74,13 +74,13 @@ async function fetchWhaleActivity(
 ): Promise<WhaleActivityResponse> {
   const params = new URLSearchParams();
 
-  if (options.whaleCount) {
+  if (options.whaleCount !== undefined) {
     params.set("whaleCount", options.whaleCount.toString());
   }
-  if (options.minTradeSize) {
+  if (options.minTradeSize !== undefined) {
     params.set("minTradeSize", options.minTradeSize.toString());
   }
-  if (options.tradesPerWhale) {
+  if (options.tradesPerWhale !== undefined) {
     params.set("tradesPerWhale", options.tradesPerWhale.toString());
   }
   if (options.timePeriod) {

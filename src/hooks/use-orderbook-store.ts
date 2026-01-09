@@ -394,6 +394,7 @@ function addPriceHistory(
 
 /**
  * Get price at a specific timestamp using linear interpolation
+ * Note: Assumes history is sorted by timestamp ascending for correct interpolation
  */
 function getPriceAtTimestamp(
   history: PriceHistoryEntry[],
@@ -401,11 +402,14 @@ function getPriceAtTimestamp(
 ): number | null {
   if (history.length === 0) return null;
 
+  // Ensure history is sorted by timestamp ascending (handles out-of-order events)
+  const sortedHistory = [...history].sort((a, b) => a.timestamp - b.timestamp);
+
   // Find the two entries that bracket the target timestamp
   let before: PriceHistoryEntry | null = null;
   let after: PriceHistoryEntry | null = null;
 
-  for (const entry of history) {
+  for (const entry of sortedHistory) {
     if (entry.timestamp <= targetTs) {
       before = entry;
     } else if (!after) {

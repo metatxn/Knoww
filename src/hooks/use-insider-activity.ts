@@ -101,7 +101,7 @@ async function fetchInsiderActivity(
   if (options.minShares !== undefined && options.minShares > 0) {
     params.set("minShares", options.minShares.toString());
   }
-  if (options.minScore) {
+  if (options.minScore !== undefined) {
     params.set("minScore", options.minScore.toString());
   }
   if (options.limit) {

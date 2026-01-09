@@ -48,9 +48,22 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
   const assetIds = React.useMemo(() => {
     if (!market) return [];
     const tokens = market.tokens || [];
-    const clobTokenIds = market.clobTokenIds
-      ? JSON.parse(market.clobTokenIds)
-      : [];
+
+    // Safely parse clobTokenIds with try-catch to handle malformed JSON
+    let clobTokenIds: string[] = [];
+    if (market.clobTokenIds) {
+      try {
+        const parsed = JSON.parse(market.clobTokenIds);
+        clobTokenIds = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        // Malformed JSON - fall back to empty array
+        console.warn(
+          `Failed to parse clobTokenIds for market ${market.slug || market.id}:`,
+          market.clobTokenIds
+        );
+      }
+    }
+
     // Prefer token IDs from tokens array, fallback to clobTokenIds
     if (tokens.length > 0) {
       return tokens.map((t) => t.token_id).filter(Boolean);
