@@ -65,8 +65,17 @@ function formatNotificationMessage(notification: Notification): string {
     case NotificationType.ORDER_FILL: {
       const p = payload as OrderFillPayload;
       const side = p.side === "BUY" ? "bought" : "sold";
-      const role = p.trader_side === "MAKER" ? "(maker)" : "(taker)";
-      return `You ${side} ${p.size} shares at $${p.price} ${role}`;
+      // trader_side may not always be present in API response
+      const role = p.trader_side
+        ? p.trader_side === "MAKER"
+          ? "(maker)"
+          : "(taker)"
+        : "";
+      // Use matched_size (actual API field) with fallback to size for compatibility
+      const size = p.matched_size || p.size || "0";
+      // Include outcome (Yes/No) in the message
+      const outcome = p.outcome ? ` ${p.outcome}` : "";
+      return `You ${side} ${size}${outcome} shares at $${p.price}${role ? ` ${role}` : ""}`;
     }
     case NotificationType.ORDER_CANCELLATION: {
       const p = payload as OrderCancellationPayload;
