@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
@@ -31,6 +31,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
+import { usePriceAlertDetection } from "@/hooks/use-price-alerts";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import type { OutcomeData } from "@/types/market";
 
@@ -42,6 +43,23 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
 
   // Fetch market details with TanStack Query (slug-based only, as recommended by API team)
   const { data: market, isLoading: loading, error } = useMarketDetail(slug);
+
+  // Extract asset IDs for price alert monitoring
+  const assetIds = React.useMemo(() => {
+    if (!market) return [];
+    const tokens = market.tokens || [];
+    const clobTokenIds = market.clobTokenIds
+      ? JSON.parse(market.clobTokenIds)
+      : [];
+    // Prefer token IDs from tokens array, fallback to clobTokenIds
+    if (tokens.length > 0) {
+      return tokens.map((t) => t.token_id).filter(Boolean);
+    }
+    return clobTokenIds.filter(Boolean);
+  }, [market]);
+
+  // Enable price alert detection for this market's assets
+  usePriceAlertDetection(assetIds);
 
   // Handle order success - must be at top level before any early returns
   const handleOrderSuccess = useCallback((_order: unknown) => {

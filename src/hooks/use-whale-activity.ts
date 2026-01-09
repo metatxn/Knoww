@@ -148,7 +148,8 @@ export function useWhaleActivity(options: UseWhaleActivityOptions = {}) {
         timePeriod,
       }),
     enabled,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 60 * 1000, // 1 minute - increased from 30s to reduce redundant fetches
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep data in cache longer
     refetchInterval,
   });
 }

@@ -16,6 +16,14 @@ import type {
 const STALE_THRESHOLD_MS = 60000;
 
 /**
+ * Price history configuration
+ */
+const PRICE_HISTORY_MAX_AGE_MS = 120000; // Keep 2 minutes of history
+const PRICE_HISTORY_MAX_ENTRIES = 500; // Cap entries to prevent memory bloat
+const ANOMALY_THRESHOLD_5S = 0.05; // 5% change in 5 seconds = anomaly
+const ANOMALY_THRESHOLD_1S = 0.1; // 10% change in 1 second = anomaly
+
+/**
  * Processed order book data with computed values
  */
 export interface ProcessedOrderBook {
@@ -69,6 +77,37 @@ interface PendingChange {
 }
 
 /**
+ * A single price history entry for tracking price over time
+ */
+export interface PriceHistoryEntry {
+  bestBid: number;
+  bestAsk: number;
+  midpoint: number;
+  timestamp: number; // Unix ms
+}
+
+/**
+ * Price velocity metrics calculated from history
+ * Used for detecting sudden price movements (dips/spikes)
+ */
+export interface PriceVelocity {
+  /** Price change in last 1 second (percentage, e.g., -0.05 = -5%) */
+  change1s: number;
+  /** Price change in last 5 seconds (percentage) */
+  change5s: number;
+  /** Price change in last 30 seconds (percentage) */
+  change30s: number;
+  /** Price change in last 60 seconds (percentage) */
+  change60s: number;
+  /** Is this an unusual/anomalous movement? */
+  isAnomaly: boolean;
+  /** Direction of movement */
+  direction: "UP" | "DOWN" | "STABLE";
+  /** Timestamp of last calculation */
+  calculatedAt: number;
+}
+
+/**
  * Order book store state
  */
 interface OrderBookStoreState {
@@ -78,6 +117,10 @@ interface OrderBookStoreState {
   lastTrades: Map<string, LastTrade>;
   /** Pending price changes for assets without initial snapshot */
   pendingChanges: Map<string, PendingChange[]>;
+  /** Price history for each asset (sliding window) */
+  priceHistory: Map<string, PriceHistoryEntry[]>;
+  /** Calculated price velocity for each asset */
+  priceVelocity: Map<string, PriceVelocity>;
   /** Connection status */
   isConnected: boolean;
   /** Last error */
@@ -118,6 +161,10 @@ interface OrderBookStoreState {
   getLastTrade: (assetId: string) => LastTrade | undefined;
   /** Check if order book data is stale */
   isStale: (assetId: string) => boolean;
+  /** Get price velocity for a specific asset */
+  getVelocity: (assetId: string) => PriceVelocity | undefined;
+  /** Get price at a specific timestamp (interpolated if needed) */
+  getPriceAt: (assetId: string, timestampMs: number) => number | null;
 }
 
 /**
@@ -320,6 +367,116 @@ function applyPendingChanges(
   return result;
 }
 
+// ============================================
+// Price History Helper Functions
+// ============================================
+
+/**
+ * Add a price entry to history and trim old entries
+ */
+function addPriceHistory(
+  history: PriceHistoryEntry[],
+  entry: PriceHistoryEntry
+): PriceHistoryEntry[] {
+  const now = Date.now();
+  const cutoff = now - PRICE_HISTORY_MAX_AGE_MS;
+
+  // Add new entry and filter old ones
+  const updated = [...history, entry].filter((h) => h.timestamp > cutoff);
+
+  // Cap the array size
+  if (updated.length > PRICE_HISTORY_MAX_ENTRIES) {
+    return updated.slice(-PRICE_HISTORY_MAX_ENTRIES);
+  }
+
+  return updated;
+}
+
+/**
+ * Get price at a specific timestamp using linear interpolation
+ */
+function getPriceAtTimestamp(
+  history: PriceHistoryEntry[],
+  targetTs: number
+): number | null {
+  if (history.length === 0) return null;
+
+  // Find the two entries that bracket the target timestamp
+  let before: PriceHistoryEntry | null = null;
+  let after: PriceHistoryEntry | null = null;
+
+  for (const entry of history) {
+    if (entry.timestamp <= targetTs) {
+      before = entry;
+    } else if (!after) {
+      after = entry;
+      break;
+    }
+  }
+
+  // If we only have one side, return that
+  if (!before && after) return after.midpoint;
+  if (before && !after) return before.midpoint;
+  if (!before || !after) return null;
+
+  // If timestamps are the same, return the price directly
+  if (before.timestamp === after.timestamp) return before.midpoint;
+
+  // Linear interpolation between the two points
+  const ratio =
+    (targetTs - before.timestamp) / (after.timestamp - before.timestamp);
+  return before.midpoint + ratio * (after.midpoint - before.midpoint);
+}
+
+/**
+ * Calculate the price change over a specific time window
+ */
+function calculatePriceChange(
+  history: PriceHistoryEntry[],
+  windowMs: number
+): number {
+  if (history.length === 0) return 0;
+
+  const now = Date.now();
+  const currentPrice = history[history.length - 1]?.midpoint ?? 0;
+  const pastPrice = getPriceAtTimestamp(history, now - windowMs);
+
+  if (!pastPrice || pastPrice === 0) return 0;
+  return (currentPrice - pastPrice) / pastPrice;
+}
+
+/**
+ * Calculate price velocity metrics from history
+ */
+function calculateVelocity(history: PriceHistoryEntry[]): PriceVelocity {
+  const now = Date.now();
+
+  const change1s = calculatePriceChange(history, 1000);
+  const change5s = calculatePriceChange(history, 5000);
+  const change30s = calculatePriceChange(history, 30000);
+  const change60s = calculatePriceChange(history, 60000);
+
+  // Detect anomaly: significant change in short window
+  const isAnomaly =
+    Math.abs(change5s) > ANOMALY_THRESHOLD_5S ||
+    Math.abs(change1s) > ANOMALY_THRESHOLD_1S;
+
+  // Determine direction based on 5-second change
+  let direction: "UP" | "DOWN" | "STABLE" = "STABLE";
+  if (change5s > 0.01) direction = "UP";
+  else if (change5s < -0.01) direction = "DOWN";
+
+  return {
+    change1s,
+    change5s,
+    change30s,
+    change60s,
+    isAnomaly,
+    direction,
+    calculatedAt: now,
+  };
+}
+
 /**
  * Zustand store for order book state management
  *
@@ -337,6 +494,8 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
     orderBooks: new Map<string, ProcessedOrderBook>(),
     lastTrades: new Map<string, LastTrade>(),
     pendingChanges: new Map<string, PendingChange[]>(),
+    priceHistory: new Map<string, PriceHistoryEntry[]>(),
+    priceVelocity: new Map<string, PriceVelocity>(),
     isConnected: false,
     lastError: null,
 
@@ -365,9 +524,31 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         const newPendingChanges = new Map(state.pendingChanges);
         newPendingChanges.delete(event.asset_id);
 
+        // Track price history for signal detection
+        const newPriceHistory = new Map(state.priceHistory);
+        const newPriceVelocity = new Map(state.priceVelocity);
+
+        if (processed.midpoint !== null) {
+          const history = state.priceHistory.get(event.asset_id) || [];
+          const newEntry: PriceHistoryEntry = {
+            bestBid: processed.bestBid ?? 0,
+            bestAsk: processed.bestAsk ?? 0,
+            midpoint: processed.midpoint,
+            timestamp: Date.now(),
+          };
+          const updatedHistory = addPriceHistory(history, newEntry);
+          newPriceHistory.set(event.asset_id, updatedHistory);
+
+          // Calculate velocity
+          const velocity = calculateVelocity(updatedHistory);
+          newPriceVelocity.set(event.asset_id, velocity);
+        }
+
         return {
           orderBooks: newOrderBooks,
           pendingChanges: newPendingChanges,
+          priceHistory: newPriceHistory,
+          priceVelocity: newPriceVelocity,
         };
       });
     },
@@ -376,6 +557,8 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
       set((state) => {
         const newOrderBooks = new Map(state.orderBooks);
         const newPendingChanges = new Map(state.pendingChanges);
+        const newPriceHistory = new Map(state.priceHistory);
+        const newPriceVelocity = new Map(state.priceVelocity);
 
         for (const change of event.price_changes) {
           const existing = newOrderBooks.get(change.asset_id);
@@ -391,6 +574,23 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
               event.timestamp
             );
             newOrderBooks.set(change.asset_id, updated);
+
+            // Track price history for signal detection
+            if (updated.midpoint !== null) {
+              const history = newPriceHistory.get(change.asset_id) || [];
+              const newEntry: PriceHistoryEntry = {
+                bestBid: updated.bestBid ?? 0,
+                bestAsk: updated.bestAsk ?? 0,
+                midpoint: updated.midpoint,
+                timestamp: Date.now(),
+              };
+              const updatedHistory = addPriceHistory(history, newEntry);
+              newPriceHistory.set(change.asset_id, updatedHistory);
+
+              // Calculate velocity
+              const velocity = calculateVelocity(updatedHistory);
+              newPriceVelocity.set(change.asset_id, velocity);
+            }
           } else {
             // Queue for later if we don't have the initial snapshot yet
             const pending = newPendingChanges.get(change.asset_id) || [];
@@ -411,6 +611,8 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         return {
           orderBooks: newOrderBooks,
           pendingChanges: newPendingChanges,
+          priceHistory: newPriceHistory,
+          priceVelocity: newPriceVelocity,
         };
       });
     },
@@ -475,10 +677,16 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         newLastTrades.delete(assetId);
         const newPendingChanges = new Map(state.pendingChanges);
         newPendingChanges.delete(assetId);
+        const newPriceHistory = new Map(state.priceHistory);
+        newPriceHistory.delete(assetId);
+        const newPriceVelocity = new Map(state.priceVelocity);
+        newPriceVelocity.delete(assetId);
         return {
           orderBooks: newOrderBooks,
           lastTrades: newLastTrades,
           pendingChanges: newPendingChanges,
+          priceHistory: newPriceHistory,
+          priceVelocity: newPriceVelocity,
         };
       });
     },
@@ -488,6 +696,8 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
         orderBooks: new Map<string, ProcessedOrderBook>(),
         lastTrades: new Map<string, LastTrade>(),
         pendingChanges: new Map<string, PendingChange[]>(),
+        priceHistory: new Map<string, PriceHistoryEntry[]>(),
+        priceVelocity: new Map<string, PriceVelocity>(),
       });
     },
 
@@ -525,6 +735,16 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
       if (!orderBook) return true;
       const age = Date.now() - orderBook.receivedAt;
       return age > STALE_THRESHOLD_MS;
+    },
+
+    getVelocity: (assetId: string) => {
+      return get().priceVelocity.get(assetId);
+    },
+
+    getPriceAt: (assetId: string, timestampMs: number) => {
+      const history = get().priceHistory.get(assetId);
+      if (!history) return null;
+      return getPriceAtTimestamp(history, timestampMs);
     },
   }))
 );
@@ -611,5 +831,79 @@ export function useOrderBookWithStatus(assetId: string | undefined) {
         source: orderBook.source,
       };
     })
+  );
+}
+
+// ============================================
+// Price Velocity Hooks (for signal detection)
+// ============================================
+
+/**
+ * Hook to get price velocity for a specific asset
+ * Returns metrics about how fast the price is changing
+ */
+export function usePriceVelocity(assetId: string | undefined) {
+  return useOrderBookStore((state: OrderBookStoreState) =>
+    assetId ? state.priceVelocity.get(assetId) : undefined
+  );
+}
+
+/**
+ * Hook to detect if there's a price anomaly (sudden movement)
+ * Useful for triggering alerts
+ */
+export function usePriceAnomaly(assetId: string | undefined) {
+  return useOrderBookStore(
+    useShallow((state: OrderBookStoreState) => {
+      if (!assetId) {
+        return { isAnomaly: false, change: 0, direction: "STABLE" as const };
+      }
+      const velocity = state.priceVelocity.get(assetId);
+      return {
+        isAnomaly: velocity?.isAnomaly ?? false,
+        change: velocity?.change5s ?? 0,
+        direction: velocity?.direction ?? ("STABLE" as const),
+      };
+    })
+  );
+}
+
+/**
+ * Hook to get price velocity with all metrics
+ * Uses useShallow to prevent infinite re-renders
+ */
+export function usePriceVelocityMetrics(assetId: string | undefined) {
+  return useOrderBookStore(
+    useShallow((state: OrderBookStoreState) => {
+      if (!assetId) {
+        return {
+          change1s: 0,
+          change5s: 0,
+          change30s: 0,
+          change60s: 0,
+          isAnomaly: false,
+          direction: "STABLE" as const,
+        };
+      }
+      const velocity = state.priceVelocity.get(assetId);
+      return {
+        change1s: velocity?.change1s ?? 0,
+        change5s: velocity?.change5s ?? 0,
+        change30s: velocity?.change30s ?? 0,
+        change60s: velocity?.change60s ?? 0,
+        isAnomaly: velocity?.isAnomaly ?? false,
+        direction: velocity?.direction ?? ("STABLE" as const),
+      };
+    })
+  );
+}
+
+/**
+ * Hook to get price history for a specific asset
+ * Useful for charting or custom analysis
+ */
+export function usePriceHistory(assetId: string | undefined) {
+  return useOrderBookStore((state: OrderBookStoreState) =>
+    assetId ? state.priceHistory.get(assetId) : undefined
   );
 }

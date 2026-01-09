@@ -18,6 +18,7 @@ import {
   useOrderBook as useOrderBookFromStore,
   useOrderBookStore,
 } from "@/hooks/use-orderbook-store";
+import { usePriceAlertDetection } from "@/hooks/use-price-alerts";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
@@ -418,6 +419,9 @@ export default function EventDetailClient({
       tokenMarketMap: tokenMap,
     };
   }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
+
+  // Enable price alert detection for all token IDs in this event
+  usePriceAlertDetection(allTokenIds);
 
   // Auto-expand the order book upfront when the event has exactly one market.
   useEffect(() => {
