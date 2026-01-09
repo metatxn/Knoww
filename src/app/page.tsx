@@ -534,13 +534,17 @@ function HomeContent() {
               <span className="text-sm text-muted-foreground">active markets</span>
             </div> */}
 
-            {/* Whale Tracker Badge */}
+            {/* Whale Tracker Badge - Highlighted */}
             <Link href="/whales">
-              <div className="flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-500/40 transition-all cursor-pointer active:scale-95">
-                <Fish className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-500" />
-                <span className="text-xs sm:text-sm font-semibold text-cyan-600 dark:text-cyan-400">
+              <div className="relative flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 transition-all cursor-pointer active:scale-95 shadow-md hover:shadow-lg hover:shadow-cyan-500/30">
+                <Fish className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+                <span className="text-xs sm:text-sm font-bold text-white">
                   <span className="sm:hidden">🐋</span>
                   <span className="hidden sm:inline">Whales</span>
+                </span>
+                {/* NEW badge */}
+                <span className="absolute -top-1.5 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-full shadow-sm animate-pulse">
+                  NEW
                 </span>
               </div>
             </Link>

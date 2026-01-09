@@ -74,13 +74,13 @@ async function fetchWhaleActivity(
 ): Promise<WhaleActivityResponse> {
   const params = new URLSearchParams();
 
-  if (options.whaleCount) {
+  if (options.whaleCount !== undefined) {
     params.set("whaleCount", options.whaleCount.toString());
   }
-  if (options.minTradeSize) {
+  if (options.minTradeSize !== undefined) {
     params.set("minTradeSize", options.minTradeSize.toString());
   }
-  if (options.tradesPerWhale) {
+  if (options.tradesPerWhale !== undefined) {
     params.set("tradesPerWhale", options.tradesPerWhale.toString());
   }
   if (options.timePeriod) {
@@ -148,7 +148,8 @@ export function useWhaleActivity(options: UseWhaleActivityOptions = {}) {
         timePeriod,
       }),
     enabled,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 60 * 1000, // 1 minute - increased from 30s to reduce redundant fetches
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep data in cache longer
     refetchInterval,
   });
 }

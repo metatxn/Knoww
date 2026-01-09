@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   Cpu,
   Crown,
+  Fish,
   FolderOpen,
   Globe,
   Grid3X3,
@@ -111,6 +112,20 @@ export function SidebarMobile() {
               >
                 <Grid3X3 className="h-5 w-5" />
                 All Markets
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleNavigation("/whales")}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                  pathname === "/whales"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                <Fish className="h-5 w-5" />
+                Whales
               </button>
 
               {isConnected && (

@@ -3,18 +3,22 @@
 import { motion } from "framer-motion";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   BarChart3,
   Clock,
   Crown,
+  Eye,
   Fish,
   Flame,
   RefreshCw,
+  Shield,
   Target,
   TrendingDown,
   TrendingUp,
+  UserPlus,
   Users,
 } from "lucide-react";
 import Image from "next/image";
@@ -41,12 +45,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  formatAccountAge,
+  getInsiderActivityStats,
+  getSuspicionColor,
+  getSuspicionRiskLevel,
+  type SuspiciousActivity,
+  useInsiderActivity,
+} from "@/hooks/use-insider-activity";
+import {
   getWhaleActivityStats,
   useWhaleActivity,
   type WhaleActivity,
 } from "@/hooks/use-whale-activity";
 import { formatCurrencyCompact } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+
+// View tabs
+type ViewTab = "whales" | "insiders";
 
 // Time period options - maps UI values to API timePeriod values
 const TIME_PERIODS = [
@@ -71,12 +86,28 @@ const TIME_PERIODS = [
   },
 ];
 
-// Trade size filter options
+// Trade size filter options (for whale activity)
 const TRADE_SIZE_OPTIONS = [
   { value: "100", label: "$100+" },
   { value: "500", label: "$500+" },
   { value: "1000", label: "$1K+" },
   { value: "5000", label: "$5K+" },
+];
+
+// USD value filter options (for insider detection)
+const INSIDER_USD_OPTIONS = [
+  { value: "1000", label: "$1K+" },
+  { value: "5000", label: "$5K+" },
+  { value: "10000", label: "$10K+" },
+  { value: "25000", label: "$25K+" },
+];
+
+// Share count filter options (for insider detection)
+const INSIDER_SHARES_OPTIONS = [
+  { value: "0", label: "Any" },
+  { value: "500", label: "500+" },
+  { value: "1000", label: "1K+" },
+  { value: "5000", label: "5K+" },
 ];
 
 function formatAddress(address: string | null | undefined) {
@@ -808,6 +839,219 @@ function RecentActivityRow({
   );
 }
 
+// ============================================================================
+// INSIDER DETECTION COMPONENTS
+// ============================================================================
+
+function SuspicionScoreBadge({ score }: { score: number }) {
+  const riskLevel = getSuspicionRiskLevel(score);
+  const colorClass = getSuspicionColor(score);
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold",
+        riskLevel === "CRITICAL" && "bg-red-100 dark:bg-red-900/40",
+        riskLevel === "HIGH" && "bg-orange-100 dark:bg-orange-900/40",
+        riskLevel === "MEDIUM" && "bg-yellow-100 dark:bg-yellow-900/40",
+        riskLevel === "LOW" && "bg-green-100 dark:bg-green-900/40"
+      )}
+    >
+      <AlertTriangle className={cn("h-3.5 w-3.5", colorClass)} />
+      <span className={colorClass}>{score}</span>
+    </div>
+  );
+}
+
+function InsiderActivityRow({
+  activity,
+  index,
+}: {
+  activity: SuspiciousActivity;
+  index: number;
+}) {
+  const isBuy = activity.trade.side === "BUY";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-xl transition-colors",
+        "hover:bg-slate-100 dark:hover:bg-slate-800/60",
+        index % 2 === 0
+          ? "bg-slate-50/50 dark:bg-slate-800/30"
+          : "bg-transparent"
+      )}
+    >
+      {/* Suspicion Score */}
+      <SuspicionScoreBadge score={activity.analysis.suspicionScore} />
+
+      {/* Trader Info */}
+      <Link
+        href={`/profile/${activity.account.address}`}
+        className="shrink-0 group"
+      >
+        <Avatar className="h-9 w-9 ring-2 ring-amber-400/50 group-hover:ring-amber-400 transition-all">
+          <AvatarImage
+            src={activity.account.profileImage || undefined}
+            alt={activity.account.name || "Trader"}
+          />
+          <AvatarFallback className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-bold">
+            <UserPlus className="h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
+      </Link>
+
+      {/* Trade Details */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href={`/profile/${activity.account.address}`}
+            className="text-sm font-bold text-foreground hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+          >
+            {activity.account.name || formatAddress(activity.account.address)}
+          </Link>
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30"
+          >
+            {formatAccountAge(activity.account.accountAgeHours)} old
+          </Badge>
+          <span
+            className={cn(
+              "text-sm font-semibold",
+              isBuy
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+            )}
+          >
+            {isBuy ? "bought" : "sold"}
+          </span>
+          <span className="text-sm text-foreground/70 font-medium">
+            {activity.trade.outcome} @ {(activity.trade.price * 100).toFixed(0)}
+            ¢
+          </span>
+        </div>
+        <Link
+          href={`/events/detail/${
+            activity.market.eventSlug || activity.market.slug
+          }`}
+          className="text-sm text-foreground/60 hover:text-foreground transition-colors line-clamp-1 mt-0.5"
+        >
+          {activity.market.title}
+        </Link>
+        <div className="text-xs text-foreground/50 mt-1 line-clamp-1">
+          {activity.analysis.reason}
+        </div>
+      </div>
+
+      {/* Amount & Market Price */}
+      <div className="text-right shrink-0">
+        <div
+          className={cn(
+            "text-base font-bold",
+            isBuy
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
+          )}
+        >
+          {formatCurrencyCompact(activity.trade.usdcAmount)}
+        </div>
+        <div className="text-xs text-foreground/60 font-medium">
+          Market: {(activity.market.currentPrice * 100).toFixed(0)}%
+        </div>
+        <div className="text-xs text-foreground/50">
+          {formatTimeAgo(activity.timestamp)}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function InsiderStatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
+}: {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  icon: React.ElementType;
+  trend?: "up" | "down" | "warning" | "neutral";
+}) {
+  return (
+    <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm overflow-hidden relative">
+      <div
+        className={cn(
+          "absolute inset-0 opacity-5",
+          trend === "up" && "bg-emerald-500",
+          trend === "down" && "bg-red-500",
+          trend === "warning" && "bg-amber-500",
+          !trend && "bg-slate-500"
+        )}
+      />
+      <CardContent className="p-4 relative">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">
+              {title}
+            </p>
+            <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+            <p className="text-xs text-foreground/60 mt-1">{subtitle}</p>
+          </div>
+          <div
+            className={cn(
+              "p-2.5 rounded-xl",
+              trend === "up" && "bg-emerald-100 dark:bg-emerald-900/40",
+              trend === "down" && "bg-red-100 dark:bg-red-900/40",
+              trend === "warning" && "bg-amber-100 dark:bg-amber-900/40",
+              !trend && "bg-slate-100 dark:bg-slate-800"
+            )}
+          >
+            <Icon
+              className={cn(
+                "h-5 w-5",
+                trend === "up" && "text-emerald-600 dark:text-emerald-400",
+                trend === "down" && "text-red-600 dark:text-red-400",
+                trend === "warning" && "text-amber-600 dark:text-amber-400",
+                !trend && "text-foreground/70"
+              )}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InsiderLoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Stats Skeleton */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={`insider-stat-${i}`} className="h-24 rounded-xl" />
+        ))}
+      </div>
+
+      {/* Activity Skeleton */}
+      <div className="space-y-3">
+        {[...Array(6)].map((_, i) => (
+          <Skeleton key={`insider-activity-${i}`} className="h-20 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// END INSIDER DETECTION COMPONENTS
+// ============================================================================
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
@@ -840,28 +1084,57 @@ function LoadingSkeleton() {
 }
 
 export default function WhalesPage() {
+  const [activeTab, setActiveTab] = useState<ViewTab>("whales");
   const [timePeriod, setTimePeriod] = useState("24h");
   const [minTradeSize, setMinTradeSize] = useState("100");
+
+  // Insider detection filters
+  const [insiderMinUsd, setInsiderMinUsd] = useState("5000"); // Default $5K
+  const [insiderMinShares, setInsiderMinShares] = useState("0"); // Default: any
 
   // Get the API time period based on selected filter
   const selectedPeriod = TIME_PERIODS.find((p) => p.value === timePeriod);
   const apiTimePeriod = selectedPeriod?.apiPeriod || "DAY";
 
+  // Whale Activity Query - Optimized: reduced from 50 whales/50 trades to 25/25 for faster initial load
   const { data, isLoading, error, refetch, isFetching } = useWhaleActivity({
-    whaleCount: 50,
+    whaleCount: 25,
     minTradeSize: Number.parseFloat(minTradeSize),
-    tradesPerWhale: 50,
-    timePeriod: apiTimePeriod, // Use dynamic time period for API
+    tradesPerWhale: 25,
+    timePeriod: apiTimePeriod,
+    enabled: activeTab === "whales",
+  });
+
+  // Insider Activity Query
+  const {
+    data: insiderData,
+    isLoading: insiderLoading,
+    error: insiderError,
+    refetch: refetchInsiders,
+    isFetching: insiderFetching,
+  } = useInsiderActivity({
+    maxAccountAge: 168, // 7 days
+    minUsdValue: Number.parseFloat(insiderMinUsd),
+    minShares: Number.parseFloat(insiderMinShares),
+    minScore: 30,
+    limit: 100,
+    enabled: activeTab === "insiders",
   });
 
   // For the selected time period, we use all activities from the API
   // since the API already filters by the correct time period
   const filteredActivities = data?.activities ?? [];
 
-  // Compute derived data
+  // Compute derived data for whales
   const stats = useMemo(
     () => getWhaleActivityStats(filteredActivities),
     [filteredActivities]
+  );
+
+  // Compute derived data for insiders
+  const insiderStats = useMemo(
+    () => getInsiderActivityStats(insiderData?.activities ?? []),
+    [insiderData?.activities]
   );
   const hotMarkets = useMemo(
     () => getHotMarkets(filteredActivities),
@@ -894,106 +1167,261 @@ export default function WhalesPage() {
                 Whale Tracker
               </h1>
               <p className="text-foreground/70 text-base font-medium">
-                See what the top traders are buying and selling
+                {activeTab === "whales"
+                  ? "See what the top traders are buying and selling"
+                  : "Detect potential insider activity from new accounts"}
               </p>
             </div>
           </div>
 
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-2 mb-4 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setActiveTab("whales")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                activeTab === "whales"
+                  ? "bg-white dark:bg-slate-900 text-foreground shadow-sm"
+                  : "text-foreground/60 hover:text-foreground hover:bg-white/50 dark:hover:bg-slate-900/50"
+              )}
+            >
+              <Fish className="h-4 w-4" />
+              <span>Whale Activity</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("insiders")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                activeTab === "insiders"
+                  ? "bg-amber-500 text-white shadow-sm"
+                  : "text-foreground/60 hover:text-foreground hover:bg-amber-100 dark:hover:bg-amber-900/30"
+              )}
+            >
+              <Eye className="h-4 w-4" />
+              <span>Insider Detection</span>
+              {insiderData && insiderData.stats.suspiciousActivities > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white">
+                  {insiderData.stats.suspiciousActivities}
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* Filters Bar - More Prominent */}
           <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm">
-            {/* Mobile: Dropdowns with labels */}
-            <div className="flex items-center gap-3 sm:hidden">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-foreground/60 font-medium">
-                  Period:
-                </span>
-                <Select value={timePeriod} onValueChange={setTimePeriod}>
-                  <SelectTrigger
-                    className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
-                    aria-label="Period"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_PERIODS.map((period) => (
-                      <SelectItem key={period.value} value={period.value}>
-                        {getPeriodLabel(period.value)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* ===== WHALE ACTIVITY FILTERS ===== */}
+            {activeTab === "whales" && (
+              <>
+                {/* Mobile: Dropdowns with labels */}
+                <div className="flex items-center gap-3 sm:hidden">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground/60 font-medium">
+                      Period:
+                    </span>
+                    <Select value={timePeriod} onValueChange={setTimePeriod}>
+                      <SelectTrigger
+                        className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
+                        aria-label="Period"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_PERIODS.map((period) => (
+                          <SelectItem key={period.value} value={period.value}>
+                            {getPeriodLabel(period.value)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-foreground/60 font-medium">
-                  Min:
-                </span>
-                <Select value={minTradeSize} onValueChange={setMinTradeSize}>
-                  <SelectTrigger
-                    className="h-9 px-3 bg-cyan-500 text-white border-cyan-500 rounded-xl font-semibold"
-                    aria-label="Minimum trade size"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRADE_SIZE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Desktop: Pill buttons */}
-            <div className="hidden sm:flex items-center gap-4">
-              {/* Time Period Pills */}
-              <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                {TIME_PERIODS.map((period) => (
-                  <button
-                    key={period.value}
-                    type="button"
-                    onClick={() => setTimePeriod(period.value)}
-                    className={cn(
-                      "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
-                      timePeriod === period.value
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
-                    )}
-                  >
-                    {getPeriodLabel(period.value)}
-                  </button>
-                ))}
-              </div>
-
-              {/* Divider */}
-              <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
-
-              {/* Min Trade Size */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
-                  Min Trade:
-                </span>
-                <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                  {TRADE_SIZE_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setMinTradeSize(option.value)}
-                      className={cn(
-                        "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
-                        minTradeSize === option.value
-                          ? "bg-cyan-500 text-white shadow-md"
-                          : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
-                      )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground/60 font-medium">
+                      Min:
+                    </span>
+                    <Select
+                      value={minTradeSize}
+                      onValueChange={setMinTradeSize}
                     >
-                      {option.label}
-                    </button>
-                  ))}
+                      <SelectTrigger
+                        className="h-9 px-3 bg-cyan-500 text-white border-cyan-500 rounded-xl font-semibold"
+                        aria-label="Minimum trade size"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRADE_SIZE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-            </div>
+
+                {/* Desktop: Pill buttons */}
+                <div className="hidden sm:flex items-center gap-4">
+                  {/* Time Period Pills */}
+                  <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    {TIME_PERIODS.map((period) => (
+                      <button
+                        key={period.value}
+                        type="button"
+                        onClick={() => setTimePeriod(period.value)}
+                        className={cn(
+                          "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+                          timePeriod === period.value
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                        )}
+                      >
+                        {getPeriodLabel(period.value)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
+
+                  {/* Min Trade Size */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
+                      Min Trade:
+                    </span>
+                    <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      {TRADE_SIZE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setMinTradeSize(option.value)}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            minTradeSize === option.value
+                              ? "bg-cyan-500 text-white shadow-md"
+                              : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== INSIDER DETECTION FILTERS ===== */}
+            {activeTab === "insiders" && (
+              <>
+                {/* Mobile: Dropdowns */}
+                <div className="flex items-center gap-3 sm:hidden">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground/60 font-medium">
+                      Min USD:
+                    </span>
+                    <Select
+                      value={insiderMinUsd}
+                      onValueChange={setInsiderMinUsd}
+                    >
+                      <SelectTrigger
+                        className="h-9 px-3 bg-amber-500 text-white border-amber-500 rounded-xl font-semibold"
+                        aria-label="Minimum USD value"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INSIDER_USD_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground/60 font-medium">
+                      Shares:
+                    </span>
+                    <Select
+                      value={insiderMinShares}
+                      onValueChange={setInsiderMinShares}
+                    >
+                      <SelectTrigger
+                        className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
+                        aria-label="Minimum shares"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INSIDER_SHARES_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Desktop: Pill buttons */}
+                <div className="hidden sm:flex items-center gap-4">
+                  {/* Min USD Value */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
+                      Min Value:
+                    </span>
+                    <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      {INSIDER_USD_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setInsiderMinUsd(option.value)}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            insiderMinUsd === option.value
+                              ? "bg-amber-500 text-white shadow-md"
+                              : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
+
+                  {/* Min Shares */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
+                      Min Shares:
+                    </span>
+                    <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      {INSIDER_SHARES_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setInsiderMinShares(option.value)}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            insiderMinShares === option.value
+                              ? "bg-purple-500 text-white shadow-md"
+                              : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Spacer */}
             <div className="flex-1" />
@@ -1005,12 +1433,21 @@ export default function WhalesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => refetch()}
-                    disabled={isFetching}
+                    onClick={() =>
+                      activeTab === "whales" ? refetch() : refetchInsiders()
+                    }
+                    disabled={
+                      activeTab === "whales" ? isFetching : insiderFetching
+                    }
                     className="rounded-xl gap-2 font-semibold h-10 px-4 border-slate-300 dark:border-slate-600"
                   >
                     <RefreshCw
-                      className={cn("h-4 w-4", isFetching && "animate-spin")}
+                      className={cn(
+                        "h-4 w-4",
+                        (activeTab === "whales"
+                          ? isFetching
+                          : insiderFetching) && "animate-spin"
+                      )}
                     />
                     <span className="hidden sm:inline">Refresh</span>
                   </Button>
@@ -1019,8 +1456,8 @@ export default function WhalesPage() {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Stats Badge */}
-            {data && (
+            {/* Stats Badge - Whale View */}
+            {activeTab === "whales" && data && (
               <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">
                 <span className="text-sm text-foreground/80 font-medium">
                   Tracking{" "}
@@ -1041,295 +1478,486 @@ export default function WhalesPage() {
           </div>
         </motion.div>
 
-        {/* Loading State */}
-        {isLoading && <LoadingSkeleton />}
+        {/* ========== WHALE VIEW ========== */}
+        {activeTab === "whales" && (
+          <>
+            {/* Loading State */}
+            {isLoading && <LoadingSkeleton />}
 
-        {/* Error State */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-12 px-4 rounded-2xl bg-destructive/5 border border-destructive/20"
-          >
-            <Fish className="h-10 w-10 text-destructive mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-destructive mb-2">
-              Failed to load whale data
-            </h3>
-            <p className="text-muted-foreground mb-4">{error.message}</p>
-            <Button
-              variant="outline"
-              onClick={() => refetch()}
-              className="rounded-xl"
-            >
-              Try Again
-            </Button>
-          </motion.div>
+            {/* Error State */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-12 px-4 rounded-2xl bg-destructive/5 border border-destructive/20"
+              >
+                <Fish className="h-10 w-10 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-destructive mb-2">
+                  Failed to load whale data
+                </h3>
+                <p className="text-muted-foreground mb-4">{error.message}</p>
+                <Button
+                  variant="outline"
+                  onClick={() => refetch()}
+                  className="rounded-xl"
+                >
+                  Try Again
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Main Content */}
+            {!isLoading && !error && data && (
+              <>
+                {/* Stats Row */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+                >
+                  <StatCard
+                    title="Total Volume"
+                    value={formatCurrencyCompact(stats.totalVolume)}
+                    subtitle={`${stats.totalTrades} trades from ${stats.uniqueTraders} whales`}
+                    icon={BarChart3}
+                  />
+                  <StatCard
+                    title="Buy Pressure"
+                    value={formatCurrencyCompact(stats.totalBuyVolume)}
+                    subtitle={`${stats.buyCount} buy orders`}
+                    icon={TrendingUp}
+                    trend="up"
+                  />
+                  <StatCard
+                    title="Sell Pressure"
+                    value={formatCurrencyCompact(stats.totalSellVolume)}
+                    subtitle={`${stats.sellCount} sell orders`}
+                    icon={TrendingDown}
+                    trend="down"
+                  />
+                  <StatCard
+                    title="Market Sentiment"
+                    value={
+                      stats.sentiment === "bullish"
+                        ? "🐂 Bullish"
+                        : stats.sentiment === "bearish"
+                        ? "🐻 Bearish"
+                        : "⚖️ Neutral"
+                    }
+                    subtitle={`${(stats.buyRatio * 100).toFixed(
+                      0
+                    )}% of volume is buying`}
+                    icon={Activity}
+                    trend={
+                      stats.sentiment === "bullish"
+                        ? "up"
+                        : stats.sentiment === "bearish"
+                        ? "down"
+                        : "neutral"
+                    }
+                  />
+                </motion.div>
+
+                {/* Buy vs Sell Area Chart */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="mb-6 p-4 rounded-2xl bg-card/80 backdrop-blur-sm border border-border shadow-sm"
+                >
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <BarChart3 className="h-5 w-5 text-foreground/70" />
+                    <span className="text-base font-bold text-foreground">
+                      Buy vs Sell Pressure
+                    </span>
+                  </div>
+                  <BuySellAreaChart
+                    activities={filteredActivities}
+                    buyVolume={stats.totalBuyVolume}
+                    sellVolume={stats.totalSellVolume}
+                    buyCount={stats.buyCount}
+                    sellCount={stats.sellCount}
+                  />
+                </motion.div>
+
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Hot Markets */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="lg:col-span-2"
+                  >
+                    <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
+                      <CardHeader className="px-4 py-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Flame className="h-5 w-5 text-orange-500" />
+                          <span className="text-foreground font-bold">
+                            Hot Markets
+                          </span>
+                          <span className="text-sm font-medium text-foreground/60 ml-1">
+                            Where whales are most active
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-4 pt-0">
+                        {hotMarkets.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {hotMarkets.map((market, index) => (
+                              <HotMarketCard
+                                key={market.id}
+                                market={market}
+                                index={index}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-foreground/60">
+                            <Target className="h-10 w-10 mx-auto mb-3 opacity-60" />
+                            <p className="text-base font-medium">
+                              No market activity in this time period
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* Right Column - Top Whales */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                  >
+                    <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
+                      <CardHeader className="px-4 py-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Crown className="h-5 w-5 text-amber-500" />
+                          <span className="text-foreground font-bold">
+                            Most Active Whales
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 px-4 pb-4 pt-0">
+                        {topWhales.length > 0 ? (
+                          topWhales.map((whale, index) => (
+                            <TopWhaleCard
+                              key={whale.address}
+                              whale={whale}
+                              index={index}
+                            />
+                          ))
+                        ) : (
+                          <div className="text-center py-8 text-foreground/60">
+                            <Users className="h-10 w-10 mx-auto mb-3 opacity-60" />
+                            <p className="text-base font-medium">
+                              No whale activity
+                            </p>
+                          </div>
+                        )}
+
+                        <Link href="/leaderboard">
+                          <Button
+                            variant="outline"
+                            className="w-full mt-3 text-sm font-semibold text-foreground/80 hover:text-foreground border-border"
+                          >
+                            View Full Leaderboard
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </div>
+
+                {/* Recent Activity Feed */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-6"
+                >
+                  <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
+                    <CardHeader className="px-4 py-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-lg">
+                          <Clock className="h-5 w-5 text-blue-500" />
+                          <span className="text-foreground font-bold">
+                            Recent Activity
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold text-foreground/70 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
+                          {filteredActivities.length} trades
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 pt-0">
+                      {filteredActivities.length > 0 ? (
+                        <div className="max-h-[500px] overflow-y-auto pr-2">
+                          {filteredActivities
+                            .slice(0, 25)
+                            .map((activity, index) => (
+                              <RecentActivityRow
+                                key={`${activity.id}-${index}`}
+                                activity={activity}
+                                index={index}
+                              />
+                            ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-foreground/60">
+                          <Activity className="h-10 w-10 mx-auto mb-3 opacity-60" />
+                          <p className="text-base font-medium">
+                            No activity in this time period
+                          </p>
+                          <p className="text-sm mt-2 text-foreground/50">
+                            Try selecting a longer time range
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Info Section */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-8 p-6 rounded-2xl bg-linear-to-br from-cyan-100/80 to-blue-100/80 dark:from-cyan-900/30 dark:to-blue-900/30 border border-cyan-300 dark:border-cyan-700 shadow-sm"
+                >
+                  <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-foreground">
+                    <Fish className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                    How to use Whale Tracker
+                  </h3>
+                  <ul className="text-sm text-foreground/80 space-y-2.5">
+                    <li className="flex items-start gap-3">
+                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">Hot Markets</strong>{" "}
+                        shows where top traders are placing the most money
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">
+                          Buy/Sell ratio
+                        </strong>{" "}
+                        indicates market sentiment - green bars mean more buying
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">
+                          Most Active Whales
+                        </strong>{" "}
+                        are the top traders by volume in your selected period
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        Click any market or trader to see more details
+                      </span>
+                    </li>
+                  </ul>
+                </motion.div>
+              </>
+            )}
+          </>
         )}
 
-        {/* Main Content */}
-        {!isLoading && !error && data && (
+        {/* ========== INSIDER DETECTION VIEW ========== */}
+        {activeTab === "insiders" && (
           <>
-            {/* Stats Row */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
-            >
-              <StatCard
-                title="Total Volume"
-                value={formatCurrencyCompact(stats.totalVolume)}
-                subtitle={`${stats.totalTrades} trades from ${stats.uniqueTraders} whales`}
-                icon={BarChart3}
-              />
-              <StatCard
-                title="Buy Pressure"
-                value={formatCurrencyCompact(stats.totalBuyVolume)}
-                subtitle={`${stats.buyCount} buy orders`}
-                icon={TrendingUp}
-                trend="up"
-              />
-              <StatCard
-                title="Sell Pressure"
-                value={formatCurrencyCompact(stats.totalSellVolume)}
-                subtitle={`${stats.sellCount} sell orders`}
-                icon={TrendingDown}
-                trend="down"
-              />
-              <StatCard
-                title="Market Sentiment"
-                value={
-                  stats.sentiment === "bullish"
-                    ? "🐂 Bullish"
-                    : stats.sentiment === "bearish"
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"
-                }
-                subtitle={`${(stats.buyRatio * 100).toFixed(
-                  0
-                )}% of volume is buying`}
-                icon={Activity}
-                trend={
-                  stats.sentiment === "bullish"
-                    ? "up"
-                    : stats.sentiment === "bearish"
-                    ? "down"
-                    : "neutral"
-                }
-              />
-            </motion.div>
+            {/* Loading State */}
+            {insiderLoading && <InsiderLoadingSkeleton />}
 
-            {/* Buy vs Sell Area Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="mb-6 p-4 rounded-2xl bg-card/80 backdrop-blur-sm border border-border shadow-sm"
-            >
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <BarChart3 className="h-5 w-5 text-foreground/70" />
-                <span className="text-base font-bold text-foreground">
-                  Buy vs Sell Pressure
-                </span>
-              </div>
-              <BuySellAreaChart
-                activities={filteredActivities}
-                buyVolume={stats.totalBuyVolume}
-                sellVolume={stats.totalSellVolume}
-                buyCount={stats.buyCount}
-                sellCount={stats.sellCount}
-              />
-            </motion.div>
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Hot Markets */}
+            {/* Error State */}
+            {insiderError && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="lg:col-span-2"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-12 px-4 rounded-2xl bg-destructive/5 border border-destructive/20"
               >
-                <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
-                  <CardHeader className="px-4 py-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Flame className="h-5 w-5 text-orange-500" />
-                      <span className="text-foreground font-bold">
-                        Hot Markets
-                      </span>
-                      <span className="text-sm font-medium text-foreground/60 ml-1">
-                        Where whales are most active
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 pt-0">
-                    {hotMarkets.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {hotMarkets.map((market, index) => (
-                          <HotMarketCard
-                            key={market.id}
-                            market={market}
-                            index={index}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-foreground/60">
-                        <Target className="h-10 w-10 mx-auto mb-3 opacity-60" />
-                        <p className="text-base font-medium">
-                          No market activity in this time period
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-destructive mb-2">
+                  Failed to load insider data
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  {insiderError.message}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => refetchInsiders()}
+                  className="rounded-xl"
+                >
+                  Try Again
+                </Button>
               </motion.div>
+            )}
 
-              {/* Right Column - Top Whales */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
-              >
-                <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
-                  <CardHeader className="px-4 py-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Crown className="h-5 w-5 text-amber-500" />
-                      <span className="text-foreground font-bold">
-                        Most Active Whales
+            {/* Main Insider Content */}
+            {!insiderLoading && !insiderError && insiderData && (
+              <>
+                {/* Insider Stats Row */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+                >
+                  <InsiderStatCard
+                    title="Suspicious Activities"
+                    value={insiderData.stats.suspiciousActivities}
+                    subtitle={`From ${insiderData.stats.newAccountsFound} new accounts`}
+                    icon={AlertTriangle}
+                    trend="warning"
+                  />
+                  <InsiderStatCard
+                    title="Total Volume"
+                    value={formatCurrencyCompact(insiderStats.totalVolume)}
+                    subtitle={`${insiderStats.uniqueAccounts} unique accounts`}
+                    icon={BarChart3}
+                  />
+                  <InsiderStatCard
+                    title="Contrarian Trades"
+                    value={insiderStats.contrarianCount}
+                    subtitle="Against market sentiment"
+                    icon={Target}
+                    trend={
+                      insiderStats.contrarianCount > 0 ? "warning" : "neutral"
+                    }
+                  />
+                  <InsiderStatCard
+                    title="High Risk"
+                    value={insiderStats.highScoreCount}
+                    subtitle="Suspicion score ≥ 60"
+                    icon={Shield}
+                    trend={insiderStats.highScoreCount > 0 ? "down" : "up"}
+                  />
+                </motion.div>
+
+                {/* Suspicious Activity Feed */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
+                    <CardHeader className="px-4 py-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-lg">
+                          <Eye className="h-5 w-5 text-amber-500" />
+                          <span className="text-foreground font-bold">
+                            Suspicious Activity
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-3 py-1 rounded-lg">
+                          {insiderData.activities.length} flagged
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 pt-0">
+                      {insiderData.activities.length > 0 ? (
+                        <div className="max-h-[600px] overflow-y-auto pr-2 space-y-1">
+                          {insiderData.activities.map((activity, index) => (
+                            <InsiderActivityRow
+                              key={`${activity.id}-${index}`}
+                              activity={activity}
+                              index={index}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-foreground/60">
+                          <Shield className="h-10 w-10 mx-auto mb-3 opacity-60 text-emerald-500" />
+                          <p className="text-base font-medium text-emerald-600 dark:text-emerald-400">
+                            No suspicious activity detected
+                          </p>
+                          <p className="text-sm mt-2 text-foreground/50">
+                            All clear! No new accounts with unusual positions
+                            found.
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Insider Info Section */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-8 p-6 rounded-2xl bg-linear-to-br from-amber-100/80 to-orange-100/80 dark:from-amber-900/30 dark:to-orange-900/30 border border-amber-300 dark:border-amber-700 shadow-sm"
+                >
+                  <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-foreground">
+                    <Eye className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    How Insider Detection Works
+                  </h3>
+                  <ul className="text-sm text-foreground/80 space-y-2.5">
+                    <li className="flex items-start gap-3">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold text-lg leading-none">
+                        •
                       </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 px-4 pb-4 pt-0">
-                    {topWhales.length > 0 ? (
-                      topWhales.map((whale, index) => (
-                        <TopWhaleCard
-                          key={whale.address}
-                          whale={whale}
-                          index={index}
-                        />
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-foreground/60">
-                        <Users className="h-10 w-10 mx-auto mb-3 opacity-60" />
-                        <p className="text-base font-medium">
-                          No whale activity
-                        </p>
-                      </div>
-                    )}
-
-                    <Link href="/leaderboard">
-                      <Button
-                        variant="outline"
-                        className="w-full mt-3 text-sm font-semibold text-foreground/80 hover:text-foreground border-border"
-                      >
-                        View Full Leaderboard
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </div>
-
-            {/* Recent Activity Feed */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mt-6"
-            >
-              <Card className="bg-card/80 backdrop-blur-sm border-border shadow-sm">
-                <CardHeader className="px-4 py-3">
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-lg">
-                      <Clock className="h-5 w-5 text-blue-500" />
-                      <span className="text-foreground font-bold">
-                        Recent Activity
+                      <span>
+                        <strong className="text-foreground">
+                          New Accounts
+                        </strong>{" "}
+                        — Detects accounts created within the last 7 days
                       </span>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground/70 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
-                      {filteredActivities.length} trades
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-4 pt-0">
-                  {filteredActivities.length > 0 ? (
-                    <div className="max-h-[500px] overflow-y-auto pr-2">
-                      {filteredActivities
-                        .slice(0, 25)
-                        .map((activity, index) => (
-                          <RecentActivityRow
-                            key={`${activity.id}-${index}`}
-                            activity={activity}
-                            index={index}
-                          />
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-foreground/60">
-                      <Activity className="h-10 w-10 mx-auto mb-3 opacity-60" />
-                      <p className="text-base font-medium">
-                        No activity in this time period
-                      </p>
-                      <p className="text-sm mt-2 text-foreground/50">
-                        Try selecting a longer time range
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Info Section */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="mt-8 p-6 rounded-2xl bg-linear-to-br from-cyan-100/80 to-blue-100/80 dark:from-cyan-900/30 dark:to-blue-900/30 border border-cyan-300 dark:border-cyan-700 shadow-sm"
-            >
-              <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-foreground">
-                <Fish className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                How to use Whale Tracker
-              </h3>
-              <ul className="text-sm text-foreground/80 space-y-2.5">
-                <li className="flex items-start gap-3">
-                  <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                    •
-                  </span>
-                  <span>
-                    <strong className="text-foreground">Hot Markets</strong>{" "}
-                    shows where top traders are placing the most money
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                    •
-                  </span>
-                  <span>
-                    <strong className="text-foreground">Buy/Sell ratio</strong>{" "}
-                    indicates market sentiment - green bars mean more buying
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                    •
-                  </span>
-                  <span>
-                    <strong className="text-foreground">
-                      Most Active Whales
-                    </strong>{" "}
-                    are the top traders by volume in your selected period
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                    •
-                  </span>
-                  <span>Click any market or trader to see more details</span>
-                </li>
-              </ul>
-            </motion.div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">
+                          Contrarian Positions
+                        </strong>{" "}
+                        — Flags trades against market consensus (e.g., buying
+                        YES when market favors NO)
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">
+                          Suspicion Score
+                        </strong>{" "}
+                        — Combines account age, trade count, position size, and
+                        market sentiment
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-red-500">⚠️ Disclaimer</strong>{" "}
+                        — This is for informational purposes only. Not all
+                        flagged activity is malicious.
+                      </span>
+                    </li>
+                  </ul>
+                </motion.div>
+              </>
+            )}
           </>
         )}
       </main>

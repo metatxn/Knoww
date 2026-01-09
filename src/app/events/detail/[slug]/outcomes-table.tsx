@@ -813,7 +813,7 @@ export function OutcomesTable({
                             }}
                           >
                             <span className="lg:hidden xl:inline">Buy </span>
-                            Yes {formatPrice(market.yesPrice)}¢
+                            Yes {formatPrice(market.yesPrice)}
                           </Button>
                           <Button
                             type="button"
@@ -833,7 +833,7 @@ export function OutcomesTable({
                             }}
                           >
                             <span className="lg:hidden xl:inline">Buy </span>
-                            No {formatPrice(market.noPrice)}¢
+                            No {formatPrice(market.noPrice)}
                           </Button>
                         </div>
                       </div>
