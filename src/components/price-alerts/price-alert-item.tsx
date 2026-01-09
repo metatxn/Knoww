@@ -73,6 +73,8 @@ const alertLabels: Record<AlertType, string> = {
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
 
+  // Handle edge case where timestamp is in the future
+  if (seconds < 0) return "Just now";
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;

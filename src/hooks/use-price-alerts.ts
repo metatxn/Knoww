@@ -219,7 +219,7 @@ function getAudioContext(): AudioContext | null {
   return audioContext;
 }
 
-function playAlertSound(type: AlertType) {
+async function playAlertSound(type: AlertType) {
   // Use Web Audio API for a simple beep sound
   try {
     const ctx = getAudioContext();
@@ -227,7 +227,7 @@ function playAlertSound(type: AlertType) {
 
     // Resume if suspended (autoplay policy)
     if (ctx.state === "suspended") {
-      ctx.resume();
+      await ctx.resume();
     }
 
     const oscillator = ctx.createOscillator();
@@ -347,10 +347,9 @@ export function usePriceAlertDetection(assetIds: string[]) {
           previousPrice: lastPrice,
           timestamp: Date.now(),
         });
-      }
-
-      // Check for SPIKE (positive change exceeds threshold)
-      if (velocity.change5s >= config.spikeThreshold) {
+      } else if (velocity.change5s >= config.spikeThreshold) {
+        // Check for SPIKE (positive change exceeds threshold)
+        // Using else-if to prevent both DIP and SPIKE firing on same update
         addAlert({
           type: "SPIKE",
           assetId,
