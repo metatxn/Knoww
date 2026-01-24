@@ -27,6 +27,17 @@ interface CacheConfig {
   isPrivate: boolean;
 }
 
+/**
+ * Shared cache config for minute-level caching (events, leaderboard)
+ * Intentionally duplicated to allow future divergence between profiles
+ */
+const MINUTE_CACHE: Omit<CacheConfig, "isPrivate"> = {
+  maxAge: 30, // 30 seconds in browser
+  sMaxAge: 60, // 1 minute at edge
+  staleWhileRevalidate: 120, // 2 minutes
+  staleIfError: 300, // 5 minutes
+};
+
 const CACHE_PROFILES: Record<CacheProfile, CacheConfig> = {
   static: {
     maxAge: 300, // 5 minutes in browser
@@ -36,10 +47,7 @@ const CACHE_PROFILES: Record<CacheProfile, CacheConfig> = {
     isPrivate: false,
   },
   events: {
-    maxAge: 30, // 30 seconds in browser
-    sMaxAge: 60, // 1 minute at edge
-    staleWhileRevalidate: 120, // 2 minutes
-    staleIfError: 300, // 5 minutes
+    ...MINUTE_CACHE,
     isPrivate: false,
   },
   realtime: {
@@ -50,10 +58,7 @@ const CACHE_PROFILES: Record<CacheProfile, CacheConfig> = {
     isPrivate: false,
   },
   leaderboard: {
-    maxAge: 30, // 30 seconds in browser
-    sMaxAge: 60, // 1 minute at edge
-    staleWhileRevalidate: 120, // 2 minutes
-    staleIfError: 300, // 5 minutes
+    ...MINUTE_CACHE,
     isPrivate: false,
   },
   user: {

@@ -75,7 +75,11 @@ function formatNotificationMessage(notification: Notification): string {
       const size = p.matched_size ?? p.size ?? "0";
       // Include outcome (Yes/No) in the message
       const outcome = p.outcome ? ` ${p.outcome}` : "";
-      return `You ${side} ${size}${outcome} shares at $${p.price}${role ? ` ${role}` : ""}`;
+      // Ensure consistent price formatting (e.g., $0.50 not $0.5)
+      // Price is a string from API, parse and format to 2 decimal places
+      const priceNum = Number.parseFloat(p.price);
+      const formattedPrice = Number.isNaN(priceNum) ? p.price : priceNum.toFixed(2);
+      return `You ${side} ${size}${outcome} shares at $${formattedPrice}${role ? ` ${role}` : ""}`;
     }
     case NotificationType.ORDER_CANCELLATION: {
       const p = payload as OrderCancellationPayload;

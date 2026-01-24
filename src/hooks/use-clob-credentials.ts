@@ -96,9 +96,16 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
 function storeCredentials(address: string, creds: ApiKeyCreds): void {
   if (typeof window === "undefined") return;
   const cacheKey = address.toLowerCase();
-  sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
-  // Store shallow copy to prevent external mutations from corrupting cache
-  credentialsCache.set(cacheKey, { ...creds });
+  try {
+    sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
+    // Store shallow copy to prevent external mutations from corrupting cache
+    // Only update cache if sessionStorage write succeeded
+    credentialsCache.set(cacheKey, { ...creds });
+  } catch {
+    // sessionStorage may throw if quota exceeded or in private browsing
+    // Still update in-memory cache for current session functionality
+    credentialsCache.set(cacheKey, { ...creds });
+  }
 }
 
 /**
@@ -155,12 +162,19 @@ function getStoredReadonlyKeys(address: string): string[] {
 function storeReadonlyKeys(address: string, keys: string[]): void {
   if (typeof window === "undefined") return;
   const cacheKey = address.toLowerCase();
-  sessionStorage.setItem(
-    getReadonlyKeysStorageKey(address),
-    JSON.stringify(keys)
-  );
-  // Store copy to prevent external mutations from corrupting cache
-  readonlyKeysCache.set(cacheKey, [...keys]);
+  try {
+    sessionStorage.setItem(
+      getReadonlyKeysStorageKey(address),
+      JSON.stringify(keys)
+    );
+    // Store copy to prevent external mutations from corrupting cache
+    // Only update cache if sessionStorage write succeeded
+    readonlyKeysCache.set(cacheKey, [...keys]);
+  } catch {
+    // sessionStorage may throw if quota exceeded or in private browsing
+    // Still update in-memory cache for current session functionality
+    readonlyKeysCache.set(cacheKey, [...keys]);
+  }
 }
 
 /**
@@ -394,14 +408,18 @@ export function useClobCredentials() {
    * Refresh credentials from sessionStorage
    * Useful after completing onboarding to ensure state is up to date.
    * Forces a read from storage by clearing the cache entry first.
+   * Also refreshes readonly keys for consistency.
    */
   const refresh = useCallback(() => {
     if (address) {
       // Clear cache to force reading from sessionStorage
       const cacheKey = address.toLowerCase();
       credentialsCache.delete(cacheKey);
+      readonlyKeysCache.delete(cacheKey);
       const stored = getStoredCredentials(address);
       setCredentials(stored);
+      const storedReadonlyKeys = getStoredReadonlyKeys(address);
+      setReadonlyKeys(storedReadonlyKeys);
     }
   }, [address]);
 

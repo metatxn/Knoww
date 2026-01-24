@@ -191,7 +191,7 @@ export const getInitialLeaderboard = cache(
             Accept: "application/json",
           },
           next: {
-            revalidate: 60, // Cache for 1 minute
+            revalidate: CACHE_DURATION.EVENTS, // Use constant for consistency (1 minute)
           },
         }
       );
@@ -201,7 +201,13 @@ export const getInitialLeaderboard = cache(
         return null;
       }
 
-      const traders: LeaderboardTrader[] = await response.json();
+      // Safely parse response - handle both array and wrapper object formats
+      const rawData: unknown = await response.json();
+      const traders: LeaderboardTrader[] = Array.isArray(rawData)
+        ? rawData
+        : ((rawData as { data?: LeaderboardTrader[]; traders?: LeaderboardTrader[] })?.data ?? 
+           (rawData as { data?: LeaderboardTrader[]; traders?: LeaderboardTrader[] })?.traders ?? 
+           []);
 
       return {
         traders,

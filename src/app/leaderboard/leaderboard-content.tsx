@@ -166,6 +166,9 @@ export function LeaderboardContent({ initialData }: LeaderboardContentProps) {
     updateURL({ page: newPage.toString() });
   };
 
+  // hasMore is true only when we get a full page AND there's no indication we're on the last page
+  // This heuristic may show "Next" on the exact last page if it has exactly ITEMS_PER_PAGE items,
+  // but it's safer than prematurely hiding pagination. The API would ideally return a total count.
   const hasMore = traders.length === ITEMS_PER_PAGE;
   const userAddress = proxyAddress || address;
 

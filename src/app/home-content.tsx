@@ -69,10 +69,20 @@ const TAB_CATEGORIES = [
 
 type ViewMode = "categories" | "trending" | "breaking" | "new";
 
-// Re-export types from server-cache for backwards compatibility
-export type { InitialEvent, InitialHomeData } from "@/lib/server-cache";
+// Valid ViewMode values for runtime validation
+const VALID_VIEW_MODES: ViewMode[] = ["categories", "trending", "breaking", "new"];
+
+/**
+ * Type guard to validate if a value is a valid ViewMode
+ */
+function isValidViewMode(value: unknown): value is ViewMode {
+  return typeof value === "string" && VALID_VIEW_MODES.includes(value as ViewMode);
+}
 
 import type { InitialHomeData } from "@/lib/server-cache";
+
+// Re-export types from server-cache for backwards compatibility
+export type { InitialEvent, InitialHomeData } from "@/lib/server-cache";
 
 // Desktop-only inline filter chips component
 function DesktopFilterChips() {
@@ -276,17 +286,16 @@ export function HomeContent({ initialData }: HomeContentProps) {
   useEffect(() => {
     setMounted(true);
     // Check URL param first, then sessionStorage
-    if (
-      viewParam &&
-      ["categories", "trending", "breaking", "new"].includes(viewParam)
-    ) {
+    if (viewParam && isValidViewMode(viewParam)) {
       setViewMode(viewParam);
     } else {
       try {
         const saved = sessionStorage.getItem("homeViewMode");
-        if (saved) {
-          setViewMode(saved as ViewMode);
+        // Validate saved value before using it
+        if (saved && isValidViewMode(saved)) {
+          setViewMode(saved);
         }
+        // If invalid or null, keep the default "categories" view mode
       } catch {
         // sessionStorage unavailable (incognito, storage blocked, etc.)
       }
@@ -815,7 +824,9 @@ export function HomeContent({ initialData }: HomeContentProps) {
                   <p className="text-muted-foreground max-w-md mx-auto">
                     {hasActiveFilters
                       ? "No markets match your current filters. Try adjusting or clearing your filters."
-                      : `Looks like there are no ${viewMode} markets right now. Check back soon or explore other categories!`}
+                      : viewMode === "categories"
+                        ? "No markets available right now. Check back soon!"
+                        : `Looks like there are no ${viewMode} markets right now. Check back soon or explore other categories!`}
                   </p>
                   {hasActiveFilters && (
                     <Button
@@ -891,7 +902,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
             <span>Powered by Polymarket</span>
           </div>
           <div className="flex items-center gap-4">
-            <span>© 2025</span>
+            <span>© {new Date().getFullYear()}</span>
             <span className="hidden sm:inline">•</span>
             <span className="hidden sm:inline">
               Decentralized & Unstoppable
