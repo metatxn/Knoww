@@ -11,7 +11,13 @@ import { LeaderboardContent } from "./leaderboard-content";
  */
 export default async function LeaderboardPage() {
   // Pre-fetch initial leaderboard data on the server
-  const initialData = await getInitialLeaderboard();
+  let initialData = null;
+  try {
+    initialData = await getInitialLeaderboard();
+  } catch (error) {
+    console.error("[LeaderboardPage] Failed to pre-fetch data:", error);
+    // Continue with null - client will fetch on mount
+  }
 
   return (
     <Suspense

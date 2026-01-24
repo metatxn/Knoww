@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getEvent } from "@/lib/server-cache";
 import EventDetailClient from "./event-detail-client";
 
@@ -55,6 +56,11 @@ export default async function EventDetailPage({ params }: Props) {
 
   // Pre-fetch event data on the server (runs at the edge on Cloudflare)
   const initialEvent = await getEvent(slug);
+
+  // Return 404 at server level for better SEO and UX
+  if (!initialEvent) {
+    notFound();
+  }
 
   return <EventDetailClient slug={slug} initialEvent={initialEvent} />;
 }

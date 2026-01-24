@@ -28,4 +28,5 @@ const SidebarDesktop = dynamic(() => import("./sidebar-desktop-inner"), {
 
 // Export for use in layout
 export { SidebarDesktop };
+// Backwards-compatible alias (both exports are SSR-disabled via dynamic import)
 export { SidebarDesktop as SidebarDesktopNoSSR };

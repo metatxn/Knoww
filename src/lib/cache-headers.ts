@@ -96,7 +96,7 @@ export function getCacheHeaders(profile: CacheProfile): HeadersInit {
 export function cachedJsonResponse(
   data: unknown,
   profile: CacheProfile,
-  status = 200
+  status = 200,
 ): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -108,7 +108,7 @@ export function cachedJsonResponse(
 }
 
 /**
- * Add cache headers to an existing NextResponse
+ * Add cache headers to an existing Header Object
  */
 export function addCacheHeaders(headers: Headers, profile: CacheProfile): void {
   const cacheHeaders = getCacheHeaders(profile);

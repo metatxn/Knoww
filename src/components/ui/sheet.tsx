@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 function Sheet({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="sheet" {...props} />;
+  // Note: DialogPrimitive.Root is a context provider, not a DOM element
+  return <DialogPrimitive.Root {...props} />;
 }
 
 function SheetTrigger({

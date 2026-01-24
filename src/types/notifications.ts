@@ -26,7 +26,10 @@ export const NotificationTypeLabels: Record<NotificationType, string> = {
 
 /**
  * Notification payload for Order Fill (type 2)
- * Note: The Polymarket API returns matched_size/original_size instead of size
+ *
+ * Note: The Polymarket API returns matched_size/original_size instead of size.
+ * For fill events, the API typically returns: matched_size, original_size, remaining_size.
+ * The deprecated `size` field is kept only for backwards compatibility.
  */
 export interface OrderFillPayload {
   order_id: string;
@@ -46,8 +49,14 @@ export interface OrderFillPayload {
   /** Note: API may not always return this field */
   trader_side?: "TAKER" | "MAKER";
   transaction_hash?: string;
-  /** Order type (e.g., "FAK" for Fill-And-Kill) */
-  type?: string;
+  /**
+   * Order type - known values with autocomplete support:
+   * - FOK: Fill-Or-Kill
+   * - FAK: Fill-And-Kill
+   * - GTC: Good-Til-Cancelled
+   * - GTD: Good-Til-Date
+   */
+  type?: "FOK" | "FAK" | "GTC" | "GTD" | (string & {});
 }
 
 /**

@@ -83,7 +83,7 @@ export const getInitialEvents = cache(
         `${POLYMARKET_API.GAMMA.EVENTS_PAGINATION}?${params.toString()}`,
         {
           headers: {
-            "Content-Type": "application/json",
+            Accept: "application/json",
           },
           next: {
             revalidate: CACHE_DURATION.EVENTS,
@@ -227,10 +227,16 @@ export const getInitialLeaderboard = cache(
 export const getEvent = cache(
   async (slug: string): Promise<GammaEventFull | null> => {
     try {
-      const res = await fetch(`${POLYMARKET_API.GAMMA.EVENTS}/slug/${slug}`, {
-        next: { revalidate: 60 }, // Cache for 60 seconds
-      });
-      if (!res.ok) return null;
+      const res = await fetch(
+        `${POLYMARKET_API.GAMMA.EVENTS}/slug/${encodeURIComponent(slug)}`,
+        {
+          next: { revalidate: 60 }, // Cache for 60 seconds
+        }
+      );
+      if (!res.ok) {
+        console.error("Failed to fetch event:", res.status, res.statusText);
+        return null;
+      }
       return (await res.json()) as GammaEventFull;
     } catch (error) {
       console.error("Error fetching event:", error);

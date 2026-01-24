@@ -99,12 +99,18 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") || "10";
 
     if (!query.trim()) {
-      return NextResponse.json({
-        events: [],
-        tags: [],
-        profiles: [],
-        pagination: { hasMore: false, totalResults: 0 },
-      });
+      // Return empty results with same edge caching headers as successful responses
+      return NextResponse.json(
+        {
+          events: [],
+          tags: [],
+          profiles: [],
+          pagination: { hasMore: false, totalResults: 0 },
+        },
+        {
+          headers: getCacheHeaders("events"),
+        }
+      );
     }
 
     // Build search URL with query parameters

@@ -97,7 +97,8 @@ function storeCredentials(address: string, creds: ApiKeyCreds): void {
   if (typeof window === "undefined") return;
   const cacheKey = address.toLowerCase();
   sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
-  credentialsCache.set(cacheKey, creds);
+  // Store shallow copy to prevent external mutations from corrupting cache
+  credentialsCache.set(cacheKey, { ...creds });
 }
 
 /**
@@ -158,7 +159,8 @@ function storeReadonlyKeys(address: string, keys: string[]): void {
     getReadonlyKeysStorageKey(address),
     JSON.stringify(keys)
   );
-  readonlyKeysCache.set(cacheKey, keys);
+  // Store copy to prevent external mutations from corrupting cache
+  readonlyKeysCache.set(cacheKey, [...keys]);
 }
 
 /**
@@ -390,10 +392,14 @@ export function useClobCredentials() {
 
   /**
    * Refresh credentials from sessionStorage
-   * Useful after completing onboarding to ensure state is up to date
+   * Useful after completing onboarding to ensure state is up to date.
+   * Forces a read from storage by clearing the cache entry first.
    */
   const refresh = useCallback(() => {
     if (address) {
+      // Clear cache to force reading from sessionStorage
+      const cacheKey = address.toLowerCase();
+      credentialsCache.delete(cacheKey);
       const stored = getStoredCredentials(address);
       setCredentials(stored);
     }

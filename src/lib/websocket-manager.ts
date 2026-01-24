@@ -210,7 +210,9 @@ class WebSocketManager {
       this.ws.onopen = () => {
         console.log("[WSManager] Connected to Polymarket Market Channel");
         this.updateConnectionState("connected");
+        // Reset reconnection tracking on successful connection
         this.reconnectAttempt = 0;
+        this.firstReconnectTime = 0;
 
         // Subscribe to all pending + existing subscriptions
         const allAssets = [
@@ -304,6 +306,9 @@ class WebSocketManager {
    */
   reconnect(): void {
     this.disconnect();
+    // Reset reconnection tracking for explicit user-initiated reconnect
+    this.reconnectAttempt = 0;
+    this.firstReconnectTime = 0;
     if (this.subscriptions.size > 0) {
       // Move all subscriptions to pending
       for (const assetId of this.subscriptions.keys()) {

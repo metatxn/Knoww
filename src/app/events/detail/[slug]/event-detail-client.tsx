@@ -48,7 +48,7 @@ const TradingForm = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="sticky top-4 w-full">
+      <div className="w-full">
         <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-12 w-full" />
@@ -309,13 +309,14 @@ export default function EventDetailClient({
     0;
   const isSingleMarketEvent = totalMarketsCount === 1;
 
-  // Compute selected market and trading outcomes
+  // Compute selected market, trading outcomes, and sorted market data for display
   const {
     selectedMarket,
     tradingOutcomes,
     currentTokenId,
     allTokenIds,
     tokenMarketMap,
+    sortedMarketData,
   } = useMemo(() => {
     if (!event || openMarkets.length === 0) {
       return {
@@ -324,10 +325,27 @@ export default function EventDetailClient({
         currentTokenId: "",
         allTokenIds: [] as string[],
         tokenMarketMap: new Map() as TokenMarketMap,
+        sortedMarketData: [] as Array<{
+          id: string;
+          conditionId: string;
+          question: string;
+          groupItemTitle: string;
+          yesProbability: number;
+          yesPrice: string;
+          noPrice: string;
+          yesTokenId: string;
+          noTokenId: string;
+          negRisk: boolean;
+          orderMinSize: number;
+          change: number;
+          volume: string;
+          color: string;
+          image: string | undefined;
+        }>,
       };
     }
 
-    // Build market data
+    // Build market data - shared transformation for both trading and display
     const marketData = openMarkets.map((market, idx) => {
       const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
       const prices = market.outcomePrices
@@ -457,6 +475,7 @@ export default function EventDetailClient({
       currentTokenId: tokenId,
       allTokenIds: tokenIds,
       tokenMarketMap: tokenMap,
+      sortedMarketData,
     };
   }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
 
@@ -689,65 +708,7 @@ export default function EventDetailClient({
     );
   }
 
-  // Build market data for display (reuse the computed markets)
-  const marketData = openMarkets.map((market, idx) => {
-    const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
-    const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
-    const tokens = market.tokens || [];
-    const clobTokenIds = market.clobTokenIds
-      ? JSON.parse(market.clobTokenIds)
-      : [];
-
-    const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes")
-    );
-    const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no")
-    );
-
-    const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
-    const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
-
-    let yesTokenId = "";
-    let noTokenId = "";
-
-    if (tokens.length > 0) {
-      const yesToken = tokens.find((t) => t.outcome?.toLowerCase() === "yes");
-      const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
-      yesTokenId = yesToken?.token_id || "";
-      noTokenId = noToken?.token_id || "";
-    } else if (clobTokenIds.length > 0) {
-      yesTokenId = yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
-      noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
-    }
-
-    const yesProbability = yesPrice
-      ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
-      : 0;
-    const change = ((Math.random() - 0.5) * 10).toFixed(1);
-    const colors = ["orange", "blue", "purple", "green"];
-
-    return {
-      id: market.id,
-      conditionId: market.conditionId || "",
-      question: market.question,
-      groupItemTitle: market.groupItemTitle || market.question,
-      yesProbability,
-      yesPrice: yesPrice || "0",
-      noPrice: noPrice || "0",
-      yesTokenId: yesTokenId || "",
-      noTokenId: noTokenId || "",
-      negRisk: market.negRisk || false,
-      change: Number.parseFloat(change),
-      volume: market.volume || "0",
-      color: colors[idx % colors.length],
-      image: market.image,
-    };
-  });
-
-  const sortedMarketData = [...marketData].sort(
-    (a, b) => b.yesProbability - a.yesProbability
-  );
+  // sortedMarketData is already computed in the useMemo above
 
   // Build closed market data for display
   const closedMarketData = closedMarkets.map((market) => {

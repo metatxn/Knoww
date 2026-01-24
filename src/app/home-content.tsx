@@ -22,6 +22,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -56,7 +57,6 @@ import {
 import { useBreakingEvents } from "@/hooks/use-breaking-events";
 import { useNewEvents } from "@/hooks/use-new-events";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
-import { useTags } from "@/hooks/use-tags";
 import { useTrendingEvents } from "@/hooks/use-trending-events";
 
 // Tab categories
@@ -266,7 +266,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("categories");
   const [mounted, setMounted] = useState(false);
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
-    null
+    null,
   );
 
   // useTransition for non-urgent view mode changes (tab switches)
@@ -282,21 +282,26 @@ export function HomeContent({ initialData }: HomeContentProps) {
     ) {
       setViewMode(viewParam);
     } else {
-      const saved = sessionStorage.getItem("homeViewMode");
-      if (saved) {
-        setViewMode(saved as ViewMode);
+      try {
+        const saved = sessionStorage.getItem("homeViewMode");
+        if (saved) {
+          setViewMode(saved as ViewMode);
+        }
+      } catch {
+        // sessionStorage unavailable (incognito, storage blocked, etc.)
       }
     }
   }, [viewParam]);
 
   useEffect(() => {
     if (mounted) {
-      sessionStorage.setItem("homeViewMode", viewMode);
+      try {
+        sessionStorage.setItem("homeViewMode", viewMode);
+      } catch {
+        // sessionStorage unavailable
+      }
     }
   }, [viewMode, mounted]);
-
-  // Tags available for category filtering if needed
-  const { data: _tags, error: _tagsError } = useTags();
 
   // Get filter context with server-side filter params
   const {
@@ -348,7 +353,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
         return true;
       });
     },
-    [filters.dateRange]
+    [filters.dateRange],
   );
 
   // Use server-side filtering for paginated events
@@ -495,7 +500,11 @@ export function HomeContent({ initialData }: HomeContentProps) {
 
   const currentData = getCurrentEvents();
 
-  // Infinite scroll - Re-attach when element or currentData state changes
+  // Use ref to hold latest fetchMore to avoid recreating IntersectionObserver on each render
+  const fetchMoreRef = useRef(currentData.fetchMore);
+  fetchMoreRef.current = currentData.fetchMore;
+
+  // Infinite scroll - Re-attach only when element or fetch state changes
   useEffect(() => {
     if (!loadMoreElement) return;
 
@@ -504,20 +513,15 @@ export function HomeContent({ initialData }: HomeContentProps) {
         if (!entries[0].isIntersecting) return;
 
         if (currentData.hasMore && !currentData.isFetchingMore) {
-          currentData.fetchMore();
+          fetchMoreRef.current();
         }
       },
-      { threshold: 0.1, rootMargin: "400px" }
+      { threshold: 0.1, rootMargin: "400px" },
     );
 
     observer.observe(loadMoreElement);
     return () => observer.disconnect();
-  }, [
-    loadMoreElement,
-    currentData.hasMore,
-    currentData.isFetchingMore,
-    currentData.fetchMore,
-  ]);
+  }, [loadMoreElement, currentData.hasMore, currentData.isFetchingMore]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden selection:bg-purple-500/30">
