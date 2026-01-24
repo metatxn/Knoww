@@ -181,9 +181,13 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
   const isFullySetUp =
     hasCredentials && hasProxyWallet && hasUsdcApproval === true;
 
-  // If localStorage says onboarding is complete, trust it (fast path)
-  // This prevents the popup from showing while async checks are running
-  const isSetupCompleteFromStorage = hasCompletedOnboarding === true;
+  // If localStorage says onboarding is complete, we should verify credentials still exist
+  // sessionStorage (where credentials are stored) is cleared when browser closes,
+  // but localStorage persists. So user may have "completed" onboarding before,
+  // but lost their credentials when they closed the browser.
+  // Only trust localStorage if credentials actually exist, OR if we're still loading credentials.
+  const isSetupCompleteFromStorage =
+    hasCompletedOnboarding === true && (hasCredentials || isCredentialsLoading);
 
   const isCheckingSetup =
     isCredentialsLoading ||

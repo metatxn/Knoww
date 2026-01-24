@@ -2,6 +2,7 @@
 
 import { useAppKit } from "@reown/appkit/react";
 import {
+  ArrowDownToLine,
   BadgeCheck,
   BarChart2,
   Bitcoin,
@@ -52,6 +53,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { WithdrawModal } from "@/components/withdraw-modal";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useSidebar } from "@/context/sidebar-context";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
@@ -84,6 +86,7 @@ export function Sidebar() {
   const { open } = useAppKit();
   const [copied, setCopied] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // Use global contexts
   const { isCollapsed, setIsCollapsed } = useSidebar();
@@ -603,14 +606,23 @@ export function Sidebar() {
                     </button>
                   </div>
 
-                  {/* Deposit Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowDepositModal(true)}
-                    className="w-full py-2.5 text-sm font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 group-hover:shadow-emerald-500/30"
-                  >
-                    Deposit
-                  </button>
+                  {/* Deposit & Withdraw Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowDepositModal(true)}
+                      className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
+                    >
+                      Deposit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-gray-700 hover:bg-gray-600 text-white transition-all border border-gray-600"
+                    >
+                      Withdraw
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -757,23 +769,39 @@ export function Sidebar() {
         {/* Collapsed Bottom Actions */}
         {isCollapsed && (
           <div className="relative border-t border-border/40 p-2 space-y-2">
-            {/* Deposit Button */}
-            {isConnected && hasProxyWallet && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setShowDepositModal(true)}
-                    className="w-full h-10 flex items-center justify-center rounded-xl bg-linear-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
-                  Deposit Funds
-                </TooltipContent>
-              </Tooltip>
-            )}
+            {/* Deposit & Withdraw Buttons */}
+            {isConnected && hasProxyWallet ? (
+              <div className="flex gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setShowDepositModal(true)}
+                      className="flex-1 h-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={10}>
+                    Deposit
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="flex-1 h-10 flex items-center justify-center rounded-xl bg-gray-700 hover:bg-gray-600 text-white border border-gray-600 transition-all"
+                    >
+                      <ArrowDownToLine className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={10}>
+                    Withdraw
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : null}
 
             {/* Account/Connect */}
             {isConnected ? (
@@ -835,6 +863,12 @@ export function Sidebar() {
         <DepositModal
           open={showDepositModal}
           onOpenChange={setShowDepositModal}
+        />
+
+        {/* Withdraw Modal */}
+        <WithdrawModal
+          open={showWithdrawModal}
+          onOpenChange={setShowWithdrawModal}
         />
       </aside>
     </TooltipProvider>

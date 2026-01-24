@@ -1,7 +1,20 @@
 import { motion } from "framer-motion";
-import { Check, Clock, Copy, Info, Loader2, Zap } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Info,
+  Loader2,
+  RefreshCw,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { SupportedAsset } from "@/hooks/use-bridge";
+import type {
+  DepositTransaction,
+  QuoteResponse,
+  SupportedAsset,
+} from "@/hooks/use-bridge";
 import type { TokenBalance } from "@/hooks/use-wallet-tokens";
 import { formatAddress } from "@/lib/formatters";
 
@@ -21,6 +34,46 @@ interface ConfirmationProps {
   copied: boolean;
   onCopy: () => void;
   onDeposit: () => void;
+  quote?: QuoteResponse | null;
+  isLoadingQuote?: boolean;
+  depositTransactions?: DepositTransaction[];
+  isLoadingDepositStatus?: boolean;
+}
+
+/**
+ * Get human-readable status text and color for deposit status
+ */
+function getDepositStatusDisplay(status: DepositTransaction["status"]) {
+  switch (status) {
+    case "DEPOSIT_DETECTED":
+      return { text: "Deposit detected", color: "text-blue-500", icon: Clock };
+    case "PROCESSING":
+      return { text: "Processing", color: "text-amber-500", icon: RefreshCw };
+    case "ORIGIN_TX_CONFIRMED":
+      return { text: "Origin confirmed", color: "text-amber-500", icon: Check };
+    case "SUBMITTED":
+      return { text: "Submitted", color: "text-blue-500", icon: RefreshCw };
+    case "COMPLETED":
+      return {
+        text: "Completed",
+        color: "text-green-500",
+        icon: CheckCircle2,
+      };
+    case "FAILED":
+      return { text: "Failed", color: "text-red-500", icon: Info };
+    default:
+      return { text: status, color: "text-muted-foreground", icon: Clock };
+  }
+}
+
+/**
+ * Format milliseconds to human-readable time
+ */
+function formatCheckoutTime(ms: number): string {
+  if (ms < 60000) {
+    return `~${Math.ceil(ms / 1000)}s`;
+  }
+  return `~${Math.ceil(ms / 60000)} min`;
 }
 
 export function Confirmation({
@@ -39,7 +92,20 @@ export function Confirmation({
   copied,
   onCopy,
   onDeposit,
+  quote,
+  isLoadingQuote,
+  depositTransactions,
+  isLoadingDepositStatus,
 }: ConfirmationProps) {
+  // Use quote data for more accurate receive amount if available
+  const displayReceiveAmount = quote
+    ? (Number(quote.estToTokenBaseUnit) / 1e6).toFixed(2) // USDC.e has 6 decimals
+    : receiveAmount;
+
+  // Use quote for estimated time if available
+  const estimatedTime = quote
+    ? formatCheckoutTime(quote.estCheckoutTimeMs)
+    : "< 2 min";
   return (
     <motion.div
       key="confirm"
@@ -172,7 +238,7 @@ export function Confirmation({
               <span className="text-muted-foreground">Estimated time</span>
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">&lt; 2 min</span>
+                <span className="text-foreground">{estimatedTime}</span>
               </div>
             </div>
           </div>
@@ -187,19 +253,80 @@ export function Confirmation({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">
-                You receive (approx)
+                You receive {quote ? "" : "(approx)"}
               </span>
-              <span className="text-foreground">~{receiveAmount} USDC.e</span>
+              <div className="flex items-center gap-1">
+                {isLoadingQuote ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                ) : null}
+                <span className="text-foreground">
+                  {quote ? "" : "~"}
+                  {displayReceiveAmount} USDC.e
+                </span>
+              </div>
             </div>
             <div className="border-t border-border pt-2 mt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground/70">Network cost</span>
-                <span className="text-muted-foreground">~$0.01</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground/70">Bridge fee</span>
-                <span className="text-muted-foreground">~0.1%</span>
-              </div>
+              {quote?.estFeeBreakdown ? (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground/70">Gas fee</span>
+                    <span className="text-muted-foreground">
+                      ${quote.estFeeBreakdown.gasUsd.toFixed(4)}
+                    </span>
+                  </div>
+                  {quote.estFeeBreakdown.swapImpactUsd > 0 ? (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground/70">
+                        Swap impact
+                      </span>
+                      <span className="text-muted-foreground">
+                        ${quote.estFeeBreakdown.swapImpactUsd.toFixed(4)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {quote.estFeeBreakdown.appFeeUsd > 0 ? (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground/70">
+                        {quote.estFeeBreakdown.appFeeLabel || "App fee"}
+                      </span>
+                      <span className="text-muted-foreground">
+                        ${quote.estFeeBreakdown.appFeeUsd.toFixed(4)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {quote.estFeeBreakdown.maxSlippage > 0 ? (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground/70">
+                        Max slippage
+                      </span>
+                      <span className="text-muted-foreground">
+                        {(quote.estFeeBreakdown.maxSlippage * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between text-sm mt-1 pt-1 border-t border-border/50">
+                    <span className="text-muted-foreground/70">
+                      Min. received
+                    </span>
+                    <span className="text-foreground font-medium">
+                      {quote.estFeeBreakdown.minReceived.toFixed(2)} USDC.e
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground/70">
+                      Network cost
+                    </span>
+                    <span className="text-muted-foreground">~$0.01</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground/70">Bridge fee</span>
+                    <span className="text-muted-foreground">~0.1%</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -236,6 +363,51 @@ export function Confirmation({
               </div>
             </div>
           )}
+
+          {/* Deposit Status Tracking - using ternary for conditional render (rendering-conditional-render) */}
+          {isConfirmed &&
+          depositTransactions &&
+          depositTransactions.length > 0 ? (
+            <div className="p-4 rounded-xl bg-gray-100 dark:bg-card border border-gray-200 dark:border-border">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-foreground">
+                  Bridge Status
+                </span>
+                {isLoadingDepositStatus ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                {depositTransactions.slice(0, 3).map((tx, index) => {
+                  const statusDisplay = getDepositStatusDisplay(tx.status);
+                  const StatusIcon = statusDisplay.icon;
+                  return (
+                    <div
+                      key={`${tx.fromAmountBaseUnit}-${tx.createdTimeMs || index}`}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <StatusIcon
+                          className={`h-4 w-4 ${statusDisplay.color} ${
+                            tx.status === "PROCESSING" ||
+                            tx.status === "SUBMITTED"
+                              ? "animate-spin"
+                              : ""
+                          }`}
+                        />
+                        <span className={statusDisplay.color}>
+                          {statusDisplay.text}
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground text-xs">
+                        {(Number(tx.fromAmountBaseUnit) / 1e6).toFixed(2)} USDC
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {/* Terms */}
           <p className="text-xs text-muted-foreground/70 text-center">

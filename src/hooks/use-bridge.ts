@@ -6,7 +6,7 @@ import { useProxyWallet } from "./use-proxy-wallet";
 
 /**
  * Polymarket Bridge API base URL
- * @see https://docs.polymarket.com/developers/misc-endpoints/bridge-deposit
+ * @see https://docs.polymarket.com/api-reference/bridge
  */
 const BRIDGE_API_URL = "https://bridge.polymarket.com";
 
@@ -57,6 +57,82 @@ export interface SupportedAssetsResponse {
 }
 
 /**
+ * Quote request parameters
+ * @see https://docs.polymarket.com/api-reference/bridge/get-a-quote
+ */
+export interface QuoteRequest {
+  fromAmountBaseUnit: string;
+  fromChainId: string;
+  fromTokenAddress: string;
+  recipientAddress: string;
+  toChainId: string;
+  toTokenAddress: string;
+}
+
+/**
+ * Fee breakdown from quote response
+ */
+export interface FeeBreakdown {
+  appFeeLabel: string;
+  appFeePercent: number;
+  appFeeUsd: number;
+  fillCostPercent: number;
+  fillCostUsd: number;
+  gasUsd: number;
+  maxSlippage: number;
+  minReceived: number;
+  swapImpact: number;
+  swapImpactUsd: number;
+  totalImpact: number;
+  totalImpactUsd: number;
+}
+
+/**
+ * Quote response from the Bridge API
+ */
+export interface QuoteResponse {
+  estCheckoutTimeMs: number;
+  estFeeBreakdown: FeeBreakdown;
+  estInputUsd: number;
+  estOutputUsd: number;
+  estToTokenBaseUnit: string;
+  quoteId: string;
+}
+
+/**
+ * Deposit transaction status
+ * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
+ */
+export type DepositStatus =
+  | "DEPOSIT_DETECTED"
+  | "PROCESSING"
+  | "ORIGIN_TX_CONFIRMED"
+  | "SUBMITTED"
+  | "COMPLETED"
+  | "FAILED";
+
+/**
+ * Single deposit transaction from status API
+ */
+export interface DepositTransaction {
+  fromChainId: string;
+  fromTokenAddress: string;
+  fromAmountBaseUnit: string;
+  toChainId: string;
+  toTokenAddress: string;
+  status: DepositStatus;
+  txHash?: string;
+  createdTimeMs?: number;
+}
+
+/**
+ * Response from deposit status endpoint
+ */
+export interface DepositStatusResponse {
+  transactions: DepositTransaction[];
+}
+
+/**
  * Chain metadata for display
  */
 export const CHAIN_METADATA: Record<
@@ -80,6 +156,15 @@ export const BRIDGE_QUERY_KEYS = {
   supportedAssets: ["bridge-supported-assets"] as const,
   depositAddresses: (address: string) =>
     ["bridge-deposit-addresses", address] as const,
+  depositStatus: (address: string) =>
+    ["bridge-deposit-status", address] as const,
+  quote: (params: QuoteRequest) =>
+    [
+      "bridge-quote",
+      params.fromChainId,
+      params.fromTokenAddress,
+      params.fromAmountBaseUnit,
+    ] as const,
 };
 
 /**
@@ -94,6 +179,55 @@ async function fetchSupportedAssets(): Promise<SupportedAsset[]> {
 
   const data: SupportedAssetsResponse = await response.json();
   return data.supportedAssets;
+}
+
+/**
+ * Fetch a quote for a deposit
+ * @see https://docs.polymarket.com/api-reference/bridge/get-a-quote
+ */
+async function fetchQuote(params: QuoteRequest): Promise<QuoteResponse> {
+  const response = await fetch(`${BRIDGE_API_URL}/quote`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      errorData.error || `Failed to fetch quote: ${response.status}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch deposit status for an address
+ * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
+ */
+async function fetchDepositStatus(
+  depositAddress: string
+): Promise<DepositTransaction[]> {
+  const response = await fetch(
+    `${BRIDGE_API_URL}/status/${encodeURIComponent(depositAddress)}`
+  );
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      errorData.error || `Failed to fetch deposit status: ${response.status}`
+    );
+  }
+
+  const data: DepositStatusResponse = await response.json();
+  return data.transactions;
 }
 
 /**
@@ -184,11 +318,12 @@ async function createDepositAddresses(
  * This hook provides methods to:
  * 1. Get supported assets for deposits
  * 2. Create deposit addresses for bridging assets to Polymarket
+ * 3. Get quotes for deposits (fees, estimated output, checkout time)
+ * 4. Track deposit status
  *
- * Now uses React Query for automatic caching, deduplication, and refetching.
+ * Uses React Query for automatic caching, deduplication, and refetching.
  *
- * @see https://docs.polymarket.com/developers/misc-endpoints/bridge-deposit
- * @see https://docs.polymarket.com/developers/misc-endpoints/bridge-supported-assets
+ * @see https://docs.polymarket.com/api-reference/bridge
  */
 export function useBridge() {
   const { proxyAddress } = useProxyWallet();
@@ -226,6 +361,16 @@ export function useBridge() {
         data
       );
     },
+  });
+
+  // Mutation for fetching quotes
+  const quoteMutation = useMutation({
+    mutationFn: fetchQuote,
+  });
+
+  // Mutation for fetching deposit status
+  const depositStatusMutation = useMutation({
+    mutationFn: fetchDepositStatus,
   });
 
   /**
@@ -304,6 +449,44 @@ export function useBridge() {
     }
   }, [proxyAddress, queryClient]);
 
+  /**
+   * Get a quote for a deposit
+   *
+   * Returns estimated fees, output amount, and checkout time.
+   * Useful for showing users what they'll receive before depositing.
+   *
+   * @see https://docs.polymarket.com/api-reference/bridge/get-a-quote
+   */
+  const getQuote = useCallback(
+    async (params: QuoteRequest): Promise<QuoteResponse> => {
+      return quoteMutation.mutateAsync(params);
+    },
+    [quoteMutation]
+  );
+
+  /**
+   * Get deposit status for an address
+   *
+   * Returns all transactions associated with a deposit address.
+   * Use this to track the progress of deposits.
+   *
+   * Status values:
+   * - DEPOSIT_DETECTED: Deposit detected but not yet processing
+   * - PROCESSING: Transaction is being routed and swapped
+   * - ORIGIN_TX_CONFIRMED: Origin transaction confirmed on source chain
+   * - SUBMITTED: Transaction submitted to destination chain
+   * - COMPLETED: Transaction completed successfully
+   * - FAILED: Transaction failed
+   *
+   * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
+   */
+  const getDepositStatus = useCallback(
+    async (depositAddress: string): Promise<DepositTransaction[]> => {
+      return depositStatusMutation.mutateAsync(depositAddress);
+    },
+    [depositStatusMutation]
+  );
+
   // Combine loading states
   const isLoading =
     supportedAssetsQuery.isLoading || createDepositMutation.isPending;
@@ -327,5 +510,15 @@ export function useBridge() {
     createDepositAddresses: createDepositAddressesFn,
     getChainMetadata,
     clearDepositAddresses,
+
+    // New: Quote API
+    getQuote,
+    isLoadingQuote: quoteMutation.isPending,
+    quoteError: quoteMutation.error?.message || null,
+
+    // New: Deposit Status API
+    getDepositStatus,
+    isLoadingDepositStatus: depositStatusMutation.isPending,
+    depositStatusError: depositStatusMutation.error?.message || null,
   };
 }
