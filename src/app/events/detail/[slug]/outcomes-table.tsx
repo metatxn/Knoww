@@ -10,10 +10,9 @@ import {
   Users,
   Wifi,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { MarketPriceChart } from "@/components/market-price-chart";
-import { OrderBook } from "@/components/order-book";
 import { OrderBookInline } from "@/components/order-book-summary";
 import { SellPositionModal } from "@/components/portfolio/sell-position-modal";
 import type { Position as PortfolioPosition } from "@/components/portfolio/types";
@@ -31,6 +30,29 @@ import { useTopHolders } from "@/hooks/use-top-holders";
 import type { Position } from "@/hooks/use-user-positions";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+
+// Lazy load heavy chart and order book components
+const MarketPriceChart = dynamic(
+  () =>
+    import("@/components/market-price-chart").then((mod) => ({
+      default: mod.MarketPriceChart,
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[250px] w-full rounded-xl" />,
+  }
+);
+
+const OrderBook = dynamic(
+  () =>
+    import("@/components/order-book").then((mod) => ({
+      default: mod.OrderBook,
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />,
+  }
+);
 
 interface MarketData {
   id: string;
@@ -132,7 +154,7 @@ function MarketExpandedContent({
   return (
     <div
       className={cn(
-        "grid transition-all duration-300 ease-in-out border-b border-border/50 bg-muted/5",
+        "grid transition-[grid-template-rows,opacity,background-color] duration-300 ease-in-out border-b border-border/50 bg-muted/5",
         isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       )}
     >
@@ -261,7 +283,7 @@ function MarketExpandedContent({
                 <Button
                   size="sm"
                   variant="destructive"
-                  className="shrink-0 w-full sm:w-auto font-bold shadow-lg shadow-rose-500/20 transition-all active:scale-95"
+                  className="shrink-0 w-full sm:w-auto font-bold shadow-lg shadow-rose-500/20 transition-[background-color,transform] duration-150 active:scale-95"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSellPosition(userPosition);
@@ -642,7 +664,7 @@ export function OutcomesTable({
                     {/* Market Row Container - Using a div to avoid nested buttons */}
                     <div
                       className={cn(
-                        "w-full flex flex-col lg:grid lg:grid-cols-[1fr_220px] transition-all border-l-2",
+                        "w-full flex flex-col lg:grid lg:grid-cols-[1fr_220px] transition-[background-color,border-color] duration-150 border-l-2",
                         selectedMarketId === market.id
                           ? "bg-primary/5 border-l-primary"
                           : "hover:bg-accent/30 border-l-transparent",
@@ -652,7 +674,7 @@ export function OutcomesTable({
                       {/* Left Side: Market Info (Clickable to expand) */}
                       <button
                         type="button"
-                        className="flex-1 text-left px-6 py-4 cursor-pointer outline-none group"
+                        className="flex-1 text-left px-6 py-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 group"
                         onClick={() => {
                           if (isExpanded) {
                             setExpandedOrderBookMarketId(null);
@@ -800,7 +822,7 @@ export function OutcomesTable({
                             type="button"
                             size="sm"
                             className={cn(
-                              "h-9 px-3 text-xs lg:w-[100px] lg:h-10 lg:text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95",
+                              "h-9 px-3 text-xs lg:w-[100px] lg:h-10 lg:text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20 transition-[background-color,transform] duration-150 active:scale-95",
                               isExpanded &&
                                 selectedOutcomeIndex === 0 &&
                                 "ring-2 ring-emerald-400 ring-offset-2"
@@ -820,7 +842,7 @@ export function OutcomesTable({
                             size="sm"
                             variant="destructive"
                             className={cn(
-                              "h-9 px-3 text-xs lg:w-[100px] lg:h-10 lg:text-sm font-bold shadow-lg shadow-rose-500/20 transition-all active:scale-95",
+                              "h-9 px-3 text-xs lg:w-[100px] lg:h-10 lg:text-sm font-bold shadow-lg shadow-rose-500/20 transition-[background-color,transform] duration-150 active:scale-95",
                               isExpanded &&
                                 selectedOutcomeIndex === 1 &&
                                 "ring-2 ring-rose-400 ring-offset-2"

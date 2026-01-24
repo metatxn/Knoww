@@ -1,29 +1,11 @@
 import type { Metadata } from "next";
-import { POLYMARKET_API } from "@/constants/polymarket";
+import { notFound } from "next/navigation";
+import { getEvent } from "@/lib/server-cache";
 import EventDetailClient from "./event-detail-client";
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
-
-interface GammaEvent {
-  title: string;
-  description?: string;
-  image?: string;
-}
-
-async function getEvent(slug: string): Promise<GammaEvent | null> {
-  try {
-    const res = await fetch(`${POLYMARKET_API.GAMMA.EVENTS}/slug/${slug}`, {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as GammaEvent;
-  } catch (error) {
-    console.error("Error fetching event for metadata:", error);
-    return null;
-  }
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -62,7 +44,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * Server Component - Pre-fetches event data at the edge
+ *
+ * React 19 optimization: Data is fetched on the server and passed
+ * as initial data to the client component, eliminating the loading state
+ * and reducing time-to-first-meaningful-paint.
+ */
 export default async function EventDetailPage({ params }: Props) {
   const { slug } = await params;
-  return <EventDetailClient slug={slug} />;
+
+  // Pre-fetch event data on the server (runs at the edge on Cloudflare)
+  const initialEvent = await getEvent(slug);
+
+  // Return 404 at server level for better SEO and UX
+  if (!initialEvent) {
+    notFound();
+  }
+
+  return <EventDetailClient slug={slug} initialEvent={initialEvent} />;
 }

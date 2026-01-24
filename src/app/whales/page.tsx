@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { VList } from "virtua";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -225,8 +226,8 @@ function getHotMarkets(activities: WhaleActivity[]) {
         buyRatio > 0.65
           ? ("bullish" as const)
           : buyRatio < 0.35
-          ? ("bearish" as const)
-          : ("neutral" as const),
+            ? ("bearish" as const)
+            : ("neutral" as const),
     };
   });
 
@@ -450,7 +451,7 @@ function BuySellAreaChart({
       <div className="flex items-center mb-3">
         {/* Buy side */}
         <div
-          className="h-2 bg-emerald-500 rounded-l-full transition-all duration-500"
+          className="h-2 bg-emerald-500 rounded-l-full transition-[width] duration-500"
           style={{ width: `${buyPercent}%` }}
         />
         {/* Center marker */}
@@ -459,7 +460,7 @@ function BuySellAreaChart({
         </div>
         {/* Sell side */}
         <div
-          className="h-2 bg-red-500 rounded-r-full transition-all duration-500"
+          className="h-2 bg-red-500 rounded-r-full transition-[width] duration-500"
           style={{ width: `${sellPercent}%` }}
         />
       </div>
@@ -616,7 +617,7 @@ function HotMarketCard({
       transition={{ delay: index * 0.05 }}
     >
       <Link href={`/events/detail/${market.eventSlug || market.slug}`}>
-        <Card className="bg-card/90 hover:bg-card border-border hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
+        <Card className="bg-card/90 hover:bg-card border-border hover:border-primary/50 transition-[background-color,border-color] duration-150 cursor-pointer group shadow-sm">
           <CardContent className="p-3">
             {/* Market Title */}
             <h4 className="font-bold text-base text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
@@ -669,8 +670,8 @@ function HotMarketCard({
                 {isBullish
                   ? "🐂 Bullish"
                   : isBearish
-                  ? "🐻 Bearish"
-                  : "⚖️ Neutral"}
+                    ? "🐻 Bearish"
+                    : "⚖️ Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -699,7 +700,7 @@ function TopWhaleCard({
       transition={{ delay: index * 0.05 }}
     >
       <Link href={`/profile/${whale.address}`}>
-        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-card/80 hover:bg-card border border-border hover:border-primary/50 transition-all group shadow-sm">
+        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-card/80 hover:bg-card border border-border hover:border-primary/50 transition-[background-color,border-color] duration-150 group shadow-sm">
           <div className="relative">
             <Avatar className="h-10 w-10 border-2 border-amber-400">
               {whale.profileImage && (
@@ -755,12 +756,19 @@ function RecentActivityRow({
   index: number;
 }) {
   const isBuy = activity.trade.side === "BUY";
+  // Track if component has mounted before to prevent re-animation on VList remounts
+  const hasMountedRef = useRef(false);
+  const shouldAnimate = !hasMountedRef.current;
+
+  useEffect(() => {
+    hasMountedRef.current = true;
+  }, []);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 5 }}
+      initial={shouldAnimate ? { opacity: 0, y: 5 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02 }}
+      transition={shouldAnimate ? { delay: index * 0.02 } : { duration: 0 }}
       className="flex items-center gap-3 py-3.5 border-b border-border last:border-0"
     >
       {/* Trade Direction Icon */}
@@ -893,7 +901,7 @@ function InsiderActivityRow({
         href={`/profile/${activity.account.address}`}
         className="shrink-0 group"
       >
-        <Avatar className="h-9 w-9 ring-2 ring-amber-400/50 group-hover:ring-amber-400 transition-all">
+        <Avatar className="h-9 w-9 ring-2 ring-amber-400/50 group-hover:ring-amber-400 transition-shadow duration-150">
           <AvatarImage
             src={activity.account.profileImage || undefined}
             alt={activity.account.name || "Trader"}
@@ -1180,7 +1188,7 @@ export default function WhalesPage() {
               type="button"
               onClick={() => setActiveTab("whales")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                 activeTab === "whales"
                   ? "bg-white dark:bg-slate-900 text-foreground shadow-sm"
                   : "text-foreground/60 hover:text-foreground hover:bg-white/50 dark:hover:bg-slate-900/50"
@@ -1193,7 +1201,7 @@ export default function WhalesPage() {
               type="button"
               onClick={() => setActiveTab("insiders")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                 activeTab === "insiders"
                   ? "bg-amber-500 text-white shadow-sm"
                   : "text-foreground/60 hover:text-foreground hover:bg-amber-100 dark:hover:bg-amber-900/30"
@@ -1272,7 +1280,7 @@ export default function WhalesPage() {
                         type="button"
                         onClick={() => setTimePeriod(period.value)}
                         className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+                          "px-4 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                           timePeriod === period.value
                             ? "bg-primary text-primary-foreground shadow-md"
                             : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -1298,7 +1306,7 @@ export default function WhalesPage() {
                           type="button"
                           onClick={() => setMinTradeSize(option.value)}
                           className={cn(
-                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                             minTradeSize === option.value
                               ? "bg-cyan-500 text-white shadow-md"
                               : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -1381,7 +1389,7 @@ export default function WhalesPage() {
                           type="button"
                           onClick={() => setInsiderMinUsd(option.value)}
                           className={cn(
-                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                             insiderMinUsd === option.value
                               ? "bg-amber-500 text-white shadow-md"
                               : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -1408,7 +1416,7 @@ export default function WhalesPage() {
                           type="button"
                           onClick={() => setInsiderMinShares(option.value)}
                           className={cn(
-                            "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                            "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
                             insiderMinShares === option.value
                               ? "bg-purple-500 text-white shadow-md"
                               : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -1542,8 +1550,8 @@ export default function WhalesPage() {
                       stats.sentiment === "bullish"
                         ? "🐂 Bullish"
                         : stats.sentiment === "bearish"
-                        ? "🐻 Bearish"
-                        : "⚖️ Neutral"
+                          ? "🐻 Bearish"
+                          : "⚖️ Neutral"
                     }
                     subtitle={`${(stats.buyRatio * 100).toFixed(
                       0
@@ -1553,8 +1561,8 @@ export default function WhalesPage() {
                       stats.sentiment === "bullish"
                         ? "up"
                         : stats.sentiment === "bearish"
-                        ? "down"
-                        : "neutral"
+                          ? "down"
+                          : "neutral"
                     }
                   />
                 </motion.div>
@@ -1695,9 +1703,10 @@ export default function WhalesPage() {
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
                       {filteredActivities.length > 0 ? (
-                        <div className="max-h-[500px] overflow-y-auto pr-2">
+                        // Virtualized list - now shows up to 100 items efficiently
+                        <VList style={{ height: 500 }} className="pr-2">
                           {filteredActivities
-                            .slice(0, 25)
+                            .slice(0, 100)
                             .map((activity, index) => (
                               <RecentActivityRow
                                 key={`${activity.id}-${index}`}
@@ -1705,7 +1714,7 @@ export default function WhalesPage() {
                                 index={index}
                               />
                             ))}
-                        </div>
+                        </VList>
                       ) : (
                         <div className="text-center py-10 text-foreground/60">
                           <Activity className="h-10 w-10 mx-auto mb-3 opacity-60" />
@@ -1872,7 +1881,8 @@ export default function WhalesPage() {
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
                       {insiderData.activities.length > 0 ? (
-                        <div className="max-h-[600px] overflow-y-auto pr-2 space-y-1">
+                        // Virtualized list for performance with large datasets (500+ items)
+                        <VList style={{ height: 600 }} className="pr-2">
                           {insiderData.activities.map((activity, index) => (
                             <InsiderActivityRow
                               key={`${activity.id}-${index}`}
@@ -1880,7 +1890,7 @@ export default function WhalesPage() {
                               index={index}
                             />
                           ))}
-                        </div>
+                        </VList>
                       ) : (
                         <div className="text-center py-10 text-foreground/60">
                           <Shield className="h-10 w-10 mx-auto mb-3 opacity-60 text-emerald-500" />
@@ -1949,9 +1959,9 @@ export default function WhalesPage() {
                         •
                       </span>
                       <span>
-                        <strong className="text-red-500">⚠️ Disclaimer</strong>{" "}
-                        — This is for informational purposes only. Not all
-                        flagged activity is malicious.
+                        <strong className="text-red-500">⚠️ Disclaimer</strong> —
+                        This is for informational purposes only. Not all flagged
+                        activity is malicious.
                       </span>
                     </li>
                   </ul>

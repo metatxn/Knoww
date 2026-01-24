@@ -99,14 +99,23 @@ async function fetchEventDetail(
  * Hook to fetch event details by slug or ID
  *
  * @param slugOrId - Event slug (preferred) or numeric ID (fallback)
+ * @param initialData - Optional initial data from server-side fetch (React 19 SSR optimization)
  * @returns TanStack Query result with event data including markets
  */
-export function useEventDetail(slugOrId: string | undefined) {
+export function useEventDetail(
+  slugOrId: string | undefined,
+  initialData?: Event | null
+) {
   return useQuery({
     queryKey: ["events", "detail", slugOrId],
     queryFn: () => fetchEventDetail(slugOrId),
     enabled: !!slugOrId,
     staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
+    // Use server-fetched data as initial data to eliminate loading state
+    initialData: initialData ?? undefined,
+    // Tell TanStack Query when the initial data was fetched so staleTime is computed correctly
+    // Without this, initialData is treated as fetched at epoch (time 0), causing immediate refetch
+    initialDataUpdatedAt: initialData ? Date.now() : undefined,
   });
 }

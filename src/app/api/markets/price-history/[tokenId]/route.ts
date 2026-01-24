@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { getCacheHeaders } from "@/lib/cache-headers";
 
 /**
  * Price history response from Polymarket CLOB API
@@ -96,14 +97,17 @@ export async function GET(
 
     const data: PolymarketPriceHistoryResponse = await response.json();
 
-    // Return the price history
-    return NextResponse.json({
-      success: true,
-      history: data.history || [],
-      tokenId,
-      startTs: Number(startTs),
-      fidelity: Number(fidelity),
-    });
+    // Return with cache headers - price history can be cached longer
+    return NextResponse.json(
+      {
+        success: true,
+        history: data.history || [],
+        tokenId,
+        startTs: Number(startTs),
+        fidelity: Number(fidelity),
+      },
+      { headers: getCacheHeaders("priceHistory") }
+    );
   } catch (error) {
     console.error("Error fetching price history:", error);
     return NextResponse.json(

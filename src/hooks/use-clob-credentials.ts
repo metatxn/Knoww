@@ -44,6 +44,14 @@ const CREDS_STORAGE_KEY = "polymarket_api_creds";
 const READONLY_KEYS_STORAGE_KEY = "polymarket_readonly_keys";
 
 /**
+ * Module-level cache for credentials to avoid repeated sessionStorage reads
+ * and JSON parsing across multiple component mounts.
+ * Cache is invalidated when credentials are stored or cleared.
+ */
+const credentialsCache = new Map<string, ApiKeyCreds | null>();
+const readonlyKeysCache = new Map<string, string[]>();
+
+/**
  * Get the storage key for a specific address
  */
 function getStorageKey(address: string): string {
@@ -52,37 +60,64 @@ function getStorageKey(address: string): string {
 
 /**
  * Get stored credentials from sessionStorage (cleared when browser closes)
- * This provides better security than localStorage as credentials don't persist indefinitely
+ * Uses module-level cache to avoid repeated storage reads and JSON parsing.
+ * This provides better security than localStorage as credentials don't persist indefinitely.
  */
 function getStoredCredentials(address: string): ApiKeyCreds | null {
   if (typeof window === "undefined") return null;
 
+  const cacheKey = address.toLowerCase();
+
+  // Return cached value if available (defensive copy to prevent cache corruption)
+  if (credentialsCache.has(cacheKey)) {
+    const cached = credentialsCache.get(cacheKey);
+    return cached ? { ...cached } : null;
+  }
+
   try {
     const stored = sessionStorage.getItem(getStorageKey(address));
     if (stored) {
-      return JSON.parse(stored) as ApiKeyCreds;
+      const parsed = JSON.parse(stored) as ApiKeyCreds;
+      credentialsCache.set(cacheKey, parsed);
+      return parsed;
     }
   } catch {
     // Ignore parse errors
   }
+
+  credentialsCache.set(cacheKey, null);
   return null;
 }
 
 /**
  * Store credentials in sessionStorage (cleared when browser closes)
- * This provides better security than localStorage as credentials don't persist indefinitely
+ * Updates the module-level cache for consistency.
+ * This provides better security than localStorage as credentials don't persist indefinitely.
  */
 function storeCredentials(address: string, creds: ApiKeyCreds): void {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
+  const cacheKey = address.toLowerCase();
+  try {
+    sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
+    // Store shallow copy to prevent external mutations from corrupting cache
+    // Only update cache if sessionStorage write succeeded
+    credentialsCache.set(cacheKey, { ...creds });
+  } catch {
+    // sessionStorage may throw if quota exceeded or in private browsing
+    // Still update in-memory cache for current session functionality
+    credentialsCache.set(cacheKey, { ...creds });
+  }
 }
 
 /**
  * Clear stored credentials from sessionStorage
+ * Also clears the module-level cache.
  */
 function clearStoredCredentials(address: string): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.removeItem(getStorageKey(address));
+  credentialsCache.delete(cacheKey);
 }
 
 /**
@@ -94,38 +129,64 @@ function getReadonlyKeysStorageKey(address: string): string {
 
 /**
  * Get stored read-only API keys from sessionStorage (cleared when browser closes)
+ * Uses module-level cache to avoid repeated storage reads and JSON parsing.
  */
 function getStoredReadonlyKeys(address: string): string[] {
   if (typeof window === "undefined") return [];
 
+  const cacheKey = address.toLowerCase();
+
+  // Return cached value if available
+  if (readonlyKeysCache.has(cacheKey)) {
+    return [...(readonlyKeysCache.get(cacheKey) ?? [])];
+  }
+
   try {
     const stored = sessionStorage.getItem(getReadonlyKeysStorageKey(address));
     if (stored) {
-      return JSON.parse(stored) as string[];
+      const parsed = JSON.parse(stored) as string[];
+      readonlyKeysCache.set(cacheKey, parsed);
+      return parsed;
     }
   } catch {
     // Ignore parse errors
   }
+
+  readonlyKeysCache.set(cacheKey, []);
   return [];
 }
 
 /**
  * Store read-only API keys in sessionStorage (cleared when browser closes)
+ * Updates the module-level cache for consistency.
  */
 function storeReadonlyKeys(address: string, keys: string[]): void {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(
-    getReadonlyKeysStorageKey(address),
-    JSON.stringify(keys)
-  );
+  const cacheKey = address.toLowerCase();
+  try {
+    sessionStorage.setItem(
+      getReadonlyKeysStorageKey(address),
+      JSON.stringify(keys)
+    );
+    // Store copy to prevent external mutations from corrupting cache
+    // Only update cache if sessionStorage write succeeded
+    readonlyKeysCache.set(cacheKey, [...keys]);
+  } catch {
+    // sessionStorage may throw if quota exceeded or in private browsing
+    // Still update in-memory cache for current session functionality
+    readonlyKeysCache.set(cacheKey, [...keys]);
+  }
 }
 
 /**
  * Clear stored read-only keys from sessionStorage
+ * Also clears the module-level cache.
  */
 function clearStoredReadonlyKeys(address: string): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.removeItem(getReadonlyKeysStorageKey(address));
+  readonlyKeysCache.delete(cacheKey);
 }
 
 /**
@@ -346,12 +407,20 @@ export function useClobCredentials() {
 
   /**
    * Refresh credentials from sessionStorage
-   * Useful after completing onboarding to ensure state is up to date
+   * Useful after completing onboarding to ensure state is up to date.
+   * Forces a read from storage by clearing the cache entry first.
+   * Also refreshes readonly keys for consistency.
    */
   const refresh = useCallback(() => {
     if (address) {
+      // Clear cache to force reading from sessionStorage
+      const cacheKey = address.toLowerCase();
+      credentialsCache.delete(cacheKey);
+      readonlyKeysCache.delete(cacheKey);
       const stored = getStoredCredentials(address);
       setCredentials(stored);
+      const storedReadonlyKeys = getStoredReadonlyKeys(address);
+      setReadonlyKeys(storedReadonlyKeys);
     }
   }, [address]);
 

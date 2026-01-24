@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { getCacheHeaders } from "@/lib/cache-headers";
 import type {
   GammaEvent,
   GammaEventsResponse,
@@ -185,11 +186,17 @@ export async function GET(request: NextRequest) {
       ),
     }));
 
-    return NextResponse.json({
-      success: true,
-      data: slimData,
-      pagination: rawData.pagination,
-    });
+    // Return with proper cache headers for Cloudflare Workers edge caching
+    return NextResponse.json(
+      {
+        success: true,
+        data: slimData,
+        pagination: rawData.pagination,
+      },
+      {
+        headers: getCacheHeaders("events"),
+      }
+    );
   } catch (error) {
     console.error("Error fetching paginated events:", error);
     return NextResponse.json(

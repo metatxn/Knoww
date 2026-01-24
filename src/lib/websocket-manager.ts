@@ -33,6 +33,17 @@ const HEARTBEAT_CONFIG = {
   TIMEOUT_MS: 10000,
 };
 
+/**
+ * Reconnection limits to prevent infinite reconnection loops
+ * and conserve resources on Cloudflare Workers
+ */
+const RECONNECT_LIMITS = {
+  /** Maximum reconnection attempts before giving up */
+  MAX_ATTEMPTS: 10,
+  /** Time window to reset attempt counter (5 minutes) */
+  RESET_WINDOW_MS: 5 * 60 * 1000,
+};
+
 class WebSocketManager {
   private static instance: WebSocketManager | null = null;
 
@@ -40,6 +51,7 @@ class WebSocketManager {
   private connectionState: ConnectionState = "disconnected";
   private reconnectAttempt = 0;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private firstReconnectTime: number = 0; // Track when reconnection attempts started
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private heartbeatTimeout: NodeJS.Timeout | null = null;
   private lastPongReceived: number = 0;
@@ -198,7 +210,9 @@ class WebSocketManager {
       this.ws.onopen = () => {
         console.log("[WSManager] Connected to Polymarket Market Channel");
         this.updateConnectionState("connected");
+        // Reset reconnection tracking on successful connection
         this.reconnectAttempt = 0;
+        this.firstReconnectTime = 0;
 
         // Subscribe to all pending + existing subscriptions
         const allAssets = [
@@ -292,6 +306,9 @@ class WebSocketManager {
    */
   reconnect(): void {
     this.disconnect();
+    // Reset reconnection tracking for explicit user-initiated reconnect
+    this.reconnectAttempt = 0;
+    this.firstReconnectTime = 0;
     if (this.subscriptions.size > 0) {
       // Move all subscriptions to pending
       for (const assetId of this.subscriptions.keys()) {
@@ -345,7 +362,33 @@ class WebSocketManager {
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) return;
 
+    // Reset attempt counter if enough time has passed
+    const now = Date.now();
+    if (
+      this.firstReconnectTime &&
+      now - this.firstReconnectTime > RECONNECT_LIMITS.RESET_WINDOW_MS
+    ) {
+      this.reconnectAttempt = 0;
+      this.firstReconnectTime = 0;
+    }
+
+    // Track when reconnection attempts started
+    if (this.reconnectAttempt === 0) {
+      this.firstReconnectTime = now;
+    }
+
     this.reconnectAttempt++;
+
+    // Check if we've exceeded max attempts
+    if (this.reconnectAttempt > RECONNECT_LIMITS.MAX_ATTEMPTS) {
+      console.warn(
+        `[WSManager] Max reconnection attempts (${RECONNECT_LIMITS.MAX_ATTEMPTS}) reached. ` +
+          `Giving up. User can manually refresh to retry.`
+      );
+      this.updateConnectionState("disconnected");
+      return;
+    }
+
     const delay = Math.min(
       WEBSOCKET_CONFIG.RECONNECT_DELAY_MS *
         WEBSOCKET_CONFIG.RECONNECT_BACKOFF ** (this.reconnectAttempt - 1),
@@ -353,7 +396,7 @@ class WebSocketManager {
     );
 
     console.log(
-      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`
+      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${RECONNECT_LIMITS.MAX_ATTEMPTS})`
     );
     this.updateConnectionState("reconnecting");
 

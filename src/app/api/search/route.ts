@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getCacheHeaders } from "@/lib/cache-headers";
 
 const GAMMA_API_BASE = "https://gamma-api.polymarket.com";
 
@@ -98,12 +99,18 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") || "10";
 
     if (!query.trim()) {
-      return NextResponse.json({
-        events: [],
-        tags: [],
-        profiles: [],
-        pagination: { hasMore: false, totalResults: 0 },
-      });
+      // Return empty results with same edge caching headers as successful responses
+      return NextResponse.json(
+        {
+          events: [],
+          tags: [],
+          profiles: [],
+          pagination: { hasMore: false, totalResults: 0 },
+        },
+        {
+          headers: getCacheHeaders("events"),
+        }
+      );
     }
 
     // Build search URL with query parameters
@@ -151,7 +158,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(data);
+    // Cache search results at edge
+    return NextResponse.json(data, {
+      headers: getCacheHeaders("events"),
+    });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
