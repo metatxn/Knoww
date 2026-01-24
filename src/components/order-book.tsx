@@ -392,9 +392,11 @@ export function OrderBook({
                 refetch();
               }}
               disabled={isFetching}
+              aria-label="Refresh order book"
             >
               <RefreshCw
                 className={cn("h-3 w-3", isFetching && "animate-spin")}
+                aria-hidden="true"
               />
             </Button>
           </div>

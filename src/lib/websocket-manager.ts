@@ -33,6 +33,17 @@ const HEARTBEAT_CONFIG = {
   TIMEOUT_MS: 10000,
 };
 
+/**
+ * Reconnection limits to prevent infinite reconnection loops
+ * and conserve resources on Cloudflare Workers
+ */
+const RECONNECT_LIMITS = {
+  /** Maximum reconnection attempts before giving up */
+  MAX_ATTEMPTS: 10,
+  /** Time window to reset attempt counter (5 minutes) */
+  RESET_WINDOW_MS: 5 * 60 * 1000,
+};
+
 class WebSocketManager {
   private static instance: WebSocketManager | null = null;
 
@@ -40,6 +51,7 @@ class WebSocketManager {
   private connectionState: ConnectionState = "disconnected";
   private reconnectAttempt = 0;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private firstReconnectTime: number = 0; // Track when reconnection attempts started
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private heartbeatTimeout: NodeJS.Timeout | null = null;
   private lastPongReceived: number = 0;
@@ -252,7 +264,7 @@ class WebSocketManager {
 
       this.ws.onclose = (event) => {
         console.log(
-          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`
+          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`,
         );
         this.stopHeartbeat();
 
@@ -303,7 +315,7 @@ class WebSocketManager {
 
   private sendSubscription(
     type: "subscribe" | "unsubscribe",
-    assetIds: string[]
+    assetIds: string[],
   ): void {
     if (
       !this.ws ||
@@ -345,15 +357,41 @@ class WebSocketManager {
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) return;
 
+    // Reset attempt counter if enough time has passed
+    const now = Date.now();
+    if (
+      this.firstReconnectTime &&
+      now - this.firstReconnectTime > RECONNECT_LIMITS.RESET_WINDOW_MS
+    ) {
+      this.reconnectAttempt = 0;
+      this.firstReconnectTime = 0;
+    }
+
+    // Track when reconnection attempts started
+    if (this.reconnectAttempt === 0) {
+      this.firstReconnectTime = now;
+    }
+
     this.reconnectAttempt++;
+
+    // Check if we've exceeded max attempts
+    if (this.reconnectAttempt > RECONNECT_LIMITS.MAX_ATTEMPTS) {
+      console.warn(
+        `[WSManager] Max reconnection attempts (${RECONNECT_LIMITS.MAX_ATTEMPTS}) reached. ` +
+          `Giving up. User can manually refresh to retry.`,
+      );
+      this.updateConnectionState("disconnected");
+      return;
+    }
+
     const delay = Math.min(
       WEBSOCKET_CONFIG.RECONNECT_DELAY_MS *
         WEBSOCKET_CONFIG.RECONNECT_BACKOFF ** (this.reconnectAttempt - 1),
-      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS
+      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS,
     );
 
     console.log(
-      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`
+      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${RECONNECT_LIMITS.MAX_ATTEMPTS})`,
     );
     this.updateConnectionState("reconnecting");
 
@@ -397,7 +435,7 @@ class WebSocketManager {
     // If we're still waiting for a pong from the last ping, connection might be dead
     if (this.awaitingPong) {
       console.warn(
-        "[WSManager] No pong received for previous ping, connection may be stale"
+        "[WSManager] No pong received for previous ping, connection may be stale",
       );
       // Don't immediately reconnect, let the timeout handle it
     }
@@ -412,7 +450,7 @@ class WebSocketManager {
       this.heartbeatTimeout = setTimeout(() => {
         if (this.awaitingPong) {
           console.warn(
-            "[WSManager] Heartbeat timeout - no pong received, reconnecting..."
+            "[WSManager] Heartbeat timeout - no pong received, reconnecting...",
           );
           this.awaitingPong = false;
           this.reconnect();

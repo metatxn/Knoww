@@ -44,6 +44,14 @@ const CREDS_STORAGE_KEY = "polymarket_api_creds";
 const READONLY_KEYS_STORAGE_KEY = "polymarket_readonly_keys";
 
 /**
+ * Module-level cache for credentials to avoid repeated sessionStorage reads
+ * and JSON parsing across multiple component mounts.
+ * Cache is invalidated when credentials are stored or cleared.
+ */
+const credentialsCache = new Map<string, ApiKeyCreds | null>();
+const readonlyKeysCache = new Map<string, string[]>();
+
+/**
  * Get the storage key for a specific address
  */
 function getStorageKey(address: string): string {
@@ -52,37 +60,55 @@ function getStorageKey(address: string): string {
 
 /**
  * Get stored credentials from sessionStorage (cleared when browser closes)
- * This provides better security than localStorage as credentials don't persist indefinitely
+ * Uses module-level cache to avoid repeated storage reads and JSON parsing.
+ * This provides better security than localStorage as credentials don't persist indefinitely.
  */
 function getStoredCredentials(address: string): ApiKeyCreds | null {
   if (typeof window === "undefined") return null;
 
+  const cacheKey = address.toLowerCase();
+
+  // Return cached value if available
+  if (credentialsCache.has(cacheKey)) {
+    return credentialsCache.get(cacheKey) ?? null;
+  }
+
   try {
     const stored = sessionStorage.getItem(getStorageKey(address));
     if (stored) {
-      return JSON.parse(stored) as ApiKeyCreds;
+      const parsed = JSON.parse(stored) as ApiKeyCreds;
+      credentialsCache.set(cacheKey, parsed);
+      return parsed;
     }
   } catch {
     // Ignore parse errors
   }
+
+  credentialsCache.set(cacheKey, null);
   return null;
 }
 
 /**
  * Store credentials in sessionStorage (cleared when browser closes)
- * This provides better security than localStorage as credentials don't persist indefinitely
+ * Updates the module-level cache for consistency.
+ * This provides better security than localStorage as credentials don't persist indefinitely.
  */
 function storeCredentials(address: string, creds: ApiKeyCreds): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.setItem(getStorageKey(address), JSON.stringify(creds));
+  credentialsCache.set(cacheKey, creds);
 }
 
 /**
  * Clear stored credentials from sessionStorage
+ * Also clears the module-level cache.
  */
 function clearStoredCredentials(address: string): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.removeItem(getStorageKey(address));
+  credentialsCache.delete(cacheKey);
 }
 
 /**
@@ -94,38 +120,56 @@ function getReadonlyKeysStorageKey(address: string): string {
 
 /**
  * Get stored read-only API keys from sessionStorage (cleared when browser closes)
+ * Uses module-level cache to avoid repeated storage reads and JSON parsing.
  */
 function getStoredReadonlyKeys(address: string): string[] {
   if (typeof window === "undefined") return [];
 
+  const cacheKey = address.toLowerCase();
+
+  // Return cached value if available
+  if (readonlyKeysCache.has(cacheKey)) {
+    return readonlyKeysCache.get(cacheKey) ?? [];
+  }
+
   try {
     const stored = sessionStorage.getItem(getReadonlyKeysStorageKey(address));
     if (stored) {
-      return JSON.parse(stored) as string[];
+      const parsed = JSON.parse(stored) as string[];
+      readonlyKeysCache.set(cacheKey, parsed);
+      return parsed;
     }
   } catch {
     // Ignore parse errors
   }
+
+  readonlyKeysCache.set(cacheKey, []);
   return [];
 }
 
 /**
  * Store read-only API keys in sessionStorage (cleared when browser closes)
+ * Updates the module-level cache for consistency.
  */
 function storeReadonlyKeys(address: string, keys: string[]): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.setItem(
     getReadonlyKeysStorageKey(address),
     JSON.stringify(keys)
   );
+  readonlyKeysCache.set(cacheKey, keys);
 }
 
 /**
  * Clear stored read-only keys from sessionStorage
+ * Also clears the module-level cache.
  */
 function clearStoredReadonlyKeys(address: string): void {
   if (typeof window === "undefined") return;
+  const cacheKey = address.toLowerCase();
   sessionStorage.removeItem(getReadonlyKeysStorageKey(address));
+  readonlyKeysCache.delete(cacheKey);
 }
 
 /**

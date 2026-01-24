@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { getCacheHeaders } from "@/lib/cache-headers";
 
 /**
  * Leaderboard API Route
@@ -148,7 +149,10 @@ export async function GET(request: NextRequest) {
       total: traders.length,
     };
 
-    return NextResponse.json(result);
+    // Cache leaderboard data at edge for 1 minute
+    return NextResponse.json(result, {
+      headers: getCacheHeaders("leaderboard"),
+    });
   } catch (error) {
     console.error("Leaderboard API error:", error);
     return NextResponse.json(

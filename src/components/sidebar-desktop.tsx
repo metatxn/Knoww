@@ -1,37 +1,31 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { Sidebar } from "@/components/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Client-only wrapper that renders the Sidebar only on desktop (lg and up).
- * This prevents the sidebar from occupying space or duplicating nav on mobile.
+ * Dynamic import for code-splitting: The Sidebar component (with all its hooks
+ * and dependencies like useTrendingEvents, useBreakingEvents, etc.) is only
+ * loaded on desktop screens. Mobile users get zero sidebar JS.
+ *
+ * React 19 / Next.js 15 optimization: This proper dynamic import creates a
+ * separate chunk that's only downloaded when needed, reducing initial bundle
+ * size for mobile users.
  */
-export function SidebarDesktop() {
-  const [isDesktop, setIsDesktop] = useState(false);
+const SidebarDesktop = dynamic(() => import("./sidebar-desktop-inner"), {
+  ssr: false,
+  loading: () => (
+    // Minimal skeleton to prevent layout shift
+    <div className="hidden xl:block w-[280px] shrink-0">
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    </div>
+  ),
+});
 
-  useEffect(() => {
-    // Only render sidebar on >= 1280px (desktop). iPad Pro (1024px) should hide it.
-    const mql = window.matchMedia("(min-width: 1280px)");
-    const handleChange = (event: MediaQueryListEvent | MediaQueryList) => {
-      setIsDesktop(event.matches);
-    };
-
-    // Set initial value
-    handleChange(mql);
-
-    // Listen for changes
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
-  }, []);
-
-  if (!isDesktop) return null;
-  return <Sidebar />;
-}
-
-// Export a dynamic, ssr-disabled version for server components (like layout)
-export const SidebarDesktopNoSSR = dynamic(
-  () => Promise.resolve(SidebarDesktop),
-  { ssr: false }
-);
+// Export for use in layout
+export { SidebarDesktop };
+export { SidebarDesktop as SidebarDesktopNoSSR };

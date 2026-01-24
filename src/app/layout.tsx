@@ -93,6 +93,16 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Preconnect to external API domains for faster initial requests */}
+        <link rel="preconnect" href="https://gamma-api.polymarket.com" />
+        <link rel="preconnect" href="https://clob.polymarket.com" />
+        <link rel="preconnect" href="https://data-api.polymarket.com" />
+        <link rel="dns-prefetch" href="https://user-pnl-api.polymarket.com" />
+        <link rel="dns-prefetch" href="https://strapi-matic.poly.market" />
+        <link
+          rel="dns-prefetch"
+          href="https://ws-subscriptions-clob.polymarket.com"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getCacheHeaders } from "@/lib/cache-headers";
 import { fetchOrderBook } from "@/lib/polymarket";
 
 /**
@@ -17,11 +18,15 @@ export async function GET(
     // Fetch order book directly from CLOB API
     const orderBook = await fetchOrderBook(tokenID);
 
-    return NextResponse.json({
-      success: true,
-      tokenID,
-      orderBook,
-    });
+    // Order book is realtime data - short cache with stale-while-revalidate
+    return NextResponse.json(
+      {
+        success: true,
+        tokenID,
+        orderBook,
+      },
+      { headers: getCacheHeaders("realtime") }
+    );
   } catch (error) {
     console.error("Error fetching order book:", error);
     return NextResponse.json(

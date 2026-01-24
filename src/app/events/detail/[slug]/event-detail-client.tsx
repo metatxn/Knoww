@@ -2,17 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CommentsSection } from "@/components/comments";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
-import { TradingForm } from "@/components/trading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Event } from "@/hooks/use-event-detail";
 import { useEventDetail } from "@/hooks/use-event-detail";
 import {
   useOrderBook as useOrderBookFromStore,
@@ -27,6 +27,43 @@ import type { TokenMarketMap } from "@/types/comments";
 import type { OutcomeData, TradingSide } from "@/types/market";
 import { HeaderSection } from "./header-section";
 import { OutcomesTable } from "./outcomes-table";
+
+// Lazy load heavy components - they're code-split into separate chunks
+const MarketPriceChart = dynamic(
+  () =>
+    import("@/components/market-price-chart").then((mod) => ({
+      default: mod.MarketPriceChart,
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />,
+  }
+);
+
+const TradingForm = dynamic(
+  () =>
+    import("@/components/trading-form").then((mod) => ({
+      default: mod.TradingForm,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="sticky top-4 w-full">
+        <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    ),
+  }
+);
+
+// Props for the client component
+interface EventDetailClientProps {
+  slug: string;
+  initialEvent?: Event | null;
+}
 
 // Order book response type - defined outside component to avoid hook order issues
 interface OrderBookResponse {
@@ -47,9 +84,8 @@ interface OrderBookResponse {
 
 export default function EventDetailClient({
   slug: eventSlugOrId,
-}: {
-  slug: string;
-}) {
+  initialEvent,
+}: EventDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -133,11 +169,12 @@ export default function EventDetailClient({
   );
 
   // Use slug from URL params - API handles both slugs and numeric IDs
+  // Pass initialEvent from server for instant rendering (React 19 SSR optimization)
   const {
     data: event,
     isLoading: loading,
     error,
-  } = useEventDetail(eventSlugOrId);
+  } = useEventDetail(eventSlugOrId, initialEvent);
 
   // Fetch user positions to show "You have a position" indicator
   const {

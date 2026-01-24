@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getCacheHeaders } from "@/lib/cache-headers";
 import { fetchPrice } from "@/lib/polymarket";
 
 // Validation schema
@@ -36,12 +37,16 @@ export async function GET(request: NextRequest) {
     // Fetch price directly from CLOB API
     const price = await fetchPrice(parsed.data.tokenID);
 
-    return NextResponse.json({
-      success: true,
-      tokenID: parsed.data.tokenID,
-      side: parsed.data.side || "midpoint",
-      price,
-    });
+    // Price data is realtime - short cache
+    return NextResponse.json(
+      {
+        success: true,
+        tokenID: parsed.data.tokenID,
+        side: parsed.data.side || "midpoint",
+        price,
+      },
+      { headers: getCacheHeaders("realtime") }
+    );
   } catch (error) {
     console.error("Error fetching price:", error);
     return NextResponse.json(

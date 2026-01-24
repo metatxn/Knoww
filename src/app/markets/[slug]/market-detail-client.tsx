@@ -10,15 +10,13 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useState } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { MarketPriceChart } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
-import { OrderBook } from "@/components/order-book";
 import { PageBackground } from "@/components/page-background";
-import { TradingForm } from "@/components/trading-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +32,48 @@ import { useMarketDetail } from "@/hooks/use-market-detail";
 import { usePriceAlertDetection } from "@/hooks/use-price-alerts";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import type { OutcomeData } from "@/types/market";
+
+// Lazy load heavy components - they're code-split into separate chunks
+const MarketPriceChart = dynamic(
+  () =>
+    import("@/components/market-price-chart").then((mod) => ({
+      default: mod.MarketPriceChart,
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />,
+  }
+);
+
+const OrderBook = dynamic(
+  () =>
+    import("@/components/order-book").then((mod) => ({
+      default: mod.OrderBook,
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[300px] w-full rounded-xl" />,
+  }
+);
+
+const TradingForm = dynamic(
+  () =>
+    import("@/components/trading-form").then((mod) => ({
+      default: mod.TradingForm,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="sticky top-4 w-full">
+        <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    ),
+  }
+);
 
 export default function MarketDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
@@ -616,8 +656,9 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
                               onClick={() =>
                                 copyToClipboard(formatVolume(outcome.volume))
                               }
+                              aria-label="Copy volume"
                             >
-                              <Copy className="h-3 w-3" />
+                              <Copy className="h-3 w-3" aria-hidden="true" />
                             </Button>
                           </div>
                         </div>
@@ -628,7 +669,7 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
                         <Button
                           type="button"
                           size="lg"
-                          className={`bg-green-600 hover:bg-green-700 text-white min-w-[120px] transition-all ${
+                          className={`bg-green-600 hover:bg-green-700 text-white min-w-[120px] transition-[background-color,box-shadow] duration-150 ${
                             showOrderBook && selectedOutcome === idx
                               ? "ring-2 ring-green-400 ring-offset-2 ring-offset-background"
                               : ""
@@ -648,7 +689,7 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
                           type="button"
                           size="lg"
                           variant="destructive"
-                          className={`min-w-[120px] transition-all ${
+                          className={`min-w-[120px] transition-[background-color,box-shadow] duration-150 ${
                             showOrderBook && selectedOutcome === idx
                               ? "ring-2 ring-red-400 ring-offset-2 ring-offset-background"
                               : ""

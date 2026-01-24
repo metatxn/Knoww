@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { getCacheHeaders } from "@/lib/cache-headers";
 
 // Fallback tags if API doesn't have a tags endpoint
 const FALLBACK_TAGS = [
@@ -101,12 +102,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      count: data.length,
-      tags: data,
-      fallback: false,
-    });
+    // Tags are static data - cache for longer at edge
+    return NextResponse.json(
+      {
+        success: true,
+        count: data.length,
+        tags: data,
+        fallback: false,
+      },
+      { headers: getCacheHeaders("static") }
+    );
   } catch (error) {
     console.error("Error fetching tags:", error);
     // Return fallback tags instead of error
