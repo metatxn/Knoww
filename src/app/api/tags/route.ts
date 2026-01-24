@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.warn(
-        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`
+        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`,
       );
       // Use fallback tags if endpoint doesn't exist
       return NextResponse.json({
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         tags: data,
         fallback: false,
       },
-      { headers: getCacheHeaders("static") }
+      { headers: getCacheHeaders("static") },
     );
   } catch (error) {
     console.error("Error fetching tags:", error);
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       count: FALLBACK_TAGS.length,
       tags: FALLBACK_TAGS,
       fallback: true,
-      warning: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 }

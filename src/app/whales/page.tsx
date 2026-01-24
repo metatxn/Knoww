@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { VList } from "virtua";
 import { Navbar } from "@/components/navbar";
 import { PageBackground } from "@/components/page-background";
@@ -756,12 +756,19 @@ function RecentActivityRow({
   index: number;
 }) {
   const isBuy = activity.trade.side === "BUY";
+  // Track if component has mounted before to prevent re-animation on VList remounts
+  const hasMountedRef = useRef(false);
+  const shouldAnimate = !hasMountedRef.current;
+
+  useEffect(() => {
+    hasMountedRef.current = true;
+  }, []);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 5 }}
+      initial={shouldAnimate ? { opacity: 0, y: 5 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02 }}
+      transition={shouldAnimate ? { delay: index * 0.02 } : { duration: 0 }}
       className="flex items-center gap-3 py-3.5 border-b border-border last:border-0"
     >
       {/* Trade Direction Icon */}

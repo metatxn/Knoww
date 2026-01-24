@@ -114,5 +114,8 @@ export function useEventDetail(
     refetchOnWindowFocus: false,
     // Use server-fetched data as initial data to eliminate loading state
     initialData: initialData ?? undefined,
+    // Tell TanStack Query when the initial data was fetched so staleTime is computed correctly
+    // Without this, initialData is treated as fetched at epoch (time 0), causing immediate refetch
+    initialDataUpdatedAt: initialData ? Date.now() : undefined,
   });
 }
