@@ -106,7 +106,7 @@ export async function GET(
         startTs: Number(startTs),
         fidelity: Number(fidelity),
       },
-      { headers: getCacheHeaders("events") }
+      { headers: getCacheHeaders("priceHistory") }
     );
   } catch (error) {
     console.error("Error fetching price history:", error);

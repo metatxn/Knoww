@@ -96,11 +96,23 @@ export default async function RootLayout({
         {/* Preconnect to external API domains for faster initial requests */}
         {/* crossOrigin needed for CORS-enabled fetch/XHR requests to reuse the connection */}
         {/* dns-prefetch fallbacks added for older browsers that don't support preconnect */}
-        <link rel="preconnect" href="https://gamma-api.polymarket.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://gamma-api.polymarket.com"
+          crossOrigin="anonymous"
+        />
         <link rel="dns-prefetch" href="https://gamma-api.polymarket.com" />
-        <link rel="preconnect" href="https://clob.polymarket.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://clob.polymarket.com"
+          crossOrigin="anonymous"
+        />
         <link rel="dns-prefetch" href="https://clob.polymarket.com" />
-        <link rel="preconnect" href="https://data-api.polymarket.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://data-api.polymarket.com"
+          crossOrigin="anonymous"
+        />
         <link rel="dns-prefetch" href="https://data-api.polymarket.com" />
         <link rel="dns-prefetch" href="https://user-pnl-api.polymarket.com" />
         <link rel="dns-prefetch" href="https://strapi-matic.poly.market" />

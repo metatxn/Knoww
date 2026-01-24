@@ -78,7 +78,9 @@ function formatNotificationMessage(notification: Notification): string {
       // Ensure consistent price formatting (e.g., $0.50 not $0.5)
       // Price is a string from API, parse and format to 2 decimal places
       const priceNum = Number.parseFloat(p.price);
-      const formattedPrice = Number.isNaN(priceNum) ? p.price : priceNum.toFixed(2);
+      const formattedPrice = Number.isNaN(priceNum)
+        ? p.price
+        : priceNum.toFixed(2);
       return `You ${side} ${size}${outcome} shares at $${formattedPrice}${role ? ` ${role}` : ""}`;
     }
     case NotificationType.ORDER_CANCELLATION: {

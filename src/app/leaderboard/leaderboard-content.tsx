@@ -77,6 +77,7 @@ const ITEMS_PER_PAGE = 25;
 
 // Re-export type from server-cache for backwards compatibility
 import type { InitialLeaderboardData } from "@/lib/server-cache";
+
 export type { InitialLeaderboardData } from "@/lib/server-cache";
 
 interface LeaderboardContentProps {
@@ -140,7 +141,7 @@ export function LeaderboardContent({ initialData }: LeaderboardContentProps) {
       }
       router.push(`/leaderboard?${params.toString()}`, { scroll: false });
     },
-    [router, searchParams],
+    [router, searchParams]
   );
 
   const handleCategoryChange = (value: LeaderboardCategory) => {
@@ -213,7 +214,7 @@ export function LeaderboardContent({ initialData }: LeaderboardContentProps) {
                     "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-[background-color,box-shadow] duration-200",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <Icon className="h-4 w-4" />

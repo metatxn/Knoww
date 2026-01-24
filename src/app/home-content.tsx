@@ -70,13 +70,20 @@ const TAB_CATEGORIES = [
 type ViewMode = "categories" | "trending" | "breaking" | "new";
 
 // Valid ViewMode values for runtime validation
-const VALID_VIEW_MODES: ViewMode[] = ["categories", "trending", "breaking", "new"];
+const VALID_VIEW_MODES: ViewMode[] = [
+  "categories",
+  "trending",
+  "breaking",
+  "new",
+];
 
 /**
  * Type guard to validate if a value is a valid ViewMode
  */
 function isValidViewMode(value: unknown): value is ViewMode {
-  return typeof value === "string" && VALID_VIEW_MODES.includes(value as ViewMode);
+  return (
+    typeof value === "string" && VALID_VIEW_MODES.includes(value as ViewMode)
+  );
 }
 
 import type { InitialHomeData } from "@/lib/server-cache";
@@ -276,7 +283,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("categories");
   const [mounted, setMounted] = useState(false);
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
-    null,
+    null
   );
 
   // useTransition for non-urgent view mode changes (tab switches)
@@ -362,7 +369,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
         return true;
       });
     },
-    [filters.dateRange],
+    [filters.dateRange]
   );
 
   // Use server-side filtering for paginated events
@@ -525,7 +532,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
           fetchMoreRef.current();
         }
       },
-      { threshold: 0.1, rootMargin: "400px" },
+      { threshold: 0.1, rootMargin: "400px" }
     );
 
     observer.observe(loadMoreElement);

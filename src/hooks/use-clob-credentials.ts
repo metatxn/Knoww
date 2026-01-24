@@ -68,9 +68,10 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
 
   const cacheKey = address.toLowerCase();
 
-  // Return cached value if available
+  // Return cached value if available (defensive copy to prevent cache corruption)
   if (credentialsCache.has(cacheKey)) {
-    return credentialsCache.get(cacheKey) ?? null;
+    const cached = credentialsCache.get(cacheKey);
+    return cached ? { ...cached } : null;
   }
 
   try {
@@ -137,7 +138,7 @@ function getStoredReadonlyKeys(address: string): string[] {
 
   // Return cached value if available
   if (readonlyKeysCache.has(cacheKey)) {
-    return readonlyKeysCache.get(cacheKey) ?? [];
+    return [...(readonlyKeysCache.get(cacheKey) ?? [])];
   }
 
   try {

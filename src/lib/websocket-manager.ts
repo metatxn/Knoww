@@ -266,7 +266,7 @@ class WebSocketManager {
 
       this.ws.onclose = (event) => {
         console.log(
-          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`,
+          `[WSManager] Closed: code=${event.code}, reason=${event.reason}`
         );
         this.stopHeartbeat();
 
@@ -320,7 +320,7 @@ class WebSocketManager {
 
   private sendSubscription(
     type: "subscribe" | "unsubscribe",
-    assetIds: string[],
+    assetIds: string[]
   ): void {
     if (
       !this.ws ||
@@ -383,7 +383,7 @@ class WebSocketManager {
     if (this.reconnectAttempt > RECONNECT_LIMITS.MAX_ATTEMPTS) {
       console.warn(
         `[WSManager] Max reconnection attempts (${RECONNECT_LIMITS.MAX_ATTEMPTS}) reached. ` +
-          `Giving up. User can manually refresh to retry.`,
+          `Giving up. User can manually refresh to retry.`
       );
       this.updateConnectionState("disconnected");
       return;
@@ -392,11 +392,11 @@ class WebSocketManager {
     const delay = Math.min(
       WEBSOCKET_CONFIG.RECONNECT_DELAY_MS *
         WEBSOCKET_CONFIG.RECONNECT_BACKOFF ** (this.reconnectAttempt - 1),
-      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS,
+      WEBSOCKET_CONFIG.MAX_RECONNECT_DELAY_MS
     );
 
     console.log(
-      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${RECONNECT_LIMITS.MAX_ATTEMPTS})`,
+      `[WSManager] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt}/${RECONNECT_LIMITS.MAX_ATTEMPTS})`
     );
     this.updateConnectionState("reconnecting");
 
@@ -440,7 +440,7 @@ class WebSocketManager {
     // If we're still waiting for a pong from the last ping, connection might be dead
     if (this.awaitingPong) {
       console.warn(
-        "[WSManager] No pong received for previous ping, connection may be stale",
+        "[WSManager] No pong received for previous ping, connection may be stale"
       );
       // Don't immediately reconnect, let the timeout handle it
     }
@@ -455,7 +455,7 @@ class WebSocketManager {
       this.heartbeatTimeout = setTimeout(() => {
         if (this.awaitingPong) {
           console.warn(
-            "[WSManager] Heartbeat timeout - no pong received, reconnecting...",
+            "[WSManager] Heartbeat timeout - no pong received, reconnecting..."
           );
           this.awaitingPong = false;
           this.reconnect();

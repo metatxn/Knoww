@@ -26,10 +26,10 @@ function SheetClose({
   return <DialogPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
-function SheetPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="sheet-portal" {...props} />;
+function SheetPortal(
+  props: React.ComponentProps<typeof DialogPrimitive.Portal>
+) {
+  return <DialogPrimitive.Portal {...props} />;
 }
 
 function SheetOverlay({

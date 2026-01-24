@@ -160,7 +160,7 @@ export const getInitialEvents = cache(
 
       return {
         events: slimEvents,
-        totalResults: rawData.pagination?.totalResults || slimEvents.length,
+        totalResults: rawData.pagination?.totalResults ?? slimEvents.length,
       };
     } catch (error) {
       console.error("Error fetching initial events:", error);
@@ -205,9 +205,19 @@ export const getInitialLeaderboard = cache(
       const rawData: unknown = await response.json();
       const traders: LeaderboardTrader[] = Array.isArray(rawData)
         ? rawData
-        : ((rawData as { data?: LeaderboardTrader[]; traders?: LeaderboardTrader[] })?.data ?? 
-           (rawData as { data?: LeaderboardTrader[]; traders?: LeaderboardTrader[] })?.traders ?? 
-           []);
+        : ((
+            rawData as {
+              data?: LeaderboardTrader[];
+              traders?: LeaderboardTrader[];
+            }
+          )?.data ??
+          (
+            rawData as {
+              data?: LeaderboardTrader[];
+              traders?: LeaderboardTrader[];
+            }
+          )?.traders ??
+          []);
 
       return {
         traders,

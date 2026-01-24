@@ -17,7 +17,8 @@ export type CacheProfile =
   | "events" // Event data (1 minute)
   | "realtime" // Price data, order books (10 seconds)
   | "user" // User-specific data (no cache)
-  | "leaderboard"; // Leaderboard data (1 minute)
+  | "leaderboard" // Leaderboard data (1 minute)
+  | "priceHistory"; // Historical price data (5 minutes)
 
 interface CacheConfig {
   maxAge: number; // Browser cache (seconds)
@@ -61,6 +62,13 @@ const CACHE_PROFILES: Record<CacheProfile, CacheConfig> = {
     ...MINUTE_CACHE,
     isPrivate: false,
   },
+  priceHistory: {
+    maxAge: 120, // 2 minutes in browser
+    sMaxAge: 300, // 5 minutes at edge
+    staleWhileRevalidate: 600, // 10 minutes
+    staleIfError: 1800, // 30 minutes
+    isPrivate: false,
+  },
   user: {
     maxAge: 0,
     sMaxAge: 0,
@@ -97,17 +105,23 @@ export function getCacheHeaders(profile: CacheProfile): HeadersInit {
 
 /**
  * Create a cached JSON response
+ * Only applies cache headers for successful responses (status < 400)
+ * Error responses use no-store to prevent caching
  */
 export function cachedJsonResponse(
   data: unknown,
   profile: CacheProfile,
-  status = 200,
+  status = 200
 ): Response {
+  const isError = status >= 400;
+
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...getCacheHeaders(profile),
+      ...(isError
+        ? { "Cache-Control": "no-store, no-cache, must-revalidate" }
+        : getCacheHeaders(profile)),
     },
   });
 }
