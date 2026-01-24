@@ -770,7 +770,7 @@ export function Sidebar() {
         {isCollapsed && (
           <div className="relative border-t border-border/40 p-2 space-y-2">
             {/* Deposit & Withdraw Buttons */}
-            {isConnected && hasProxyWallet ? (
+            {isConnected && hasProxyWallet && proxyAddress ? (
               <div className="flex gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>

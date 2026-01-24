@@ -176,7 +176,8 @@ export function useWithdraw() {
       tokenId = "usdc-e",
     }: WithdrawParams): Promise<WithdrawResult> => {
       // Validate inputs
-      if (!amount || Number.parseFloat(amount) <= 0) {
+      const parsedAmount = Number.parseFloat(amount);
+      if (!amount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
         throw new Error("Invalid withdrawal amount");
       }
 
@@ -193,8 +194,7 @@ export function useWithdraw() {
         );
       }
 
-      const amountNum = Number.parseFloat(amount);
-      if (amountNum > usdcBalance) {
+      if (parsedAmount > usdcBalance) {
         throw new Error(
           `Insufficient balance. Available: $${usdcBalance.toFixed(2)}`
         );
@@ -321,12 +321,12 @@ export function useWithdraw() {
           }
         }
 
-        // If polling times out but transaction was submitted, consider it pending
+        // If polling times out but transaction was submitted, it's still pending (not confirmed)
+        // Don't mislead users into thinking withdrawal is complete
         console.log(
-          "[Withdraw] Polling timed out, but transaction was submitted"
+          "[Withdraw] Polling timed out, transaction status unknown - treating as pending"
         );
-        setState("confirmed");
-        await refreshBalance();
+        setState("pending");
 
         return {
           success: true,

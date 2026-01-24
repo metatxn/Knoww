@@ -79,7 +79,8 @@ function getStoredCredentials(address: string): ApiKeyCreds | null {
     if (stored) {
       const parsed = JSON.parse(stored) as ApiKeyCreds;
       credentialsCache.set(cacheKey, parsed);
-      return parsed;
+      // Return defensive copy to prevent cache corruption from caller mutations
+      return { ...parsed };
     }
   } catch {
     // Ignore parse errors
@@ -146,7 +147,8 @@ function getStoredReadonlyKeys(address: string): string[] {
     if (stored) {
       const parsed = JSON.parse(stored) as string[];
       readonlyKeysCache.set(cacheKey, parsed);
-      return parsed;
+      // Return defensive copy to prevent cache corruption from caller mutations
+      return [...parsed];
     }
   } catch {
     // Ignore parse errors

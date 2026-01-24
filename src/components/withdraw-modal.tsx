@@ -175,10 +175,10 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [selectedToken, setSelectedToken] = useState<WithdrawToken>(
-    WITHDRAW_TOKENS[0]
+    WITHDRAW_TOKENS[0],
   );
   const [selectedChain, setSelectedChain] = useState<WithdrawChain>(
-    WITHDRAW_CHAINS[0]
+    WITHDRAW_CHAINS[0],
   );
   const [txHash, setTxHash] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -215,8 +215,18 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   }, [amountNum, usdcBalance]);
 
   const isValidAddress = useMemo(() => {
+    if (!recipientAddress) return false;
+
+    // Solana addresses are base58 encoded, typically 32-44 characters
+    if (selectedChain.id === "solana") {
+      // Base58 character set (excludes 0, O, I, l to avoid confusion)
+      const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+      return base58Regex.test(recipientAddress);
+    }
+
+    // EVM chains use 0x-prefixed 40 hex character addresses
     return /^0x[a-fA-F0-9]{40}$/.test(recipientAddress);
-  }, [recipientAddress]);
+  }, [recipientAddress, selectedChain.id]);
 
   const canProceed = useMemo(() => {
     return isValidAmount && isValidAddress && canWithdraw;
@@ -237,15 +247,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   }, [address]);
 
   const handleMaxAmount = useCallback(() => {
-    setAmount(usdcBalance.toFixed(2));
+    // Use 6 decimals to match USDC token precision and avoid truncation
+    setAmount(usdcBalance.toFixed(6));
   }, [usdcBalance]);
 
   const handlePercentage = useCallback(
     (percent: number) => {
       const value = (usdcBalance * percent) / 100;
-      setAmount(value.toFixed(2));
+      // Use 6 decimals to match USDC token precision and avoid truncation
+      setAmount(value.toFixed(6));
     },
-    [usdcBalance]
+    [usdcBalance],
   );
 
   // Extract primitive dependency for rerender-dependencies best practice
@@ -390,7 +402,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       type="text"
                       value={recipientAddress}
                       onChange={(e) => setRecipientAddress(e.target.value)}
-                      placeholder="0x..."
+                      placeholder={selectedChain.id === "solana" ? "Solana address..." : "0x..."}
                       className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary font-mono text-sm truncate"
                     />
                     <button
@@ -496,7 +508,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                             onClick={() => setSelectedToken(token)}
                             className={cn(
                               "flex items-center gap-2 cursor-pointer",
-                              selectedToken.id === token.id && "bg-primary/10"
+                              selectedToken.id === token.id && "bg-primary/10",
                             )}
                           >
                             <Image
@@ -548,7 +560,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                             onClick={() => setSelectedChain(chain)}
                             className={cn(
                               "flex items-center justify-between cursor-pointer",
-                              selectedChain.id === chain.id && "bg-primary/10"
+                              selectedChain.id === chain.id && "bg-primary/10",
                             )}
                           >
                             <span className="text-foreground">
@@ -587,7 +599,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                   <div
                     className={cn(
                       "p-3 rounded-xl bg-secondary border border-border flex items-center gap-2",
-                      statusDisplay.colorClass
+                      statusDisplay.colorClass,
                     )}
                   >
                     {statusDisplay.icon}
@@ -615,7 +627,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     "w-full h-12 font-semibold rounded-xl transition-all",
                     canProceed && !isWithdrawing
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-muted text-muted-foreground cursor-not-allowed",
                   )}
                 >
                   {getButtonText()}
