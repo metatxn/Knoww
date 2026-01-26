@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: getCacheHeaders("search"),
-        },
+        }
       );
     }
 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         {
           status: response.status,
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
-        },
+        }
       );
     }
 
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       {
         status: 500,
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
-      },
+      }
     );
   }
 }

@@ -88,7 +88,7 @@ export const getInitialEvents = cache(
           next: {
             revalidate: CACHE_DURATION.EVENTS,
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -154,7 +154,7 @@ export const getInitialEvents = cache(
           tags: event.tags?.map((t) =>
             typeof t === "string"
               ? t
-              : { id: t.id, slug: t.slug, label: t.label },
+              : { id: t.id, slug: t.slug, label: t.label }
           ),
         })) || [];
 
@@ -166,7 +166,7 @@ export const getInitialEvents = cache(
       console.error("Error fetching initial events:", error);
       return null;
     }
-  },
+  }
 );
 
 /**
@@ -193,7 +193,7 @@ export const getInitialLeaderboard = cache(
           next: {
             revalidate: CACHE_DURATION.EVENTS,
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -230,7 +230,7 @@ export const getInitialLeaderboard = cache(
       console.error("Error fetching leaderboard:", error);
       return null;
     }
-  },
+  }
 );
 
 /**
@@ -247,7 +247,7 @@ export const getEvent = cache(
         `${POLYMARKET_API.GAMMA.EVENTS}/slug/${encodeURIComponent(slug)}`,
         {
           next: { revalidate: CACHE_DURATION.EVENTS },
-        },
+        }
       );
       if (!res.ok) {
         console.error("Failed to fetch event:", res.status, res.statusText);
@@ -258,5 +258,5 @@ export const getEvent = cache(
       console.error("Error fetching event:", error);
       return null;
     }
-  },
+  }
 );

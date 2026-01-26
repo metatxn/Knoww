@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { TokenPricesResponse } from "@/app/api/price/tokens/route";
 
 /**
@@ -123,7 +123,9 @@ export interface UseTokenPricesReturn {
  * const usdValue = tokenBalance * getPrice(token.symbol);
  * ```
  */
-export function useTokenPrices(options?: UseTokenPricesOptions): UseTokenPricesReturn {
+export function useTokenPrices(
+  options?: UseTokenPricesOptions
+): UseTokenPricesReturn {
   const { enabled = true } = options ?? {};
 
   const query = useQuery({

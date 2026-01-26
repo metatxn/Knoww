@@ -37,6 +37,8 @@ export interface TokenPricesResponse {
   cached: boolean;
   stale?: boolean;
   timestamp: number;
+  warning?: string;
+  error?: string;
 }
 
 /**
@@ -141,8 +143,8 @@ export async function GET() {
           stale: true,
           timestamp: Date.now(),
           warning: "Using fallback prices - API key not configured",
-        },
-        { status: 200 },
+        } satisfies TokenPricesResponse,
+        { status: 200 }
       );
     }
 
@@ -155,7 +157,7 @@ export async function GET() {
           Accept: "application/json",
         },
         next: { revalidate: 300 }, // Next.js cache for 5 minutes
-      },
+      }
     );
 
     if (!response.ok) {
@@ -228,8 +230,8 @@ export async function GET() {
         stale: true,
         timestamp: Date.now(),
         error: "Failed to fetch prices, using fallback values",
-      },
-      { status: 200 }, // Return 200 with fallback prices instead of 500
+      } satisfies TokenPricesResponse,
+      { status: 200 } // Return 200 with fallback prices instead of 500
     );
   }
 }
@@ -238,7 +240,9 @@ export async function GET() {
  * Build a price map that includes all our token symbols
  * Maps wrapped tokens to their base asset prices
  */
-function buildMappedPrices(basePrices: Record<string, number>): Record<string, number> {
+function buildMappedPrices(
+  basePrices: Record<string, number>
+): Record<string, number> {
   const mappedPrices: Record<string, number> = { ...basePrices };
 
   // Add mapped symbols

@@ -109,7 +109,7 @@ export function Sidebar() {
   // Fetch public profile using proxy address (Polymarket profiles are tied to proxy wallets)
   const profileAddress = proxyAddress || address;
   const { data: publicProfile, isLoading: isLoadingProfile } = usePublicProfile(
-    profileAddress || undefined,
+    profileAddress || undefined
   );
 
   // Display the user's connected EOA under their username (not the proxy Safe address).
@@ -165,7 +165,7 @@ export function Sidebar() {
       <aside
         className={cn(
           "hidden xl:flex fixed left-0 top-0 z-40 h-screen flex-col border-r border-gray-200 dark:border-border/40 bg-white dark:bg-background transition-all duration-300",
-          isCollapsed ? "w-16" : "w-56",
+          isCollapsed ? "w-16" : "w-56"
         )}
       >
         {/* Subtle gradient overlay - only in dark mode */}
@@ -181,7 +181,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative flex h-14 items-center border-b border-border/40",
-            isCollapsed ? "justify-center px-2" : "px-4",
+            isCollapsed ? "justify-center px-2" : "px-4"
           )}
         >
           <button
@@ -208,7 +208,7 @@ export function Sidebar() {
         <nav
           className={cn(
             "relative flex-1 overflow-y-auto py-4 scrollbar-hide",
-            isCollapsed ? "px-1.5" : "px-2",
+            isCollapsed ? "px-1.5" : "px-2"
           )}
         >
           {/* Main Nav */}
@@ -224,7 +224,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/"
                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
                     <Target
@@ -233,7 +233,7 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/" ? "text-primary-foreground" : "",
+                        pathname === "/" ? "text-primary-foreground" : ""
                       )}
                     />
                     {!isCollapsed && (
@@ -266,7 +266,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/whales"
                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
                     <Fish
@@ -275,7 +275,7 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/whales" ? "text-primary-foreground" : "",
+                        pathname === "/whales" ? "text-primary-foreground" : ""
                       )}
                     />
                     {!isCollapsed && (
@@ -309,7 +309,7 @@ export function Sidebar() {
                         isCollapsed ? "justify-center px-2" : "px-3",
                         pathname === "/portfolio"
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                       )}
                     >
                       <FolderOpen
@@ -320,7 +320,7 @@ export function Sidebar() {
                             : "h-4 w-4 group-hover:scale-110",
                           pathname === "/portfolio"
                             ? "text-primary-foreground"
-                            : "",
+                            : ""
                         )}
                       />
                       {!isCollapsed && (
@@ -354,7 +354,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/search"
                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
                     <Search
@@ -363,7 +363,7 @@ export function Sidebar() {
                         isCollapsed
                           ? "h-5 w-5 group-hover:scale-110"
                           : "h-4 w-4 group-hover:scale-110",
-                        pathname === "/search" ? "text-primary-foreground" : "",
+                        pathname === "/search" ? "text-primary-foreground" : ""
                       )}
                     />
                     {!isCollapsed && (
@@ -396,7 +396,7 @@ export function Sidebar() {
                       isCollapsed ? "justify-center px-2" : "px-3",
                       pathname === "/leaderboard"
                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40",
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:hover:bg-muted/40"
                     )}
                   >
                     <Crown
@@ -407,7 +407,7 @@ export function Sidebar() {
                           : "h-4 w-4 group-hover:scale-110",
                         pathname === "/leaderboard"
                           ? "text-primary-foreground"
-                          : "",
+                          : ""
                       )}
                     />
                     {!isCollapsed && (
@@ -471,7 +471,7 @@ export function Sidebar() {
                         isCollapsed ? "justify-center px-2" : "px-3",
                         isActive
                           ? "bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30",
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/30"
                       )}
                     >
                       <cat.icon
@@ -480,7 +480,7 @@ export function Sidebar() {
                           isCollapsed
                             ? "h-5 w-5 group-hover:scale-110"
                             : "h-4 w-4 group-hover:scale-110",
-                          isActive ? "text-primary-foreground" : "",
+                          isActive ? "text-primary-foreground" : ""
                         )}
                       />
                       {!isCollapsed && (
@@ -510,7 +510,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative border-t border-border/40 p-2",
-            isCollapsed ? "flex justify-center" : "",
+            isCollapsed ? "flex justify-center" : ""
           )}
         >
           <Tooltip>
@@ -520,7 +520,7 @@ export function Sidebar() {
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className={cn(
                   "flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all",
-                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2",
+                  isCollapsed ? "w-10 h-10" : "w-full h-8 gap-2"
                 )}
               >
                 {isCollapsed ? (
@@ -571,7 +571,7 @@ export function Sidebar() {
                           "text-[10px] font-semibold px-1.5 py-0.5 rounded transition-all duration-300 group-hover:scale-105 whitespace-nowrap",
                           isProfit
                             ? "text-emerald-400 bg-emerald-500/10"
-                            : "text-red-400 bg-red-500/10",
+                            : "text-red-400 bg-red-500/10"
                         )}
                       >
                         P&L {isProfit ? "+" : ""}${totalPnl.toFixed(2)}

@@ -123,7 +123,7 @@ export function useClobClient() {
       proxyAddress,
       undefined,
       false,
-      builderConfig,
+      builderConfig
     );
   }, [credentials, proxyAddress, getEthersSigner]);
 
@@ -167,7 +167,7 @@ export function useClobClient() {
             expiration:
               params.orderType === OrderType.GTD ? params.expiration : 0,
           },
-          orderOptions,
+          orderOptions
         );
 
         const response = await client.postOrder(order, params.orderType);
@@ -181,7 +181,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [address, canTrade, getClient],
+    [address, canTrade, getClient]
   );
 
   /**
@@ -319,7 +319,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [canTrade, getClient],
+    [canTrade, getClient]
   );
 
   /**
@@ -366,7 +366,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address],
+    [address]
   );
 
   /**
@@ -383,7 +383,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [],
+    []
   );
 
   /**
@@ -438,7 +438,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address],
+    [address]
   );
 
   /**
@@ -458,7 +458,7 @@ export function useClobClient() {
         return false;
       }
     },
-    [canTrade, getClient],
+    [canTrade, getClient]
   );
 
   /**
@@ -476,7 +476,7 @@ export function useClobClient() {
         return {};
       }
     },
-    [canTrade, getClient],
+    [canTrade, getClient]
   );
 
   return {

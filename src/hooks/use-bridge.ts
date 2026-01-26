@@ -208,7 +208,7 @@ async function fetchQuote(params: QuoteRequest): Promise<QuoteResponse> {
       error?: string;
     };
     throw new Error(
-      errorData.error || `Failed to fetch quote: ${response.status}`,
+      errorData.error || `Failed to fetch quote: ${response.status}`
     );
   }
 
@@ -220,10 +220,10 @@ async function fetchQuote(params: QuoteRequest): Promise<QuoteResponse> {
  * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
  */
 async function fetchDepositStatus(
-  depositAddress: string,
+  depositAddress: string
 ): Promise<DepositTransaction[]> {
   const response = await fetch(
-    `${BRIDGE_API_URL}/status/${encodeURIComponent(depositAddress)}`,
+    `${BRIDGE_API_URL}/status/${encodeURIComponent(depositAddress)}`
   );
 
   if (!response.ok) {
@@ -231,7 +231,7 @@ async function fetchDepositStatus(
       error?: string;
     };
     throw new Error(
-      errorData.error || `Failed to fetch deposit status: ${response.status}`,
+      errorData.error || `Failed to fetch deposit status: ${response.status}`
     );
   }
 
@@ -243,7 +243,7 @@ async function fetchDepositStatus(
  * Convert API response to DepositAddress format
  */
 function convertToDepositAddresses(
-  data: CreateDepositResponse,
+  data: CreateDepositResponse
 ): DepositAddress[] {
   // Convert the API response to our DepositAddress format
   // The EVM address is used for all EVM chains (Polygon, Ethereum, Arbitrum, etc.)
@@ -295,7 +295,7 @@ function convertToDepositAddresses(
  * Create deposit addresses for a wallet
  */
 async function createDepositAddresses(
-  walletAddress: string,
+  walletAddress: string
 ): Promise<DepositAddress[]> {
   const response = await fetch(`${BRIDGE_API_URL}/deposit`, {
     method: "POST",
@@ -313,7 +313,7 @@ async function createDepositAddresses(
     };
     throw new Error(
       errorData.message ||
-        `Failed to create deposit addresses: ${response.status}`,
+        `Failed to create deposit addresses: ${response.status}`
     );
   }
 
@@ -351,7 +351,7 @@ export function useBridge() {
     queryFn: () => {
       if (!proxyAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first.",
+          "No wallet address provided. Please complete trading setup first."
         );
       }
       return createDepositAddresses(proxyAddress);
@@ -367,7 +367,7 @@ export function useBridge() {
       // Cache the result
       queryClient.setQueryData(
         BRIDGE_QUERY_KEYS.depositAddresses(walletAddress),
-        data,
+        data
       );
     },
   });
@@ -416,13 +416,13 @@ export function useBridge() {
 
       if (!targetAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first.",
+          "No wallet address provided. Please complete trading setup first."
         );
       }
 
       // If we already have cached data for this address, return it
       const cached = queryClient.getQueryData<DepositAddress[]>(
-        BRIDGE_QUERY_KEYS.depositAddresses(targetAddress),
+        BRIDGE_QUERY_KEYS.depositAddresses(targetAddress)
       );
       if (cached) {
         return cached;
@@ -431,7 +431,7 @@ export function useBridge() {
       // Otherwise, use mutation to create new addresses
       return createDepositMutation.mutateAsync(targetAddress);
     },
-    [proxyAddress, queryClient, createDepositMutation],
+    [proxyAddress, queryClient, createDepositMutation]
   );
 
   /**
@@ -470,7 +470,7 @@ export function useBridge() {
     async (params: QuoteRequest): Promise<QuoteResponse> => {
       return quoteMutation.mutateAsync(params);
     },
-    [quoteMutation],
+    [quoteMutation]
   );
 
   /**
@@ -493,7 +493,7 @@ export function useBridge() {
     async (depositAddress: string): Promise<DepositTransaction[]> => {
       return depositStatusMutation.mutateAsync(depositAddress);
     },
-    [depositStatusMutation],
+    [depositStatusMutation]
   );
 
   // Combine loading states

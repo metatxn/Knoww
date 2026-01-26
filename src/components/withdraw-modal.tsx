@@ -431,7 +431,8 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       type="text"
                       value={amount}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        const raw = e.target.value.replace(/[^0-9.]/g, "");
+                        const val = raw.replace(/\.(?=.*\.)/g, "");
                         setAmount(val);
                       }}
                       placeholder="0.00"

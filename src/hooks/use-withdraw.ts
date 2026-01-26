@@ -228,7 +228,7 @@ export function useWithdraw() {
       RELAYER_API_URL,
       POLYGON_CHAIN_ID,
       walletClient,
-      builderConfig,
+      builderConfig
     );
 
     return client;
@@ -258,13 +258,13 @@ export function useWithdraw() {
 
       if (!proxyAddress) {
         throw new Error(
-          "Trading wallet not found. Please complete trading setup first.",
+          "Trading wallet not found. Please complete trading setup first."
         );
       }
 
       if (parsedAmount > usdcBalance) {
         throw new Error(
-          `Insufficient balance. Available: $${usdcBalance.toFixed(2)}`,
+          `Insufficient balance. Available: $${usdcBalance.toFixed(2)}`
         );
       }
 
@@ -390,7 +390,7 @@ export function useWithdraw() {
         ) {
           console.log(
             "[Withdraw] Transaction confirmed:",
-            result.transactionHash,
+            result.transactionHash
           );
           setState("confirmed");
 
@@ -414,7 +414,7 @@ export function useWithdraw() {
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           console.log(
-            `[Withdraw] Polling attempt ${attempt + 1}/${maxAttempts}...`,
+            `[Withdraw] Polling attempt ${attempt + 1}/${maxAttempts}...`
           );
           const txns = await client.getTransaction(response.transactionID);
 
@@ -429,7 +429,7 @@ export function useWithdraw() {
             if (successStates.includes(tx.state)) {
               console.log(
                 "[Withdraw] Withdrawal confirmed:",
-                tx.transactionHash,
+                tx.transactionHash
               );
               setState("confirmed");
 
@@ -453,7 +453,7 @@ export function useWithdraw() {
         // Return success: false with pending: true to indicate the transaction was submitted
         // but we couldn't confirm it within the timeout period
         console.log(
-          "[Withdraw] Polling timed out, transaction status unknown - treating as pending",
+          "[Withdraw] Polling timed out, transaction status unknown - treating as pending"
         );
         setState("pending");
 
@@ -499,7 +499,7 @@ export function useWithdraw() {
         };
       }
     },
-    [withdrawMutation],
+    [withdrawMutation]
   );
 
   /**

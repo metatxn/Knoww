@@ -175,7 +175,7 @@ type PriceGetter = (symbol: string) => number;
  */
 async function fetchWalletTokens(
   address: string,
-  getPrice: PriceGetter,
+  getPrice: PriceGetter
 ): Promise<WalletTokensResult> {
   const { formatUnits } = await import("viem");
   const client = await getClient();
@@ -228,7 +228,7 @@ async function fetchWalletTokens(
           });
         }
       }
-    },
+    }
   );
 
   // Add native POL if balance > 0
@@ -324,8 +324,9 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
    * Get total USD value of all tokens
    */
   const totalUsdValue = useMemo(
-    () => tokensWithUpdatedPrices.reduce((sum, token) => sum + token.usdValue, 0),
-    [tokensWithUpdatedPrices],
+    () =>
+      tokensWithUpdatedPrices.reduce((sum, token) => sum + token.usdValue, 0),
+    [tokensWithUpdatedPrices]
   );
 
   return {

@@ -103,7 +103,7 @@ async function throttleRpc(): Promise<void> {
 
   if (timeSinceLastCall < MIN_RPC_INTERVAL) {
     await new Promise((resolve) =>
-      setTimeout(resolve, MIN_RPC_INTERVAL - timeSinceLastCall),
+      setTimeout(resolve, MIN_RPC_INTERVAL - timeSinceLastCall)
     );
   }
 
@@ -119,7 +119,7 @@ async function throttleRpc(): Promise<void> {
  */
 export async function checkIsDeployed(
   address: string,
-  options?: { skipCache?: boolean },
+  options?: { skipCache?: boolean }
 ): Promise<boolean> {
   const cacheKey = address.toLowerCase();
 
@@ -167,7 +167,7 @@ export async function checkIsDeployed(
  */
 export async function fetchUsdcBalance(
   address: string,
-  options?: { skipCache?: boolean },
+  options?: { skipCache?: boolean }
 ): Promise<number> {
   const cacheKey = address.toLowerCase();
 

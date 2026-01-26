@@ -12,12 +12,66 @@ import { type NextRequest, NextResponse } from "next/server";
 // Timeout for RPC requests (30 seconds)
 const RPC_TIMEOUT_MS = 30000;
 
-// CORS headers for responses
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+// Allowed origins whitelist - add your production/staging domains here
+const ALLOWED_ORIGINS_WHITELIST = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://polycaster.vercel.app",
+  // Add more allowed origins as needed
+];
+
+/**
+ * Validates the request origin against the whitelist or env-configured value.
+ * Returns the validated origin if allowed, or null if not allowed.
+ */
+function getValidatedOrigin(requestOrigin: string | null): string | null {
+  if (!requestOrigin) {
+    return null;
+  }
+
+  // Priority 1: Check env-configured allowed origin (single origin)
+  const envAllowedOrigin = process.env.ALLOWED_ORIGIN;
+  if (envAllowedOrigin && requestOrigin === envAllowedOrigin) {
+    return requestOrigin;
+  }
+
+  // Priority 2: Check env-configured allowed origins (comma-separated list)
+  const envAllowedOrigins = process.env.ALLOWED_ORIGINS;
+  if (envAllowedOrigins) {
+    const originsArray = envAllowedOrigins.split(",").map((o) => o.trim());
+    if (originsArray.includes(requestOrigin)) {
+      return requestOrigin;
+    }
+  }
+
+  // Priority 3: Check against hardcoded whitelist
+  if (ALLOWED_ORIGINS_WHITELIST.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return null;
+}
+
+/**
+ * Generates CORS headers with the validated origin.
+ * If origin is not validated, returns headers without Access-Control-Allow-Origin.
+ */
+function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
+  const validatedOrigin = getValidatedOrigin(requestOrigin);
+
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  if (validatedOrigin) {
+    headers["Access-Control-Allow-Origin"] = validatedOrigin;
+    // Vary header is important when origin can change based on request
+    headers["Vary"] = "Origin";
+  }
+
+  return headers;
+}
 
 // Get the RPC URL server-side (API key is not exposed to client)
 function getServerRpcUrl(): string {
@@ -38,6 +92,10 @@ function getServerRpcUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Get the request origin for CORS validation
+  const requestOrigin = request.headers.get("origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   try {
     const body = await request.json();
 
@@ -45,7 +103,7 @@ export async function POST(request: NextRequest) {
     if (!body || (typeof body !== "object" && !Array.isArray(body))) {
       return NextResponse.json(
         { error: "Invalid JSON-RPC request" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -73,11 +131,11 @@ export async function POST(request: NextRequest) {
         console.error(
           "[RPC Proxy] Request timed out after",
           RPC_TIMEOUT_MS,
-          "ms",
+          "ms"
         );
         return NextResponse.json(
           { error: "RPC request timed out" },
-          { status: 504, headers: corsHeaders },
+          { status: 504, headers: corsHeaders }
         );
       }
       throw fetchError; // Re-throw other errors to be caught by outer catch
@@ -89,11 +147,11 @@ export async function POST(request: NextRequest) {
       console.error(
         "[RPC Proxy] Upstream error:",
         response.status,
-        response.statusText,
+        response.statusText
       );
       return NextResponse.json(
         { error: `RPC request failed: ${response.statusText}` },
-        { status: response.status, headers: corsHeaders },
+        { status: response.status, headers: corsHeaders }
       );
     }
 
@@ -103,13 +161,17 @@ export async function POST(request: NextRequest) {
     console.error("[RPC Proxy] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: corsHeaders }
     );
   }
 }
 
 // Handle preflight requests for CORS
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  // Get the request origin for CORS validation
+  const requestOrigin = request.headers.get("origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   return new NextResponse(null, {
     status: 200,
     headers: corsHeaders,

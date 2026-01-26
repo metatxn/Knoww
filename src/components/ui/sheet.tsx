@@ -100,7 +100,6 @@ function SheetContent({
         className={cn(sheetVariants({ side }), className)}
         {...props}
       >
-        {children}
         {showClose && (
           <DialogPrimitive.Close
             {...closeProps}
@@ -118,6 +117,7 @@ function SheetContent({
             )}
           </DialogPrimitive.Close>
         )}
+        {children}
       </DialogPrimitive.Content>
     </SheetPortal>
   );

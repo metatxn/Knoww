@@ -40,7 +40,7 @@ function getPolygonRpcUrl(): string {
 
   const customRpcUrl = process.env.POLYGON_RPC_URL;
   if (customRpcUrl) {
-    console.log("[Config] Using custom RPC for Polygon:", customRpcUrl);
+    //console.log("[Config] Using custom RPC for Polygon:", customRpcUrl);
     return customRpcUrl;
   }
 
