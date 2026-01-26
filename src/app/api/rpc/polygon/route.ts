@@ -14,9 +14,9 @@ const RPC_TIMEOUT_MS = 30000;
 
 // Allowed origins whitelist - add your production/staging domains here
 const ALLOWED_ORIGINS_WHITELIST = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "https://polycaster.vercel.app",
+  "http://localhost:8000",
+  "https://knoww.app",
+  "https://www.knoww.app",
   // Add more allowed origins as needed
 ];
 
