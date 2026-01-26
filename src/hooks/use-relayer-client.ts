@@ -374,7 +374,7 @@ export function useRelayerClient() {
         // ========== ERC-20 (USDC.e) Approvals ==========
         // Approve CTF Contract (for split/merge operations)
         {
-          to: CONTRACTS.USDC,
+          to: CONTRACTS.USDC_E,
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -384,7 +384,7 @@ export function useRelayerClient() {
         },
         // Approve CTF Exchange (for standard binary markets)
         {
-          to: CONTRACTS.USDC,
+          to: CONTRACTS.USDC_E,
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -394,7 +394,7 @@ export function useRelayerClient() {
         },
         // Approve Neg Risk CTF Exchange (for negative risk markets)
         {
-          to: CONTRACTS.USDC,
+          to: CONTRACTS.USDC_E,
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",
@@ -404,7 +404,7 @@ export function useRelayerClient() {
         },
         // Approve Neg Risk Adapter (for converting between market types)
         {
-          to: CONTRACTS.USDC,
+          to: CONTRACTS.USDC_E,
           data: encodeFunctionData({
             abi: erc20ApproveAbi,
             functionName: "approve",

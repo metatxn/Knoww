@@ -76,7 +76,7 @@ async function checkErc20Allowance(
     await throttleApprovalCheck();
     const client = getPublicClient();
     const allowance = await client.readContract({
-      address: CONTRACTS.USDC,
+      address: CONTRACTS.USDC_E,
       abi: erc20Abi,
       functionName: "allowance",
       args: [owner, spender],
