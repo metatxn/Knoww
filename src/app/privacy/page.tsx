@@ -101,7 +101,8 @@ export default function PrivacyPage() {
               <ExternalLink href="https://knoww.app">knoww.app</ExternalLink>{" "}
               (the “Web App”) and our Chrome extension{" "}
               <strong>Knoww – Prediction Markets for Social Media</strong> (also
-              referred to as the <strong>Knoww Extension</strong>.
+              referred to as the <strong>Knoww Extension</strong>, the
+              “Extension”).
             </p>
           </div>
 
@@ -269,7 +270,7 @@ export default function PrivacyPage() {
                   <p>
                     The Extension runs on: <strong>x.com</strong>,{" "}
                     <strong>twitter.com</strong>, <strong>linkedin.com</strong>,{" "}
-                    <strong>reddit.com</strong> (including old Reddit).{" "}
+                    <strong>reddit.com</strong> (including old Reddit).
                   </p>
 
                   <p className="font-semibold text-foreground mt-3">
