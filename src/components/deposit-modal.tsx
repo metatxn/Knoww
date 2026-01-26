@@ -12,9 +12,18 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { type SupportedAsset, useBridge } from "@/hooks/use-bridge";
+import {
+  type DepositTransaction,
+  type QuoteResponse,
+  type SupportedAsset,
+  useBridge,
+} from "@/hooks/use-bridge";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { type TokenBalance, useWalletTokens } from "@/hooks/use-wallet-tokens";
+
+// USDC.e contract address on Polygon (destination token for all deposits)
+const POLYGON_USDC_E_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
+
 import { AmountInput } from "./deposit/amount-input";
 import { BridgeSelection } from "./deposit/bridge-selection";
 import { Confirmation } from "./deposit/confirmation";
@@ -50,6 +59,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
     isLoading: loadingBridge,
     getSupportedAssets,
     createDepositAddresses,
+    getQuote,
+    isLoadingQuote,
+    getDepositStatus,
+    isLoadingDepositStatus,
   } = useBridge();
 
   const [isPending, setIsPending] = useState(false);
@@ -70,6 +83,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [depositError, setDepositError] = useState<string | null>(null);
+  const [quote, setQuote] = useState<QuoteResponse | null>(null);
+  const [depositTransactions, setDepositTransactions] = useState<
+    DepositTransaction[]
+  >([]);
 
   useEffect(() => {
     if (!open) {
@@ -87,6 +104,8 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setIsConfirming(false);
       setIsConfirmed(false);
       setTxError(null);
+      setQuote(null);
+      setDepositTransactions([]);
     }
   }, [open]);
 
@@ -100,7 +119,23 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
 
   useEffect(() => {
     if (txError) {
-      setDepositError(txError?.message || "Transaction failed");
+      // Clean up error message for better UX
+      let errorMessage = txError?.message || "Transaction failed";
+
+      // Handle common error patterns
+      if (errorMessage.includes("Timed out while waiting for transaction")) {
+        errorMessage =
+          "Transaction confirmation timed out. Please check your wallet or Polygonscan for the transaction status.";
+      } else if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("user rejected")
+      ) {
+        errorMessage = "Transaction was rejected.";
+      } else if (errorMessage.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for this transaction.";
+      }
+
+      setDepositError(errorMessage);
       setIsProcessing(false);
     }
   }, [txError]);
@@ -300,11 +335,22 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
 
       setIsPending(false);
       setIsConfirming(true);
+      const { getRpcUrl } = await import("@/lib/rpc");
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl(), {
+          retryCount: 2,
+          retryDelay: 2000,
+        }),
       });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      // Use longer polling interval to avoid rate limiting (5 seconds instead of default 1 second)
+      // Also increase timeout to 3 minutes for slower confirmations
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        pollingInterval: 5_000, // Poll every 5 seconds
+        timeout: 180_000, // 3 minute timeout
+        confirmations: 1, // Wait for 1 confirmation
+      });
       if (receipt.status === "success") setIsConfirmed(true);
       else throw new Error("Transaction failed on-chain");
     } catch (err) {
@@ -325,14 +371,85 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setStep("token");
       setSelectedToken(null);
       setAmount("");
+      setQuote(null);
     } else if (step === "confirm") {
       if (selectedMethod === "bridge") {
         setStep("bridge-select");
         setSelectedBridgeAsset(null);
         setBridgeAddress("");
-      } else setStep("amount");
+      } else {
+        setStep("amount");
+        setQuote(null);
+      }
     }
   }, [step, selectedMethod]);
+
+  // Fetch quote when moving to confirm step
+  // Using primitive dependencies to avoid unnecessary re-runs (rerender-dependencies)
+  const shouldFetchQuote =
+    step === "confirm" && !!selectedToken && !!amount && !!bridgeAddress;
+  const tokenAddress = selectedToken?.address;
+  const tokenDecimals = selectedToken?.decimals;
+
+  useEffect(() => {
+    if (!shouldFetchQuote || !tokenAddress || tokenDecimals === undefined)
+      return;
+
+    const numAmount = Number.parseFloat(amount);
+    if (Number.isNaN(numAmount) || numAmount <= 0) return;
+
+    // Convert amount to base units using parseUnits for precision
+    // parseUnits handles decimal conversion correctly without floating-point errors
+    const amountBaseUnit = parseUnits(amount, tokenDecimals).toString();
+
+    getQuote({
+      fromAmountBaseUnit: amountBaseUnit,
+      fromChainId: "137", // Polygon
+      fromTokenAddress: tokenAddress,
+      recipientAddress: bridgeAddress,
+      toChainId: "137", // Polygon
+      toTokenAddress: POLYGON_USDC_E_ADDRESS,
+    })
+      .then(setQuote)
+      .catch((err) => {
+        // Quote is optional - don't block the deposit if it fails
+        console.warn("Failed to fetch quote:", err);
+        setQuote(null);
+      });
+  }, [
+    shouldFetchQuote,
+    amount,
+    bridgeAddress,
+    tokenAddress,
+    tokenDecimals,
+    getQuote,
+  ]);
+
+  // Poll deposit status after transaction is confirmed
+  // Using primitive dependencies (rerender-dependencies)
+  const shouldPollStatus = isConfirmed && !!bridgeAddress;
+
+  useEffect(() => {
+    if (!shouldPollStatus) return;
+
+    // Fetch immediately
+    getDepositStatus(bridgeAddress)
+      .then(setDepositTransactions)
+      .catch((err) => {
+        console.warn("Failed to fetch deposit status:", err);
+      });
+
+    // Then poll every 5 seconds for updates
+    const interval = setInterval(() => {
+      getDepositStatus(bridgeAddress)
+        .then(setDepositTransactions)
+        .catch((err) => {
+          console.warn("Failed to fetch deposit status:", err);
+        });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [shouldPollStatus, bridgeAddress, getDepositStatus]);
 
   const receiveAmount = useMemo(() => {
     if (!amount || !selectedToken) return "0";
@@ -480,6 +597,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                 copied={copied}
                 onCopy={handleCopy}
                 onDeposit={handleDeposit}
+                quote={quote}
+                isLoadingQuote={isLoadingQuote}
+                depositTransactions={depositTransactions}
+                isLoadingDepositStatus={isLoadingDepositStatus}
               />
             )}
           </AnimatePresence>

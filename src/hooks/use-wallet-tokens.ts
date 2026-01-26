@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useConnection } from "wagmi";
+import { useTokenPrices } from "./use-token-prices";
 
 /**
  * Token balance information
@@ -98,40 +99,49 @@ const ERC20_ABI = [
   },
 ] as const;
 
-// Polygon RPC endpoints with fallbacks.
-// Keep this list short: viem fallback ranking/probing + retries can multiply requests quickly.
-const POLYGON_RPC_URLS = [
-  "https://rpc.ankr.com/polygon", // Ankr - another fallback
-  "https://polygon-rpc.com", // Default - rate limited
-];
+/**
+ * Get the best Polygon RPC URL.
+ * Uses proxy on client-side to hide API keys.
+ */
+function getPolygonRpcUrl(): string {
+  const isClient = typeof window !== "undefined";
+
+  if (isClient) {
+    // On client: Use the proxy (handles RPC selection server-side)
+    return "/api/rpc/polygon";
+  }
+
+  // On server: Use Alchemy directly
+  const alchemyKey =
+    process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  if (alchemyKey) {
+    return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
+  }
+
+  const customRpcUrl =
+    process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  if (customRpcUrl) {
+    return customRpcUrl;
+  }
+
+  return "https://polygon-rpc.com";
+}
 
 /**
- * Create a viem client with fallback RPC support
+ * Create a viem client - uses single RPC endpoint (proxy on client)
+ * No fallback needed since proxy handles RPC selection server-side.
  */
 async function createClient() {
-  const { createPublicClient, http, fallback } = await import("viem");
+  const { createPublicClient, http } = await import("viem");
   const { polygon } = await import("viem/chains");
-
-  // Create transport with fallbacks and retry logic
-  const transport = fallback(
-    POLYGON_RPC_URLS.map((url) =>
-      http(url, {
-        timeout: 10_000, // 10 second timeout
-        // Keep retries low. If an endpoint is down, retries multiply very quickly.
-        retryCount: 1,
-        retryDelay: 250,
-      })
-    ),
-    {
-      // Ranking triggers extra probe requests (and can loop when endpoints fail).
-      // We'll use fixed ordering + fallback instead.
-      rank: false,
-    }
-  );
 
   return createPublicClient({
     chain: polygon,
-    transport,
+    transport: http(getPolygonRpcUrl(), {
+      timeout: 15_000, // 15 second timeout
+      retryCount: 2,
+      retryDelay: 1000,
+    }),
     batch: {
       multicall: true, // Enable automatic multicall batching
     },
@@ -153,9 +163,20 @@ async function getClient() {
 }
 
 /**
- * Fetch all token balances for a wallet using multicall
+ * Price getter function type
  */
-async function fetchWalletTokens(address: string): Promise<WalletTokensResult> {
+type PriceGetter = (symbol: string) => number;
+
+/**
+ * Fetch all token balances for a wallet using multicall
+ *
+ * @param address - The wallet address to fetch balances for
+ * @param getPrice - Function to get the current price for a token symbol
+ */
+async function fetchWalletTokens(
+  address: string,
+  getPrice: PriceGetter
+): Promise<WalletTokensResult> {
   const { formatUnits } = await import("viem");
   const client = await getClient();
 
@@ -191,15 +212,9 @@ async function fetchWalletTokens(address: string): Promise<WalletTokensResult> {
         const balanceFormatted = Number(formatUnits(balance, token.decimals));
 
         if (balanceFormatted > 0.000001) {
-          // Simple USD value estimation (1:1 for stablecoins, approximate for others)
-          let usdValue = balanceFormatted;
-          if (token.symbol === "WETH") {
-            usdValue = balanceFormatted * 3500; // Approximate ETH price
-          } else if (token.symbol === "WMATIC") {
-            usdValue = balanceFormatted * 0.5; // Approximate MATIC price
-          } else if (token.symbol === "WBTC") {
-            usdValue = balanceFormatted * 100000; // Approximate BTC price
-          }
+          // Get live price from CoinMarketCap API
+          const tokenPrice = getPrice(token.symbol);
+          const usdValue = balanceFormatted * tokenPrice;
 
           tokenBalances.push({
             symbol: token.symbol,
@@ -218,6 +233,9 @@ async function fetchWalletTokens(address: string): Promise<WalletTokensResult> {
 
   // Add native POL if balance > 0
   if (nativeBalFormatted > 0.000001) {
+    // Get live POL price from CoinMarketCap API
+    const polPrice = getPrice("POL");
+
     tokenBalances.push({
       symbol: "POL",
       name: "Polygon",
@@ -225,7 +243,7 @@ async function fetchWalletTokens(address: string): Promise<WalletTokensResult> {
       decimals: 18,
       balance: nativeBalFormatted,
       balanceRaw: nativeBal.toString(),
-      usdValue: nativeBalFormatted * 0.5, // Approximate
+      usdValue: nativeBalFormatted * polPrice,
       logoUrl: "https://cryptologos.cc/logos/polygon-matic-logo.png",
     });
   }
@@ -261,10 +279,19 @@ export interface UseWalletTokensOptions {
  * - Automatic refetch on window focus
  * - Built-in error retry logic
  * - No manual debouncing needed (React Query handles it)
+ *
+ * USD values are calculated using live prices from CoinMarketCap API.
  */
 export function useWalletTokens(options?: UseWalletTokensOptions) {
   const { address, isConnected } = useConnection();
   const enabled = options?.enabled ?? true;
+
+  // Get live token prices from CoinMarketCap
+  const {
+    getPrice,
+    isLoading: isPricesLoading,
+    isStale: isPricesStale,
+  } = useTokenPrices({ enabled });
 
   const query = useQuery({
     queryKey: ["wallet-tokens", address],
@@ -272,7 +299,7 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
       if (!address) {
         throw new Error("No address provided");
       }
-      return fetchWalletTokens(address);
+      return fetchWalletTokens(address, getPrice);
     },
     enabled: enabled && !!address && isConnected,
     staleTime: 30 * 1000, // 30 seconds - balances can change frequently
@@ -281,19 +308,34 @@ export function useWalletTokens(options?: UseWalletTokensOptions) {
   });
 
   /**
+   * Recalculate token USD values when prices update
+   * This ensures the UI reflects the latest prices without refetching balances
+   */
+  const tokensWithUpdatedPrices = useMemo(() => {
+    if (!query.data?.tokens) return [];
+
+    return query.data.tokens.map((token) => ({
+      ...token,
+      usdValue: token.balance * getPrice(token.symbol),
+    }));
+  }, [query.data?.tokens, getPrice]);
+
+  /**
    * Get total USD value of all tokens
    */
   const totalUsdValue = useMemo(
     () =>
-      query.data?.tokens.reduce((sum, token) => sum + token.usdValue, 0) ?? 0,
-    [query.data?.tokens]
+      tokensWithUpdatedPrices.reduce((sum, token) => sum + token.usdValue, 0),
+    [tokensWithUpdatedPrices]
   );
 
   return {
-    tokens: query.data?.tokens ?? [],
+    tokens: tokensWithUpdatedPrices,
     nativeBalance: query.data?.nativeBalance ?? 0,
     totalUsdValue,
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || isPricesLoading,
+    /** Whether the USD prices are estimates (API unavailable or stale) */
+    isPricesStale,
     error: query.error?.message ?? null,
     refresh: query.refetch,
   };

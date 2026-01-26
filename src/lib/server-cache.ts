@@ -56,7 +56,7 @@ export interface InitialLeaderboardData {
 }
 
 // Full event type for server-side fetching
-interface GammaEventFull extends Event {
+export interface GammaEventFull extends Event {
   title: string;
   description?: string;
   image?: string;
@@ -191,7 +191,7 @@ export const getInitialLeaderboard = cache(
             Accept: "application/json",
           },
           next: {
-            revalidate: CACHE_DURATION.EVENTS, // Use constant for consistency (1 minute)
+            revalidate: CACHE_DURATION.EVENTS,
           },
         }
       );
@@ -246,7 +246,7 @@ export const getEvent = cache(
       const res = await fetch(
         `${POLYMARKET_API.GAMMA.EVENTS}/slug/${encodeURIComponent(slug)}`,
         {
-          next: { revalidate: 60 }, // Cache for 60 seconds
+          next: { revalidate: CACHE_DURATION.EVENTS },
         }
       );
       if (!res.ok) {

@@ -5,10 +5,11 @@ import { useConnection } from "wagmi";
 import {
   CTF_EXCHANGE_ADDRESS,
   NEG_RISK_CTF_EXCHANGE_ADDRESS,
-  USDC_ADDRESS,
-  USDC_DECIMALS,
+  USDC_E_ADDRESS,
+  USDC_E_DECIMALS,
 } from "@/constants/contracts";
 import { SignatureType } from "@/lib/polymarket";
+import { getRpcUrl } from "@/lib/rpc";
 import { useClobCredentials } from "./use-clob-credentials";
 import { useProxyWallet } from "./use-proxy-wallet";
 
@@ -250,7 +251,7 @@ export function useClobClient() {
       const { createPublicClient, http } = await import("viem");
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl()),
       });
 
       await walletClient.requestAddresses();
@@ -258,12 +259,17 @@ export function useClobClient() {
       const approve = async (spender: `0x${string}`) => {
         const hash = await walletClient.writeContract({
           account: address,
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "approve",
           args: [spender, maxUint256],
         });
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+          pollingInterval: 5_000, // Poll every 5 seconds to avoid rate limiting
+          timeout: 120_000, // 2 minute timeout
+          confirmations: 1, // Wait for 1 confirmation
+        });
         if (receipt.status !== "success") {
           throw new Error(`Approval failed for ${spender}`);
         }
@@ -340,20 +346,20 @@ export function useClobClient() {
 
         const client = createPublicClient({
           chain: polygon,
-          transport: http(),
+          transport: http(getRpcUrl()),
         });
 
         const balance = await client.readContract({
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "balanceOf",
           args: [targetAddress as `0x${string}`],
         });
 
         return {
-          balance: Number(formatUnits(balance, USDC_DECIMALS)),
+          balance: Number(formatUnits(balance, USDC_E_DECIMALS)),
           balanceRaw: balance.toString(),
-          decimals: USDC_DECIMALS,
+          decimals: USDC_E_DECIMALS,
         };
       } catch (err) {
         console.error("Failed to get USDC balance:", err);
@@ -411,20 +417,20 @@ export function useClobClient() {
 
         const client = createPublicClient({
           chain: polygon,
-          transport: http(),
+          transport: http(getRpcUrl()),
         });
 
         const allowance = await client.readContract({
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "allowance",
           args: [targetAddress as `0x${string}`, exchangeAddress],
         });
 
         return {
-          allowance: Number(formatUnits(allowance, USDC_DECIMALS)),
+          allowance: Number(formatUnits(allowance, USDC_E_DECIMALS)),
           allowanceRaw: allowance.toString(),
-          decimals: USDC_DECIMALS,
+          decimals: USDC_E_DECIMALS,
           exchange: negRisk ? "NEG_RISK_CTF_EXCHANGE" : "CTF_EXCHANGE",
         };
       } catch (err) {

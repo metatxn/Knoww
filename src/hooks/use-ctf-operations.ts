@@ -13,7 +13,7 @@
 
 import { useCallback, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
-import { CONTRACTS, CTF_ADDRESS, USDC_DECIMALS } from "@/constants/contracts";
+import { CONTRACTS, CTF_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
 
 // ============================================================================
@@ -292,10 +292,11 @@ export function useCtfOperations() {
 
       const { createPublicClient, http } = await import("viem");
       const { polygon } = await import("viem/chains");
+      const { getRpcUrl } = await import("@/lib/rpc");
 
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl()),
       });
 
       const balances = (await publicClient.readContract({
@@ -328,13 +329,13 @@ export function useCtfOperations() {
     ): Promise<OperationResult> => {
       const { encodeFunctionData, parseUnits } = await import("viem");
 
-      const amountInWei = parseUnits(amount.toString(), USDC_DECIMALS);
+      const amountInWei = parseUnits(amount.toString(), USDC_E_DECIMALS);
 
       const encodedData = encodeFunctionData({
         abi: CTF_ABI,
         functionName: "splitPosition",
         args: [
-          CONTRACTS.USDC as `0x${string}`,
+          CONTRACTS.USDC_E as `0x${string}`,
           PARENT_COLLECTION_ID,
           conditionId as `0x${string}`,
           BINARY_PARTITION,
@@ -359,13 +360,13 @@ export function useCtfOperations() {
     ): Promise<OperationResult> => {
       const { encodeFunctionData, parseUnits } = await import("viem");
 
-      const amountInWei = parseUnits(amount.toString(), USDC_DECIMALS);
+      const amountInWei = parseUnits(amount.toString(), USDC_E_DECIMALS);
 
       const encodedData = encodeFunctionData({
         abi: CTF_ABI,
         functionName: "mergePositions",
         args: [
-          CONTRACTS.USDC as `0x${string}`,
+          CONTRACTS.USDC_E as `0x${string}`,
           PARENT_COLLECTION_ID,
           conditionId as `0x${string}`,
           BINARY_PARTITION,
@@ -392,7 +393,7 @@ export function useCtfOperations() {
         abi: CTF_ABI,
         functionName: "redeemPositions",
         args: [
-          CONTRACTS.USDC as `0x${string}`,
+          CONTRACTS.USDC_E as `0x${string}`,
           PARENT_COLLECTION_ID,
           conditionId as `0x${string}`,
           BINARY_PARTITION,

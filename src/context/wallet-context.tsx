@@ -15,6 +15,7 @@ import {
   useConnection,
   useWalletClient,
 } from "wagmi";
+import { getRpcUrl } from "@/lib/rpc";
 
 /**
  * Wallet context value
@@ -47,9 +48,10 @@ interface WalletContextValue {
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 // Create a singleton public client for read operations
+// Uses Alchemy if configured, falls back to custom RPC or public RPC
 const polygonPublicClient = createPublicClient({
   chain: polygon,
-  transport: http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL),
+  transport: http(getRpcUrl()),
 });
 
 /**

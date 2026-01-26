@@ -78,15 +78,18 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.warn(
-        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`,
+        `Gamma API /tags endpoint not available (${response.status}), using fallback tags`
       );
       // Use fallback tags if endpoint doesn't exist
-      return NextResponse.json({
-        success: true,
-        count: FALLBACK_TAGS.length,
-        tags: FALLBACK_TAGS,
-        fallback: true,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          count: FALLBACK_TAGS.length,
+          tags: FALLBACK_TAGS,
+          fallback: true,
+        },
+        { headers: getCacheHeaders("static") }
+      );
     }
 
     const data = (await response.json()) as unknown[];
@@ -94,12 +97,15 @@ export async function GET(request: NextRequest) {
     // If data is empty or invalid, use fallback
     if (!data || !Array.isArray(data) || data.length === 0) {
       console.warn("Gamma API /tags returned empty data, using fallback tags");
-      return NextResponse.json({
-        success: true,
-        count: FALLBACK_TAGS.length,
-        tags: FALLBACK_TAGS,
-        fallback: true,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          count: FALLBACK_TAGS.length,
+          tags: FALLBACK_TAGS,
+          fallback: true,
+        },
+        { headers: getCacheHeaders("static") }
+      );
     }
 
     // Tags are static data - cache for longer at edge
@@ -110,17 +116,20 @@ export async function GET(request: NextRequest) {
         tags: data,
         fallback: false,
       },
-      { headers: getCacheHeaders("static") },
+      { headers: getCacheHeaders("static") }
     );
   } catch (error) {
     console.error("Error fetching tags:", error);
     // Return fallback tags instead of error
-    return NextResponse.json({
-      success: true,
-      count: FALLBACK_TAGS.length,
-      tags: FALLBACK_TAGS,
-      fallback: true,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        count: FALLBACK_TAGS.length,
+        tags: FALLBACK_TAGS,
+        fallback: true,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { headers: getCacheHeaders("static") }
+    );
   }
 }

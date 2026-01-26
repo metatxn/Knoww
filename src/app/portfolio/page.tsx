@@ -4,6 +4,7 @@ import { useAppKit } from "@reown/appkit/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownToLine,
+  ArrowUpFromLine,
   BarChart3,
   Check,
   Copy,
@@ -33,6 +34,7 @@ import type {
   TabType,
 } from "@/components/portfolio/types";
 import { Button } from "@/components/ui/button";
+import { WithdrawModal } from "@/components/withdraw-modal";
 import { useCancelOrder, useOpenOrders } from "@/hooks/use-open-orders";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useUserDetails } from "@/hooks/use-user-details";
@@ -48,6 +50,7 @@ export default function PortfolioPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // Sorting & Filtering state
   const [sortField, setSortField] = useState<SortField>("value");
@@ -255,16 +258,27 @@ export default function PortfolioPage() {
               </button>
             )}
             <div className="flex items-center gap-2">
-              {hasProxyWallet && proxyAddress && (
-                <Button
-                  onClick={() => setShowDepositModal(true)}
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 h-9 px-3 sm:px-4 font-bold transition-all active:scale-95"
-                >
-                  <ArrowDownToLine className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Deposit</span>
-                </Button>
-              )}
+              {hasProxyWallet && proxyAddress ? (
+                <>
+                  <Button
+                    onClick={() => setShowDepositModal(true)}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 h-9 px-3 sm:px-4 font-bold transition-all active:scale-95"
+                  >
+                    <ArrowDownToLine className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Deposit</span>
+                  </Button>
+                  <Button
+                    onClick={() => setShowWithdrawModal(true)}
+                    size="sm"
+                    variant="outline"
+                    className="border-border hover:bg-secondary text-foreground h-9 px-3 sm:px-4 font-bold transition-all active:scale-95"
+                  >
+                    <ArrowUpFromLine className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Withdraw</span>
+                  </Button>
+                </>
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -410,6 +424,12 @@ export default function PortfolioPage() {
       <DepositModal
         open={showDepositModal}
         onOpenChange={setShowDepositModal}
+      />
+
+      {/* Withdraw Modal */}
+      <WithdrawModal
+        open={showWithdrawModal}
+        onOpenChange={setShowWithdrawModal}
       />
 
       {/* Sell Position Modal */}

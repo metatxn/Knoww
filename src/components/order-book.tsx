@@ -452,7 +452,7 @@ export function OrderBook({
             className="mt-2"
             onClick={() => refetch()}
           >
-            <RefreshCw className="h-3 w-3 mr-2" />
+            <RefreshCw className="h-3 w-3 mr-2" aria-hidden="true" />
             Retry
           </Button>
         </div>

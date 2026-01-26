@@ -13,10 +13,7 @@
 
 import { createPublicClient, erc20Abi, http, type PublicClient } from "viem";
 import { polygon } from "viem/chains";
-import {
-  USDC_DECIMALS,
-  USDC_ADDRESS as USDC_E_ADDRESS,
-} from "@/constants/contracts";
+import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 
 // Cache expiration times
 const DEPLOYMENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -40,19 +37,35 @@ const MIN_RPC_INTERVAL = 100; // Minimum 100ms between RPC calls
 
 /**
  * Get the RPC URL with priority:
- * 1. Alchemy (most reliable, has generous rate limits)
- * 2. Custom RPC URL from env
- * 3. Fallback to public Polygon RPC
+ * Client-side: Uses /api/rpc/polygon proxy (hides API key)
+ * Server-side priority:
+ *   1. Alchemy RPC (if ALCHEMY_API_KEY is set)
+ *   2. Custom RPC URL from env (POLYGON_RPC_URL)
+ *   3. Fallback to public Polygon RPC
+ *
+ * SECURITY: We use a server-side proxy to hide the Alchemy API key.
+ * The proxy endpoint forwards requests to Alchemy without exposing the key.
+ *
+ * @returns The best available RPC URL
  */
-function getRpcUrl(): string {
-  // Priority 1: Alchemy (best for production)
-  const alchemyKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+export function getRpcUrl(): string {
+  // Check if we're on the client side
+  const isClient = typeof window !== "undefined";
+
+  if (isClient) {
+    // On client: Use the proxy to hide API key
+    // The proxy will use Alchemy server-side
+    return "/api/rpc/polygon";
+  }
+
+  // On server: Use Alchemy directly (key is safe server-side)
+  const alchemyKey = process.env.ALCHEMY_API_KEY;
   if (alchemyKey) {
     return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
   }
 
   // Priority 2: Custom RPC URL
-  const customRpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  const customRpcUrl = process.env.POLYGON_RPC_URL;
   if (customRpcUrl) {
     return customRpcUrl;
   }
@@ -67,10 +80,7 @@ function getRpcUrl(): string {
 export function getPublicClient(): PublicClient {
   if (!publicClient) {
     const rpcUrl = getRpcUrl();
-    console.log(
-      "[RPC] Using RPC endpoint:",
-      rpcUrl.replace(/\/v2\/.*/, "/v2/***")
-    ); // Hide API key in logs
+    // Hide API key in logs
     publicClient = createPublicClient({
       chain: polygon,
       transport: http(rpcUrl, {
@@ -181,7 +191,7 @@ export async function fetchUsdcBalance(
       args: [address as `0x${string}`],
     });
 
-    const balance = Number(formatUnits(rawBalance, USDC_DECIMALS));
+    const balance = Number(formatUnits(rawBalance, USDC_E_DECIMALS));
 
     // Update cache
     balanceCache.set(cacheKey, {

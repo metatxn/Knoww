@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           pagination: { hasMore: false, totalResults: 0 },
         },
         {
-          headers: getCacheHeaders("events"),
+          headers: getCacheHeaders("search"),
         }
       );
     }
@@ -132,7 +132,10 @@ export async function GET(request: NextRequest) {
       console.error("Search API error:", response.status, response.statusText);
       return NextResponse.json(
         { error: "Failed to search" },
-        { status: response.status }
+        {
+          status: response.status,
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        }
       );
     }
 
@@ -158,15 +161,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Cache search results at edge
+    // Cache search results at edge with TTL aligned to upstream fetch revalidate (30s)
     return NextResponse.json(data, {
-      headers: getCacheHeaders("events"),
+      headers: getCacheHeaders("search"),
     });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      }
     );
   }
 }
