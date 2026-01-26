@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   createContext,
@@ -85,6 +86,9 @@ interface OnboardingProviderProps {
 export function OnboardingProvider({ children }: OnboardingProviderProps) {
   const { address, isConnected } = useConnection();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const pathname = usePathname();
+  const isPrivacyPage =
+    pathname === "/privacy" || pathname.startsWith("/privacy/");
 
   // Track if we've already auto-shown the popup this session
   // This prevents showing it multiple times if user dismisses it
@@ -227,6 +231,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       !isCheckingSetup &&
       needsTradingSetup &&
       !hasAutoShownRef.current &&
+      !isPrivacyPage &&
       justConnected
     ) {
       // Small delay to ensure UI has settled after wallet connection
@@ -237,7 +242,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
 
       return () => clearTimeout(timer);
     }
-  }, [isConnected, isCheckingSetup, needsTradingSetup]);
+  }, [isConnected, isCheckingSetup, needsTradingSetup, isPrivacyPage]);
 
   // Also auto-show if user connects and we detect they need setup after loading completes
   // This handles the case where loading takes time after connection
@@ -247,6 +252,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       !isCheckingSetup &&
       needsTradingSetup &&
       !hasAutoShownRef.current &&
+      !isPrivacyPage &&
       !showOnboarding
     ) {
       // Small delay to ensure UI has settled, matching the delay in the primary effect
@@ -260,7 +266,20 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
 
       return () => clearTimeout(timer);
     }
-  }, [isConnected, isCheckingSetup, needsTradingSetup, showOnboarding]);
+  }, [
+    isConnected,
+    isCheckingSetup,
+    needsTradingSetup,
+    showOnboarding,
+    isPrivacyPage,
+  ]);
+
+  // Never show onboarding on the Privacy Policy page (auto-close if open).
+  useEffect(() => {
+    if (isPrivacyPage && showOnboarding) {
+      setShowOnboarding(false);
+    }
+  }, [isPrivacyPage, showOnboarding]);
 
   const handleComplete = useCallback(() => {
     setShowOnboarding(false);
