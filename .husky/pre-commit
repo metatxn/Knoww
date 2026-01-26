@@ -1,0 +1,24 @@
+#!/bin/sh
+
+echo "🔍 Running pre-commit checks..."
+
+# Run linting
+echo "📋 Checking linting..."
+pnpm lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed. Please fix the errors before committing."
+  exit 1
+fi
+echo "✅ Linting passed!"
+
+# Run formatting check
+echo "🎨 Checking formatting..."
+pnpm format
+if [ $? -ne 0 ]; then
+  echo "❌ Formatting failed. Please fix the errors before committing."
+  exit 1
+fi
+echo "✅ Formatting passed!"
+
+echo "🎉 Pre-commit checks passed! Proceeding with commit..."
+echo "💡 Note: Build check will run before push."
