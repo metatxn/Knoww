@@ -5,10 +5,11 @@ import { useConnection } from "wagmi";
 import {
   CTF_EXCHANGE_ADDRESS,
   NEG_RISK_CTF_EXCHANGE_ADDRESS,
-  USDC_ADDRESS,
-  USDC_DECIMALS,
+  USDC_E_ADDRESS,
+  USDC_E_DECIMALS,
 } from "@/constants/contracts";
 import { SignatureType } from "@/lib/polymarket";
+import { getRpcUrl } from "@/lib/rpc";
 import { useClobCredentials } from "./use-clob-credentials";
 import { useProxyWallet } from "./use-proxy-wallet";
 
@@ -122,7 +123,7 @@ export function useClobClient() {
       proxyAddress,
       undefined,
       false,
-      builderConfig
+      builderConfig,
     );
   }, [credentials, proxyAddress, getEthersSigner]);
 
@@ -166,7 +167,7 @@ export function useClobClient() {
             expiration:
               params.orderType === OrderType.GTD ? params.expiration : 0,
           },
-          orderOptions
+          orderOptions,
         );
 
         const response = await client.postOrder(order, params.orderType);
@@ -180,7 +181,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [address, canTrade, getClient]
+    [address, canTrade, getClient],
   );
 
   /**
@@ -248,7 +249,6 @@ export function useClobClient() {
       });
 
       const { createPublicClient, http } = await import("viem");
-      const { getRpcUrl } = await import("@/lib/rpc");
       const publicClient = createPublicClient({
         chain: polygon,
         transport: http(getRpcUrl()),
@@ -259,7 +259,7 @@ export function useClobClient() {
       const approve = async (spender: `0x${string}`) => {
         const hash = await walletClient.writeContract({
           account: address,
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "approve",
           args: [spender, maxUint256],
@@ -319,7 +319,7 @@ export function useClobClient() {
         setIsLoading(false);
       }
     },
-    [canTrade, getClient]
+    [canTrade, getClient],
   );
 
   /**
@@ -333,7 +333,6 @@ export function useClobClient() {
       try {
         const { createPublicClient, http, formatUnits } = await import("viem");
         const { polygon } = await import("viem/chains");
-        const { getRpcUrl } = await import("@/lib/rpc");
 
         const ERC20_ABI = [
           {
@@ -351,23 +350,23 @@ export function useClobClient() {
         });
 
         const balance = await client.readContract({
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "balanceOf",
           args: [targetAddress as `0x${string}`],
         });
 
         return {
-          balance: Number(formatUnits(balance, USDC_DECIMALS)),
+          balance: Number(formatUnits(balance, USDC_E_DECIMALS)),
           balanceRaw: balance.toString(),
-          decimals: USDC_DECIMALS,
+          decimals: USDC_E_DECIMALS,
         };
       } catch (err) {
         console.error("Failed to get USDC balance:", err);
         throw err;
       }
     },
-    [address]
+    [address],
   );
 
   /**
@@ -384,7 +383,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    []
+    [],
   );
 
   /**
@@ -398,7 +397,6 @@ export function useClobClient() {
       try {
         const { createPublicClient, http, formatUnits } = await import("viem");
         const { polygon } = await import("viem/chains");
-        const { getRpcUrl } = await import("@/lib/rpc");
 
         const exchangeAddress = negRisk
           ? NEG_RISK_CTF_EXCHANGE_ADDRESS
@@ -423,16 +421,16 @@ export function useClobClient() {
         });
 
         const allowance = await client.readContract({
-          address: USDC_ADDRESS,
+          address: USDC_E_ADDRESS,
           abi: ERC20_ABI,
           functionName: "allowance",
           args: [targetAddress as `0x${string}`, exchangeAddress],
         });
 
         return {
-          allowance: Number(formatUnits(allowance, USDC_DECIMALS)),
+          allowance: Number(formatUnits(allowance, USDC_E_DECIMALS)),
           allowanceRaw: allowance.toString(),
-          decimals: USDC_DECIMALS,
+          decimals: USDC_E_DECIMALS,
           exchange: negRisk ? "NEG_RISK_CTF_EXCHANGE" : "CTF_EXCHANGE",
         };
       } catch (err) {
@@ -440,7 +438,7 @@ export function useClobClient() {
         throw err;
       }
     },
-    [address]
+    [address],
   );
 
   /**
@@ -460,7 +458,7 @@ export function useClobClient() {
         return false;
       }
     },
-    [canTrade, getClient]
+    [canTrade, getClient],
   );
 
   /**
@@ -478,7 +476,7 @@ export function useClobClient() {
         return {};
       }
     },
-    [canTrade, getClient]
+    [canTrade, getClient],
   );
 
   return {

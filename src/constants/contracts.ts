@@ -11,9 +11,9 @@
  * USDC.e (Bridged USDC) - ERC20 token used for trading
  * Note: This is NOT native USDC, but the bridged version
  */
-export const USDC_ADDRESS =
+export const USDC_E_ADDRESS =
   "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174" as const;
-export const USDC_DECIMALS = 6;
+export const USDC_E_DECIMALS = 6;
 
 /**
  * Conditional Tokens Framework (CTF) - ERC1155 outcome tokens
@@ -60,7 +60,7 @@ export const SAFE_INIT_CODE_HASH =
  * All contracts grouped together
  */
 export const CONTRACTS = {
-  USDC: USDC_ADDRESS,
+  USDC_E: USDC_E_ADDRESS,
   CTF: CTF_ADDRESS,
   CTF_EXCHANGE: CTF_EXCHANGE_ADDRESS,
   NEG_RISK_CTF_EXCHANGE: NEG_RISK_CTF_EXCHANGE_ADDRESS,

@@ -53,7 +53,7 @@ function markOnboardingComplete(walletAddress: string): void {
       completedWallets.push(lowerAddress);
       localStorage.setItem(
         ONBOARDING_COMPLETE_KEY,
-        JSON.stringify(completedWallets)
+        JSON.stringify(completedWallets),
       );
     }
   } catch {
@@ -107,7 +107,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         "[OnboardingContext] Checked localStorage for",
         address,
         ":",
-        isComplete
+        isComplete,
       );
     } else {
       setHasCompletedOnboarding(null);
@@ -166,7 +166,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       } catch (err) {
         console.error(
           "[OnboardingContext] Failed to check USDC approval:",
-          err
+          err,
         );
         setHasUsdcApproval(false);
       } finally {
@@ -249,9 +249,16 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       !hasAutoShownRef.current &&
       !showOnboarding
     ) {
-      // Only auto-show if we haven't shown yet and the popup isn't already open
-      setShowOnboarding(true);
-      hasAutoShownRef.current = true;
+      // Small delay to ensure UI has settled, matching the delay in the primary effect
+      const timer = setTimeout(() => {
+        // Double-check conditions haven't changed during the delay
+        if (!hasAutoShownRef.current) {
+          setShowOnboarding(true);
+          hasAutoShownRef.current = true;
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, [isConnected, isCheckingSetup, needsTradingSetup, showOnboarding]);
 
@@ -264,7 +271,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       setHasCompletedOnboarding(true);
       console.log(
         "[OnboardingContext] Marked onboarding complete for",
-        address
+        address,
       );
     }
 

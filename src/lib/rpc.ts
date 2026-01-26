@@ -13,10 +13,7 @@
 
 import { createPublicClient, erc20Abi, http, type PublicClient } from "viem";
 import { polygon } from "viem/chains";
-import {
-  USDC_DECIMALS,
-  USDC_ADDRESS as USDC_E_ADDRESS,
-} from "@/constants/contracts";
+import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 
 // Cache expiration times
 const DEPLOYMENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -40,9 +37,11 @@ const MIN_RPC_INTERVAL = 100; // Minimum 100ms between RPC calls
 
 /**
  * Get the RPC URL with priority:
- * 1. Server-side proxy (hides API key from client)
- * 2. Custom RPC URL from env (if no proxy available)
- * 3. Fallback to public Polygon RPC
+ * Client-side: Uses /api/rpc/polygon proxy (hides API key)
+ * Server-side priority:
+ *   1. Alchemy RPC (if ALCHEMY_API_KEY is set)
+ *   2. Custom RPC URL from env (POLYGON_RPC_URL)
+ *   3. Fallback to public Polygon RPC
  *
  * SECURITY: We use a server-side proxy to hide the Alchemy API key.
  * The proxy endpoint forwards requests to Alchemy without exposing the key.
@@ -60,15 +59,13 @@ export function getRpcUrl(): string {
   }
 
   // On server: Use Alchemy directly (key is safe server-side)
-  const alchemyKey =
-    process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const alchemyKey = process.env.ALCHEMY_API_KEY;
   if (alchemyKey) {
     return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
   }
 
   // Priority 2: Custom RPC URL
-  const customRpcUrl =
-    process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  const customRpcUrl = process.env.POLYGON_RPC_URL;
   if (customRpcUrl) {
     return customRpcUrl;
   }
@@ -83,10 +80,7 @@ export function getRpcUrl(): string {
 export function getPublicClient(): PublicClient {
   if (!publicClient) {
     const rpcUrl = getRpcUrl();
-    console.log(
-      "[RPC] Using RPC endpoint:",
-      rpcUrl.replace(/\/v2\/.*/, "/v2/***")
-    ); // Hide API key in logs
+    // Hide API key in logs
     publicClient = createPublicClient({
       chain: polygon,
       transport: http(rpcUrl, {
@@ -109,7 +103,7 @@ async function throttleRpc(): Promise<void> {
 
   if (timeSinceLastCall < MIN_RPC_INTERVAL) {
     await new Promise((resolve) =>
-      setTimeout(resolve, MIN_RPC_INTERVAL - timeSinceLastCall)
+      setTimeout(resolve, MIN_RPC_INTERVAL - timeSinceLastCall),
     );
   }
 
@@ -125,7 +119,7 @@ async function throttleRpc(): Promise<void> {
  */
 export async function checkIsDeployed(
   address: string,
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean },
 ): Promise<boolean> {
   const cacheKey = address.toLowerCase();
 
@@ -173,7 +167,7 @@ export async function checkIsDeployed(
  */
 export async function fetchUsdcBalance(
   address: string,
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean },
 ): Promise<number> {
   const cacheKey = address.toLowerCase();
 
@@ -197,7 +191,7 @@ export async function fetchUsdcBalance(
       args: [address as `0x${string}`],
     });
 
-    const balance = Number(formatUnits(rawBalance, USDC_DECIMALS));
+    const balance = Number(formatUnits(rawBalance, USDC_E_DECIMALS));
 
     // Update cache
     balanceCache.set(cacheKey, {

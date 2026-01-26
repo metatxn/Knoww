@@ -72,7 +72,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
 
   const [step, setStep] = useState<DepositStep>("method");
   const [selectedMethod, setSelectedMethod] = useState<DepositMethod | null>(
-    null
+    null,
   );
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
   const [selectedBridgeAsset, setSelectedBridgeAsset] =
@@ -158,12 +158,12 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
           (tokenSymbol.toUpperCase() === "USDC.E" &&
             asset.token.symbol.toUpperCase() === "USDC") ||
           (tokenSymbol.toUpperCase() === "USDC" &&
-            asset.token.symbol.toUpperCase() === "USDC")
+            asset.token.symbol.toUpperCase() === "USDC"),
       );
       if (matchingAssets.length === 0) return 45;
       return Math.min(...matchingAssets.map((a) => a.minCheckoutUsd));
     },
-    [supportedAssets]
+    [supportedAssets],
   );
 
   const defaultMinDeposit = useMemo(() => {
@@ -178,7 +178,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       (asset) =>
         asset.token.symbol.toLowerCase().includes(query) ||
         asset.token.name.toLowerCase().includes(query) ||
-        asset.chainName.toLowerCase().includes(query)
+        asset.chainName.toLowerCase().includes(query),
     );
   }, [supportedAssets, searchQuery]);
 
@@ -190,7 +190,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       if (method === "wallet") setStep("token");
       else if (method === "bridge") setStep("bridge-select");
     },
-    []
+    [],
   );
 
   const handleSelectToken = useCallback(
@@ -207,20 +207,20 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
           const matching = addresses.find(
             (addr) =>
               addr.chainId === "137" &&
-              addr.tokenSymbol.toUpperCase() === token.symbol.toUpperCase()
+              addr.tokenSymbol.toUpperCase() === token.symbol.toUpperCase(),
           );
           if (matching) resolvedDepositAddress = matching.depositAddress;
           else {
             const polygonUsdc = addresses.find(
               (addr) =>
                 addr.chainId === "137" &&
-                addr.tokenSymbol.toUpperCase() === "USDC"
+                addr.tokenSymbol.toUpperCase() === "USDC",
             );
             if (polygonUsdc)
               resolvedDepositAddress = polygonUsdc.depositAddress;
             else {
               const polygonAddr = addresses.find(
-                (addr) => addr.chainId === "137"
+                (addr) => addr.chainId === "137",
               );
               if (polygonAddr)
                 resolvedDepositAddress = polygonAddr.depositAddress;
@@ -230,7 +230,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         } else setDepositError("Failed to get deposit addresses.");
       } catch (err) {
         setDepositError(
-          err instanceof Error ? err.message : "Failed to get deposit address."
+          err instanceof Error ? err.message : "Failed to get deposit address.",
         );
       } finally {
         setIsProcessing(false);
@@ -240,7 +240,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setBridgeAddress(resolvedDepositAddress);
       setStep("amount");
     },
-    [createDepositAddresses]
+    [createDepositAddresses],
   );
 
   const handleSelectBridgeAsset = useCallback(
@@ -254,7 +254,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
             addresses.find(
               (addr) =>
                 addr.chainId === asset.chainId &&
-                addr.tokenSymbol === asset.token.symbol
+                addr.tokenSymbol === asset.token.symbol,
             ) || addresses.find((addr) => addr.chainId === asset.chainId);
           if (matching) setBridgeAddress(matching.depositAddress);
         }
@@ -265,7 +265,7 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
         setStep("confirm");
       }
     },
-    [createDepositAddresses]
+    [createDepositAddresses],
   );
 
   const handlePercentage = useCallback(
@@ -273,10 +273,10 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       if (!selectedToken) return;
       const value = (selectedToken.balance * percent) / 100;
       setAmount(
-        value.toFixed(selectedToken.decimals > 6 ? 6 : selectedToken.decimals)
+        value.toFixed(selectedToken.decimals > 6 ? 6 : selectedToken.decimals),
       );
     },
-    [selectedToken]
+    [selectedToken],
   );
 
   const handleCopy = useCallback(() => {
@@ -398,10 +398,9 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
     const numAmount = Number.parseFloat(amount);
     if (Number.isNaN(numAmount) || numAmount <= 0) return;
 
-    // Convert amount to base units (considering token decimals)
-    const amountBaseUnit = Math.floor(
-      numAmount * 10 ** tokenDecimals
-    ).toString();
+    // Convert amount to base units using parseUnits for precision
+    // parseUnits handles decimal conversion correctly without floating-point errors
+    const amountBaseUnit = parseUnits(amount, tokenDecimals).toString();
 
     getQuote({
       fromAmountBaseUnit: amountBaseUnit,

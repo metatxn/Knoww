@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { encodeFunctionData, parseUnits } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
-import { USDC_ADDRESS, USDC_DECIMALS } from "@/constants/contracts";
+import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
 import { PROXY_WALLET_QUERY_KEY, useProxyWallet } from "./use-proxy-wallet";
 
@@ -136,15 +136,15 @@ export const WITHDRAW_TOKEN_CONFIGS: Record<
     id: "usdc-e",
     symbol: "USDC.e",
     name: "Bridged USDC",
-    address: USDC_ADDRESS, // 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
-    decimals: USDC_DECIMALS,
+    address: USDC_E_ADDRESS, // 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
+    decimals: USDC_E_DECIMALS,
   },
   usdc: {
     id: "usdc",
     symbol: "USDC",
     name: "USD Coin",
     // Native USDC on Polygon (Circle's native USDC)
-    address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+    address: NATIVE_USDC_ADDRESS,
     decimals: 6,
   },
 };
@@ -228,7 +228,7 @@ export function useWithdraw() {
       RELAYER_API_URL,
       POLYGON_CHAIN_ID,
       walletClient,
-      builderConfig
+      builderConfig,
     );
 
     return client;
@@ -258,13 +258,13 @@ export function useWithdraw() {
 
       if (!proxyAddress) {
         throw new Error(
-          "Trading wallet not found. Please complete trading setup first."
+          "Trading wallet not found. Please complete trading setup first.",
         );
       }
 
       if (parsedAmount > usdcBalance) {
         throw new Error(
-          `Insufficient balance. Available: $${usdcBalance.toFixed(2)}`
+          `Insufficient balance. Available: $${usdcBalance.toFixed(2)}`,
         );
       }
 
@@ -282,7 +282,7 @@ export function useWithdraw() {
         const client = await getClient();
 
         // Convert amount to token base units (always 6 decimals for both USDC variants)
-        const amountInWei = parseUnits(amount, USDC_DECIMALS);
+        const amountInWei = parseUnits(amount, USDC_E_DECIMALS);
 
         // Build transactions based on selected token
         const transactions: Array<{ to: string; data: string; value: string }> =
@@ -298,7 +298,7 @@ export function useWithdraw() {
           });
 
           transactions.push({
-            to: USDC_ADDRESS, // USDC.e address
+            to: USDC_E_ADDRESS, // USDC.e address
             data: approveData,
             value: "0",
           });
@@ -316,7 +316,7 @@ export function useWithdraw() {
             functionName: "exactInputSingle",
             args: [
               {
-                tokenIn: USDC_ADDRESS as `0x${string}`, // USDC.e
+                tokenIn: USDC_E_ADDRESS as `0x${string}`, // USDC.e
                 tokenOut: NATIVE_USDC_ADDRESS as `0x${string}`, // Native USDC
                 fee: POOL_FEE,
                 recipient: destinationAddress as `0x${string}`, // Send directly to user's EOA
@@ -353,7 +353,7 @@ export function useWithdraw() {
           });
 
           transactions.push({
-            to: USDC_ADDRESS, // USDC.e address
+            to: USDC_E_ADDRESS, // USDC.e address
             data: transferData,
             value: "0",
           });
@@ -390,7 +390,7 @@ export function useWithdraw() {
         ) {
           console.log(
             "[Withdraw] Transaction confirmed:",
-            result.transactionHash
+            result.transactionHash,
           );
           setState("confirmed");
 
@@ -414,7 +414,7 @@ export function useWithdraw() {
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           console.log(
-            `[Withdraw] Polling attempt ${attempt + 1}/${maxAttempts}...`
+            `[Withdraw] Polling attempt ${attempt + 1}/${maxAttempts}...`,
           );
           const txns = await client.getTransaction(response.transactionID);
 
@@ -429,7 +429,7 @@ export function useWithdraw() {
             if (successStates.includes(tx.state)) {
               console.log(
                 "[Withdraw] Withdrawal confirmed:",
-                tx.transactionHash
+                tx.transactionHash,
               );
               setState("confirmed");
 
@@ -453,7 +453,7 @@ export function useWithdraw() {
         // Return success: false with pending: true to indicate the transaction was submitted
         // but we couldn't confirm it within the timeout period
         console.log(
-          "[Withdraw] Polling timed out, transaction status unknown - treating as pending"
+          "[Withdraw] Polling timed out, transaction status unknown - treating as pending",
         );
         setState("pending");
 
@@ -499,7 +499,7 @@ export function useWithdraw() {
         };
       }
     },
-    [withdrawMutation]
+    [withdrawMutation],
   );
 
   /**

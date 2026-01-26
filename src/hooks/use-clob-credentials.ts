@@ -168,7 +168,7 @@ function storeReadonlyKeys(address: string, keys: string[]): void {
   try {
     sessionStorage.setItem(
       getReadonlyKeysStorageKey(address),
-      JSON.stringify(keys)
+      JSON.stringify(keys),
     );
     // Store copy to prevent external mutations from corrupting cache
     // Only update cache if sessionStorage write succeeded
@@ -338,7 +338,7 @@ export function useClobCredentials() {
       // Create ethers signer from wallet provider
       const provider = new ethersModule.providers.Web3Provider(
         // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-        window.ethereum as any
+        window.ethereum as any,
       );
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
@@ -348,7 +348,7 @@ export function useClobCredentials() {
         process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
           "https://clob.polymarket.com",
         137,
-        signer
+        signer,
       );
 
       let creds: { key: string; secret: string; passphrase: string };
@@ -360,7 +360,7 @@ export function useClobCredentials() {
       } catch (sdkErr) {
         console.log(
           "[ClobCredentials] SDK failed, using API fallback...",
-          sdkErr
+          sdkErr,
         );
         return await deriveCredentialsViaApi();
       }
@@ -438,7 +438,7 @@ export function useClobCredentials() {
   const getAuthenticatedClient = useCallback(async () => {
     if (!credentials) {
       throw new Error(
-        "Full credentials required. Please derive credentials first."
+        "Full credentials required. Please derive credentials first.",
       );
     }
 
@@ -453,7 +453,7 @@ export function useClobCredentials() {
 
     const provider = new ethersModule.providers.Web3Provider(
       // biome-ignore lint/suspicious/noExplicitAny: window.ethereum is the wallet provider
-      window.ethereum as any
+      window.ethereum as any,
     );
     await provider.send("eth_requestAccounts", []);
     const signer = provider.getSigner();
@@ -468,7 +468,7 @@ export function useClobCredentials() {
       process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com",
       137,
       signer,
-      creds
+      creds,
     ) as InstanceType<typeof ClobClient> & ClobClientWithReadonlyMethods;
   }, [credentials]);
 
@@ -575,7 +575,7 @@ export function useClobCredentials() {
 
         if (success) {
           console.log(
-            "[ClobCredentials] Successfully deleted read-only API key"
+            "[ClobCredentials] Successfully deleted read-only API key",
           );
 
           // Update local state and storage
@@ -596,7 +596,7 @@ export function useClobCredentials() {
         setIsLoading(false);
       }
     },
-    [address, getAuthenticatedClient, readonlyKeys]
+    [address, getAuthenticatedClient, readonlyKeys],
   );
 
   /**
@@ -614,7 +614,7 @@ export function useClobCredentials() {
         const client = new ClobClient(
           process.env.NEXT_PUBLIC_POLYMARKET_HOST ||
             "https://clob.polymarket.com",
-          137
+          137,
         ) as InstanceType<typeof ClobClient> & ClobClientWithReadonlyMethods;
 
         const result = await client.validateReadonlyApiKey(targetAddress, key);
@@ -623,7 +623,7 @@ export function useClobCredentials() {
         return false;
       }
     },
-    []
+    [],
   );
 
   return {

@@ -32,15 +32,13 @@ function getPolygonRpcUrl(): string {
   }
 
   // On server (SSR): Use Alchemy directly
-  const alchemyKey =
-    process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const alchemyKey = process.env.ALCHEMY_API_KEY;
   if (alchemyKey) {
     console.log("[Config] Using Alchemy RPC for Polygon (server-side)");
     return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
   }
 
-  const customRpcUrl =
-    process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  const customRpcUrl = process.env.POLYGON_RPC_URL;
   if (customRpcUrl) {
     console.log("[Config] Using custom RPC for Polygon:", customRpcUrl);
     return customRpcUrl;

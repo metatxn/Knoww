@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useProxyWallet } from "./use-proxy-wallet";
 
 /**
@@ -156,8 +156,14 @@ export const BRIDGE_QUERY_KEYS = {
   supportedAssets: ["bridge-supported-assets"] as const,
   depositAddresses: (address: string) =>
     ["bridge-deposit-addresses", address] as const,
+  // TODO: Reserved for future query-based caching/polling of deposit status.
+  // Currently, getDepositStatus() uses a mutation (depositStatusMutation) for on-demand fetching.
+  // Convert to useQuery with this key if automatic polling or cache invalidation is needed.
   depositStatus: (address: string) =>
     ["bridge-deposit-status", address] as const,
+  // TODO: Reserved for future query-based caching of quotes.
+  // Currently, getQuote() uses a mutation (quoteMutation) for on-demand fetching.
+  // Convert to useQuery with this key if quote caching or deduplication is needed.
   quote: (params: QuoteRequest) =>
     [
       "bridge-quote",
@@ -202,7 +208,7 @@ async function fetchQuote(params: QuoteRequest): Promise<QuoteResponse> {
       error?: string;
     };
     throw new Error(
-      errorData.error || `Failed to fetch quote: ${response.status}`
+      errorData.error || `Failed to fetch quote: ${response.status}`,
     );
   }
 
@@ -214,10 +220,10 @@ async function fetchQuote(params: QuoteRequest): Promise<QuoteResponse> {
  * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
  */
 async function fetchDepositStatus(
-  depositAddress: string
+  depositAddress: string,
 ): Promise<DepositTransaction[]> {
   const response = await fetch(
-    `${BRIDGE_API_URL}/status/${encodeURIComponent(depositAddress)}`
+    `${BRIDGE_API_URL}/status/${encodeURIComponent(depositAddress)}`,
   );
 
   if (!response.ok) {
@@ -225,7 +231,7 @@ async function fetchDepositStatus(
       error?: string;
     };
     throw new Error(
-      errorData.error || `Failed to fetch deposit status: ${response.status}`
+      errorData.error || `Failed to fetch deposit status: ${response.status}`,
     );
   }
 
@@ -237,7 +243,7 @@ async function fetchDepositStatus(
  * Convert API response to DepositAddress format
  */
 function convertToDepositAddresses(
-  data: CreateDepositResponse
+  data: CreateDepositResponse,
 ): DepositAddress[] {
   // Convert the API response to our DepositAddress format
   // The EVM address is used for all EVM chains (Polygon, Ethereum, Arbitrum, etc.)
@@ -289,7 +295,7 @@ function convertToDepositAddresses(
  * Create deposit addresses for a wallet
  */
 async function createDepositAddresses(
-  walletAddress: string
+  walletAddress: string,
 ): Promise<DepositAddress[]> {
   const response = await fetch(`${BRIDGE_API_URL}/deposit`, {
     method: "POST",
@@ -307,7 +313,7 @@ async function createDepositAddresses(
     };
     throw new Error(
       errorData.message ||
-        `Failed to create deposit addresses: ${response.status}`
+        `Failed to create deposit addresses: ${response.status}`,
     );
   }
 
@@ -345,7 +351,7 @@ export function useBridge() {
     queryFn: () => {
       if (!proxyAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first."
+          "No wallet address provided. Please complete trading setup first.",
         );
       }
       return createDepositAddresses(proxyAddress);
@@ -361,7 +367,7 @@ export function useBridge() {
       // Cache the result
       queryClient.setQueryData(
         BRIDGE_QUERY_KEYS.depositAddresses(walletAddress),
-        data
+        data,
       );
     },
   });
@@ -410,13 +416,13 @@ export function useBridge() {
 
       if (!targetAddress) {
         throw new Error(
-          "No wallet address provided. Please complete trading setup first."
+          "No wallet address provided. Please complete trading setup first.",
         );
       }
 
       // If we already have cached data for this address, return it
       const cached = queryClient.getQueryData<DepositAddress[]>(
-        BRIDGE_QUERY_KEYS.depositAddresses(targetAddress)
+        BRIDGE_QUERY_KEYS.depositAddresses(targetAddress),
       );
       if (cached) {
         return cached;
@@ -425,7 +431,7 @@ export function useBridge() {
       // Otherwise, use mutation to create new addresses
       return createDepositMutation.mutateAsync(targetAddress);
     },
-    [proxyAddress, queryClient, createDepositMutation]
+    [proxyAddress, queryClient, createDepositMutation],
   );
 
   /**
@@ -458,19 +464,13 @@ export function useBridge() {
    * Returns estimated fees, output amount, and checkout time.
    * Useful for showing users what they'll receive before depositing.
    *
-   * Note: We use a ref to stabilize the function reference and avoid
-   * infinite re-renders when used in useEffect dependencies.
-   *
    * @see https://docs.polymarket.com/api-reference/bridge/get-a-quote
    */
-  const quoteMutationRef = useRef(quoteMutation);
-  quoteMutationRef.current = quoteMutation;
-
   const getQuote = useCallback(
     async (params: QuoteRequest): Promise<QuoteResponse> => {
-      return quoteMutationRef.current.mutateAsync(params);
+      return quoteMutation.mutateAsync(params);
     },
-    [] // Empty deps - uses ref for stable reference
+    [quoteMutation],
   );
 
   /**
@@ -487,19 +487,13 @@ export function useBridge() {
    * - COMPLETED: Transaction completed successfully
    * - FAILED: Transaction failed
    *
-   * Note: We use a ref to stabilize the function reference and avoid
-   * infinite re-renders when used in useEffect dependencies.
-   *
    * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
    */
-  const depositStatusMutationRef = useRef(depositStatusMutation);
-  depositStatusMutationRef.current = depositStatusMutation;
-
   const getDepositStatus = useCallback(
     async (depositAddress: string): Promise<DepositTransaction[]> => {
-      return depositStatusMutationRef.current.mutateAsync(depositAddress);
+      return depositStatusMutation.mutateAsync(depositAddress);
     },
-    [] // Empty deps - uses ref for stable reference
+    [depositStatusMutation],
   );
 
   // Combine loading states
