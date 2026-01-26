@@ -144,7 +144,7 @@ export async function GET() {
           timestamp: Date.now(),
           warning: "Using fallback prices - API key not configured",
         } satisfies TokenPricesResponse,
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -157,7 +157,7 @@ export async function GET() {
           Accept: "application/json",
         },
         next: { revalidate: 300 }, // Next.js cache for 5 minutes
-      }
+      },
     );
 
     if (!response.ok) {
@@ -231,7 +231,7 @@ export async function GET() {
         timestamp: Date.now(),
         error: "Failed to fetch prices, using fallback values",
       } satisfies TokenPricesResponse,
-      { status: 200 } // Return 200 with fallback prices instead of 500
+      { status: 200 }, // Return 200 with fallback prices instead of 500
     );
   }
 }
@@ -241,7 +241,7 @@ export async function GET() {
  * Maps wrapped tokens to their base asset prices
  */
 function buildMappedPrices(
-  basePrices: Record<string, number>
+  basePrices: Record<string, number>,
 ): Record<string, number> {
   const mappedPrices: Record<string, number> = { ...basePrices };
 

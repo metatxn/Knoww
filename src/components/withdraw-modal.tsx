@@ -111,6 +111,28 @@ const WITHDRAW_CHAINS = [
 type WithdrawToken = (typeof WITHDRAW_TOKENS)[number];
 type WithdrawChain = (typeof WITHDRAW_CHAINS)[number];
 
+// Block explorer URLs for each supported chain
+const CHAIN_EXPLORER_URLS: Record<WithdrawChain["id"], string> = {
+  polygon: "https://polygonscan.com/tx/",
+  ethereum: "https://etherscan.io/tx/",
+  base: "https://basescan.org/tx/",
+  arbitrum: "https://arbiscan.io/tx/",
+  optimism: "https://optimistic.etherscan.io/tx/",
+  bsc: "https://bscscan.com/tx/",
+  solana: "https://explorer.solana.com/tx/",
+};
+
+// Explorer display names for each chain
+const CHAIN_EXPLORER_NAMES: Record<WithdrawChain["id"], string> = {
+  polygon: "Polygonscan",
+  ethereum: "Etherscan",
+  base: "Basescan",
+  arbitrum: "Arbiscan",
+  optimism: "Optimism Explorer",
+  bsc: "BscScan",
+  solana: "Solana Explorer",
+};
+
 /**
  * Get status display info based on withdrawal state
  */
@@ -367,14 +389,14 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     {amount} {selectedToken.symbol} sent to your wallet
                   </p>
                 </div>
-                {txHash ? (
+                {txHash && CHAIN_EXPLORER_URLS[selectedChain.id] ? (
                   <a
-                    href={`https://polygonscan.com/tx/${txHash}`}
+                    href={`${CHAIN_EXPLORER_URLS[selectedChain.id]}${txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80"
                   >
-                    View on Polygonscan
+                    View on {CHAIN_EXPLORER_NAMES[selectedChain.id]}
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : null}
@@ -631,14 +653,16 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       </span>
                     </div>
                     {/* Show transaction link for pending state */}
-                    {state === "pending" && txHash ? (
+                    {state === "pending" &&
+                    txHash &&
+                    CHAIN_EXPLORER_URLS[selectedChain.id] ? (
                       <a
-                        href={`https://polygonscan.com/tx/${txHash}`}
+                        href={`${CHAIN_EXPLORER_URLS[selectedChain.id]}${txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
                       >
-                        Track on Polygonscan
+                        Track on {CHAIN_EXPLORER_NAMES[selectedChain.id]}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : null}

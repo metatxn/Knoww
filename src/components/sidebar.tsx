@@ -777,6 +777,7 @@ export function Sidebar() {
                     <button
                       type="button"
                       onClick={() => setShowDepositModal(true)}
+                      aria-label="Deposit"
                       className="flex-1 h-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       <Plus className="h-4 w-4" />
@@ -791,6 +792,7 @@ export function Sidebar() {
                     <button
                       type="button"
                       onClick={() => setShowWithdrawModal(true)}
+                      aria-label="Withdraw"
                       className="flex-1 h-10 flex items-center justify-center rounded-xl bg-gray-700 hover:bg-gray-600 text-white border border-gray-600 transition-all"
                     >
                       <ArrowDownToLine className="h-4 w-4" />

@@ -94,12 +94,43 @@ function getServerRpcUrl(): string {
 export async function POST(request: NextRequest) {
   // Get the request origin for CORS validation
   const requestOrigin = request.headers.get("origin");
+  const validatedOrigin = getValidatedOrigin(requestOrigin);
+
+  // Reject requests from disallowed origins to prevent proxy abuse
+  if (!validatedOrigin) {
+    console.warn(
+      "[RPC Proxy] Rejected request from disallowed origin:",
+      requestOrigin || "(no origin)"
+    );
+    return NextResponse.json(
+      {
+        error: "Forbidden",
+        message: "Origin not allowed. Cross-origin requests from this domain are not permitted.",
+      },
+      { status: 403 }
+    );
+  }
+
   const corsHeaders = getCorsHeaders(requestOrigin);
 
+  // Parse JSON body with dedicated error handling
+  let body: unknown;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch (parseError) {
+    // Handle JSON parse errors (SyntaxError) with a 400 response
+    console.warn(
+      "[RPC Proxy] Invalid JSON payload:",
+      parseError instanceof Error ? parseError.message : parseError
+    );
+    return NextResponse.json(
+      { error: "Invalid JSON payload" },
+      { status: 400, headers: corsHeaders }
+    );
+  }
 
-    // Validate the request body
+  try {
+    // Validate the request body structure
     if (!body || (typeof body !== "object" && !Array.isArray(body))) {
       return NextResponse.json(
         { error: "Invalid JSON-RPC request" },
@@ -170,6 +201,20 @@ export async function POST(request: NextRequest) {
 export async function OPTIONS(request: NextRequest) {
   // Get the request origin for CORS validation
   const requestOrigin = request.headers.get("origin");
+  const validatedOrigin = getValidatedOrigin(requestOrigin);
+
+  // Reject preflight requests from disallowed origins
+  if (!validatedOrigin) {
+    console.warn(
+      "[RPC Proxy] Rejected OPTIONS preflight from disallowed origin:",
+      requestOrigin || "(no origin)"
+    );
+    return new NextResponse(null, {
+      status: 403,
+      statusText: "Forbidden - Origin not allowed",
+    });
+  }
+
   const corsHeaders = getCorsHeaders(requestOrigin);
 
   return new NextResponse(null, {

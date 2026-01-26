@@ -1,6 +1,5 @@
 "use client";
 
-import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import type { TokenPricesResponse } from "@/app/api/price/tokens/route";
 
@@ -124,7 +123,7 @@ export interface UseTokenPricesReturn {
  * ```
  */
 export function useTokenPrices(
-  options?: UseTokenPricesOptions
+  options?: UseTokenPricesOptions,
 ): UseTokenPricesReturn {
   const { enabled = true } = options ?? {};
 
@@ -193,14 +192,3 @@ export async function getTokenPrice(symbol: string): Promise<number> {
   }
 }
 
-/**
- * Prefetch token prices for SSR or initial load
- * Call this in a server component or layout to prefetch prices
- */
-export function prefetchTokenPrices(queryClient: QueryClient) {
-  return queryClient.prefetchQuery({
-    queryKey: TOKEN_PRICES_QUERY_KEY,
-    queryFn: fetchTokenPrices,
-    staleTime: 5 * 60 * 1000,
-  });
-}
