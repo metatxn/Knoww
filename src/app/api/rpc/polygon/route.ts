@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Forbidden",
-        message: "Origin not allowed. Cross-origin requests from this domain are not permitted.",
+        message:
+          "Origin not allowed. Cross-origin requests from this domain are not permitted.",
       },
       { status: 403 }
     );

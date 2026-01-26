@@ -123,7 +123,7 @@ export interface UseTokenPricesReturn {
  * ```
  */
 export function useTokenPrices(
-  options?: UseTokenPricesOptions,
+  options?: UseTokenPricesOptions
 ): UseTokenPricesReturn {
   const { enabled = true } = options ?? {};
 
@@ -191,4 +191,3 @@ export async function getTokenPrice(symbol: string): Promise<number> {
     return FALLBACK_PRICES[symbol] ?? 1;
   }
 }
-

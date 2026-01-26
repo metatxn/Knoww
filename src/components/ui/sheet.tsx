@@ -27,7 +27,7 @@ function SheetClose({
 }
 
 function SheetPortal(
-  props: React.ComponentProps<typeof DialogPrimitive.Portal>,
+  props: React.ComponentProps<typeof DialogPrimitive.Portal>
 ) {
   return <DialogPrimitive.Portal {...props} />;
 }
@@ -41,7 +41,7 @@ function SheetOverlay({
       data-slot="sheet-overlay"
       className={cn(
         "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        className,
+        className
       )}
       {...props}
     />
@@ -64,7 +64,7 @@ const sheetVariants = cva(
     defaultVariants: {
       side: "right",
     },
-  },
+  }
 );
 
 type SheetContentProps = React.ComponentProps<typeof DialogPrimitive.Content> &
@@ -106,7 +106,7 @@ function SheetContent({
             className={cn(
               defaultCloseClassName,
               closeClassName,
-              closeProps?.className,
+              closeProps?.className
             )}
           >
             {closeElement ?? (
@@ -129,7 +129,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sheet-header"
       className={cn(
         "flex flex-col space-y-2 text-center sm:text-left",
-        className,
+        className
       )}
       {...props}
     />
@@ -142,7 +142,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sheet-footer"
       className={cn(
         "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-        className,
+        className
       )}
       {...props}
     />
