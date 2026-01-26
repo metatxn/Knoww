@@ -18,7 +18,8 @@ export type CacheProfile =
   | "realtime" // Price data, order books (10 seconds)
   | "user" // User-specific data (no cache)
   | "leaderboard" // Leaderboard data (1 minute)
-  | "priceHistory"; // Historical price data (5 minutes)
+  | "priceHistory" // Historical price data (5 minutes)
+  | "search"; // Search results (30 seconds, aligns with upstream fetch revalidate)
 
 interface CacheConfig {
   maxAge: number; // Browser cache (seconds)
@@ -75,6 +76,13 @@ const CACHE_PROFILES: Record<CacheProfile, CacheConfig> = {
     staleWhileRevalidate: 0,
     staleIfError: 0,
     isPrivate: true, // User data should never be cached at edge
+  },
+  search: {
+    maxAge: 15, // 15 seconds in browser
+    sMaxAge: 30, // 30 seconds at edge (aligns with upstream fetch revalidate: 30)
+    staleWhileRevalidate: 60, // 1 minute
+    staleIfError: 120, // 2 minutes
+    isPrivate: false,
   },
 };
 

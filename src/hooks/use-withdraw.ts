@@ -24,6 +24,72 @@ const ERC20_TRANSFER_ABI = [
 ] as const;
 
 /**
+ * ERC20 approve ABI for encoding the approve call
+ */
+const ERC20_APPROVE_ABI = [
+  {
+    name: "approve",
+    type: "function",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
+/**
+ * Uniswap V3 SwapRouter address on Polygon
+ * @see https://docs.uniswap.org/contracts/v3/reference/deployments/polygon-deployments
+ */
+const UNISWAP_V3_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+
+/**
+ * Native USDC address on Polygon (Circle's native USDC)
+ */
+const NATIVE_USDC_ADDRESS = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
+
+/**
+ * Pool fee tier for USDC.e/USDC pair (0.01% = 100 in Uniswap terms)
+ * This is the lowest fee tier, designed for stablecoin pairs
+ */
+const POOL_FEE = 100;
+
+/**
+ * Maximum slippage tolerance in basis points (10bp = 0.1%)
+ * Polymarket enforces less than 10bp difference in output amount
+ */
+const MAX_SLIPPAGE_BPS = BigInt(10);
+
+/**
+ * Uniswap V3 SwapRouter exactInputSingle ABI
+ * @see https://docs.uniswap.org/contracts/v3/reference/periphery/interfaces/ISwapRouter
+ */
+const SWAP_ROUTER_ABI = [
+  {
+    name: "exactInputSingle",
+    type: "function",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "tokenIn", type: "address" },
+          { name: "tokenOut", type: "address" },
+          { name: "fee", type: "uint24" },
+          { name: "recipient", type: "address" },
+          { name: "deadline", type: "uint256" },
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMinimum", type: "uint256" },
+          { name: "sqrtPriceLimitX96", type: "uint160" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
+] as const;
+
+/**
  * Withdrawal transaction states
  */
 export type WithdrawState =
@@ -39,6 +105,8 @@ export type WithdrawState =
  */
 export interface WithdrawResult {
   success: boolean;
+  /** Indicates the transaction was submitted but confirmation status is unknown */
+  pending?: boolean;
   transactionHash?: string;
   error?: string;
 }
@@ -213,38 +281,98 @@ export function useWithdraw() {
         // Get the relay client
         const client = await getClient();
 
-        // Convert amount to token base units
-        const amountInWei = parseUnits(amount, tokenConfig.decimals);
+        // Convert amount to token base units (always 6 decimals for both USDC variants)
+        const amountInWei = parseUnits(amount, USDC_DECIMALS);
 
-        // Encode the transfer function call
-        const transferData = encodeFunctionData({
-          abi: ERC20_TRANSFER_ABI,
-          functionName: "transfer",
-          args: [destinationAddress as `0x${string}`, amountInWei],
-        });
+        // Build transactions based on selected token
+        const transactions: Array<{ to: string; data: string; value: string }> =
+          [];
 
-        // Create the withdrawal transaction
-        // Note: For now, we always withdraw from USDC.e (the token held in Polymarket)
-        // In the future, we can add swap functionality to convert to other tokens
-        const withdrawTx = {
-          to: USDC_ADDRESS, // Always use USDC.e since that's what Polymarket holds
-          data: transferData,
-          value: "0",
-        };
+        if (tokenId === "usdc") {
+          // Native USDC: Need to swap USDC.e -> USDC via Uniswap V3, then it goes directly to recipient
+          // Step 1: Approve Uniswap V3 Router to spend USDC.e
+          const approveData = encodeFunctionData({
+            abi: ERC20_APPROVE_ABI,
+            functionName: "approve",
+            args: [UNISWAP_V3_ROUTER as `0x${string}`, amountInWei],
+          });
 
-        console.log("[Withdraw] Submitting withdrawal transaction:", {
-          from: proxyAddress,
-          to: destinationAddress,
-          token: tokenConfig.symbol,
-          amount,
-          amountInWei: amountInWei.toString(),
-        });
+          transactions.push({
+            to: USDC_ADDRESS, // USDC.e address
+            data: approveData,
+            value: "0",
+          });
+
+          // Step 2: Swap USDC.e -> Native USDC via Uniswap V3
+          // Calculate minimum output with 10bp slippage tolerance (Polymarket's approach)
+          const amountOutMinimum =
+            amountInWei - (amountInWei * MAX_SLIPPAGE_BPS) / BigInt(10000);
+
+          // Deadline: 20 minutes from now
+          const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
+
+          const swapData = encodeFunctionData({
+            abi: SWAP_ROUTER_ABI,
+            functionName: "exactInputSingle",
+            args: [
+              {
+                tokenIn: USDC_ADDRESS as `0x${string}`, // USDC.e
+                tokenOut: NATIVE_USDC_ADDRESS as `0x${string}`, // Native USDC
+                fee: POOL_FEE,
+                recipient: destinationAddress as `0x${string}`, // Send directly to user's EOA
+                deadline,
+                amountIn: amountInWei,
+                amountOutMinimum,
+                sqrtPriceLimitX96: BigInt(0), // No price limit
+              },
+            ],
+          });
+
+          transactions.push({
+            to: UNISWAP_V3_ROUTER,
+            data: swapData,
+            value: "0",
+          });
+
+          console.log("[Withdraw] Submitting swap withdrawal transaction:", {
+            from: proxyAddress,
+            to: destinationAddress,
+            tokenIn: "USDC.e",
+            tokenOut: "USDC",
+            amount,
+            amountInWei: amountInWei.toString(),
+            amountOutMinimum: amountOutMinimum.toString(),
+            slippageBps: MAX_SLIPPAGE_BPS.toString(),
+          });
+        } else {
+          // USDC.e: Direct transfer (no swap needed)
+          const transferData = encodeFunctionData({
+            abi: ERC20_TRANSFER_ABI,
+            functionName: "transfer",
+            args: [destinationAddress as `0x${string}`, amountInWei],
+          });
+
+          transactions.push({
+            to: USDC_ADDRESS, // USDC.e address
+            data: transferData,
+            value: "0",
+          });
+
+          console.log("[Withdraw] Submitting direct transfer transaction:", {
+            from: proxyAddress,
+            to: destinationAddress,
+            token: "USDC.e",
+            amount,
+            amountInWei: amountInWei.toString(),
+          });
+        }
 
         setState("submitting");
 
         // Execute the withdrawal via relayer (gasless)
-        // Note: Polymarket uses "funwithdraw" as metadata internally
-        const response = await client.execute([withdrawTx], "funwithdraw");
+        // For native USDC, this batches approve + swap atomically
+        // For USDC.e, this is a single transfer
+        const response = await client.execute(transactions, "funwithdraw");
 
         console.log("[Withdraw] Transaction submitted:", {
           transactionID: response.transactionID,
@@ -322,14 +450,16 @@ export function useWithdraw() {
         }
 
         // If polling times out but transaction was submitted, it's still pending (not confirmed)
-        // Don't mislead users into thinking withdrawal is complete
+        // Return success: false with pending: true to indicate the transaction was submitted
+        // but we couldn't confirm it within the timeout period
         console.log(
           "[Withdraw] Polling timed out, transaction status unknown - treating as pending"
         );
         setState("pending");
 
         return {
-          success: true,
+          success: false,
+          pending: true,
           transactionHash: response.transactionHash || response.transactionID,
         };
       } catch (err) {

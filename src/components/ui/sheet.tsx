@@ -67,13 +67,31 @@ const sheetVariants = cva(
   }
 );
 
+type SheetContentProps = React.ComponentProps<typeof DialogPrimitive.Content> &
+  VariantProps<typeof sheetVariants> & {
+    /** Whether to show the close button. Defaults to true. */
+    showClose?: boolean;
+    /** Additional className to apply to the close button. */
+    closeClassName?: string;
+    /** Custom element to render inside the close button instead of the X icon. */
+    closeElement?: React.ReactNode;
+    /** Props to spread onto the close button (className will be merged). */
+    closeProps?: React.ComponentProps<typeof DialogPrimitive.Close>;
+  };
+
+const defaultCloseClassName =
+  "absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary";
+
 function SheetContent({
   side = "right",
   className,
   children,
+  showClose = true,
+  closeClassName,
+  closeElement,
+  closeProps,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> &
-  VariantProps<typeof sheetVariants>) {
+}: SheetContentProps) {
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -83,10 +101,23 @@ function SheetContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-          <X className="h-5 w-5" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
+        {showClose && (
+          <DialogPrimitive.Close
+            {...closeProps}
+            className={cn(
+              defaultCloseClassName,
+              closeClassName,
+              closeProps?.className
+            )}
+          >
+            {closeElement ?? (
+              <>
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+              </>
+            )}
+          </DialogPrimitive.Close>
+        )}
       </DialogPrimitive.Content>
     </SheetPortal>
   );

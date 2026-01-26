@@ -751,18 +751,20 @@ function TopWhaleCard({
 function RecentActivityRow({
   activity,
   index,
+  animatedIds,
 }: {
   activity: WhaleActivity;
   index: number;
+  animatedIds: Set<string>;
 }) {
   const isBuy = activity.trade.side === "BUY";
-  // Track if component has mounted before to prevent re-animation on VList remounts
-  const hasMountedRef = useRef(false);
-  const shouldAnimate = !hasMountedRef.current;
+  // Check if this activity has already been animated (persists across VList remounts)
+  const shouldAnimate = !animatedIds.has(activity.id);
 
   useEffect(() => {
-    hasMountedRef.current = true;
-  }, []);
+    // Mark this activity as animated so subsequent mounts skip the animation
+    animatedIds.add(activity.id);
+  }, [animatedIds, activity.id]);
 
   return (
     <motion.div
@@ -1095,6 +1097,9 @@ export default function WhalesPage() {
   const [activeTab, setActiveTab] = useState<ViewTab>("whales");
   const [timePeriod, setTimePeriod] = useState("24h");
   const [minTradeSize, setMinTradeSize] = useState("100");
+
+  // Track which activity IDs have been animated to prevent re-animation on VList remounts
+  const animatedActivityIdsRef = useRef<Set<string>>(new Set());
 
   // Insider detection filters
   const [insiderMinUsd, setInsiderMinUsd] = useState("5000"); // Default $5K
@@ -1712,6 +1717,7 @@ export default function WhalesPage() {
                                 key={`${activity.id}-${index}`}
                                 activity={activity}
                                 index={index}
+                                animatedIds={animatedActivityIdsRef.current}
                               />
                             ))}
                         </VList>

@@ -332,8 +332,12 @@ export function Confirmation({
 
           {/* Error Message */}
           {depositError && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-              <p className="text-sm text-red-500">{depositError}</p>
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 overflow-hidden">
+              <p className="text-sm text-red-500 overflow-wrap-anywhere">
+                {depositError.length > 150
+                  ? `${depositError.slice(0, 150)}...`
+                  : depositError}
+              </p>
             </div>
           )}
 

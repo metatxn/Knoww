@@ -98,40 +98,49 @@ const ERC20_ABI = [
   },
 ] as const;
 
-// Polygon RPC endpoints with fallbacks.
-// Keep this list short: viem fallback ranking/probing + retries can multiply requests quickly.
-const POLYGON_RPC_URLS = [
-  "https://rpc.ankr.com/polygon", // Ankr - another fallback
-  "https://polygon-rpc.com", // Default - rate limited
-];
+/**
+ * Get the best Polygon RPC URL.
+ * Uses proxy on client-side to hide API keys.
+ */
+function getPolygonRpcUrl(): string {
+  const isClient = typeof window !== "undefined";
+
+  if (isClient) {
+    // On client: Use the proxy (handles RPC selection server-side)
+    return "/api/rpc/polygon";
+  }
+
+  // On server: Use Alchemy directly
+  const alchemyKey =
+    process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  if (alchemyKey) {
+    return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
+  }
+
+  const customRpcUrl =
+    process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  if (customRpcUrl) {
+    return customRpcUrl;
+  }
+
+  return "https://polygon-rpc.com";
+}
 
 /**
- * Create a viem client with fallback RPC support
+ * Create a viem client - uses single RPC endpoint (proxy on client)
+ * No fallback needed since proxy handles RPC selection server-side.
  */
 async function createClient() {
-  const { createPublicClient, http, fallback } = await import("viem");
+  const { createPublicClient, http } = await import("viem");
   const { polygon } = await import("viem/chains");
-
-  // Create transport with fallbacks and retry logic
-  const transport = fallback(
-    POLYGON_RPC_URLS.map((url) =>
-      http(url, {
-        timeout: 10_000, // 10 second timeout
-        // Keep retries low. If an endpoint is down, retries multiply very quickly.
-        retryCount: 1,
-        retryDelay: 250,
-      })
-    ),
-    {
-      // Ranking triggers extra probe requests (and can loop when endpoints fail).
-      // We'll use fixed ordering + fallback instead.
-      rank: false,
-    }
-  );
 
   return createPublicClient({
     chain: polygon,
-    transport,
+    transport: http(getPolygonRpcUrl(), {
+      timeout: 15_000, // 15 second timeout
+      retryCount: 2,
+      retryDelay: 1000,
+    }),
     batch: {
       multicall: true, // Enable automatic multicall batching
     },

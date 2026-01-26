@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useProxyWallet } from "./use-proxy-wallet";
 
 /**
@@ -164,6 +164,9 @@ export const BRIDGE_QUERY_KEYS = {
       params.fromChainId,
       params.fromTokenAddress,
       params.fromAmountBaseUnit,
+      params.recipientAddress,
+      params.toChainId,
+      params.toTokenAddress,
     ] as const,
 };
 
@@ -455,13 +458,19 @@ export function useBridge() {
    * Returns estimated fees, output amount, and checkout time.
    * Useful for showing users what they'll receive before depositing.
    *
+   * Note: We use a ref to stabilize the function reference and avoid
+   * infinite re-renders when used in useEffect dependencies.
+   *
    * @see https://docs.polymarket.com/api-reference/bridge/get-a-quote
    */
+  const quoteMutationRef = useRef(quoteMutation);
+  quoteMutationRef.current = quoteMutation;
+
   const getQuote = useCallback(
     async (params: QuoteRequest): Promise<QuoteResponse> => {
-      return quoteMutation.mutateAsync(params);
+      return quoteMutationRef.current.mutateAsync(params);
     },
-    [quoteMutation]
+    [] // Empty deps - uses ref for stable reference
   );
 
   /**
@@ -478,13 +487,19 @@ export function useBridge() {
    * - COMPLETED: Transaction completed successfully
    * - FAILED: Transaction failed
    *
+   * Note: We use a ref to stabilize the function reference and avoid
+   * infinite re-renders when used in useEffect dependencies.
+   *
    * @see https://docs.polymarket.com/api-reference/bridge/get-deposit-status
    */
+  const depositStatusMutationRef = useRef(depositStatusMutation);
+  depositStatusMutationRef.current = depositStatusMutation;
+
   const getDepositStatus = useCallback(
     async (depositAddress: string): Promise<DepositTransaction[]> => {
-      return depositStatusMutation.mutateAsync(depositAddress);
+      return depositStatusMutationRef.current.mutateAsync(depositAddress);
     },
-    [depositStatusMutation]
+    [] // Empty deps - uses ref for stable reference
   );
 
   // Combine loading states

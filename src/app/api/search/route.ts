@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           pagination: { hasMore: false, totalResults: 0 },
         },
         {
-          headers: getCacheHeaders("events"),
+          headers: getCacheHeaders("search"),
         }
       );
     }
@@ -158,9 +158,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Cache search results at edge
+    // Cache search results at edge with TTL aligned to upstream fetch revalidate (30s)
     return NextResponse.json(data, {
-      headers: getCacheHeaders("events"),
+      headers: getCacheHeaders("search"),
     });
   } catch (error) {
     console.error("Search error:", error);

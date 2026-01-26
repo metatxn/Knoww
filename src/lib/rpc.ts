@@ -40,19 +40,35 @@ const MIN_RPC_INTERVAL = 100; // Minimum 100ms between RPC calls
 
 /**
  * Get the RPC URL with priority:
- * 1. Alchemy (most reliable, has generous rate limits)
- * 2. Custom RPC URL from env
+ * 1. Server-side proxy (hides API key from client)
+ * 2. Custom RPC URL from env (if no proxy available)
  * 3. Fallback to public Polygon RPC
+ *
+ * SECURITY: We use a server-side proxy to hide the Alchemy API key.
+ * The proxy endpoint forwards requests to Alchemy without exposing the key.
+ *
+ * @returns The best available RPC URL
  */
-function getRpcUrl(): string {
-  // Priority 1: Alchemy (best for production)
-  const alchemyKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+export function getRpcUrl(): string {
+  // Check if we're on the client side
+  const isClient = typeof window !== "undefined";
+
+  if (isClient) {
+    // On client: Use the proxy to hide API key
+    // The proxy will use Alchemy server-side
+    return "/api/rpc/polygon";
+  }
+
+  // On server: Use Alchemy directly (key is safe server-side)
+  const alchemyKey =
+    process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
   if (alchemyKey) {
     return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
   }
 
   // Priority 2: Custom RPC URL
-  const customRpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+  const customRpcUrl =
+    process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
   if (customRpcUrl) {
     return customRpcUrl;
   }

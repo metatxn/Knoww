@@ -248,9 +248,10 @@ export function useClobClient() {
       });
 
       const { createPublicClient, http } = await import("viem");
+      const { getRpcUrl } = await import("@/lib/rpc");
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl()),
       });
 
       await walletClient.requestAddresses();
@@ -263,7 +264,12 @@ export function useClobClient() {
           functionName: "approve",
           args: [spender, maxUint256],
         });
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+          pollingInterval: 5_000, // Poll every 5 seconds to avoid rate limiting
+          timeout: 120_000, // 2 minute timeout
+          confirmations: 1, // Wait for 1 confirmation
+        });
         if (receipt.status !== "success") {
           throw new Error(`Approval failed for ${spender}`);
         }
@@ -327,6 +333,7 @@ export function useClobClient() {
       try {
         const { createPublicClient, http, formatUnits } = await import("viem");
         const { polygon } = await import("viem/chains");
+        const { getRpcUrl } = await import("@/lib/rpc");
 
         const ERC20_ABI = [
           {
@@ -340,7 +347,7 @@ export function useClobClient() {
 
         const client = createPublicClient({
           chain: polygon,
-          transport: http(),
+          transport: http(getRpcUrl()),
         });
 
         const balance = await client.readContract({
@@ -391,6 +398,7 @@ export function useClobClient() {
       try {
         const { createPublicClient, http, formatUnits } = await import("viem");
         const { polygon } = await import("viem/chains");
+        const { getRpcUrl } = await import("@/lib/rpc");
 
         const exchangeAddress = negRisk
           ? NEG_RISK_CTF_EXCHANGE_ADDRESS
@@ -411,7 +419,7 @@ export function useClobClient() {
 
         const client = createPublicClient({
           chain: polygon,
-          transport: http(),
+          transport: http(getRpcUrl()),
         });
 
         const allowance = await client.readContract({

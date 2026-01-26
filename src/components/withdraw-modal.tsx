@@ -175,10 +175,10 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [selectedToken, setSelectedToken] = useState<WithdrawToken>(
-    WITHDRAW_TOKENS[0],
+    WITHDRAW_TOKENS[0]
   );
   const [selectedChain, setSelectedChain] = useState<WithdrawChain>(
-    WITHDRAW_CHAINS[0],
+    WITHDRAW_CHAINS[0]
   );
   const [txHash, setTxHash] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -257,7 +257,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
       // Use 6 decimals to match USDC token precision and avoid truncation
       setAmount(value.toFixed(6));
     },
-    [usdcBalance],
+    [usdcBalance]
   );
 
   // Extract primitive dependency for rerender-dependencies best practice
@@ -272,7 +272,8 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
       tokenId: selectedTokenId,
     });
 
-    if (result.success && result.transactionHash) {
+    // Set transaction hash if available (for both success and pending states)
+    if (result.transactionHash) {
       setTxHash(result.transactionHash);
     }
   }, [canProceed, amount, recipientAddress, withdraw, selectedTokenId]);
@@ -402,7 +403,11 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       type="text"
                       value={recipientAddress}
                       onChange={(e) => setRecipientAddress(e.target.value)}
-                      placeholder={selectedChain.id === "solana" ? "Solana address..." : "0x..."}
+                      placeholder={
+                        selectedChain.id === "solana"
+                          ? "Solana address..."
+                          : "0x..."
+                      }
                       className="flex-1 min-w-0 h-12 px-4 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary font-mono text-sm truncate"
                     />
                     <button
@@ -508,7 +513,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                             onClick={() => setSelectedToken(token)}
                             className={cn(
                               "flex items-center gap-2 cursor-pointer",
-                              selectedToken.id === token.id && "bg-primary/10",
+                              selectedToken.id === token.id && "bg-primary/10"
                             )}
                           >
                             <Image
@@ -560,7 +565,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                             onClick={() => setSelectedChain(chain)}
                             className={cn(
                               "flex items-center justify-between cursor-pointer",
-                              selectedChain.id === chain.id && "bg-primary/10",
+                              selectedChain.id === chain.id && "bg-primary/10"
                             )}
                           >
                             <span className="text-foreground">
@@ -576,6 +581,16 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                   </div>
                 </div>
 
+                {/* Swap info note for native USDC */}
+                {selectedToken.id === "usdc" ? (
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <p className="text-xs text-blue-400">
+                      Your USDC.e will be automatically swapped to native USDC
+                      via Uniswap V3 (max 0.1% slippage).
+                    </p>
+                  </div>
+                ) : null}
+
                 {/* Summary */}
                 <div className="space-y-3 pt-2 border-t border-border">
                   <div className="flex items-center justify-between text-sm">
@@ -583,9 +598,15 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       You will receive
                     </span>
                     <span className="text-foreground font-medium">
-                      {estimatedReceive} {selectedToken.symbol}
+                      ~{estimatedReceive} {selectedToken.symbol}
                     </span>
                   </div>
+                  {selectedToken.id === "usdc" ? (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Swap fee</span>
+                      <span className="text-muted-foreground">0.01%</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Network fee</span>
                     <span className="text-muted-foreground">
@@ -598,14 +619,28 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                 {state !== "idle" ? (
                   <div
                     className={cn(
-                      "p-3 rounded-xl bg-secondary border border-border flex items-center gap-2",
-                      statusDisplay.colorClass,
+                      "p-3 rounded-xl bg-secondary border border-border",
+                      statusDisplay.colorClass
                     )}
                   >
-                    {statusDisplay.icon}
-                    <span className="text-sm font-medium">
-                      {statusDisplay.text}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {statusDisplay.icon}
+                      <span className="text-sm font-medium">
+                        {statusDisplay.text}
+                      </span>
+                    </div>
+                    {/* Show transaction link for pending state */}
+                    {state === "pending" && txHash ? (
+                      <a
+                        href={`https://polygonscan.com/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                      >
+                        Track on Polygonscan
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -627,11 +662,20 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     "w-full h-12 font-semibold rounded-xl transition-all",
                     canProceed && !isWithdrawing
                       ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "bg-muted text-muted-foreground cursor-not-allowed",
+                      : "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
                 >
                   {getButtonText()}
                 </Button>
+
+                {/* Liquidity warning for large USDC withdrawals */}
+                {selectedToken.id === "usdc" && amountNum > 10000 ? (
+                  <p className="text-xs text-center text-amber-500">
+                    Large withdrawals may experience liquidity issues. Consider
+                    withdrawing USDC.e directly or splitting into smaller
+                    amounts.
+                  </p>
+                ) : null}
 
                 {/* Note about cross-chain */}
                 {selectedChain.id !== "polygon" ? (

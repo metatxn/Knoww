@@ -191,7 +191,7 @@ export const getInitialLeaderboard = cache(
             Accept: "application/json",
           },
           next: {
-            revalidate: CACHE_DURATION.EVENTS, // Use constant for consistency (1 minute)
+            revalidate: CACHE_DURATION.EVENTS,
           },
         }
       );

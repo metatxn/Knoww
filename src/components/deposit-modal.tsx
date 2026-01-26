@@ -119,7 +119,23 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
 
   useEffect(() => {
     if (txError) {
-      setDepositError(txError?.message || "Transaction failed");
+      // Clean up error message for better UX
+      let errorMessage = txError?.message || "Transaction failed";
+
+      // Handle common error patterns
+      if (errorMessage.includes("Timed out while waiting for transaction")) {
+        errorMessage =
+          "Transaction confirmation timed out. Please check your wallet or Polygonscan for the transaction status.";
+      } else if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("user rejected")
+      ) {
+        errorMessage = "Transaction was rejected.";
+      } else if (errorMessage.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for this transaction.";
+      }
+
+      setDepositError(errorMessage);
       setIsProcessing(false);
     }
   }, [txError]);
@@ -319,11 +335,22 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
 
       setIsPending(false);
       setIsConfirming(true);
+      const { getRpcUrl } = await import("@/lib/rpc");
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl(), {
+          retryCount: 2,
+          retryDelay: 2000,
+        }),
       });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      // Use longer polling interval to avoid rate limiting (5 seconds instead of default 1 second)
+      // Also increase timeout to 3 minutes for slower confirmations
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+        pollingInterval: 5_000, // Poll every 5 seconds
+        timeout: 180_000, // 3 minute timeout
+        confirmations: 1, // Wait for 1 confirmation
+      });
       if (receipt.status === "success") setIsConfirmed(true);
       else throw new Error("Transaction failed on-chain");
     } catch (err) {

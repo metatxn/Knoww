@@ -292,10 +292,11 @@ export function useCtfOperations() {
 
       const { createPublicClient, http } = await import("viem");
       const { polygon } = await import("viem/chains");
+      const { getRpcUrl } = await import("@/lib/rpc");
 
       const publicClient = createPublicClient({
         chain: polygon,
-        transport: http(),
+        transport: http(getRpcUrl()),
       });
 
       const balances = (await publicClient.readContract({
