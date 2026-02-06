@@ -11,8 +11,6 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["pino-pretty", "lokijs", "encoding"],
   images: {
-    loader: "custom",
-    loaderFile: "./src/lib/image-loader.ts",
     remotePatterns: [
       {
         protocol: "https",
