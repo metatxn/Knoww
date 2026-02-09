@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 import { fetchPrice } from "@/lib/polymarket";
 
@@ -16,6 +17,12 @@ const priceSchema = z.object({
  * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 120 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 120,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const tokenID = searchParams.get("tokenID");

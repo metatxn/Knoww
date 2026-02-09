@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * Whale Activity API Route
@@ -127,6 +128,12 @@ async function fetchTraderActivity(
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 15 requests per minute (expensive endpoint — many upstream API calls)
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 15,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { searchParams } = new URL(request.url);
 

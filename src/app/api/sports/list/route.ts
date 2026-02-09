@@ -1,11 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * GET /api/sports/list
  * Get list of all available sports
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const limit = searchParams.get("limit") || "100";

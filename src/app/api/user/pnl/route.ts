@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 /**
  * Polymarket Data API base URL
@@ -63,7 +65,9 @@ const optionalBoolean = z
  * Validation schema for query parameters
  */
 const querySchema = z.object({
-  user: z.string().min(1, "User address is required"),
+  user: z.string().min(1, "User address is required").refine(isValidAddress, {
+    message: "Invalid Ethereum address format",
+  }),
   period: z
     .enum(["1d", "7d", "30d", "90d", "365d", "all"])
     .optional()
@@ -90,6 +94,12 @@ const querySchema = z.object({
  * - history: Daily P&L breakdown (if includeHistory=true)
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 30 requests per minute (expensive endpoint)
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 30,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
 

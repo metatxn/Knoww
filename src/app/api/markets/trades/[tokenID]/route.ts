@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { fetchTrades } from "@/lib/polymarket";
 
 /**
@@ -11,6 +12,12 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ tokenID: string }> }
 ) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(_request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { tokenID } = await params;
 

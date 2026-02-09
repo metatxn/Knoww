@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
+import { sanitizeSearchQuery } from "@/lib/validation";
 
 const GAMMA_API_BASE = "https://gamma-api.polymarket.com";
 
@@ -93,9 +95,16 @@ function getTopOutcome(markets: Market[]): TopOutcome | undefined {
  * @see https://docs.polymarket.com/api-reference/search/search-markets-events-and-profiles
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 searches per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q") || searchParams.get("query") || "";
+    const rawQuery = searchParams.get("q") || searchParams.get("query") || "";
+    const query = sanitizeSearchQuery(rawQuery);
     const limit = searchParams.get("limit") || "10";
 
     if (!query.trim()) {

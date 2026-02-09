@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 /**
  * Profile API Route
@@ -133,12 +135,18 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(_request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { address } = await params;
 
-    if (!address || !address.startsWith("0x")) {
+    if (!address || !isValidAddress(address)) {
       return NextResponse.json(
-        { error: "Invalid address format" },
+        { error: "Invalid Ethereum address format" },
         { status: 400 }
       );
     }

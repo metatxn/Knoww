@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 /**
  * Polymarket Gamma API for public profiles
@@ -33,7 +35,10 @@ interface PublicProfile {
  * Validation schema for query parameters
  */
 const querySchema = z.object({
-  address: z.string().min(1, "Wallet address is required"),
+  address: z
+    .string()
+    .min(1, "Wallet address is required")
+    .refine(isValidAddress, { message: "Invalid Ethereum address format" }),
 });
 
 /**
@@ -49,6 +54,12 @@ const querySchema = z.object({
  * - profile: PublicProfile object or null if not found
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
 

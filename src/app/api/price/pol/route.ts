@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 // CoinMarketCap API response types
 interface CoinMarketCapQuote {
@@ -28,7 +29,13 @@ interface CoinMarketCapResponse {
 let cachedPrice: { price: number; timestamp: number } | null = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     // Check if we have a valid cached price
     if (cachedPrice && Date.now() - cachedPrice.timestamp < CACHE_DURATION) {

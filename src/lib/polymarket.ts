@@ -88,12 +88,23 @@ export function getChainId(): number {
 }
 
 /**
+ * Default allowed origins when ALLOWED_ORIGINS env var is not set.
+ * Never default to ["*"] in production — explicitly list allowed domains.
+ */
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://knoww.app",
+  "https://www.knoww.app",
+  "http://localhost:8000",
+  "http://localhost:3000",
+] as const;
+
+/**
  * Get allowed origins for CORS (used in API routes)
  */
 export function getAllowedOrigins(): string[] {
   const origins = process.env.ALLOWED_ORIGINS;
   if (!origins) {
-    return ["*"]; // Allow all origins if not specified (not recommended for production)
+    return [...DEFAULT_ALLOWED_ORIGINS];
   }
   return origins.split(",").map((origin) => origin.trim());
 }

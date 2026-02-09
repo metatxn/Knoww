@@ -59,6 +59,19 @@ export function useTradingFormState({
 
   const { proxyAddress, isDeployed: hasProxyWallet } = useProxyWallet();
 
+  // Track pending refetch timers so we can clean them up on unmount
+  const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Clean up all pending timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of pendingTimersRef.current) {
+        clearTimeout(timer);
+      }
+      pendingTimersRef.current = [];
+    };
+  }, []);
+
   // Type for user positions response
   interface UserPositionsResponse {
     positions?: Array<{
@@ -384,9 +397,12 @@ export function useTradingFormState({
           };
 
           // Refetch at 1s, 3s, and 5s to catch the update
-          setTimeout(refetchAll, 1000);
-          setTimeout(refetchAll, 3000);
-          setTimeout(refetchAll, 5000);
+          // Store timer IDs so they can be cleaned up on unmount
+          pendingTimersRef.current.push(
+            setTimeout(refetchAll, 1000),
+            setTimeout(refetchAll, 3000),
+            setTimeout(refetchAll, 5000)
+          );
         }
       } else {
         throw new Error("Order failed");

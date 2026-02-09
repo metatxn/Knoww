@@ -1,10 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 // Validation schema
 const userAddressSchema = z.object({
-  userAddress: z.string().describe("User's wallet address"),
+  userAddress: z
+    .string()
+    .min(1, "User address is required")
+    .refine(isValidAddress, {
+      message: "Invalid Ethereum address format",
+    }),
 });
 
 /**
@@ -13,6 +20,12 @@ const userAddressSchema = z.object({
  * This is useful for the frontend to check user setup status
  */
 export async function POST(request: NextRequest) {
+  // Rate limit: 30 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 30,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const body = await request.json();
     const parsed = userAddressSchema.safeParse(body);
@@ -30,19 +43,8 @@ export async function POST(request: NextRequest) {
 
     const { userAddress } = parsed.data;
 
-    // Basic validation - check if address is valid
-    const isValid = /^0x[a-fA-F0-9]{40}$/.test(userAddress);
-
-    if (!isValid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid Ethereum address format",
-        },
-        { status: 400 }
-      );
-    }
-
+    // Address format already validated by Zod schema with isValidAddress refine.
+    // Return the validated address with checksum info.
     return NextResponse.json({
       success: true,
       userAddress,
