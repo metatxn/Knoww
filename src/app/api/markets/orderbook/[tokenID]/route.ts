@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 import { fetchOrderBook } from "@/lib/polymarket";
 
@@ -12,6 +13,12 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ tokenID: string }> }
 ) {
+  // Rate limit: 120 requests per minute
+  const rateLimitResponse = checkRateLimit(_request, {
+    uniqueTokenPerInterval: 120,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { tokenID } = await params;
 

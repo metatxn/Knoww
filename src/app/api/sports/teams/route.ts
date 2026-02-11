@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 // Validation schema
 const teamsSchema = z.object({
@@ -17,6 +18,12 @@ const teamsSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit: 60 requests per minute
+    const rateLimitResponse = checkRateLimit(request, {
+      uniqueTokenPerInterval: 60,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const searchParams = request.nextUrl.searchParams;
     const limit = searchParams.get("limit") || "100";
     const offset = searchParams.get("offset") || "0";

@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * Server-side RPC Proxy for Polygon
@@ -11,6 +12,48 @@ import { type NextRequest, NextResponse } from "next/server";
 
 // Timeout for RPC requests (30 seconds)
 const RPC_TIMEOUT_MS = 30000;
+
+// Maximum request body size (100KB — well above any legitimate JSON-RPC payload)
+const MAX_BODY_SIZE = 100 * 1024;
+
+/**
+ * Blocked JSON-RPC methods (denylist approach).
+ *
+ * We block write/signing methods that should never go through a shared proxy.
+ * Everything else (reads, gas estimation, fee queries, etc.) is allowed,
+ * which avoids breaking when viem/wagmi/wallet SDKs add new read methods.
+ */
+const BLOCKED_RPC_METHODS = new Set([
+  // Transaction submission — users should sign and submit via their own wallet
+  "eth_sendTransaction",
+  "eth_sendRawTransaction",
+  // Signing — must happen client-side via the user's wallet
+  "eth_sign",
+  "eth_signTransaction",
+  "personal_sign",
+  "eth_signTypedData",
+  "eth_signTypedData_v3",
+  "eth_signTypedData_v4",
+  // Account management — these are wallet-level operations
+  "eth_accounts",
+  "eth_requestAccounts",
+  "eth_coinbase",
+  // Mining/admin — not applicable
+  "eth_mining",
+  "eth_submitWork",
+  "eth_submitHashrate",
+  "admin_addPeer",
+  "admin_removePeer",
+  "admin_nodeInfo",
+  "debug_traceTransaction",
+  "debug_traceBlockByNumber",
+  "debug_traceBlockByHash",
+  "miner_start",
+  "miner_stop",
+  "personal_newAccount",
+  "personal_unlockAccount",
+  "personal_importRawKey",
+]);
 
 // Allowed origins whitelist - add your production/staging domains here
 const ALLOWED_ORIGINS_WHITELIST = [
@@ -112,12 +155,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Rate limit: 30 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 30,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   const corsHeaders = getCorsHeaders(requestOrigin);
+
+  // Check content-length to reject oversized payloads early
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && Number.parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+    return NextResponse.json(
+      { error: "Request body too large" },
+      { status: 413, headers: corsHeaders }
+    );
+  }
 
   // Parse JSON body with dedicated error handling
   let body: unknown;
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    if (rawBody.length > MAX_BODY_SIZE) {
+      return NextResponse.json(
+        { error: "Request body too large" },
+        { status: 413, headers: corsHeaders }
+      );
+    }
+    body = JSON.parse(rawBody);
   } catch (parseError) {
     // Handle JSON parse errors (SyntaxError) with a 400 response
     console.warn(
@@ -139,6 +204,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate JSON-RPC methods against denylist
+    const requests = Array.isArray(body) ? body : [body];
+    for (const rpcRequest of requests) {
+      const method =
+        typeof rpcRequest === "object" &&
+        rpcRequest !== null &&
+        "method" in rpcRequest
+          ? (rpcRequest as { method: unknown }).method
+          : undefined;
+
+      if (typeof method !== "string") {
+        return NextResponse.json(
+          { error: "Invalid JSON-RPC request: missing method" },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      if (BLOCKED_RPC_METHODS.has(method)) {
+        return NextResponse.json(
+          { error: `RPC method not allowed through proxy: ${method}` },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+    }
+
     const rpcUrl = getServerRpcUrl();
 
     // Set up AbortController with timeout to prevent hanging requests
@@ -157,7 +247,6 @@ export async function POST(request: NextRequest) {
         signal: controller.signal,
       });
     } catch (fetchError) {
-      clearTimeout(timeoutId);
       // Handle abort/timeout errors
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         console.error(

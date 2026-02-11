@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 const eventsSchema = z.object({
   tag: z.string().nullable().optional(),
@@ -22,6 +23,12 @@ const eventsSchema = z.object({
  * - archived: Include archived events (default: false)
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const tag = searchParams.get("tag");

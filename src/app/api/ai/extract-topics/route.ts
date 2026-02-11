@@ -2,6 +2,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, Output } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 // Schema for the AI response
 const TopicExtractionSchema = z.object({
@@ -143,6 +144,12 @@ Examples:
 - "Chiefs vs Eagles Super Bowl" → searchQuery: "Chiefs Eagles Super Bowl", tags: ["nfl", "super-bowl"]`;
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 20 requests per minute (AI is expensive)
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 20,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const body = (await request.json()) as { text?: string };
     const { text } = body;
@@ -207,8 +214,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Also support GET for simple testing
+// Also support GET for simple testing (rate limited same as POST)
 export async function GET(request: NextRequest) {
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 20,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   const { searchParams } = new URL(request.url);
   const text = searchParams.get("text");
 

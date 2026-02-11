@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 /**
  * Polymarket Data API base URL
@@ -57,7 +59,9 @@ const optionalNumber = z
  * Validation schema for query parameters
  */
 const querySchema = z.object({
-  user: z.string().min(1, "User address is required"),
+  user: z.string().min(1, "User address is required").refine(isValidAddress, {
+    message: "Invalid Ethereum address format",
+  }),
   limit: optionalNumber.pipe(
     z.number().min(1).max(100).optional().default(100)
   ),
@@ -95,6 +99,12 @@ const querySchema = z.object({
  * - count: Number of trades returned
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
 
@@ -138,13 +148,33 @@ export async function GET(request: NextRequest) {
 
     const fullUrl = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
 
-    // Fetch activity from Polymarket Data API
-    const response = await fetch(fullUrl, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    // Fetch activity from Polymarket Data API (with 10s timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+    let response: Response;
+    try {
+      response = await fetch(fullUrl, {
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request to Polymarket timed out",
+          },
+          { status: 504 }
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

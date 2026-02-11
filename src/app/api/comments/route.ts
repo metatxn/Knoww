@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 import type { Comment } from "@/types/comments";
 
 /**
@@ -172,7 +173,9 @@ const postCommentSchema = z.object({
   parentCommentId: z.string().optional(),
   // L1 Authentication fields
   auth: z.object({
-    address: z.string(),
+    address: z
+      .string()
+      .refine(isValidAddress, { message: "Invalid Ethereum address format" }),
     signature: z.string(),
     timestamp: z.string(),
     nonce: z.string().optional().default("0"),

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 // Validation schema - nullable to handle null from searchParams.get()
 const marketsSchema = z.object({
@@ -21,6 +22,12 @@ const marketsSchema = z.object({
  * Sports tags: nfl, nba, mlb, nhl, soccer, mma, etc.
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const sport = searchParams.get("sport");

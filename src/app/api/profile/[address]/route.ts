@@ -1,11 +1,28 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isValidAddress } from "@/lib/validation";
 
 /**
  * Profile API Route
  *
  * Fetches comprehensive trader profile data from multiple Polymarket APIs
  */
+
+/** Fetch with a timeout (default 10s) to prevent hanging on slow upstream APIs */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { next?: { revalidate: number } } = {},
+  timeoutMs = 10_000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 export interface TraderProfile {
   // Basic Info
@@ -49,7 +66,7 @@ async function fetchPublicProfile(
   address: string
 ): Promise<PublicProfile | null> {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${POLYMARKET_API.DATA.BASE}/profile/${address}`,
       { next: { revalidate: 300 } } // Cache for 5 minutes
     );
@@ -62,7 +79,7 @@ async function fetchPublicProfile(
 
 async function fetchUserPnL(address: string): Promise<PnLData | null> {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://user-pnl-api.polymarket.com/pnl/${address}`,
       { next: { revalidate: 60 } }
     );
@@ -84,7 +101,7 @@ async function fetchLeaderboardRank(
   timePeriod: string
 ): Promise<{ rank: string; pnl: number; vol: number } | null> {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?user=${address}&timePeriod=${timePeriod}`,
       { next: { revalidate: 60 } }
     );
@@ -105,7 +122,7 @@ async function fetchLeaderboardRank(
 
 async function fetchPositions(address: string) {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${POLYMARKET_API.DATA.BASE}/positions?user=${address}`,
       { next: { revalidate: 60 } }
     );
@@ -118,7 +135,7 @@ async function fetchPositions(address: string) {
 
 async function fetchTrades(address: string) {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${POLYMARKET_API.DATA.BASE}/trades?user=${address}&limit=100`,
       { next: { revalidate: 60 } }
     );
@@ -133,12 +150,18 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(_request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { address } = await params;
 
-    if (!address || !address.startsWith("0x")) {
+    if (!address || !isValidAddress(address)) {
       return NextResponse.json(
-        { error: "Invalid address format" },
+        { error: "Invalid Ethereum address format" },
         { status: 400 }
       );
     }

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 
 // Fallback tags if API doesn't have a tags endpoint
@@ -54,6 +55,12 @@ const FALLBACK_TAGS = [
  * - limit: Number of results (optional)
  */
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const limit = searchParams.get("limit");

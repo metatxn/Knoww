@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 
 /**
@@ -49,6 +50,12 @@ const VALID_TIME_PERIODS = ["DAY", "WEEK", "MONTH", "ALL"] as const;
 const VALID_ORDER_BY = ["PNL", "VOL"] as const;
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { searchParams } = new URL(request.url);
 

@@ -1,6 +1,18 @@
 /**
- * Simple in-memory rate limiter for API routes
- * In production, consider using Redis or a dedicated rate limiting service
+ * Simple in-memory rate limiter for API routes.
+ *
+ * IMPORTANT: This limiter is process-local. On Cloudflare Workers each isolate
+ * maintains its own Map, so effective limits scale linearly with the number of
+ * active isolates. Under high traffic the actual throughput per IP can exceed
+ * the configured limit by a factor equal to the number of concurrent isolates.
+ *
+ * For strict global enforcement, migrate to one of:
+ * - Cloudflare Rate Limiting rules (WAF product — per-zone, no code change)
+ * - Cloudflare KV (eventually consistent counters, ~50ms latency)
+ * - Cloudflare Durable Objects (strongly consistent, higher cost)
+ *
+ * The in-memory approach is still valuable as a first line of defence: it
+ * protects each isolate from burst abuse and is zero-latency / zero-cost.
  */
 
 interface RateLimitStore {

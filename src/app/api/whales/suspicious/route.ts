@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { POLYMARKET_API } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * Suspicious/Insider Activity Detection API
@@ -297,6 +298,12 @@ function checkIfContrarian(
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 10 requests per minute (very expensive endpoint — many upstream API calls)
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 10,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { searchParams } = new URL(request.url);
 

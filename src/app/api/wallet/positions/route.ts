@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * GET /api/wallet/positions
@@ -9,7 +10,13 @@ import { NextResponse } from "next/server";
  *
  * Use the `getOpenOrders()` method from the useClobClient hook instead.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   return NextResponse.json(
     {
       success: false,
