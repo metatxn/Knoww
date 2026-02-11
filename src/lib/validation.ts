@@ -60,5 +60,5 @@ export function sanitizeString(input: string, maxLength = 500): string {
  * Validate and sanitize a search query string.
  */
 export function sanitizeSearchQuery(query: string, maxLength = 200): string {
-  return sanitizeString(query, maxLength).replace(/[<>"'`;]/g, ""); // Remove characters that could be used for injection
+  return sanitizeString(query, maxLength).replace(/[<>"'`;\\]/g, ""); // Remove characters that could be used for injection
 }

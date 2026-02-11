@@ -17,13 +17,13 @@ const teamsSchema = z.object({
  * Get list of sports teams with optional filters
  */
 export async function GET(request: NextRequest) {
-  // Rate limit: 60 requests per minute
-  const rateLimitResponse = checkRateLimit(request, {
-    uniqueTokenPerInterval: 60,
-  });
-  if (rateLimitResponse) return rateLimitResponse;
-
   try {
+    // Rate limit: 60 requests per minute
+    const rateLimitResponse = checkRateLimit(request, {
+      uniqueTokenPerInterval: 60,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const searchParams = request.nextUrl.searchParams;
     const limit = searchParams.get("limit") || "100";
     const offset = searchParams.get("offset") || "0";

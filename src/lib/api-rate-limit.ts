@@ -10,7 +10,10 @@ function getClientIp(request: NextRequest): string {
   const realIp = request.headers.get("x-real-ip");
   const forwarded = request.headers.get("x-forwarded-for");
 
-  return cfConnectingIp || realIp || forwarded?.split(",")[0] || "anonymous";
+  return (
+    (cfConnectingIp || realIp || forwarded?.split(",")[0])?.trim() ||
+    "anonymous"
+  );
 }
 
 /**

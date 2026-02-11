@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
     const { userAddress } = parsed.data;
 
     // Address format already validated by Zod schema with isValidAddress refine.
-    // Return the validated address with checksum info.
     return NextResponse.json({
       success: true,
       userAddress,

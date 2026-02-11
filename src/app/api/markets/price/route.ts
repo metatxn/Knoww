@@ -17,13 +17,13 @@ const priceSchema = z.object({
  * This is a read-only operation that calls the CLOB API directly
  */
 export async function GET(request: NextRequest) {
-  // Rate limit: 120 requests per minute
-  const rateLimitResponse = checkRateLimit(request, {
-    uniqueTokenPerInterval: 120,
-  });
-  if (rateLimitResponse) return rateLimitResponse;
-
   try {
+    // Rate limit: 120 requests per minute
+    const rateLimitResponse = checkRateLimit(request, {
+      uniqueTokenPerInterval: 120,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
     const searchParams = request.nextUrl.searchParams;
     const tokenID = searchParams.get("tokenID");
     const side = searchParams.get("side");

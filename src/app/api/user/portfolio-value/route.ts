@@ -83,15 +83,36 @@ export async function GET(request: NextRequest) {
 
     // Fetch portfolio value from Polymarket Data API
     // Note: Use the proxy wallet address, not EOA
-    const response = await fetch(
-      `${DATA_API_BASE}/value?user=${user.toLowerCase()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-        next: { revalidate: 30 }, // Cache for 30 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `${DATA_API_BASE}/value?user=${user.toLowerCase()}`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+          next: { revalidate: 30 }, // Cache for 30 seconds
+          signal: controller.signal,
+        }
+      );
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request to Polymarket timed out",
+          },
+          { status: 504 }
+        );
       }
-    );
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

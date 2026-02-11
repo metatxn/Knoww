@@ -148,13 +148,34 @@ export async function GET(request: NextRequest) {
 
     const fullUrl = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
 
-    // Fetch activity from Polymarket Data API
-    const response = await fetch(fullUrl, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    // Fetch activity from Polymarket Data API (with 10s timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+    let response: Response;
+    try {
+      response = await fetch(fullUrl, {
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request to Polymarket timed out",
+          },
+          { status: 504 }
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

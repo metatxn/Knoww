@@ -247,7 +247,6 @@ export async function POST(request: NextRequest) {
         signal: controller.signal,
       });
     } catch (fetchError) {
-      clearTimeout(timeoutId);
       // Handle abort/timeout errors
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         console.error(

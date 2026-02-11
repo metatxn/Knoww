@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch profile from Polymarket
     const response = await fetch(
-      `${GAMMA_API}/public-profile?address=${address}`,
+      `${GAMMA_API}/public-profile?address=${encodeURIComponent(address)}`,
       {
         headers: {
           Accept: "application/json",

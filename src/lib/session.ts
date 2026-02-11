@@ -5,7 +5,7 @@
  * This ensures users don't have to re-onboard on every page refresh.
  *
  * Security hardening:
- * - Data integrity verification via HMAC-like checksum
+ * - Data integrity verification via non-cryptographic checksum
  * - Strict schema validation on read
  * - Session expiration enforcement
  * - Address format validation
@@ -163,6 +163,7 @@ export function getStoredSession(address: string): StoredTradingSession | null {
 
     // Verify the session is for the correct address
     if (session.eoaAddress.toLowerCase() !== address.toLowerCase()) {
+      localStorage.removeItem(key);
       return null;
     }
 
@@ -225,6 +226,7 @@ export function updateSession(
  */
 export function clearSession(address: string): void {
   if (typeof window === "undefined") return;
+  if (!ETH_ADDRESS_REGEX.test(address)) return;
 
   try {
     const key = getStorageKey(address);

@@ -26,9 +26,6 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), interest-cohort=()",
 
-  // XSS protection (legacy browsers)
-  "X-XSS-Protection": "1; mode=block",
-
   // DNS prefetch control
   "X-DNS-Prefetch-Control": "on",
 
@@ -58,8 +55,12 @@ const SECURITY_HEADERS: Record<string, string> = {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    // Upgrade insecure requests in production
-    "upgrade-insecure-requests",
+    // Upgrade insecure requests in production only – the directive forces
+    // the browser to rewrite HTTP → HTTPS for every sub-resource load,
+    // which breaks local HTTP dev servers.
+    ...(process.env.NODE_ENV === "production"
+      ? ["upgrade-insecure-requests"]
+      : []),
   ].join("; "),
 };
 
