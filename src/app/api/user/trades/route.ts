@@ -162,7 +162,6 @@ export async function GET(request: NextRequest) {
         signal: controller.signal,
       });
     } catch (err) {
-      clearTimeout(timeoutId);
       if (err instanceof DOMException && err.name === "AbortError") {
         return NextResponse.json(
           {
