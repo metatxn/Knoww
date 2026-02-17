@@ -110,7 +110,7 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   if (validatedOrigin) {
     headers["Access-Control-Allow-Origin"] = validatedOrigin;
     // Vary header is important when origin can change based on request
-    headers["Vary"] = "Origin";
+    headers.Vary = "Origin";
   }
 
   return headers;
