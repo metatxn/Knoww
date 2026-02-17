@@ -184,7 +184,7 @@ async function fetchCurrentPrice(tokenId: string): Promise<number | null> {
 function calculateSuspicionScore(
   accountAgeHours: number,
   totalTrades: number,
-  tradePrice: number,
+  _tradePrice: number,
   currentPrice: number,
   tradeSide: "BUY" | "SELL",
   tradeUsdValue: number
