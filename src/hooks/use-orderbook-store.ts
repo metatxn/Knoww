@@ -517,20 +517,29 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
 
         // Apply any pending changes that arrived before this snapshot
         const pending = state.pendingChanges.get(event.asset_id);
-        if (pending && pending.length > 0) {
+        const hasPending = pending && pending.length > 0;
+        if (hasPending) {
           processed = applyPendingChanges(processed, pending);
         }
 
+        // Only copy the orderBooks map (always changes for book events)
         const newOrderBooks = new Map(state.orderBooks);
         newOrderBooks.set(event.asset_id, processed);
 
-        // Clear pending changes for this asset
-        const newPendingChanges = new Map(state.pendingChanges);
-        newPendingChanges.delete(event.asset_id);
+        // Only copy pendingChanges if we actually had pending items to clear
+        const newPendingChanges = hasPending
+          ? (() => {
+              const m = new Map(state.pendingChanges);
+              m.delete(event.asset_id);
+              return m;
+            })()
+          : state.pendingChanges;
 
-        // Track price history for signal detection
-        const newPriceHistory = new Map(state.priceHistory);
-        const newPriceVelocity = new Map(state.priceVelocity);
+        // Only copy price history/velocity maps if midpoint exists
+        const result: Partial<OrderBookStoreState> = {
+          orderBooks: newOrderBooks,
+          pendingChanges: newPendingChanges,
+        };
 
         if (processed.midpoint !== null) {
           const history = state.priceHistory.get(event.asset_id) || [];
@@ -541,33 +550,39 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
             timestamp: Date.now(),
           };
           const updatedHistory = addPriceHistory(history, newEntry);
-          newPriceHistory.set(event.asset_id, updatedHistory);
 
-          // Calculate velocity
-          const velocity = calculateVelocity(updatedHistory);
-          newPriceVelocity.set(event.asset_id, velocity);
+          const newPriceHistory = new Map(state.priceHistory);
+          newPriceHistory.set(event.asset_id, updatedHistory);
+          result.priceHistory = newPriceHistory;
+
+          const newPriceVelocity = new Map(state.priceVelocity);
+          newPriceVelocity.set(
+            event.asset_id,
+            calculateVelocity(updatedHistory)
+          );
+          result.priceVelocity = newPriceVelocity;
         }
 
-        return {
-          orderBooks: newOrderBooks,
-          pendingChanges: newPendingChanges,
-          priceHistory: newPriceHistory,
-          priceVelocity: newPriceVelocity,
-        };
+        return result;
       });
     },
 
     handlePriceChangeEvent: (event: PriceChangeEvent) => {
       set((state) => {
-        const newOrderBooks = new Map(state.orderBooks);
-        const newPendingChanges = new Map(state.pendingChanges);
-        const newPriceHistory = new Map(state.priceHistory);
-        const newPriceVelocity = new Map(state.priceVelocity);
+        // Track which maps actually need to change to avoid unnecessary copies
+        let newOrderBooks: Map<string, ProcessedOrderBook> | null = null;
+        let newPendingChanges: Map<string, PendingChange[]> | null = null;
+        let newPriceHistory: Map<string, PriceHistoryEntry[]> | null = null;
+        let newPriceVelocity: Map<string, PriceVelocity> | null = null;
 
         for (const change of event.price_changes) {
-          const existing = newOrderBooks.get(change.asset_id);
+          const existing = (newOrderBooks ?? state.orderBooks).get(
+            change.asset_id
+          );
           if (existing) {
-            // Apply immediately if we have the order book
+            // Lazily copy orderBooks map on first mutation
+            if (!newOrderBooks) newOrderBooks = new Map(state.orderBooks);
+
             const updated = applyPriceChange(
               existing,
               change.price,
@@ -581,7 +596,15 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
 
             // Track price history for signal detection
             if (updated.midpoint !== null) {
-              const history = newPriceHistory.get(change.asset_id) || [];
+              if (!newPriceHistory)
+                newPriceHistory = new Map(state.priceHistory);
+              if (!newPriceVelocity)
+                newPriceVelocity = new Map(state.priceVelocity);
+
+              const history =
+                newPriceHistory.get(change.asset_id) ||
+                state.priceHistory.get(change.asset_id) ||
+                [];
               const newEntry: PriceHistoryEntry = {
                 bestBid: updated.bestBid ?? 0,
                 bestAsk: updated.bestAsk ?? 0,
@@ -591,33 +614,42 @@ export const useOrderBookStore = create<OrderBookStoreState>()(
               const updatedHistory = addPriceHistory(history, newEntry);
               newPriceHistory.set(change.asset_id, updatedHistory);
 
-              // Calculate velocity
               const velocity = calculateVelocity(updatedHistory);
               newPriceVelocity.set(change.asset_id, velocity);
             }
           } else {
             // Queue for later if we don't have the initial snapshot yet
-            const pending = newPendingChanges.get(change.asset_id) || [];
-            // Avoid duplicate events and limit queue size
+            const pendingSource = newPendingChanges ?? state.pendingChanges;
+            const pending = pendingSource.get(change.asset_id) || [];
             if (pending.length < 100) {
-              pending.push({
-                event: {
-                  ...event,
-                  price_changes: [change], // Only store the relevant change
+              if (!newPendingChanges)
+                newPendingChanges = new Map(state.pendingChanges);
+
+              // Create a new array instead of mutating in place - the shallow
+              // Map copy may still share inner arrays with previous state.
+              const nextPending = [
+                ...pending,
+                {
+                  event: {
+                    ...event,
+                    price_changes: [change],
+                  },
+                  receivedAt: Date.now(),
                 },
-                receivedAt: Date.now(),
-              });
-              newPendingChanges.set(change.asset_id, pending);
+              ];
+              newPendingChanges.set(change.asset_id, nextPending);
             }
           }
         }
 
-        return {
-          orderBooks: newOrderBooks,
-          pendingChanges: newPendingChanges,
-          priceHistory: newPriceHistory,
-          priceVelocity: newPriceVelocity,
-        };
+        // Only return maps that actually changed
+        const result: Partial<OrderBookStoreState> = {};
+        if (newOrderBooks) result.orderBooks = newOrderBooks;
+        if (newPendingChanges) result.pendingChanges = newPendingChanges;
+        if (newPriceHistory) result.priceHistory = newPriceHistory;
+        if (newPriceVelocity) result.priceVelocity = newPriceVelocity;
+
+        return result;
       });
     },
 

@@ -305,66 +305,119 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
  * @param assetIds - Array of asset IDs to monitor
  */
 export function usePriceAlertDetection(assetIds: string[]) {
-  const { config, addAlert, canAlertForAsset } = useAlertStore();
+  const { config, addAlert, canAlertForAsset } = useAlertStore(
+    useShallow((state) => ({
+      config: state.config,
+      addAlert: state.addAlert,
+      canAlertForAsset: state.canAlertForAsset,
+    }))
+  );
 
-  // Get raw maps from store - these are stable references
-  const priceVelocity = useOrderBookStore((state) => state.priceVelocity);
-  const orderBooks = useOrderBookStore((state) => state.orderBooks);
-
-  // Derive relevant data in useMemo to avoid creating new objects on every render
-  const relevantData = useMemo(
+  // Stabilize the asset list: dedupe, sort, and derive a string key so that
+  // downstream useMemo/useEffect only re-run when the *contents* change,
+  // not when the parent passes a new array reference with the same items.
+  const stableKey = useMemo(
     () =>
-      assetIds.map((id) => ({
-        assetId: id,
-        velocity: priceVelocity.get(id),
-        orderBook: orderBooks.get(id),
-      })),
-    [assetIds, priceVelocity, orderBooks]
+      Array.from(new Set(assetIds.filter(Boolean)))
+        .sort()
+        .join(","),
+    [assetIds]
+  );
+
+  const monitoredAssetIds = useMemo(
+    () => (stableKey ? stableKey.split(",") : []),
+    [stableKey]
+  );
+  const monitoredAssetSet = useMemo(
+    () => new Set(monitoredAssetIds),
+    [monitoredAssetIds]
   );
 
   // Track last known prices to calculate changes
   const lastPricesRef = useRef<Map<string, number>>(new Map());
+  const configRef = useRef(config);
+  const addAlertRef = useRef(addAlert);
+  const canAlertForAssetRef = useRef(canAlertForAsset);
 
-  // Check for alerts on each price update
+  // Keep latest callbacks/config without forcing store resubscription
   useEffect(() => {
-    for (const { assetId, velocity, orderBook } of relevantData) {
-      if (!velocity || !orderBook) continue;
+    configRef.current = config;
+    addAlertRef.current = addAlert;
+    canAlertForAssetRef.current = canAlertForAsset;
+  }, [config, addAlert, canAlertForAsset]);
 
-      // Check cooldown
-      if (!canAlertForAsset(assetId)) continue;
-
-      const currentPrice = orderBook.midpoint ?? 0;
-      const lastPrice = lastPricesRef.current.get(assetId) ?? currentPrice;
-
-      // Check for DIP (negative change exceeds threshold)
-      if (velocity.change5s <= -config.dipThreshold) {
-        addAlert({
-          type: "DIP",
-          assetId,
-          marketTitle: orderBook.market || `Asset ${assetId.slice(0, 8)}...`,
-          magnitude: Math.abs(velocity.change5s),
-          currentPrice,
-          previousPrice: lastPrice,
-          timestamp: Date.now(),
-        });
-      } else if (velocity.change5s >= config.spikeThreshold) {
-        // Check for SPIKE (positive change exceeds threshold)
-        // Using else-if to prevent both DIP and SPIKE firing on same update
-        addAlert({
-          type: "SPIKE",
-          assetId,
-          marketTitle: orderBook.market || `Asset ${assetId.slice(0, 8)}...`,
-          magnitude: velocity.change5s,
-          currentPrice,
-          previousPrice: lastPrice,
-          timestamp: Date.now(),
-        });
+  // Prevent unbounded growth if the monitored asset set changes over time.
+  useEffect(() => {
+    const next = new Map<string, number>();
+    for (const assetId of monitoredAssetIds) {
+      const previousPrice = lastPricesRef.current.get(assetId);
+      if (previousPrice !== undefined) {
+        next.set(assetId, previousPrice);
       }
-
-      // Update last known price
-      lastPricesRef.current.set(assetId, currentPrice);
     }
-  }, [relevantData, config, addAlert, canAlertForAsset]);
+    lastPricesRef.current = next;
+  }, [monitoredAssetIds]);
+
+  // Subscribe directly to order-book updates so we don't force parent component re-renders.
+  useEffect(() => {
+    if (monitoredAssetSet.size === 0) return;
+
+    const unsubscribe = useOrderBookStore.subscribe(
+      (state) => ({
+        priceVelocity: state.priceVelocity,
+        orderBooks: state.orderBooks,
+      }),
+      ({ priceVelocity, orderBooks }) => {
+        const currentConfig = configRef.current;
+        const addAlert = addAlertRef.current;
+        const canAlertForAsset = canAlertForAssetRef.current;
+
+        for (const assetId of monitoredAssetSet) {
+          const velocity = priceVelocity.get(assetId);
+          const orderBook = orderBooks.get(assetId);
+          if (!velocity || !orderBook) continue;
+
+          // Check cooldown
+          if (!canAlertForAsset(assetId)) continue;
+
+          const currentPrice = orderBook.midpoint ?? 0;
+          const lastPrice = lastPricesRef.current.get(assetId) ?? currentPrice;
+
+          // Check for DIP (negative change exceeds threshold)
+          if (velocity.change5s <= -currentConfig.dipThreshold) {
+            addAlert({
+              type: "DIP",
+              assetId,
+              marketTitle:
+                orderBook.market || `Asset ${assetId.slice(0, 8)}...`,
+              magnitude: Math.abs(velocity.change5s),
+              currentPrice,
+              previousPrice: lastPrice,
+              timestamp: Date.now(),
+            });
+          } else if (velocity.change5s >= currentConfig.spikeThreshold) {
+            // Check for SPIKE (positive change exceeds threshold)
+            // Using else-if to prevent both DIP and SPIKE firing on same update
+            addAlert({
+              type: "SPIKE",
+              assetId,
+              marketTitle:
+                orderBook.market || `Asset ${assetId.slice(0, 8)}...`,
+              magnitude: velocity.change5s,
+              currentPrice,
+              previousPrice: lastPrice,
+              timestamp: Date.now(),
+            });
+          }
+
+          // Update last known price
+          lastPricesRef.current.set(assetId, currentPrice);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, [monitoredAssetSet]);
 }
 
 // ============================================
