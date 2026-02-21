@@ -381,7 +381,14 @@ export function usePriceAlertDetection(assetIds: string[]) {
           if (!canAlertForAsset(assetId)) continue;
 
           const currentPrice = orderBook.midpoint ?? 0;
-          const lastPrice = lastPricesRef.current.get(assetId) ?? currentPrice;
+
+          // First observation for this asset — seed the price and skip alerts
+          if (!lastPricesRef.current.has(assetId)) {
+            lastPricesRef.current.set(assetId, currentPrice);
+            continue;
+          }
+
+          const lastPrice = lastPricesRef.current.get(assetId) as number;
 
           // Check for DIP (negative change exceeds threshold)
           if (velocity.change5s <= -currentConfig.dipThreshold) {
