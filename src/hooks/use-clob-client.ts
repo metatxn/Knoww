@@ -10,6 +10,7 @@ import {
 } from "@/constants/contracts";
 import { SignatureType } from "@/lib/polymarket";
 import { getRpcUrl } from "@/lib/rpc";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 import { useClobCredentials } from "./use-clob-credentials";
 import { useProxyWallet } from "./use-proxy-wallet";
 
@@ -58,13 +59,6 @@ export interface CreateOrderParams {
 const CLOB_HOST =
   process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_POLYMARKET_CHAIN_ID || "137");
-function getBuilderSignProxyUrl(): string {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api/sign`;
-  }
-  return "http://localhost:8000/api/sign";
-}
-
 /**
  * Hook for interacting with Polymarket CLOB using the official SDK
  */

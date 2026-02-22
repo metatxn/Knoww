@@ -6,6 +6,7 @@ import { encodeFunctionData, parseUnits } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
 import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 import { PROXY_WALLET_QUERY_KEY, useProxyWallet } from "./use-proxy-wallet";
 
 /**
@@ -203,10 +204,7 @@ export function useWithdraw() {
       throw new Error("Wallet not connected");
     }
 
-    const signProxyUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/api/sign`
-        : "http://localhost:8000/api/sign";
+    const signProxyUrl = getBuilderSignProxyUrl();
 
     // Dynamic import to avoid SSR issues
     const { RelayClient } = await import("@polymarket/builder-relayer-client");

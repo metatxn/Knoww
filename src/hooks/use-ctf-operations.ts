@@ -15,6 +15,7 @@ import { useCallback, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 import { CONTRACTS, CTF_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 
 // ============================================================================
 // Constants
@@ -210,10 +211,7 @@ export function useCtfOperations() {
       throw new Error("Wallet not connected");
     }
 
-    const signProxyUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/api/sign`
-        : "http://localhost:8000/api/sign";
+    const signProxyUrl = getBuilderSignProxyUrl();
 
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");

@@ -27,6 +27,7 @@ import {
   clearDeploymentCache,
   checkIsDeployed as rpcCheckIsDeployed,
 } from "@/lib/rpc";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 
 // Re-export for backwards compatibility
 const SAFE_FACTORY = SAFE_FACTORY_ADDRESS;
@@ -78,10 +79,7 @@ export function useRelayerClient() {
       throw new Error("Wallet not connected");
     }
 
-    const signProxyUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/api/sign`
-        : "http://localhost:8000/api/sign";
+    const signProxyUrl = getBuilderSignProxyUrl();
 
     console.log("[RelayerClient] Initializing with:", {
       relayerUrl: POLYMARKET_RELAYER_URL,
