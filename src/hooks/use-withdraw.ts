@@ -6,6 +6,7 @@ import { encodeFunctionData, parseUnits } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
 import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 import { PROXY_WALLET_QUERY_KEY, useProxyWallet } from "./use-proxy-wallet";
 
 /**
@@ -195,9 +196,6 @@ export function useWithdraw() {
   const [state, setState] = useState<WithdrawState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const builderSigningServerUrl =
-    process.env.NEXT_PUBLIC_BUILDER_SIGNING_SERVER_URL;
-
   /**
    * Initialize the RelayClient for executing the withdrawal
    */
@@ -206,24 +204,18 @@ export function useWithdraw() {
       throw new Error("Wallet not connected");
     }
 
-    if (!builderSigningServerUrl) {
-      throw new Error("Builder signing server URL not configured");
-    }
+    const signProxyUrl = getBuilderSignProxyUrl();
 
     // Dynamic import to avoid SSR issues
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
 
-    // Configure builder with remote signing
-    const authToken = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
     const builderConfig = new BuilderConfig({
       remoteBuilderConfig: {
-        url: builderSigningServerUrl,
-        ...(authToken ? { token: authToken } : {}),
+        url: signProxyUrl,
       },
     });
 
-    // Initialize the relay client
     const client = new RelayClient(
       RELAYER_API_URL,
       POLYGON_CHAIN_ID,
@@ -232,7 +224,7 @@ export function useWithdraw() {
     );
 
     return client;
-  }, [walletClient, address, builderSigningServerUrl]);
+  }, [walletClient, address]);
 
   /**
    * Execute a withdrawal from the proxy wallet

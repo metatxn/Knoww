@@ -15,6 +15,7 @@ import { useCallback, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 import { CONTRACTS, CTF_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 
 // ============================================================================
 // Constants
@@ -202,9 +203,6 @@ export function useCtfOperations() {
     txHash: null,
   });
 
-  const builderSigningServerUrl =
-    process.env.NEXT_PUBLIC_BUILDER_SIGNING_SERVER_URL;
-
   /**
    * Get the RelayClient for gasless transactions
    */
@@ -213,18 +211,18 @@ export function useCtfOperations() {
       throw new Error("Wallet not connected");
     }
 
-    if (!builderSigningServerUrl) {
-      throw new Error("Builder signing server URL not configured");
+    const signProxyUrl = getBuilderSignProxyUrl();
+
+    if (!signProxyUrl) {
+      throw new Error("Builder sign proxy URL not configured");
     }
 
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
 
-    const authToken = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
     const builderConfig = new BuilderConfig({
       remoteBuilderConfig: {
-        url: builderSigningServerUrl,
-        ...(authToken ? { token: authToken } : {}),
+        url: signProxyUrl,
       },
     });
 
@@ -234,7 +232,7 @@ export function useCtfOperations() {
       walletClient,
       builderConfig
     );
-  }, [walletClient, address, builderSigningServerUrl]);
+  }, [walletClient, address]);
 
   /**
    * Execute a CTF operation via relayer with polling
