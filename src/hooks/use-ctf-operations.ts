@@ -202,9 +202,6 @@ export function useCtfOperations() {
     txHash: null,
   });
 
-  const builderSigningServerUrl =
-    process.env.NEXT_PUBLIC_BUILDER_SIGNING_SERVER_URL;
-
   /**
    * Get the RelayClient for gasless transactions
    */
@@ -213,18 +210,17 @@ export function useCtfOperations() {
       throw new Error("Wallet not connected");
     }
 
-    if (!builderSigningServerUrl) {
-      throw new Error("Builder signing server URL not configured");
-    }
+    const signProxyUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/api/sign`
+        : "http://localhost:8000/api/sign";
 
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
 
-    const authToken = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
     const builderConfig = new BuilderConfig({
       remoteBuilderConfig: {
-        url: builderSigningServerUrl,
-        ...(authToken ? { token: authToken } : {}),
+        url: signProxyUrl,
       },
     });
 
@@ -234,7 +230,7 @@ export function useCtfOperations() {
       walletClient,
       builderConfig
     );
-  }, [walletClient, address, builderSigningServerUrl]);
+  }, [walletClient, address]);
 
   /**
    * Execute a CTF operation via relayer with polling

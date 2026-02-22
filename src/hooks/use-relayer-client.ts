@@ -69,10 +69,6 @@ export function useRelayerClient() {
   const lastCheckRef = useRef<number>(0);
   const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get builder signing server URL
-  const builderSigningServerUrl =
-    process.env.NEXT_PUBLIC_BUILDER_SIGNING_SERVER_URL;
-
   /**
    * Initialize the RelayClient with the user's wallet
    * Uses viem WalletClient directly (supported by @polymarket/builder-relayer-client)
@@ -82,14 +78,15 @@ export function useRelayerClient() {
       throw new Error("Wallet not connected");
     }
 
-    if (!builderSigningServerUrl) {
-      throw new Error("Builder signing server URL not configured");
-    }
+    const signProxyUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/api/sign`
+        : "http://localhost:8000/api/sign";
 
     console.log("[RelayerClient] Initializing with:", {
       relayerUrl: POLYMARKET_RELAYER_URL,
       chainId: CHAIN_ID,
-      builderServerUrl: builderSigningServerUrl,
+      builderServerUrl: signProxyUrl,
       walletAddress: address,
     });
 
@@ -97,17 +94,12 @@ export function useRelayerClient() {
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
 
-    // Configure builder with remote signing
-    const authToken = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
     const builderConfig = new BuilderConfig({
       remoteBuilderConfig: {
-        url: builderSigningServerUrl,
-        ...(authToken ? { token: authToken } : {}),
+        url: signProxyUrl,
       },
     });
 
-    // Initialize the relay client with viem WalletClient directly
-    // The RelayClient accepts WalletClient from viem
     const client = new RelayClient(
       POLYMARKET_RELAYER_URL,
       CHAIN_ID,
@@ -116,7 +108,7 @@ export function useRelayerClient() {
     );
 
     return client;
-  }, [walletClient, address, builderSigningServerUrl]);
+  }, [walletClient, address]);
 
   /**
    * Derive the Safe address using the SDK's built-in function

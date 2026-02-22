@@ -58,8 +58,12 @@ export interface CreateOrderParams {
 const CLOB_HOST =
   process.env.NEXT_PUBLIC_POLYMARKET_HOST || "https://clob.polymarket.com";
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_POLYMARKET_CHAIN_ID || "137");
-const BUILDER_SERVER_URL = process.env.NEXT_PUBLIC_BUILDER_SIGNING_SERVER_URL;
-const AUTH_TOKEN = process.env.NEXT_PUBLIC_INTERNAL_AUTH_TOKEN;
+function getBuilderSignProxyUrl(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/sign`;
+  }
+  return "http://localhost:8000/api/sign";
+}
 
 /**
  * Hook for interacting with Polymarket CLOB using the official SDK
@@ -92,8 +96,6 @@ export function useClobClient() {
   const getClient = useCallback(async () => {
     if (!credentials) throw new Error("API credentials not available");
     if (!proxyAddress) throw new Error("Proxy wallet not found");
-    if (!BUILDER_SERVER_URL)
-      throw new Error("Builder signing server URL not configured");
 
     const [{ ClobClient }, { BuilderConfig }, signer] = await Promise.all([
       import("@polymarket/clob-client"),
@@ -103,8 +105,7 @@ export function useClobClient() {
 
     const builderConfig = new BuilderConfig({
       remoteBuilderConfig: {
-        url: BUILDER_SERVER_URL,
-        ...(AUTH_TOKEN ? { token: AUTH_TOKEN } : {}),
+        url: getBuilderSignProxyUrl(),
       },
     });
 
