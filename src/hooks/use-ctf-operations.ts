@@ -213,6 +213,10 @@ export function useCtfOperations() {
 
     const signProxyUrl = getBuilderSignProxyUrl();
 
+    if (!signProxyUrl) {
+      throw new Error("Builder sign proxy URL not configured");
+    }
+
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
     const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
 

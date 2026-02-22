@@ -10,7 +10,8 @@ export function getBuilderSignProxyUrl(): string {
   }
 
   if (process.env.NEXTAUTH_URL) {
-    return `${process.env.NEXTAUTH_URL}/api/sign`;
+    const baseUrl = process.env.NEXTAUTH_URL.replace(/\/$/, "");
+    return `${baseUrl}/api/sign`;
   }
 
   const port = process.env.PORT ?? "8000";
