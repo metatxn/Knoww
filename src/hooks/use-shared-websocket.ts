@@ -169,6 +169,7 @@ export function useOrderBookWebSocket(assetIds: string[]) {
     (s) => s.handleLastTradePriceEvent
   );
   const clearOrderBook = useOrderBookStore((s) => s.clearOrderBook);
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { connectionState, isConnected, reconnect } = useSharedWebSocket({
     assetIds,
@@ -195,7 +196,11 @@ export function useOrderBookWebSocket(assetIds: string[]) {
     const previousIds = stableCleanupKey ? stableCleanupKey.split(",") : [];
 
     return () => {
-      setTimeout(() => {
+      if (cleanupTimerRef.current !== null) {
+        clearTimeout(cleanupTimerRef.current);
+      }
+      cleanupTimerRef.current = setTimeout(() => {
+        cleanupTimerRef.current = null;
         const manager = getWebSocketManager();
         const stillSubscribed = new Set(manager.getSubscribedAssets());
 
