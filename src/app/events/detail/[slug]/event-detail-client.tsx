@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommentsSection } from "@/components/comments";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Navbar } from "@/components/navbar";
@@ -65,6 +65,9 @@ interface EventDetailClientProps {
   initialEvent?: Event | null;
 }
 
+// Cap list-row live quotes to keep WS subscription bounded on large events.
+const MAX_MARKETS_WITH_LIVE_QUOTES = 20;
+
 // Order book response type - defined outside component to avoid hook order issues
 interface OrderBookResponse {
   success: boolean;
@@ -119,6 +122,19 @@ export default function EventDetailClient({
   });
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // Track pending refetch timers so we can cancel them on unmount
+  const sellRefetchTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cleanup sell refetch timers on unmount to prevent firing on unmounted component
+  useEffect(() => {
+    return () => {
+      for (const timer of sellRefetchTimersRef.current) {
+        clearTimeout(timer);
+      }
+      sellRefetchTimersRef.current = [];
+    };
+  }, []);
+
   // Handle scroll for sticky header effects with performance optimization and hysteresis
   useEffect(() => {
     let ticking = false;
@@ -144,7 +160,8 @@ export default function EventDetailClient({
   }, []);
 
   // Order book store action for preloading from REST
-  const { setOrderBookFromRest } = useOrderBookStore();
+  // Select only the action (stable ref) to avoid re-rendering on every store update
+  const setOrderBookFromRest = useOrderBookStore((s) => s.setOrderBookFromRest);
 
   // Helper to quickly seed order book from REST (direct Polymarket call) for a token
   const preloadOrderBook = useCallback(
@@ -195,6 +212,12 @@ export default function EventDetailClient({
     refetchPositions();
     refreshProxyWallet();
 
+    // Clear any previously scheduled refetch timers (e.g. from rapid sell clicks)
+    for (const timer of sellRefetchTimersRef.current) {
+      clearTimeout(timer);
+    }
+    sellRefetchTimersRef.current = [];
+
     // Multiple delayed refetches to catch backend updates
     const refetchAll = () => {
       refetchPositions();
@@ -202,9 +225,12 @@ export default function EventDetailClient({
     };
 
     // Refetch at 1s, 3s, and 5s to catch the update
-    setTimeout(refetchAll, 1000);
-    setTimeout(refetchAll, 3000);
-    setTimeout(refetchAll, 5000);
+    // Store timer IDs so they can be cancelled on unmount
+    sellRefetchTimersRef.current = [
+      setTimeout(refetchAll, 1000),
+      setTimeout(refetchAll, 3000),
+      setTimeout(refetchAll, 5000),
+    ];
   }, [refetchPositions, refreshProxyWallet]);
 
   // Build position lookup maps for fast matching
@@ -314,7 +340,6 @@ export default function EventDetailClient({
     selectedMarket,
     tradingOutcomes,
     currentTokenId,
-    allTokenIds,
     tokenMarketMap,
     sortedMarketData,
   } = useMemo(() => {
@@ -323,7 +348,6 @@ export default function EventDetailClient({
         selectedMarket: null,
         tradingOutcomes: [] as OutcomeData[],
         currentTokenId: "",
-        allTokenIds: [] as string[],
         tokenMarketMap: new Map() as TokenMarketMap,
         sortedMarketData: [] as Array<{
           id: string;
@@ -382,7 +406,8 @@ export default function EventDetailClient({
       const yesProbability = yesPrice
         ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
         : 0;
-      const change = ((Math.random() - 0.5) * 10).toFixed(1);
+      // TODO: Replace with real change data from API when available
+      const change = 0;
       const colors = ["orange", "blue", "purple", "green"];
 
       const rawMinSize = market.orderMinSize ?? market.order_min_size;
@@ -403,7 +428,7 @@ export default function EventDetailClient({
         noTokenId: noTokenId || "",
         negRisk: market.negRisk || false,
         orderMinSize,
-        change: Number.parseFloat(change),
+        change,
         volume: market.volume || "0",
         color: colors[idx % colors.length],
         image: market.image,
@@ -438,14 +463,6 @@ export default function EventDetailClient({
 
     const tokenId = outcomes[selectedOutcomeIndex]?.tokenId || "";
 
-    // Collect all valid token IDs for WebSocket subscription
-    // Dedupe token IDs to avoid duplicate processing in usePriceAlertDetection
-    const tokenIds = Array.from(
-      new Set(
-        marketData.flatMap((m) => [m.yesTokenId, m.noTokenId]).filter(Boolean)
-      )
-    );
-
     // Build token to market mapping for comments position display
     const tokenMap: TokenMarketMap = new Map();
     for (const market of marketData) {
@@ -473,14 +490,49 @@ export default function EventDetailClient({
       selectedMarket: selected,
       tradingOutcomes: outcomes,
       currentTokenId: tokenId,
-      allTokenIds: tokenIds,
       tokenMarketMap: tokenMap,
       sortedMarketData,
     };
   }, [event, openMarkets, selectedMarketId, selectedOutcomeIndex]);
 
-  // Enable price alert detection for all token IDs in this event
-  usePriceAlertDetection(allTokenIds);
+  // Bound WS scope for large events:
+  // 1) top rows for inline quotes, 2) selected market, 3) expanded market.
+  const websocketTokenIds = useMemo(() => {
+    const tokenIds = new Set<string>();
+
+    for (const market of sortedMarketData.slice(
+      0,
+      MAX_MARKETS_WITH_LIVE_QUOTES
+    )) {
+      if (market.yesTokenId) {
+        tokenIds.add(market.yesTokenId);
+      }
+    }
+
+    if (selectedMarket?.yesTokenId) {
+      tokenIds.add(selectedMarket.yesTokenId);
+    }
+    if (selectedMarket?.noTokenId) {
+      tokenIds.add(selectedMarket.noTokenId);
+    }
+
+    if (expandedOrderBookMarketId) {
+      const expandedMarket = sortedMarketData.find(
+        (m) => m.id === expandedOrderBookMarketId
+      );
+      if (expandedMarket?.yesTokenId) {
+        tokenIds.add(expandedMarket.yesTokenId);
+      }
+      if (expandedMarket?.noTokenId) {
+        tokenIds.add(expandedMarket.noTokenId);
+      }
+    }
+
+    return Array.from(tokenIds);
+  }, [sortedMarketData, selectedMarket, expandedOrderBookMarketId]);
+
+  // Enable price alert detection only for actively subscribed tokens.
+  usePriceAlertDetection(websocketTokenIds);
 
   // Auto-expand the order book upfront when the event has exactly one market.
   useEffect(() => {
@@ -585,7 +637,8 @@ export default function EventDetailClient({
 
   // STEP 3: Connect to shared WebSocket for real-time incremental updates
   // Uses singleton WebSocket manager - only ONE connection for all components
-  const { connectionState, isConnected } = useOrderBookWebSocket(allTokenIds);
+  const { connectionState, isConnected } =
+    useOrderBookWebSocket(websocketTokenIds);
 
   // Get order book from store (seeded by REST, updated by WebSocket)
   const storeOrderBook = useOrderBookFromStore(currentTokenId);
@@ -660,6 +713,67 @@ export default function EventDetailClient({
       };
     }, [storeOrderBook, orderBookData, selectedMarket]);
 
+  // Build closed market data for display (memoized to avoid recomputation)
+  const closedMarketData = useMemo(
+    () =>
+      closedMarkets.map((market) => {
+        const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
+        const prices = market.outcomePrices
+          ? JSON.parse(market.outcomePrices)
+          : [];
+        const tokens = market.tokens || [];
+        const clobTokenIds = market.clobTokenIds
+          ? JSON.parse(market.clobTokenIds)
+          : [];
+
+        const yesIndex = outcomes.findIndex((o: string) =>
+          o.toLowerCase().includes("yes")
+        );
+        const noIndex = outcomes.findIndex((o: string) =>
+          o.toLowerCase().includes("no")
+        );
+
+        const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
+        const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
+
+        let yesTokenId = "";
+        let noTokenId = "";
+
+        if (tokens.length > 0) {
+          const yesToken = tokens.find(
+            (t) => t.outcome?.toLowerCase() === "yes"
+          );
+          const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
+          yesTokenId = yesToken?.token_id || "";
+          noTokenId = noToken?.token_id || "";
+        } else if (clobTokenIds.length > 0) {
+          yesTokenId =
+            yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
+          noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
+        }
+
+        const yesProbability = yesPrice
+          ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
+          : 0;
+
+        return {
+          id: market.id,
+          conditionId: market.conditionId || "",
+          groupItemTitle: market.groupItemTitle || market.question,
+          yesProbability,
+          yesPrice: yesPrice || "0",
+          noPrice: noPrice || "0",
+          yesTokenId: yesTokenId || "",
+          noTokenId: noTokenId || "",
+          change: 0,
+          volume: market.volume || "0",
+          image: market.image,
+          closed: true,
+        };
+      }),
+    [closedMarkets]
+  );
+
   // Loading state - AFTER all hooks
   if (loading) {
     return (
@@ -710,57 +824,7 @@ export default function EventDetailClient({
 
   // sortedMarketData is already computed in the useMemo above
 
-  // Build closed market data for display
-  const closedMarketData = closedMarkets.map((market) => {
-    const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
-    const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
-    const tokens = market.tokens || [];
-    const clobTokenIds = market.clobTokenIds
-      ? JSON.parse(market.clobTokenIds)
-      : [];
-
-    const yesIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("yes")
-    );
-    const noIndex = outcomes.findIndex((o: string) =>
-      o.toLowerCase().includes("no")
-    );
-
-    const yesPrice = yesIndex !== -1 ? prices[yesIndex] : prices[0];
-    const noPrice = noIndex !== -1 ? prices[noIndex] : prices[1];
-
-    let yesTokenId = "";
-    let noTokenId = "";
-
-    if (tokens.length > 0) {
-      const yesToken = tokens.find((t) => t.outcome?.toLowerCase() === "yes");
-      const noToken = tokens.find((t) => t.outcome?.toLowerCase() === "no");
-      yesTokenId = yesToken?.token_id || "";
-      noTokenId = noToken?.token_id || "";
-    } else if (clobTokenIds.length > 0) {
-      yesTokenId = yesIndex !== -1 ? clobTokenIds[yesIndex] : clobTokenIds[0];
-      noTokenId = noIndex !== -1 ? clobTokenIds[noIndex] : clobTokenIds[1];
-    }
-
-    const yesProbability = yesPrice
-      ? Number.parseFloat((Number.parseFloat(yesPrice) * 100).toFixed(0))
-      : 0;
-
-    return {
-      id: market.id,
-      conditionId: market.conditionId || "",
-      groupItemTitle: market.groupItemTitle || market.question,
-      yesProbability,
-      yesPrice: yesPrice || "0",
-      noPrice: noPrice || "0",
-      yesTokenId: yesTokenId || "",
-      noTokenId: noTokenId || "",
-      change: 0,
-      volume: market.volume || "0",
-      image: market.image,
-      closed: true,
-    };
-  });
+  // closedMarketData is now memoized above the early returns
 
   // Chart behavior:
   // - If the event has ONE market, show BOTH Yes + No on the main chart.

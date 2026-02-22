@@ -121,6 +121,7 @@ function getServerRpcUrl(): string {
   // Priority 1: Alchemy (best for production)
   const alchemyKey = process.env.ALCHEMY_API_KEY;
   if (alchemyKey) {
+    console.log("[RPC Proxy] Using Alchemy RPC for Polygon (server-side)");
     return `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`;
   }
 

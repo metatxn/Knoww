@@ -308,6 +308,7 @@ function MarketExpandedContent({
               maxLevels={4}
               onPriceClick={handlePriceClick}
               onOutcomeChange={setSelectedOutcomeIndex}
+              useWebSocket={false}
               embedded
             />
           </TabsContent>

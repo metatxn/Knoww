@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOrderBookStore } from "@/hooks/use-orderbook-store";
 import { filterValidTokenIds } from "@/lib/token-validation";
 import { getWebSocketManager } from "@/lib/websocket-manager";
@@ -85,10 +85,17 @@ export function useSharedWebSocket(options: UseSharedWebSocketOptions) {
     return unsubscribe;
   }, []);
 
+  // Stabilize assetIds: only re-subscribe when the actual IDs change,
+  // not when the parent passes a new array reference with the same items.
+  const stableAssetKey = useMemo(
+    () => filterValidTokenIds(assetIds).sort().join(","),
+    [assetIds]
+  );
+
   // Subscribe to events and filter by our asset IDs
   useEffect(() => {
     const manager = getWebSocketManager();
-    const validIds = filterValidTokenIds(assetIds);
+    const validIds = stableAssetKey ? stableAssetKey.split(",") : [];
     const assetIdSet = new Set(validIds);
 
     if (assetIdSet.size === 0) return;
@@ -136,7 +143,7 @@ export function useSharedWebSocket(options: UseSharedWebSocketOptions) {
       removeEventListener();
       unsubscribe();
     };
-  }, [assetIds]);
+  }, [stableAssetKey]);
 
   return {
     connectionState,
@@ -152,8 +159,17 @@ export function useSharedWebSocket(options: UseSharedWebSocketOptions) {
  * This is the recommended way to use WebSocket for order books
  */
 export function useOrderBookWebSocket(assetIds: string[]) {
-  const { handleBookEvent, handlePriceChangeEvent, handleLastTradePriceEvent } =
-    useOrderBookStore();
+  // Select only the action functions we need. Actions are stable references in
+  // Zustand so these selectors won't cause re-renders when order book data changes.
+  const handleBookEvent = useOrderBookStore((s) => s.handleBookEvent);
+  const handlePriceChangeEvent = useOrderBookStore(
+    (s) => s.handlePriceChangeEvent
+  );
+  const handleLastTradePriceEvent = useOrderBookStore(
+    (s) => s.handleLastTradePriceEvent
+  );
+  const clearOrderBook = useOrderBookStore((s) => s.clearOrderBook);
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { connectionState, isConnected, reconnect } = useSharedWebSocket({
     assetIds,
@@ -161,6 +177,41 @@ export function useOrderBookWebSocket(assetIds: string[]) {
     onPriceChange: handlePriceChangeEvent,
     onLastTradePrice: handleLastTradePriceEvent,
   });
+
+  // Stabilize the asset list for cleanup (same pattern as useSharedWebSocket)
+  const stableCleanupKey = useMemo(
+    () => filterValidTokenIds(assetIds).sort().join(","),
+    [assetIds]
+  );
+
+  // Clean up order book data when this component unmounts or asset list changes.
+  // Only clears assets that are no longer subscribed by any other component
+  // (checked via the WebSocket manager's reference-counted subscriptions).
+  //
+  // Deferred via setTimeout so the check runs after React has executed the new
+  // subscription effect. Without deferral, the synchronous cleanup sees the gap
+  // between the old unsubscribe and the new subscribe, incorrectly treating
+  // overlapping assets as unsubscribed.
+  useEffect(() => {
+    const previousIds = stableCleanupKey ? stableCleanupKey.split(",") : [];
+
+    return () => {
+      if (cleanupTimerRef.current !== null) {
+        clearTimeout(cleanupTimerRef.current);
+      }
+      cleanupTimerRef.current = setTimeout(() => {
+        cleanupTimerRef.current = null;
+        const manager = getWebSocketManager();
+        const stillSubscribed = new Set(manager.getSubscribedAssets());
+
+        for (const assetId of previousIds) {
+          if (!stillSubscribed.has(assetId)) {
+            clearOrderBook(assetId);
+          }
+        }
+      }, 0);
+    };
+  }, [stableCleanupKey, clearOrderBook]);
 
   return { connectionState, isConnected, reconnect };
 }

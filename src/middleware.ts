@@ -45,8 +45,8 @@ const SECURITY_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline'",
     // Images: self + Polymarket S3 + data URIs + blob URIs + crypto logos
     "img-src 'self' data: blob: https://polymarket-upload.s3.us-east-2.amazonaws.com https://*.polymarket.com https://cryptologos.cc",
-    // Fonts: self + data URIs
-    "font-src 'self' data:",
+    // Fonts: self + data URIs + Reown-hosted wallet fonts
+    "font-src 'self' data: https://fonts.reown.com",
     // Connect: self + Polymarket APIs + Alchemy + WalletConnect/Web3Modal + Polygon RPC
     "connect-src 'self' https://clob.polymarket.com https://gamma-api.polymarket.com https://data-api.polymarket.com https://user-pnl-api.polymarket.com https://bridge.polymarket.com https://relayer-v2.polymarket.com https://*.alchemy.com https://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.com wss://*.walletconnect.org https://*.web3modal.org https://*.web3modal.com https://polygon-rpc.com https://polygon-mainnet.g.alchemy.com wss://ws-subscriptions-clob.polymarket.com https://openrouter.ai https://*.reown.com wss://*.reown.com",
     // Frames: none (we don't embed iframes)

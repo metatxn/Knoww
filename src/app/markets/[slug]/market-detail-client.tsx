@@ -307,10 +307,6 @@ export default function MarketDetailClient({ slug }: { slug: string }) {
   const outcomes = market.outcomes ? JSON.parse(market.outcomes) : [];
   const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
 
-  // Debug: Log the full market object to see its structure
-  console.log("[MarketDetail] Full market object:", market);
-  console.log("[MarketDetail] Market keys:", Object.keys(market));
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
