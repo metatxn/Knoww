@@ -186,18 +186,25 @@ export function useOrderBookWebSocket(assetIds: string[]) {
   // Clean up order book data when this component unmounts or asset list changes.
   // Only clears assets that are no longer subscribed by any other component
   // (checked via the WebSocket manager's reference-counted subscriptions).
+  //
+  // Deferred via setTimeout so the check runs after React has executed the new
+  // subscription effect. Without deferral, the synchronous cleanup sees the gap
+  // between the old unsubscribe and the new subscribe, incorrectly treating
+  // overlapping assets as unsubscribed.
   useEffect(() => {
     const previousIds = stableCleanupKey ? stableCleanupKey.split(",") : [];
 
     return () => {
-      const manager = getWebSocketManager();
-      const stillSubscribed = new Set(manager.getSubscribedAssets());
+      setTimeout(() => {
+        const manager = getWebSocketManager();
+        const stillSubscribed = new Set(manager.getSubscribedAssets());
 
-      for (const assetId of previousIds) {
-        if (!stillSubscribed.has(assetId)) {
-          clearOrderBook(assetId);
+        for (const assetId of previousIds) {
+          if (!stillSubscribed.has(assetId)) {
+            clearOrderBook(assetId);
+          }
         }
-      }
+      }, 0);
     };
   }, [stableCleanupKey, clearOrderBook]);
 
