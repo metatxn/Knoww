@@ -162,7 +162,11 @@ interface TopicExtractionResponse {
   truncated: boolean;
   cached?: boolean;
   durationMs?: number;
-  fallbackReason?: "short-input" | "timeout" | "provider-error";
+  fallbackReason?:
+    | "short-input"
+    | "timeout"
+    | "provider-error"
+    | "validation-failed";
   error?: string;
 }
 
@@ -171,7 +175,82 @@ interface CacheEntry {
   cachedAt: number;
 }
 
-const extractionCache = new Map<string, CacheEntry>();
+interface ExtractionCache {
+  get(key: string): CacheEntry | null;
+  set(key: string, value: TopicExtractionResponse, ttlMs: number): void;
+  delete(key: string): void;
+}
+
+class InMemoryExtractionCache implements ExtractionCache {
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly maxEntries: number;
+
+  constructor(maxEntries: number) {
+    this.maxEntries = maxEntries;
+  }
+
+  get(key: string): CacheEntry | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry;
+  }
+
+  set(key: string, value: TopicExtractionResponse, ttlMs: number): void {
+    this.evictExpiredEntries(ttlMs);
+
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+
+    this.cache.set(key, {
+      value: { ...value, cached: undefined, durationMs: undefined },
+      cachedAt: Date.now(),
+    });
+
+    while (this.cache.size > this.maxEntries) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.cache.delete(oldestKey);
+    }
+  }
+
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+
+  private evictExpiredEntries(ttlMs: number): void {
+    const now = Date.now();
+    for (const [entryKey, entry] of this.cache.entries()) {
+      if (now - entry.cachedAt > ttlMs) {
+        this.cache.delete(entryKey);
+      }
+    }
+  }
+}
+
+function createExtractionCache(): ExtractionCache {
+  const backend = (process.env.CACHE_BACKEND || "memory").toLowerCase();
+
+  if (backend !== "memory") {
+    console.warn(
+      `[extract-topics] CACHE_BACKEND="${backend}" is not configured in this route yet. Falling back to in-memory cache.`
+    );
+  }
+
+  console.info(
+    "[extract-topics] Using in-memory best-effort cache (instance-local, non-durable). Configure CACHE_BACKEND with a durable store implementation for cross-instance sharing."
+  );
+
+  return new InMemoryExtractionCache(CACHE_MAX_ENTRIES);
+}
+
+const extractionCache: ExtractionCache = createExtractionCache();
 
 function normalizeInputText(text: string): string {
   return text
@@ -199,11 +278,6 @@ function getCachedExtraction(text: string): TopicExtractionResponse | null {
   const entry = extractionCache.get(key);
   if (!entry) return null;
 
-  if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
-    extractionCache.delete(key);
-    return null;
-  }
-
   return {
     ...entry.value,
     cached: true,
@@ -216,19 +290,7 @@ function setCachedExtraction(
   value: TopicExtractionResponse
 ): void {
   const key = getCacheKey(text);
-
-  if (extractionCache.has(key)) {
-    extractionCache.delete(key);
-  }
-  extractionCache.set(key, {
-    value: { ...value, cached: undefined, durationMs: undefined },
-    cachedAt: Date.now(),
-  });
-
-  if (extractionCache.size > CACHE_MAX_ENTRIES) {
-    const oldestKey = extractionCache.keys().next().value;
-    if (oldestKey !== undefined) extractionCache.delete(oldestKey);
-  }
+  extractionCache.set(key, value, CACHE_TTL_MS);
 }
 
 async function withTimeout<T>(
@@ -312,6 +374,22 @@ async function extractTopicsFromText(
     );
 
     const output = aiResult.output;
+    if (!output) {
+      return createResponse({
+        success: false,
+        category: "other",
+        entities: [],
+        tags: [],
+        searchQuery: "",
+        confidence: 0,
+        inputLength: rawText.length,
+        truncated: rawText.length > MAX_INPUT_CHARS,
+        fallbackReason: "validation-failed",
+        error: "AI response missing structured output",
+        durationMs: Date.now() - startedAt,
+      });
+    }
+
     const response = createResponse({
       success: true,
       category: output.category,
@@ -369,7 +447,7 @@ export async function POST(request: NextRequest) {
 
     const extraction = await extractTopicsFromText(text);
     return NextResponse.json(extraction, {
-      status: extraction.success ? 200 : 200,
+      status: 200,
     });
   } catch (error) {
     console.error("AI extraction request parse error:", error);
@@ -413,6 +491,6 @@ export async function GET(request: NextRequest) {
 
   const extraction = await extractTopicsFromText(text);
   return NextResponse.json(extraction, {
-    status: extraction.success ? 200 : 200,
+    status: 200,
   });
 }
