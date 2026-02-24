@@ -4,6 +4,12 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
+const MAX_INPUT_CHARS = 500;
+const MIN_MEANINGFUL_CHARS = 20;
+const AI_TIMEOUT_MS = 7000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 300;
+
 // Schema for the AI response
 const TopicExtractionSchema = z.object({
   category: z
@@ -143,6 +149,206 @@ Examples:
 - "Bitcoin breaking $100k soon!" → searchQuery: "Bitcoin price 100k", tags: ["bitcoin", "crypto"]
 - "Chiefs vs Eagles Super Bowl" → searchQuery: "Chiefs Eagles Super Bowl", tags: ["nfl", "super-bowl"]`;
 
+interface TopicExtractionResponse {
+  success: boolean;
+  category: z.infer<typeof TopicExtractionSchema>["category"];
+  entities: string[];
+  tags: string[];
+  topics: string[]; // compatibility alias for extension clients
+  searchQuery: string;
+  keywords: string; // compatibility alias for extension clients
+  confidence: number;
+  inputLength: number;
+  truncated: boolean;
+  cached?: boolean;
+  durationMs?: number;
+  fallbackReason?: "short-input" | "timeout" | "provider-error";
+  error?: string;
+}
+
+interface CacheEntry {
+  value: TopicExtractionResponse;
+  cachedAt: number;
+}
+
+const extractionCache = new Map<string, CacheEntry>();
+
+function normalizeInputText(text: string): string {
+  return text
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createResponse(
+  data: Omit<TopicExtractionResponse, "topics" | "keywords">
+): TopicExtractionResponse {
+  return {
+    ...data,
+    topics: data.tags,
+    keywords: data.searchQuery,
+  };
+}
+
+function getCacheKey(text: string): string {
+  return text.toLowerCase().slice(0, 600);
+}
+
+function getCachedExtraction(text: string): TopicExtractionResponse | null {
+  const key = getCacheKey(text);
+  const entry = extractionCache.get(key);
+  if (!entry) return null;
+
+  if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+    extractionCache.delete(key);
+    return null;
+  }
+
+  return {
+    ...entry.value,
+    cached: true,
+    durationMs: 0,
+  };
+}
+
+function setCachedExtraction(
+  text: string,
+  value: TopicExtractionResponse
+): void {
+  const key = getCacheKey(text);
+
+  if (extractionCache.has(key)) {
+    extractionCache.delete(key);
+  }
+  extractionCache.set(key, {
+    value: { ...value, cached: undefined, durationMs: undefined },
+    cachedAt: Date.now(),
+  });
+
+  if (extractionCache.size > CACHE_MAX_ENTRIES) {
+    const oldestKey = extractionCache.keys().next().value;
+    if (oldestKey !== undefined) extractionCache.delete(oldestKey);
+  }
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(timeoutMessage)),
+        timeoutMs
+      );
+    });
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function extractTopicsFromText(
+  rawText: string
+): Promise<TopicExtractionResponse> {
+  const startedAt = Date.now();
+  const normalizedText = normalizeInputText(rawText);
+  const truncatedText = normalizedText.slice(0, MAX_INPUT_CHARS);
+
+  if (normalizedText.length < MIN_MEANINGFUL_CHARS) {
+    return createResponse({
+      success: false,
+      category: "other",
+      entities: [],
+      tags: [],
+      searchQuery: "",
+      confidence: 0,
+      inputLength: rawText.length,
+      truncated: rawText.length > MAX_INPUT_CHARS,
+      fallbackReason: "short-input",
+      error: "Input too short for reliable extraction",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  const cached = getCachedExtraction(truncatedText);
+  if (cached) {
+    return cached;
+  }
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("OPENROUTER_API_KEY not configured");
+    return createResponse({
+      success: false,
+      category: "other",
+      entities: [],
+      tags: [],
+      searchQuery: "",
+      confidence: 0,
+      inputLength: rawText.length,
+      truncated: rawText.length > MAX_INPUT_CHARS,
+      fallbackReason: "provider-error",
+      error: "AI service not configured",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  try {
+    const openrouter = createOpenRouter({ apiKey });
+    const aiResult = await withTimeout(
+      generateText({
+        model: openrouter.chat("google/gemini-3-flash-preview"),
+        output: Output.object({ schema: TopicExtractionSchema }),
+        system: SYSTEM_PROMPT,
+        prompt: `Analyze this social media post and extract prediction market topics:\n\n"${truncatedText}"`,
+        temperature: 0.3,
+        maxOutputTokens: 300,
+      }),
+      AI_TIMEOUT_MS,
+      "AI extraction timeout"
+    );
+
+    const output = aiResult.output;
+    const response = createResponse({
+      success: true,
+      category: output.category,
+      entities: output.entities || [],
+      tags: output.tags || [],
+      searchQuery: output.searchQuery || "",
+      confidence: output.confidence ?? 0,
+      inputLength: rawText.length,
+      truncated: rawText.length > MAX_INPUT_CHARS,
+      cached: false,
+      durationMs: Date.now() - startedAt,
+    });
+
+    setCachedExtraction(truncatedText, response);
+    return response;
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error && error.message === "AI extraction timeout";
+    if (!isTimeout) {
+      console.error("AI extraction error:", error);
+    }
+    return createResponse({
+      success: false,
+      category: "other",
+      entities: [],
+      tags: [],
+      searchQuery: "",
+      confidence: 0,
+      inputLength: rawText.length,
+      truncated: rawText.length > MAX_INPUT_CHARS,
+      fallbackReason: isTimeout ? "timeout" : "provider-error",
+      error: error instanceof Error ? error.message : "AI extraction failed",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+}
+
 export async function POST(request: NextRequest) {
   // Rate limit: 20 requests per minute (AI is expensive)
   const rateLimitResponse = checkRateLimit(request, {
@@ -161,55 +367,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Limit text length to avoid excessive token usage
-    const truncatedText = text.slice(0, 500);
-
-    // Get API key from environment
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      console.error("OPENROUTER_API_KEY not configured");
-      return NextResponse.json(
-        { error: "AI service not configured" },
-        { status: 503 }
-      );
-    }
-
-    const openrouter = createOpenRouter({ apiKey });
-
-    const response = await generateText({
-      model: openrouter.chat("google/gemini-3-flash-preview"),
-      output: Output.object({ schema: TopicExtractionSchema }),
-      system: SYSTEM_PROMPT,
-      prompt: `Analyze this social media post and extract prediction market topics:\n\n"${truncatedText}"`,
-      temperature: 0.3,
-      maxOutputTokens: 300,
-    });
-
-    const result = response.output;
-
-    return NextResponse.json({
-      success: true,
-      ...result,
-      // Include the original text length for debugging
-      inputLength: text.length,
-      truncated: text.length > 500,
+    const extraction = await extractTopicsFromText(text);
+    return NextResponse.json(extraction, {
+      status: extraction.success ? 200 : 200,
     });
   } catch (error) {
-    console.error("AI extraction error:", error);
-
-    // Return a structured error response
+    console.error("AI extraction request parse error:", error);
     return NextResponse.json(
-      {
+      createResponse({
         success: false,
-        error: error instanceof Error ? error.message : "AI extraction failed",
-        // Return empty defaults so the extension can fall back to rule-based
         category: "other",
         entities: [],
         tags: [],
         searchQuery: "",
         confidence: 0,
-      },
-      { status: 500 }
+        inputLength: 0,
+        truncated: false,
+        fallbackReason: "provider-error",
+        error: "Invalid request payload",
+      }),
+      { status: 400 }
     );
   }
 }
@@ -234,10 +411,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Reuse POST logic
-  const fakeRequest = {
-    json: async () => ({ text }),
-  } as NextRequest;
-
-  return POST(fakeRequest);
+  const extraction = await extractTopicsFromText(text);
+  return NextResponse.json(extraction, {
+    status: extraction.success ? 200 : 200,
+  });
 }
