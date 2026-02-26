@@ -52,19 +52,27 @@ interface CacheEntry {
   cachedAt: number;
 }
 
-const cache = new Map<string, CacheEntry>();
+const IS_DEV = process.env.NODE_ENV === "development";
 
-function getCacheKey(postText: string, marketTitle: string): string {
-  const p = postText.toLowerCase().slice(0, 300);
-  const m = marketTitle.toLowerCase().slice(0, 150);
-  return `${p}|||${m}`;
-}
+const cache = IS_DEV ? new Map<string, CacheEntry>() : null;
 
-function getCached(
+async function getCacheKey(
   postText: string,
   marketTitle: string
-): ValidationResponse | null {
-  const key = getCacheKey(postText, marketTitle);
+): Promise<string> {
+  const raw = `${postText.toLowerCase().slice(0, 400)}|${marketTitle.toLowerCase().slice(0, 150)}`;
+  const data = new TextEncoder().encode(raw);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function getCached(
+  postText: string,
+  marketTitle: string
+): Promise<ValidationResponse | null> {
+  if (!cache) return null;
+  const key = await getCacheKey(postText, marketTitle);
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
@@ -74,20 +82,19 @@ function getCached(
   return { ...entry.value, cached: true, durationMs: 0 };
 }
 
-function setCache(
+async function setCache(
   postText: string,
   marketTitle: string,
   value: ValidationResponse
-): void {
-  const key = getCacheKey(postText, marketTitle);
+): Promise<void> {
+  if (!cache) return;
+  const key = await getCacheKey(postText, marketTitle);
 
-  // Evict expired entries when near capacity
   if (cache.size >= CACHE_MAX_ENTRIES) {
     const now = Date.now();
     for (const [k, v] of cache.entries()) {
       if (now - v.cachedAt > CACHE_TTL_MS) cache.delete(k);
     }
-    // If still too large, remove oldest
     while (cache.size >= CACHE_MAX_ENTRIES) {
       const oldest = cache.keys().next().value;
       if (oldest === undefined) break;
@@ -124,7 +131,7 @@ async function validateRelevance(
 ): Promise<ValidationResponse> {
   const startedAt = Date.now();
 
-  const cached = getCached(postText, marketTitle);
+  const cached = await getCached(postText, marketTitle);
   if (cached) return cached;
 
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -181,7 +188,7 @@ Is this market relevant to what the post is discussing?`,
       durationMs: Date.now() - startedAt,
     };
 
-    setCache(postText, marketTitle, response);
+    await setCache(postText, marketTitle, response);
     return response;
   } catch (error) {
     const isTimeout =
@@ -208,7 +215,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       postText?: string;
       marketTitle?: string;
-      marketTags?: string[];
+      marketTags?: string[] | string;
     };
 
     if (
@@ -223,10 +230,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tags = Array.isArray(body.marketTags)
+      ? body.marketTags
+      : typeof body.marketTags === "string"
+        ? body.marketTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+
     const result = await validateRelevance(
       body.postText,
       body.marketTitle,
-      body.marketTags || []
+      tags
     );
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
