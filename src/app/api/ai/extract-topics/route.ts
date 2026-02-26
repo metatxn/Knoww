@@ -137,17 +137,26 @@ Guidelines:
 1. Focus on topics that could have prediction markets (outcomes that can be verified)
 2. Extract specific entities (people, teams, companies, events)
 3. Generate a concise search query (3-6 words) optimized for Polymarket's search
-4. Only include tags that are directly relevant
-5. Set confidence based on how likely the post relates to prediction markets:
-   - 0.8-1.0: Clearly about a predictable event (election, game, price target)
-   - 0.5-0.7: Mentions topics that often have markets (politics, crypto, sports)
-   - 0.2-0.4: General discussion that might relate to markets
-   - 0.0-0.2: Unlikely to have relevant markets (personal posts, jokes)
+4. Only include tags that are DIRECTLY and SPECIFICALLY relevant to the post's main topic
+5. Do NOT associate unrelated topics just because they share a common word. For example:
+   - "Golden Fan Cup" (food promotion) is NOT related to "Golden Globes" (entertainment)
+   - "Cup" (sports trophy) is NOT related to "World Cup" unless the post is about soccer
+   - A post about a food brand giveaway has NOTHING to do with entertainment awards
+6. Set confidence STRICTLY based on how likely the post relates to prediction markets:
+   - 0.8-1.0: Clearly about a predictable event (election result, game outcome, price target, policy decision)
+   - 0.5-0.7: Directly discusses topics that often have markets (political figures, crypto prices, sports seasons)
+   - 0.2-0.4: Tangentially mentions a market-relevant topic but the post is mainly about something else
+   - 0.0-0.2: No prediction market relevance (product promotions, personal posts, memes, recipes, giveaways, food reviews, lifestyle content)
+7. When the post is about consumer products, food, personal stories, humor, or daily life, confidence MUST be below 0.2
+8. Return EMPTY tags array [] when confidence is below 0.3
 
 Examples:
-- "Trump is going to win 2024" → searchQuery: "Trump 2024 election", tags: ["trump", "2024-election"]
-- "Bitcoin breaking $100k soon!" → searchQuery: "Bitcoin price 100k", tags: ["bitcoin", "crypto"]
-- "Chiefs vs Eagles Super Bowl" → searchQuery: "Chiefs Eagles Super Bowl", tags: ["nfl", "super-bowl"]`;
+- "Trump is going to win 2024" → confidence: 0.95, searchQuery: "Trump 2024 election", tags: ["trump", "2024-election"]
+- "Bitcoin breaking $100k soon!" → confidence: 0.9, searchQuery: "Bitcoin price 100k", tags: ["bitcoin", "crypto"]
+- "Chiefs vs Eagles Super Bowl" → confidence: 0.9, searchQuery: "Chiefs Eagles Super Bowl", tags: ["nfl", "super-bowl"]
+- "Chick-fil-A Golden Fan Cup sweepstakes free food" → confidence: 0.05, searchQuery: "", tags: []
+- "Just made the best pasta of my life" → confidence: 0.0, searchQuery: "", tags: []
+- "New iPhone looks amazing" → confidence: 0.15, searchQuery: "", tags: []`;
 
 interface TopicExtractionResponse {
   success: boolean;
