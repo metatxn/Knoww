@@ -3,6 +3,7 @@ import { generateText, Output } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { verifyExtensionRequest } from "@/lib/extension-auth";
 
 const AI_TIMEOUT_MS = 5000;
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -206,6 +207,9 @@ Is this market relevant to what the post is discussing?`,
 }
 
 export async function POST(request: NextRequest) {
+  const authResponse = await verifyExtensionRequest(request);
+  if (authResponse) return authResponse;
+
   const rateLimitResponse = checkRateLimit(request, {
     uniqueTokenPerInterval: 30,
   });

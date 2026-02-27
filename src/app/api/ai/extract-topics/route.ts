@@ -3,6 +3,7 @@ import { generateText, Output } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { verifyExtensionRequest } from "@/lib/extension-auth";
 
 const MAX_INPUT_CHARS = 500;
 const MIN_MEANINGFUL_CHARS = 20;
@@ -445,6 +446,9 @@ ${truncatedText}
 }
 
 export async function POST(request: NextRequest) {
+  const authResponse = await verifyExtensionRequest(request);
+  if (authResponse) return authResponse;
+
   // Rate limit: 20 requests per minute (AI is expensive)
   const rateLimitResponse = checkRateLimit(request, {
     uniqueTokenPerInterval: 20,
@@ -488,6 +492,9 @@ export async function POST(request: NextRequest) {
 
 // Also support GET for simple testing (rate limited same as POST)
 export async function GET(request: NextRequest) {
+  const authResponse = await verifyExtensionRequest(request);
+  if (authResponse) return authResponse;
+
   const rateLimitResponse = checkRateLimit(request, {
     uniqueTokenPerInterval: 20,
   });
