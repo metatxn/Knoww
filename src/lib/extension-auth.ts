@@ -2,9 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const MAX_TIMESTAMP_DRIFT_MS = 60_000;
 
-const ALLOWED_ORIGINS = [
-  "chrome-extension://", // any Chrome extension (tightened below by HMAC)
-];
+const ALLOWED_ORIGINS = ["chrome-extension://ialnajflhafkmfnglapjaegjpbdifcmc"];
 
 const ALLOWED_REFERER_HOSTS = new Set(["knoww.app", "www.knoww.app"]);
 
@@ -21,6 +19,18 @@ function isRefererAllowed(referer: string | null): boolean {
   } catch {
     return false;
   }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
+  const len = Math.max(bufA.byteLength, bufB.byteLength);
+  let diff = bufA.byteLength ^ bufB.byteLength;
+  for (let i = 0; i < len; i++) {
+    diff |= (bufA[i] ?? 0) ^ (bufB[i] ?? 0);
+  }
+  return diff === 0;
 }
 
 async function computeHmac(secret: string, message: string): Promise<string> {
@@ -65,9 +75,13 @@ export async function verifyExtensionRequest(
   // Option 1: HMAC signature verification
   const secret = process.env.KNOWW_EXTENSION_SECRET;
   if (!secret) {
-    // If the server hasn't configured a secret, skip HMAC check
-    // (allows gradual rollout)
-    return null;
+    console.error(
+      "[extension-auth] KNOWW_EXTENSION_SECRET is not configured — rejecting request"
+    );
+    return NextResponse.json(
+      { error: "Server misconfigured" },
+      { status: 500 }
+    );
   }
 
   const signature = request.headers.get("x-knoww-signature");
@@ -90,7 +104,7 @@ export async function verifyExtensionRequest(
   const message = `${timestamp}:${bodyText}`;
   const expected = await computeHmac(secret, message);
 
-  if (signature !== expected) {
+  if (!timingSafeEqual(signature, expected)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
