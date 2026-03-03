@@ -170,6 +170,7 @@ function getHotMarkets(activities: WhaleActivity[]) {
       tradeCount: number;
       whaleCount: number;
       whales: Set<string>;
+      tokenIds: Set<string>;
       latestPrice: number;
       sentiment: "bullish" | "bearish" | "neutral";
     }
@@ -187,9 +188,13 @@ function getHotMarkets(activities: WhaleActivity[]) {
       existing.whales.add(activity.trader.address);
       existing.whaleCount = existing.whales.size;
       existing.latestPrice = activity.trade.price;
+      if (activity.market.tokenId)
+        existing.tokenIds.add(activity.market.tokenId);
     } else {
       const whales = new Set<string>();
       whales.add(activity.trader.address);
+      const tokenIds = new Set<string>();
+      if (activity.market.tokenId) tokenIds.add(activity.market.tokenId);
       marketMap.set(key, {
         title: activity.market.title,
         slug: activity.market.slug,
@@ -202,6 +207,7 @@ function getHotMarkets(activities: WhaleActivity[]) {
         tradeCount: 1,
         whaleCount: 1,
         whales,
+        tokenIds,
         latestPrice: activity.trade.price,
         sentiment: "neutral",
       });
@@ -223,6 +229,7 @@ function getHotMarkets(activities: WhaleActivity[]) {
             : buyRatio < 0.35
               ? ("bearish" as const)
               : ("neutral" as const),
+        tokenIdList: [...data.tokenIds],
       };
     })
     .sort((a, b) => b.totalVolume - a.totalVolume)
@@ -1226,10 +1233,10 @@ export default function WhalesPage() {
     [insiderData?.activities]
   );
 
-  // Live feed — subscribe to hot market token IDs
+  // Live feed — subscribe to actual token IDs (not condition IDs)
   const liveAssetIds = useMemo(() => {
     return hotMarkets
-      .map((m) => m.id)
+      .flatMap((m) => m.tokenIdList)
       .filter(Boolean)
       .slice(0, 20);
   }, [hotMarkets]);

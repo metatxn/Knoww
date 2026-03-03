@@ -28,7 +28,7 @@ export interface SuspiciousActivity {
     address: string;
     name: string | null;
     profileImage: string | null;
-    firstTradeDate: string;
+    firstTradeDate: string | null;
     accountAgeHours: number;
     totalTrades: number;
   };
@@ -457,10 +457,7 @@ export async function GET(request: NextRequest) {
         marketsInvolved
       );
 
-      // Include if meets score threshold — contrarian OR non-contrarian with high enough score
-      const meetsThreshold =
-        analysis.score >= minSuspicionScore &&
-        (analysis.isContrarian || analysis.score >= 50);
+      const meetsThreshold = analysis.score >= minSuspicionScore;
 
       if (meetsThreshold) {
         suspiciousActivities.push({

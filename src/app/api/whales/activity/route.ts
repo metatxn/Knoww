@@ -36,6 +36,7 @@ export interface WhaleActivity {
     slug: string;
     eventSlug: string;
     image?: string;
+    tokenId?: string;
   };
   source: "leaderboard" | "global_scan";
 }
@@ -260,7 +261,7 @@ export async function GET(request: NextRequest) {
               address: trader.proxyWallet,
               name: trader.userName,
               profileImage: trader.profileImage,
-              rank: Number.parseInt(trader.rank, 10),
+              rank: Number.parseInt(trader.rank, 10) || 0,
               totalPnl: trader.pnl,
               totalVolume: trader.vol,
             },
@@ -273,9 +274,10 @@ export async function GET(request: NextRequest) {
               outcomeIndex: activity.outcomeIndex,
             },
             market: {
-              conditionId: activity.conditionId || activity.asset || "",
+              conditionId: activity.conditionId || "",
               title: activity.title || "Unknown Market",
               slug: activity.slug || "",
+              tokenId: activity.asset || "",
               eventSlug: activity.eventSlug || "",
               image: activity.icon,
             },
@@ -324,6 +326,7 @@ export async function GET(request: NextRequest) {
           slug: trade.slug || "",
           eventSlug: trade.eventSlug || "",
           image: trade.icon,
+          tokenId: trade.asset || "",
         },
         source: "global_scan",
       });
@@ -358,7 +361,7 @@ export async function GET(request: NextRequest) {
     const maxResults = resultLimit[timePeriod] || 500;
     const limitedActivities = filteredByTime.slice(0, maxResults);
 
-    const dataAge = Date.now() - fetchStartTime;
+    const dataAge = now - fetchStartTime;
 
     return NextResponse.json({
       success: true,

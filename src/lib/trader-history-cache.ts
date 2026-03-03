@@ -1,7 +1,7 @@
 import { POLYMARKET_API } from "@/constants/polymarket";
 
 interface TraderHistoryEntry {
-  firstTradeDate: string;
+  firstTradeDate: string | null;
   totalTrades: number;
   accountAgeHours: number;
   fetchedAt: number;
@@ -14,6 +14,7 @@ interface ActivityData {
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_CACHE_SIZE = 2000;
+const UNKNOWN_ACCOUNT_AGE_HOURS = 100 * 365 * 24; // 100 years
 
 const traderHistoryCache = new Map<string, TraderHistoryEntry>();
 
@@ -49,7 +50,7 @@ function evictStaleEntries() {
  */
 async function fetchFullTraderHistory(
   address: string
-): Promise<{ firstTradeDate: string; totalTrades: number }> {
+): Promise<{ firstTradeDate: string | null; totalTrades: number }> {
   const pageSize = 100;
   let offset = 0;
   let earliestTimestamp = Infinity;
@@ -90,7 +91,7 @@ async function fetchFullTraderHistory(
   }
 
   if (earliestTimestamp === Infinity) {
-    return { firstTradeDate: new Date().toISOString(), totalTrades: 0 };
+    return { firstTradeDate: null, totalTrades: 0 };
   }
 
   return {
@@ -114,13 +115,18 @@ export async function getTraderHistory(
     return {
       ...cached,
       accountAgeHours:
-        (now - new Date(cached.firstTradeDate).getTime()) / (1000 * 60 * 60),
+        cached.firstTradeDate === null
+          ? UNKNOWN_ACCOUNT_AGE_HOURS
+          : (now - new Date(cached.firstTradeDate).getTime()) /
+            (1000 * 60 * 60),
     };
   }
 
   const history = await fetchFullTraderHistory(address);
-  const accountAgeMs = now - new Date(history.firstTradeDate).getTime();
-  const accountAgeHours = accountAgeMs / (1000 * 60 * 60);
+  const accountAgeHours =
+    history.firstTradeDate === null
+      ? UNKNOWN_ACCOUNT_AGE_HOURS
+      : (now - new Date(history.firstTradeDate).getTime()) / (1000 * 60 * 60);
 
   const entry: TraderHistoryEntry = {
     firstTradeDate: history.firstTradeDate,

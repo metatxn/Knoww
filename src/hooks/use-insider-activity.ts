@@ -12,7 +12,7 @@ export interface SuspiciousAccount {
   address: string;
   name: string | null;
   profileImage: string | null;
-  firstTradeDate: string;
+  firstTradeDate: string | null;
   accountAgeHours: number;
   totalTrades: number;
 }
@@ -204,9 +204,10 @@ export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
   const contrarianActivities = activities.filter(
     (a) => a.analysis.isContrarian
   );
-  const highScoreActivities = activities.filter(
-    (a) => a.analysis.suspicionScore >= 60
-  );
+  const highScoreActivities = activities.filter((a) => {
+    const level = getSuspicionRiskLevel(a.analysis.suspicionScore);
+    return level === "HIGH" || level === "CRITICAL";
+  });
   const criticalActivities = activities.filter(
     (a) => a.analysis.confidence === "CRITICAL"
   );

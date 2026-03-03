@@ -59,9 +59,15 @@ const cache = IS_DEV ? new Map<string, CacheEntry>() : null;
 
 async function getCacheKey(
   postText: string,
-  marketTitle: string
+  marketTitle: string,
+  marketTags: string[]
 ): Promise<string> {
-  const raw = `${postText.toLowerCase().slice(0, 400)}|${marketTitle.toLowerCase().slice(0, 150)}`;
+  const normalizedTags = marketTags
+    .map((t) => t.toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  const raw = `${postText.toLowerCase().slice(0, 400)}|${marketTitle.toLowerCase().slice(0, 150)}|${normalizedTags}`;
   const data = new TextEncoder().encode(raw);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = new Uint8Array(hashBuffer);
@@ -70,10 +76,11 @@ async function getCacheKey(
 
 async function getCached(
   postText: string,
-  marketTitle: string
+  marketTitle: string,
+  marketTags: string[]
 ): Promise<ValidationResponse | null> {
   if (!cache) return null;
-  const key = await getCacheKey(postText, marketTitle);
+  const key = await getCacheKey(postText, marketTitle, marketTags);
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
@@ -86,10 +93,11 @@ async function getCached(
 async function setCache(
   postText: string,
   marketTitle: string,
+  marketTags: string[],
   value: ValidationResponse
 ): Promise<void> {
   if (!cache) return;
-  const key = await getCacheKey(postText, marketTitle);
+  const key = await getCacheKey(postText, marketTitle, marketTags);
 
   if (cache.size >= CACHE_MAX_ENTRIES) {
     const now = Date.now();
@@ -132,7 +140,7 @@ async function validateRelevance(
 ): Promise<ValidationResponse> {
   const startedAt = Date.now();
 
-  const cached = await getCached(postText, marketTitle);
+  const cached = await getCached(postText, marketTitle, marketTags);
   if (cached) return cached;
 
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -189,7 +197,7 @@ Is this market relevant to what the post is discussing?`,
       durationMs: Date.now() - startedAt,
     };
 
-    await setCache(postText, marketTitle, response);
+    await setCache(postText, marketTitle, marketTags, response);
     return response;
   } catch (error) {
     const isTimeout =
@@ -251,9 +259,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error("Validate relevance request error:", error);
+    const isClientError =
+      error instanceof SyntaxError ||
+      (error instanceof Error && error.message.includes("JSON"));
     return NextResponse.json(
-      { relevant: true, reason: "", confidence: 0, error: "Invalid request" },
-      { status: 400 }
+      {
+        relevant: true,
+        reason: "",
+        confidence: 0,
+        error: isClientError ? "Invalid request body" : "Internal server error",
+      },
+      { status: isClientError ? 400 : 500 }
     );
   }
 }

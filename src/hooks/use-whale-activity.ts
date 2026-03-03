@@ -26,6 +26,7 @@ export interface WhaleMarket {
   slug: string;
   eventSlug: string;
   image?: string;
+  tokenId?: string;
 }
 
 export interface WhaleActivity {
