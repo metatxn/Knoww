@@ -111,7 +111,7 @@ async function fetchTopTraders(
       }
     );
     if (!response.ok) return [];
-    return response.json();
+    return await response.json();
   } catch {
     return [];
   }
@@ -130,7 +130,7 @@ async function fetchTraderActivity(
       }
     );
     if (!response.ok) return [];
-    return response.json();
+    return await response.json();
   } catch {
     return [];
   }
@@ -146,7 +146,7 @@ async function fetchGlobalLargeTrades(limit = 200): Promise<GlobalTradeData[]> {
       }
     );
     if (!response.ok) return [];
-    return response.json();
+    return await response.json();
   } catch {
     return [];
   }
@@ -213,17 +213,27 @@ export async function GET(request: NextRequest) {
       topTraders.map((t) => t.proxyWallet.toLowerCase())
     );
 
-    // Step 2: Fetch activity for each leaderboard whale
+    // Step 2: Fetch activity for each leaderboard whale (batched to avoid overwhelming the API)
+    const BATCH_SIZE = 10;
     if (topTraders.length > 0) {
-      const activityPromises = topTraders.map(async (trader) => {
-        const activities = await fetchTraderActivity(
-          trader.proxyWallet,
-          adjustedTradesPerWhale
-        );
-        return { trader, activities };
-      });
+      const results: {
+        trader: LeaderboardTrader;
+        activities: TradeActivity[];
+      }[] = [];
 
-      const results = await Promise.all(activityPromises);
+      for (let i = 0; i < topTraders.length; i += BATCH_SIZE) {
+        const batch = topTraders.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (trader) => {
+            const activities = await fetchTraderActivity(
+              trader.proxyWallet,
+              adjustedTradesPerWhale
+            );
+            return { trader, activities };
+          })
+        );
+        results.push(...batchResults);
+      }
 
       for (const { trader, activities } of results) {
         for (const activity of activities) {

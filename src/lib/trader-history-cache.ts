@@ -18,8 +18,6 @@ const MAX_CACHE_SIZE = 2000;
 const traderHistoryCache = new Map<string, TraderHistoryEntry>();
 
 function evictStaleEntries() {
-  if (traderHistoryCache.size <= MAX_CACHE_SIZE) return;
-
   const now = Date.now();
   const toDelete: string[] = [];
 
@@ -106,8 +104,9 @@ async function fetchFullTraderHistory(
  * and total trade count. Uses paginated fetch for accurate first-seen time.
  */
 export async function getTraderHistory(
-  address: string
+  rawAddress: string
 ): Promise<TraderHistoryEntry> {
+  const address = rawAddress.toLowerCase();
   const now = Date.now();
   const cached = traderHistoryCache.get(address);
 

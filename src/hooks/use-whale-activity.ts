@@ -138,6 +138,10 @@ export function useMarketWhaleActivity(
       (activity) => activity.market.conditionId === conditionId
     ) || [];
 
+  const filteredWhaleCount = new Set(
+    filteredActivities.map((a) => a.trader.address)
+  ).size;
+
   return {
     ...query,
     data: query.data
@@ -145,6 +149,7 @@ export function useMarketWhaleActivity(
           ...query.data,
           activities: filteredActivities,
           totalTrades: filteredActivities.length,
+          whaleCount: filteredWhaleCount,
         }
       : undefined,
   };

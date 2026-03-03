@@ -101,7 +101,7 @@ export function useWhaleLiveFeed(options: UseWhaleLiveFeedOptions = {}) {
         price,
         size,
         side: event.side,
-        timestamp: new Date().toISOString(),
+        timestamp: event.timestamp,
         usdcAmount,
       };
 
