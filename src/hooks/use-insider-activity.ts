@@ -2,12 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-/**
- * Insider/Suspicious Activity Hook
- *
- * Fetches potential insider activity - new accounts that opened positions
- * contrary to market sentiment.
- */
+export interface SuspicionFactor {
+  name: string;
+  points: number;
+  description: string;
+}
 
 export interface SuspiciousAccount {
   address: string;
@@ -38,9 +37,13 @@ export interface SuspiciousMarket {
 
 export interface SuspiciousAnalysis {
   suspicionScore: number;
+  confidence: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   isContrarian: boolean;
   marketSentiment: "BULLISH" | "BEARISH" | "NEUTRAL";
   reason: string;
+  factors: SuspicionFactor[];
+  repeatOffender: boolean;
+  marketsInvolved: number;
 }
 
 export interface SuspiciousActivity {
@@ -57,6 +60,10 @@ export interface SuspiciousActivityStats {
   uniqueTradersFound: number;
   newAccountsFound: number;
   suspiciousActivities: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  repeatOffenders: number;
 }
 
 export interface SuspiciousActivityResponse {
@@ -67,26 +74,57 @@ export interface SuspiciousActivityResponse {
   error?: string;
 }
 
+export type InsiderSortMode =
+  | "suspicion"
+  | "amount"
+  | "newest_account"
+  | "most_repeated";
+
+export type InsiderSensitivity = "conservative" | "balanced" | "aggressive";
+
+export const SENSITIVITY_PRESETS: Record<
+  InsiderSensitivity,
+  {
+    minScore: number;
+    maxAccountAge: number;
+    minUsdValue: number;
+    label: string;
+    description: string;
+  }
+> = {
+  conservative: {
+    minScore: 50,
+    maxAccountAge: 72,
+    minUsdValue: 10000,
+    label: "Conservative",
+    description: "High-confidence flags only",
+  },
+  balanced: {
+    minScore: 30,
+    maxAccountAge: 168,
+    minUsdValue: 5000,
+    label: "Balanced",
+    description: "Default detection sensitivity",
+  },
+  aggressive: {
+    minScore: 15,
+    maxAccountAge: 336,
+    minUsdValue: 1000,
+    label: "Aggressive",
+    description: "Catches more, more false positives",
+  },
+};
+
 export interface UseInsiderActivityOptions {
-  /** Maximum account age in hours to consider as "new" (default: 168 = 7 days, max: 336 = 14 days) */
   maxAccountAge?: number;
-  /** Minimum trade value in USD to include (default: 5000) */
   minUsdValue?: number;
-  /** Minimum number of shares to include (default: 0 = no minimum) */
   minShares?: number;
-  /** Minimum suspicion score to include (default: 30, max: 100) */
   minScore?: number;
-  /** Maximum number of results (default: 50, max: 100) */
   limit?: number;
-  /** Enable/disable the query */
   enabled?: boolean;
-  /** Refetch interval in milliseconds (default: 120000 = 2 minutes) */
   refetchInterval?: number;
 }
 
-/**
- * Fetch suspicious/insider activity from the API
- */
 async function fetchInsiderActivity(
   options: UseInsiderActivityOptions
 ): Promise<SuspiciousActivityResponse> {
@@ -118,44 +156,15 @@ async function fetchInsiderActivity(
   return response.json();
 }
 
-/**
- * Hook to fetch suspicious/insider activity
- *
- * Identifies new accounts that have opened positions contrary to market sentiment,
- * which may indicate insider trading or unusual activity.
- *
- * @param options - Query options
- * @returns Query result with suspicious activity data
- *
- * @example
- * ```tsx
- * const { data, isLoading, error } = useInsiderActivity({
- *   maxAccountAge: 48,
- *   minTradeSize: 500,
- *   minScore: 40,
- * });
- *
- * if (isLoading) return <Loading />;
- *
- * return (
- *   <div>
- *     <p>Found {data.stats.suspiciousActivities} suspicious activities</p>
- *     {data.activities.map(activity => (
- *       <InsiderActivityRow key={activity.id} activity={activity} />
- *     ))}
- *   </div>
- * );
- * ```
- */
 export function useInsiderActivity(options: UseInsiderActivityOptions = {}) {
   const {
-    maxAccountAge = 168, // Default: 7 days (168 hours)
-    minUsdValue = 5000, // Default: $5000 USD
-    minShares = 0, // Default: no minimum shares
+    maxAccountAge = 168,
+    minUsdValue = 5000,
+    minShares = 0,
     minScore = 30,
-    limit = 50,
+    limit = 100,
     enabled = true,
-    refetchInterval = 2 * 60 * 1000, // 2 minutes
+    refetchInterval = 2 * 60 * 1000,
   } = options;
 
   return useQuery<SuspiciousActivityResponse, Error>({
@@ -176,27 +185,21 @@ export function useInsiderActivity(options: UseInsiderActivityOptions = {}) {
         limit,
       }),
     enabled,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchInterval,
   });
 }
 
-/**
- * Hook to fetch high-confidence insider activity (stricter filters)
- */
 export function useHighConfidenceInsiders() {
   return useInsiderActivity({
-    maxAccountAge: 24, // Only accounts < 24 hours old
-    minUsdValue: 10000, // Only trades >= $10K
-    minShares: 1000, // Only trades >= 1000 shares
-    minScore: 50, // Only high suspicion scores
+    maxAccountAge: 24,
+    minUsdValue: 10000,
+    minShares: 1000,
+    minScore: 50,
     limit: 25,
   });
 }
 
-/**
- * Get summary statistics from suspicious activities
- */
 export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
   const contrarianActivities = activities.filter(
     (a) => a.analysis.isContrarian
@@ -204,6 +207,10 @@ export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
   const highScoreActivities = activities.filter(
     (a) => a.analysis.suspicionScore >= 60
   );
+  const criticalActivities = activities.filter(
+    (a) => a.analysis.confidence === "CRITICAL"
+  );
+  const repeatOffenders = activities.filter((a) => a.analysis.repeatOffender);
 
   const totalVolume = activities.reduce(
     (sum, a) => sum + a.trade.usdcAmount,
@@ -226,7 +233,6 @@ export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
         activities.length
       : 0;
 
-  // Sentiment breakdown
   const sentimentCounts = activities.reduce(
     (acc, a) => {
       acc[a.analysis.marketSentiment]++;
@@ -239,6 +245,8 @@ export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
     totalActivities: activities.length,
     contrarianCount: contrarianActivities.length,
     highScoreCount: highScoreActivities.length,
+    criticalCount: criticalActivities.length,
+    repeatOffenderCount: repeatOffenders.length,
     totalVolume,
     uniqueAccounts,
     uniqueMarkets,
@@ -248,31 +256,77 @@ export function getInsiderActivityStats(activities: SuspiciousActivity[]) {
   };
 }
 
-/**
- * Get risk level based on suspicion score
- */
+export function sortInsiderActivities(
+  activities: SuspiciousActivity[],
+  sortMode: InsiderSortMode
+): SuspiciousActivity[] {
+  const sorted = [...activities];
+  switch (sortMode) {
+    case "suspicion":
+      return sorted.sort(
+        (a, b) => b.analysis.suspicionScore - a.analysis.suspicionScore
+      );
+    case "amount":
+      return sorted.sort((a, b) => b.trade.usdcAmount - a.trade.usdcAmount);
+    case "newest_account":
+      return sorted.sort(
+        (a, b) => a.account.accountAgeHours - b.account.accountAgeHours
+      );
+    case "most_repeated":
+      return sorted.sort(
+        (a, b) => b.analysis.marketsInvolved - a.analysis.marketsInvolved
+      );
+    default:
+      return sorted;
+  }
+}
+
 export function getSuspicionRiskLevel(
   score: number
 ): "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" {
-  if (score >= 80) return "CRITICAL";
-  if (score >= 60) return "HIGH";
-  if (score >= 40) return "MEDIUM";
+  if (score >= 75) return "CRITICAL";
+  if (score >= 55) return "HIGH";
+  if (score >= 35) return "MEDIUM";
   return "LOW";
 }
 
-/**
- * Get color class based on suspicion score
- */
 export function getSuspicionColor(score: number): string {
-  if (score >= 80) return "text-red-500";
-  if (score >= 60) return "text-orange-500";
-  if (score >= 40) return "text-yellow-500";
+  if (score >= 75) return "text-red-500";
+  if (score >= 55) return "text-orange-500";
+  if (score >= 35) return "text-yellow-500";
   return "text-green-500";
 }
 
-/**
- * Format account age for display
- */
+export function getConfidenceColor(
+  confidence: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+): string {
+  switch (confidence) {
+    case "CRITICAL":
+      return "text-red-500";
+    case "HIGH":
+      return "text-orange-500";
+    case "MEDIUM":
+      return "text-yellow-500";
+    case "LOW":
+      return "text-green-500";
+  }
+}
+
+export function getConfidenceBgColor(
+  confidence: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+): string {
+  switch (confidence) {
+    case "CRITICAL":
+      return "bg-red-100 dark:bg-red-900/40";
+    case "HIGH":
+      return "bg-orange-100 dark:bg-orange-900/40";
+    case "MEDIUM":
+      return "bg-yellow-100 dark:bg-yellow-900/40";
+    case "LOW":
+      return "bg-green-100 dark:bg-green-900/40";
+  }
+}
+
 export function formatAccountAge(hours: number): string {
   if (hours < 1) {
     const minutes = Math.round(hours * 60);
