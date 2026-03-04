@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
@@ -8,18 +8,26 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Crown,
   Eye,
   Fish,
   Flame,
+  Gauge,
+  Radio,
   RefreshCw,
+  Repeat,
   Shield,
+  SortAsc,
   Target,
   TrendingDown,
   TrendingUp,
   UserPlus,
   Users,
+  Wifi,
+  Zap,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -47,10 +55,14 @@ import {
 } from "@/components/ui/tooltip";
 import {
   formatAccountAge,
+  getConfidenceBgColor,
+  getConfidenceColor,
   getInsiderActivityStats,
-  getSuspicionColor,
-  getSuspicionRiskLevel,
+  type InsiderSensitivity,
+  type InsiderSortMode,
+  SENSITIVITY_PRESETS,
   type SuspiciousActivity,
+  sortInsiderActivities,
   useInsiderActivity,
 } from "@/hooks/use-insider-activity";
 import {
@@ -58,13 +70,12 @@ import {
   useWhaleActivity,
   type WhaleActivity,
 } from "@/hooks/use-whale-activity";
+import { useWhaleLiveFeed } from "@/hooks/use-whale-live-feed";
 import { formatCurrencyCompact } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
-// View tabs
 type ViewTab = "whales" | "insiders";
 
-// Time period options - maps UI values to API timePeriod values
 const TIME_PERIODS = [
   {
     value: "24h",
@@ -87,7 +98,6 @@ const TIME_PERIODS = [
   },
 ];
 
-// Trade size filter options (for whale activity)
 const TRADE_SIZE_OPTIONS = [
   { value: "100", label: "$100+" },
   { value: "500", label: "$500+" },
@@ -95,20 +105,11 @@ const TRADE_SIZE_OPTIONS = [
   { value: "5000", label: "$5K+" },
 ];
 
-// USD value filter options (for insider detection)
-const INSIDER_USD_OPTIONS = [
-  { value: "1000", label: "$1K+" },
-  { value: "5000", label: "$5K+" },
-  { value: "10000", label: "$10K+" },
-  { value: "25000", label: "$25K+" },
-];
-
-// Share count filter options (for insider detection)
-const INSIDER_SHARES_OPTIONS = [
-  { value: "0", label: "Any" },
-  { value: "500", label: "500+" },
-  { value: "1000", label: "1K+" },
-  { value: "5000", label: "5K+" },
+const INSIDER_SORT_OPTIONS: { value: InsiderSortMode; label: string }[] = [
+  { value: "suspicion", label: "Most Suspicious" },
+  { value: "amount", label: "Largest Amount" },
+  { value: "newest_account", label: "Newest Account" },
+  { value: "most_repeated", label: "Most Repeated" },
 ];
 
 function formatAddress(address: string | null | undefined) {
@@ -135,9 +136,7 @@ function formatTimeAgo(timestamp: string) {
 function getInitials(name: string | null, address: string) {
   if (name && name.length > 0) {
     const parts = name.split(/[\s-]+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
   }
   return address.slice(2, 4).toUpperCase();
@@ -158,7 +157,6 @@ function getPeriodLabel(value: string): string {
   }
 }
 
-// Aggregate activities by market to find "hot markets"
 function getHotMarkets(activities: WhaleActivity[]) {
   const marketMap = new Map<
     string,
@@ -172,6 +170,7 @@ function getHotMarkets(activities: WhaleActivity[]) {
       tradeCount: number;
       whaleCount: number;
       whales: Set<string>;
+      tokenIds: Set<string>;
       latestPrice: number;
       sentiment: "bullish" | "bearish" | "neutral";
     }
@@ -180,21 +179,22 @@ function getHotMarkets(activities: WhaleActivity[]) {
   for (const activity of activities) {
     const key = activity.market.conditionId || activity.market.slug;
     if (!key) continue;
-
     const existing = marketMap.get(key);
     if (existing) {
-      if (activity.trade.side === "BUY") {
+      if (activity.trade.side === "BUY")
         existing.buyVolume += activity.trade.usdcAmount;
-      } else {
-        existing.sellVolume += activity.trade.usdcAmount;
-      }
+      else existing.sellVolume += activity.trade.usdcAmount;
       existing.tradeCount++;
       existing.whales.add(activity.trader.address);
       existing.whaleCount = existing.whales.size;
       existing.latestPrice = activity.trade.price;
+      if (activity.market.tokenId)
+        existing.tokenIds.add(activity.market.tokenId);
     } else {
       const whales = new Set<string>();
       whales.add(activity.trader.address);
+      const tokenIds = new Set<string>();
+      if (activity.market.tokenId) tokenIds.add(activity.market.tokenId);
       marketMap.set(key, {
         title: activity.market.title,
         slug: activity.market.slug,
@@ -207,35 +207,35 @@ function getHotMarkets(activities: WhaleActivity[]) {
         tradeCount: 1,
         whaleCount: 1,
         whales,
+        tokenIds,
         latestPrice: activity.trade.price,
         sentiment: "neutral",
       });
     }
   }
 
-  // Calculate sentiment for each market
-  const markets = Array.from(marketMap.entries()).map(([id, data]) => {
-    const totalVolume = data.buyVolume + data.sellVolume;
-    const buyRatio = totalVolume > 0 ? data.buyVolume / totalVolume : 0.5;
-    return {
-      id,
-      ...data,
-      totalVolume,
-      buyRatio,
-      sentiment:
-        buyRatio > 0.65
-          ? ("bullish" as const)
-          : buyRatio < 0.35
-            ? ("bearish" as const)
-            : ("neutral" as const),
-    };
-  });
-
-  // Sort by total volume
-  return markets.sort((a, b) => b.totalVolume - a.totalVolume).slice(0, 8);
+  return Array.from(marketMap.entries())
+    .map(([id, data]) => {
+      const totalVolume = data.buyVolume + data.sellVolume;
+      const buyRatio = totalVolume > 0 ? data.buyVolume / totalVolume : 0.5;
+      return {
+        id,
+        ...data,
+        totalVolume,
+        buyRatio,
+        sentiment:
+          buyRatio > 0.65
+            ? ("bullish" as const)
+            : buyRatio < 0.35
+              ? ("bearish" as const)
+              : ("neutral" as const),
+        tokenIdList: [...data.tokenIds],
+      };
+    })
+    .sort((a, b) => b.totalVolume - a.totalVolume)
+    .slice(0, 8);
 }
 
-// Get top whales by activity
 function getTopWhales(activities: WhaleActivity[]) {
   const whaleMap = new Map<
     string,
@@ -254,11 +254,9 @@ function getTopWhales(activities: WhaleActivity[]) {
   for (const activity of activities) {
     const existing = whaleMap.get(activity.trader.address);
     if (existing) {
-      if (activity.trade.side === "BUY") {
+      if (activity.trade.side === "BUY")
         existing.buyVolume += activity.trade.usdcAmount;
-      } else {
-        existing.sellVolume += activity.trade.usdcAmount;
-      }
+      else existing.sellVolume += activity.trade.usdcAmount;
       existing.tradeCount++;
       existing.markets.add(activity.market.conditionId);
     } else {
@@ -287,6 +285,46 @@ function getTopWhales(activities: WhaleActivity[]) {
     }))
     .sort((a, b) => b.totalVolume - a.totalVolume)
     .slice(0, 10);
+}
+
+// ==================== SHARED COMPONENTS ====================
+
+function DataFreshnessBadge({
+  lastUpdated,
+  dataAge,
+  isLive,
+}: {
+  lastUpdated: string;
+  dataAge?: number;
+  isLive?: boolean;
+}) {
+  const age = dataAge ?? Date.now() - new Date(lastUpdated).getTime();
+  const ageSeconds = Math.floor(age / 1000);
+  const isFresh = ageSeconds < 120;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium",
+        isFresh
+          ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+          : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
+      )}
+    >
+      {isLive ? (
+        <Radio className="h-3 w-3 animate-pulse" />
+      ) : (
+        <Clock className="h-3 w-3" />
+      )}
+      <span>
+        {isLive
+          ? "Live"
+          : ageSeconds < 60
+            ? "Just updated"
+            : `${Math.floor(ageSeconds / 60)}m ago`}
+      </span>
+    </div>
+  );
 }
 
 function StatCard({
@@ -341,57 +379,45 @@ function StatCard({
   );
 }
 
-// Generate time-series data from activities for the area chart
+// ==================== WHALE CHART ====================
+
 function generateTimeSeriesData(activities: WhaleActivity[]) {
   if (activities.length === 0)
     return { buyData: [], sellData: [], maxVolume: 0 };
-
-  // Sort activities by timestamp
   const sorted = [...activities].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
-
-  // Group by hour buckets and accumulate volume
   const bucketMap = new Map<string, { buy: number; sell: number }>();
-
   for (const activity of sorted) {
     const date = new Date(activity.timestamp);
-    // Round to hour
     date.setMinutes(0, 0, 0);
     const key = date.toISOString();
-
     const existing = bucketMap.get(key) || { buy: 0, sell: 0 };
-    if (activity.trade.side === "BUY") {
+    if (activity.trade.side === "BUY")
       existing.buy += activity.trade.usdcAmount;
-    } else {
-      existing.sell += activity.trade.usdcAmount;
-    }
+    else existing.sell += activity.trade.usdcAmount;
     bucketMap.set(key, existing);
   }
-
-  // Convert to arrays and calculate cumulative values
   const entries = Array.from(bucketMap.entries()).sort((a, b) =>
     a[0].localeCompare(b[0])
   );
-
-  let cumulativeBuy = 0;
-  let cumulativeSell = 0;
+  let cumulativeBuy = 0,
+    cumulativeSell = 0;
   const buyData: { time: string; value: number }[] = [];
   const sellData: { time: string; value: number }[] = [];
-
   for (const [time, { buy, sell }] of entries) {
     cumulativeBuy += buy;
     cumulativeSell += sell;
     buyData.push({ time, value: cumulativeBuy });
     sellData.push({ time, value: cumulativeSell });
   }
-
-  const maxVolume = Math.max(cumulativeBuy, cumulativeSell);
-
-  return { buyData, sellData, maxVolume };
+  return {
+    buyData,
+    sellData,
+    maxVolume: Math.max(cumulativeBuy, cumulativeSell),
+  };
 }
 
-// Buy vs Sell Area Chart Component (Depth Chart Style)
 function BuySellAreaChart({
   activities,
   buyVolume,
@@ -410,26 +436,21 @@ function BuySellAreaChart({
   const instanceId = useId();
   const buyGradientId = `buyGradient-${instanceId}`;
   const sellGradientId = `sellGradient-${instanceId}`;
-
   const { buyData, sellData, maxVolume } = useMemo(
     () => generateTimeSeriesData(activities),
     [activities]
   );
-
-  // Calculate percentages for the top bar
   const totalCount = buyCount + sellCount;
   const buyPercent = totalCount > 0 ? (buyCount / totalCount) * 100 : 50;
   const sellPercent = totalCount > 0 ? (sellCount / totalCount) * 100 : 50;
 
-  // Generate SVG path for area chart
   const generatePath = (
     data: { time: string; value: number }[],
     isReversed: boolean
   ) => {
     if (data.length === 0) return "";
-
-    const width = 100;
-    const height = 100;
+    const width = 100,
+      height = 100;
     const points = data.map((d, i) => {
       const x = isReversed
         ? width - (i / Math.max(data.length - 1, 1)) * width
@@ -438,34 +459,26 @@ function BuySellAreaChart({
         height - (maxVolume > 0 ? (d.value / maxVolume) * height * 0.9 : 0);
       return `${x},${y}`;
     });
-
-    if (isReversed) {
-      return `M${width},${height} L${points.join(" L")} L0,${height} Z`;
-    }
-    return `M0,${height} L${points.join(" L")} L${width},${height} Z`;
+    return isReversed
+      ? `M${width},${height} L${points.join(" L")} L0,${height} Z`
+      : `M0,${height} L${points.join(" L")} L${width},${height} Z`;
   };
 
   return (
     <div className={cn("w-full", className)}>
-      {/* Top Summary Bar */}
       <div className="flex items-center mb-3">
-        {/* Buy side */}
         <div
           className="h-2 bg-emerald-500 rounded-l-full transition-[width] duration-500"
           style={{ width: `${buyPercent}%` }}
         />
-        {/* Center marker */}
         <div className="relative flex items-center justify-center px-2">
           <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-8 border-l-transparent border-r-transparent border-t-foreground/60" />
         </div>
-        {/* Sell side */}
         <div
           className="h-2 bg-red-500 rounded-r-full transition-[width] duration-500"
           style={{ width: `${sellPercent}%` }}
         />
       </div>
-
-      {/* Stats Row */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-foreground">
@@ -484,10 +497,7 @@ function BuySellAreaChart({
           </span>
         </div>
       </div>
-
-      {/* Area Chart */}
       <div className="relative h-40 flex">
-        {/* Buy Area (Left side - green) */}
         <div className="flex-1 relative overflow-hidden bg-emerald-50 dark:bg-emerald-950/30 rounded-l-lg border-r border-dashed border-foreground/20">
           <svg
             viewBox="0 0 100 100"
@@ -526,7 +536,6 @@ function BuySellAreaChart({
               strokeWidth="1"
             />
           </svg>
-          {/* Y-axis labels */}
           <div className="absolute left-2 top-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
             {formatCurrencyCompact(maxVolume)}
           </div>
@@ -534,8 +543,6 @@ function BuySellAreaChart({
             0
           </div>
         </div>
-
-        {/* Sell Area (Right side - red) */}
         <div className="flex-1 relative overflow-hidden bg-red-50 dark:bg-red-950/30 rounded-r-lg">
           <svg
             viewBox="0 0 100 100"
@@ -574,7 +581,6 @@ function BuySellAreaChart({
               strokeWidth="1"
             />
           </svg>
-          {/* Y-axis labels */}
           <div className="absolute right-2 top-2 text-xs font-medium text-red-700 dark:text-red-400">
             {formatCurrencyCompact(maxVolume)}
           </div>
@@ -583,8 +589,6 @@ function BuySellAreaChart({
           </div>
         </div>
       </div>
-
-      {/* Labels */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1.5">
           <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -598,6 +602,8 @@ function BuySellAreaChart({
     </div>
   );
 }
+
+// ==================== WHALE COMPONENTS ====================
 
 function HotMarketCard({
   market,
@@ -619,12 +625,9 @@ function HotMarketCard({
       <Link href={`/events/detail/${market.eventSlug || market.slug}`}>
         <Card className="bg-card/90 hover:bg-card border-border hover:border-primary/50 transition-[background-color,border-color] duration-150 cursor-pointer group shadow-sm">
           <CardContent className="p-3">
-            {/* Market Title */}
             <h4 className="font-bold text-base text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
               {market.title}
             </h4>
-
-            {/* Stats Row */}
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-foreground/70 font-medium">
                 <Users className="h-3.5 w-3.5 inline mr-1.5 text-foreground/60" />
@@ -634,22 +637,16 @@ function HotMarketCard({
                 {market.tradeCount} trades
               </span>
             </div>
-
-            {/* Volume Bar - Buy (green) from left, Sell (red) from right */}
             <div className="h-3 rounded-full overflow-hidden flex mb-2">
-              {/* Buy bar - green from left */}
               <div
                 className="h-full bg-linear-to-r from-emerald-600 to-emerald-500 dark:from-emerald-500 dark:to-emerald-400"
                 style={{ width: `${market.buyRatio * 100}%` }}
               />
-              {/* Sell bar - red from right */}
               <div
                 className="h-full bg-linear-to-l from-red-600 to-red-500 dark:from-red-500 dark:to-red-400"
                 style={{ width: `${sellRatio * 100}%` }}
               />
             </div>
-
-            {/* Buy/Sell Split */}
             <div className="flex items-center text-sm">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold flex-1 text-left">
                 Buy {formatCurrencyCompact(market.buyVolume)}
@@ -667,11 +664,7 @@ function HotMarketCard({
                     "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-400"
                 )}
               >
-                {isBullish
-                  ? "🐂 Bullish"
-                  : isBearish
-                    ? "🐻 Bearish"
-                    : "⚖️ Neutral"}
+                {isBullish ? "Bullish" : isBearish ? "Bearish" : "Neutral"}
               </Badge>
               <span className="text-red-600 dark:text-red-400 font-bold flex-1 text-right">
                 Sell {formatCurrencyCompact(market.sellVolume)}
@@ -692,7 +685,6 @@ function TopWhaleCard({
   index: number;
 }) {
   const isBuying = whale.buyVolume > whale.sellVolume;
-
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -713,11 +705,12 @@ function TopWhaleCard({
                 {getInitials(whale.name, whale.address)}
               </AvatarFallback>
             </Avatar>
-            <span className="absolute -bottom-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold border-2 border-background">
-              {whale.rank}
-            </span>
+            {whale.rank > 0 && (
+              <span className="absolute -bottom-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold border-2 border-background">
+                {whale.rank}
+              </span>
+            )}
           </div>
-
           <div className="flex-1 min-w-0">
             <div className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
               {whale.name || formatAddress(whale.address)}
@@ -726,7 +719,6 @@ function TopWhaleCard({
               {whale.tradeCount} trades • {whale.marketCount} markets
             </div>
           </div>
-
           <div className="text-right">
             <div
               className={cn(
@@ -752,19 +744,26 @@ function RecentActivityRow({
   activity,
   index,
   animatedIds,
+  maxIds,
 }: {
   activity: WhaleActivity;
   index: number;
   animatedIds: Set<string>;
+  maxIds: number;
 }) {
   const isBuy = activity.trade.side === "BUY";
-  // Check if this activity has already been animated (persists across VList remounts)
   const shouldAnimate = !animatedIds.has(activity.id);
-
   useEffect(() => {
-    // Mark this activity as animated so subsequent mounts skip the animation
     animatedIds.add(activity.id);
-  }, [animatedIds, activity.id]);
+    if (animatedIds.size > maxIds) {
+      const iter = animatedIds.values();
+      const excess = animatedIds.size - maxIds;
+      for (let i = 0; i < excess; i++) {
+        const oldest = iter.next().value;
+        if (oldest !== undefined) animatedIds.delete(oldest);
+      }
+    }
+  }, [animatedIds, activity.id, maxIds]);
 
   return (
     <motion.div
@@ -773,7 +772,6 @@ function RecentActivityRow({
       transition={shouldAnimate ? { delay: index * 0.02 } : { duration: 0 }}
       className="flex items-center gap-3 py-3.5 border-b border-border last:border-0"
     >
-      {/* Trade Direction Icon */}
       <div
         className={cn(
           "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
@@ -788,8 +786,6 @@ function RecentActivityRow({
           <ArrowDownRight className="h-5 w-5 text-red-600 dark:text-red-400" />
         )}
       </div>
-
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Link
@@ -798,12 +794,22 @@ function RecentActivityRow({
           >
             {activity.trader.name || formatAddress(activity.trader.address)}
           </Link>
-          <Badge
-            variant="outline"
-            className="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-400 font-semibold"
-          >
-            #{activity.trader.rank}
-          </Badge>
+          {activity.trader.rank > 0 && (
+            <Badge
+              variant="outline"
+              className="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-400 font-semibold"
+            >
+              #{activity.trader.rank}
+            </Badge>
+          )}
+          {activity.source === "global_scan" && (
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30"
+            >
+              New
+            </Badge>
+          )}
           <span
             className={cn(
               "text-sm font-semibold",
@@ -820,16 +826,12 @@ function RecentActivityRow({
           </span>
         </div>
         <Link
-          href={`/events/detail/${
-            activity.market.eventSlug || activity.market.slug
-          }`}
+          href={`/events/detail/${activity.market.eventSlug || activity.market.slug}`}
           className="text-sm text-foreground/60 hover:text-foreground transition-colors line-clamp-1 mt-0.5"
         >
           {activity.market.title}
         </Link>
       </div>
-
-      {/* Amount & Time */}
       <div className="text-right shrink-0">
         <div
           className={cn(
@@ -849,26 +851,93 @@ function RecentActivityRow({
   );
 }
 
-// ============================================================================
-// INSIDER DETECTION COMPONENTS
-// ============================================================================
+// ==================== INSIDER COMPONENTS ====================
 
-function SuspicionScoreBadge({ score }: { score: number }) {
-  const riskLevel = getSuspicionRiskLevel(score);
-  const colorClass = getSuspicionColor(score);
-
+function ConfidenceBadge({
+  confidence,
+}: {
+  confidence: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+}) {
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold",
-        riskLevel === "CRITICAL" && "bg-red-100 dark:bg-red-900/40",
-        riskLevel === "HIGH" && "bg-orange-100 dark:bg-orange-900/40",
-        riskLevel === "MEDIUM" && "bg-yellow-100 dark:bg-yellow-900/40",
-        riskLevel === "LOW" && "bg-green-100 dark:bg-green-900/40"
+        "flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold",
+        getConfidenceBgColor(confidence)
       )}
     >
-      <AlertTriangle className={cn("h-3.5 w-3.5", colorClass)} />
-      <span className={colorClass}>{score}</span>
+      <AlertTriangle
+        className={cn("h-3 w-3", getConfidenceColor(confidence))}
+      />
+      <span className={getConfidenceColor(confidence)}>{confidence}</span>
+    </div>
+  );
+}
+
+function FactorBreakdown({
+  factors,
+  isOpen,
+  onToggle,
+}: {
+  factors: { name: string; points: number; description: string }[];
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-1 text-xs text-foreground/50 hover:text-foreground/80 transition-colors mt-1"
+      >
+        {isOpen ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )}
+        <span>
+          {isOpen ? "Hide" : "Show"} factor breakdown ({factors.length})
+        </span>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-1">
+              {factors.map((factor) => (
+                <div
+                  key={factor.name}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <div className="w-16 text-right font-bold text-foreground/80">
+                    +{factor.points}
+                  </div>
+                  <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        factor.points >= 20
+                          ? "bg-red-500"
+                          : factor.points >= 10
+                            ? "bg-orange-500"
+                            : "bg-yellow-500"
+                      )}
+                      style={{ width: `${Math.min(factor.points * 3, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex-1 text-foreground/60 truncate">
+                    {factor.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -880,6 +949,7 @@ function InsiderActivityRow({
   activity: SuspiciousActivity;
   index: number;
 }) {
+  const [showFactors, setShowFactors] = useState(false);
   const isBuy = activity.trade.side === "BUY";
 
   return (
@@ -888,92 +958,99 @@ function InsiderActivityRow({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03 }}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-xl transition-colors",
+        "p-3 rounded-xl transition-colors",
         "hover:bg-slate-100 dark:hover:bg-slate-800/60",
         index % 2 === 0
           ? "bg-slate-50/50 dark:bg-slate-800/30"
           : "bg-transparent"
       )}
     >
-      {/* Suspicion Score */}
-      <SuspicionScoreBadge score={activity.analysis.suspicionScore} />
+      <div className="flex items-center gap-3">
+        <ConfidenceBadge confidence={activity.analysis.confidence} />
 
-      {/* Trader Info */}
-      <Link
-        href={`/profile/${activity.account.address}`}
-        className="shrink-0 group"
-      >
-        <Avatar className="h-9 w-9 ring-2 ring-amber-400/50 group-hover:ring-amber-400 transition-shadow duration-150">
-          <AvatarImage
-            src={activity.account.profileImage || undefined}
-            alt={activity.account.name || "Trader"}
-          />
-          <AvatarFallback className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-bold">
-            <UserPlus className="h-4 w-4" />
-          </AvatarFallback>
-        </Avatar>
-      </Link>
+        <Link
+          href={`/profile/${activity.account.address}`}
+          className="shrink-0 group"
+        >
+          <Avatar className="h-9 w-9 ring-2 ring-amber-400/50 group-hover:ring-amber-400 transition-shadow duration-150">
+            <AvatarImage
+              src={activity.account.profileImage || undefined}
+              alt={activity.account.name || "Trader"}
+            />
+            <AvatarFallback className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-bold">
+              <UserPlus className="h-4 w-4" />
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
-      {/* Trade Details */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/profile/${activity.account.address}`}
+              className="text-sm font-bold text-foreground hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            >
+              {activity.account.name || formatAddress(activity.account.address)}
+            </Link>
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30"
+            >
+              {formatAccountAge(activity.account.accountAgeHours)} old
+            </Badge>
+            {activity.analysis.repeatOffender && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-purple-400 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30"
+              >
+                <Repeat className="h-2.5 w-2.5 mr-0.5" />
+                {activity.analysis.marketsInvolved} mkts
+              </Badge>
+            )}
+            <span
+              className={cn(
+                "text-sm font-semibold",
+                isBuy
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400"
+              )}
+            >
+              {isBuy ? "bought" : "sold"}
+            </span>
+            <span className="text-sm text-foreground/70 font-medium">
+              {activity.trade.outcome} @{" "}
+              {(activity.trade.price * 100).toFixed(0)}¢
+            </span>
+          </div>
           <Link
-            href={`/profile/${activity.account.address}`}
-            className="text-sm font-bold text-foreground hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            href={`/events/detail/${activity.market.eventSlug || activity.market.slug}`}
+            className="text-sm text-foreground/60 hover:text-foreground transition-colors line-clamp-1 mt-0.5"
           >
-            {activity.account.name || formatAddress(activity.account.address)}
+            {activity.market.title}
           </Link>
-          <Badge
-            variant="outline"
-            className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30"
-          >
-            {formatAccountAge(activity.account.accountAgeHours)} old
-          </Badge>
-          <span
+          <FactorBreakdown
+            factors={activity.analysis.factors}
+            isOpen={showFactors}
+            onToggle={() => setShowFactors(!showFactors)}
+          />
+        </div>
+
+        <div className="text-right shrink-0">
+          <div
             className={cn(
-              "text-sm font-semibold",
+              "text-base font-bold",
               isBuy
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-red-600 dark:text-red-400"
             )}
           >
-            {isBuy ? "bought" : "sold"}
-          </span>
-          <span className="text-sm text-foreground/70 font-medium">
-            {activity.trade.outcome} @ {(activity.trade.price * 100).toFixed(0)}
-            ¢
-          </span>
-        </div>
-        <Link
-          href={`/events/detail/${
-            activity.market.eventSlug || activity.market.slug
-          }`}
-          className="text-sm text-foreground/60 hover:text-foreground transition-colors line-clamp-1 mt-0.5"
-        >
-          {activity.market.title}
-        </Link>
-        <div className="text-xs text-foreground/50 mt-1 line-clamp-1">
-          {activity.analysis.reason}
-        </div>
-      </div>
-
-      {/* Amount & Market Price */}
-      <div className="text-right shrink-0">
-        <div
-          className={cn(
-            "text-base font-bold",
-            isBuy
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400"
-          )}
-        >
-          {formatCurrencyCompact(activity.trade.usdcAmount)}
-        </div>
-        <div className="text-xs text-foreground/60 font-medium">
-          Market: {(activity.market.currentPrice * 100).toFixed(0)}%
-        </div>
-        <div className="text-xs text-foreground/50">
-          {formatTimeAgo(activity.timestamp)}
+            {formatCurrencyCompact(activity.trade.usdcAmount)}
+          </div>
+          <div className="text-xs text-foreground/60 font-medium">
+            Market: {(activity.market.currentPrice * 100).toFixed(0)}%
+          </div>
+          <div className="text-xs text-foreground/50">
+            {formatTimeAgo(activity.timestamp)}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -1038,54 +1115,46 @@ function InsiderStatCard({
   );
 }
 
+// ==================== SKELETONS ====================
+
 function InsiderLoadingSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Stats Skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={`insider-stat-${i}`} className="h-24 rounded-xl" />
+          <Skeleton key={`is-${i}`} className="h-24 rounded-xl" />
         ))}
       </div>
-
-      {/* Activity Skeleton */}
       <div className="space-y-3">
         {[...Array(6)].map((_, i) => (
-          <Skeleton key={`insider-activity-${i}`} className="h-20 rounded-xl" />
+          <Skeleton key={`ia-${i}`} className="h-20 rounded-xl" />
         ))}
       </div>
     </div>
   );
 }
 
-// ============================================================================
-// END INSIDER DETECTION COMPONENTS
-// ============================================================================
-
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Stats Skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={`stat-${i}`} className="h-24 rounded-xl" />
+          <Skeleton key={`ws-${i}`} className="h-24 rounded-xl" />
         ))}
       </div>
-
-      {/* Content Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <Skeleton className="h-8 w-48" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={`market-${i}`} className="h-36 rounded-xl" />
+              <Skeleton key={`wm-${i}`} className="h-36 rounded-xl" />
             ))}
           </div>
         </div>
         <div className="space-y-4">
           <Skeleton className="h-8 w-32" />
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={`whale-${i}`} className="h-16 rounded-xl" />
+            <Skeleton key={`ww-${i}`} className="h-16 rounded-xl" />
           ))}
         </div>
       </div>
@@ -1093,23 +1162,27 @@ function LoadingSkeleton() {
   );
 }
 
+// ==================== MAIN PAGE ====================
+
 export default function WhalesPage() {
   const [activeTab, setActiveTab] = useState<ViewTab>("whales");
   const [timePeriod, setTimePeriod] = useState("24h");
   const [minTradeSize, setMinTradeSize] = useState("100");
-
-  // Track which activity IDs have been animated to prevent re-animation on VList remounts
   const animatedActivityIdsRef = useRef<Set<string>>(new Set());
+  const MAX_ANIMATED_IDS = 500;
 
-  // Insider detection filters
-  const [insiderMinUsd, setInsiderMinUsd] = useState("5000"); // Default $5K
-  const [insiderMinShares, setInsiderMinShares] = useState("0"); // Default: any
+  // Insider state
+  const [insiderSensitivity, setInsiderSensitivity] =
+    useState<InsiderSensitivity>("balanced");
+  const [insiderSortMode, setInsiderSortMode] =
+    useState<InsiderSortMode>("suspicion");
 
-  // Get the API time period based on selected filter
+  const sensitivityPreset = SENSITIVITY_PRESETS[insiderSensitivity];
+
   const selectedPeriod = TIME_PERIODS.find((p) => p.value === timePeriod);
   const apiTimePeriod = selectedPeriod?.apiPeriod || "DAY";
 
-  // Whale Activity Query - Optimized: reduced from 50 whales/50 trades to 25/25 for faster initial load
+  // Whale Activity Query
   const { data, isLoading, error, refetch, isFetching } = useWhaleActivity({
     whaleCount: 25,
     minTradeSize: Number.parseFloat(minTradeSize),
@@ -1118,7 +1191,7 @@ export default function WhalesPage() {
     enabled: activeTab === "whales",
   });
 
-  // Insider Activity Query
+  // Insider Activity Query — uses sensitivity preset
   const {
     data: insiderData,
     isLoading: insiderLoading,
@@ -1126,29 +1199,16 @@ export default function WhalesPage() {
     refetch: refetchInsiders,
     isFetching: insiderFetching,
   } = useInsiderActivity({
-    maxAccountAge: 168, // 7 days
-    minUsdValue: Number.parseFloat(insiderMinUsd),
-    minShares: Number.parseFloat(insiderMinShares),
-    minScore: 30,
-    limit: 100,
+    maxAccountAge: sensitivityPreset.maxAccountAge,
+    minUsdValue: sensitivityPreset.minUsdValue,
+    minScore: sensitivityPreset.minScore,
+    limit: 200,
     enabled: activeTab === "insiders",
   });
 
-  // For the selected time period, we use all activities from the API
-  // since the API already filters by the correct time period
   const filteredActivities = data?.activities ?? [];
 
-  // Compute derived data for whales
-  const stats = useMemo(
-    () => getWhaleActivityStats(filteredActivities),
-    [filteredActivities]
-  );
-
-  // Compute derived data for insiders
-  const insiderStats = useMemo(
-    () => getInsiderActivityStats(insiderData?.activities ?? []),
-    [insiderData?.activities]
-  );
+  // Collect token IDs from hot markets for the live WebSocket feed
   const hotMarkets = useMemo(
     () => getHotMarkets(filteredActivities),
     [filteredActivities]
@@ -1157,6 +1217,39 @@ export default function WhalesPage() {
     () => getTopWhales(filteredActivities),
     [filteredActivities]
   );
+  const stats = useMemo(
+    () => getWhaleActivityStats(filteredActivities),
+    [filteredActivities]
+  );
+
+  // Sorted insider activities
+  const sortedInsiderActivities = useMemo(() => {
+    if (!insiderData?.activities) return [];
+    return sortInsiderActivities(insiderData.activities, insiderSortMode);
+  }, [insiderData?.activities, insiderSortMode]);
+
+  const insiderStats = useMemo(
+    () => getInsiderActivityStats(insiderData?.activities ?? []),
+    [insiderData?.activities]
+  );
+
+  // Live feed — subscribe to actual token IDs (not condition IDs)
+  const liveAssetIds = useMemo(() => {
+    return hotMarkets
+      .flatMap((m) => m.tokenIdList)
+      .filter(Boolean)
+      .slice(0, 20);
+  }, [hotMarkets]);
+
+  const {
+    liveTrades,
+    isConnected: isLiveConnected,
+    tradeCount: liveTradeCount,
+  } = useWhaleLiveFeed({
+    assetIds: liveAssetIds,
+    minTradeSize: Number.parseFloat(minTradeSize),
+    enabled: activeTab === "whales" && liveAssetIds.length > 0,
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-linear-to-b from-slate-50 via-white to-slate-50 dark:from-background dark:via-background dark:to-background relative overflow-x-hidden selection:bg-purple-500/30">
@@ -1222,12 +1315,11 @@ export default function WhalesPage() {
             </button>
           </div>
 
-          {/* Filters Bar - More Prominent */}
+          {/* Filters Bar */}
           <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-sm">
-            {/* ===== WHALE ACTIVITY FILTERS ===== */}
             {activeTab === "whales" && (
               <>
-                {/* Mobile: Dropdowns with labels */}
+                {/* Mobile Dropdowns */}
                 <div className="flex items-center gap-3 sm:hidden">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-foreground/60 font-medium">
@@ -1241,15 +1333,14 @@ export default function WhalesPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {TIME_PERIODS.map((period) => (
-                          <SelectItem key={period.value} value={period.value}>
-                            {getPeriodLabel(period.value)}
+                        {TIME_PERIODS.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {getPeriodLabel(p.value)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-foreground/60 font-medium">
                       Min:
@@ -1265,59 +1356,53 @@ export default function WhalesPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {TRADE_SIZE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                        {TRADE_SIZE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-
-                {/* Desktop: Pill buttons */}
+                {/* Desktop Pills */}
                 <div className="hidden sm:flex items-center gap-4">
-                  {/* Time Period Pills */}
                   <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                    {TIME_PERIODS.map((period) => (
+                    {TIME_PERIODS.map((p) => (
                       <button
-                        key={period.value}
+                        key={p.value}
                         type="button"
-                        onClick={() => setTimePeriod(period.value)}
+                        onClick={() => setTimePeriod(p.value)}
                         className={cn(
                           "px-4 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
-                          timePeriod === period.value
+                          timePeriod === p.value
                             ? "bg-primary text-primary-foreground shadow-md"
                             : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                         )}
                       >
-                        {getPeriodLabel(period.value)}
+                        {getPeriodLabel(p.value)}
                       </button>
                     ))}
                   </div>
-
-                  {/* Divider */}
                   <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
-
-                  {/* Min Trade Size */}
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
                       Min Trade:
                     </span>
                     <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                      {TRADE_SIZE_OPTIONS.map((option) => (
+                      {TRADE_SIZE_OPTIONS.map((o) => (
                         <button
-                          key={option.value}
+                          key={o.value}
                           type="button"
-                          onClick={() => setMinTradeSize(option.value)}
+                          onClick={() => setMinTradeSize(o.value)}
                           className={cn(
                             "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
-                            minTradeSize === option.value
+                            minTradeSize === o.value
                               ? "bg-cyan-500 text-white shadow-md"
                               : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
                         >
-                          {option.label}
+                          {o.label}
                         </button>
                       ))}
                     </div>
@@ -1326,108 +1411,108 @@ export default function WhalesPage() {
               </>
             )}
 
-            {/* ===== INSIDER DETECTION FILTERS ===== */}
             {activeTab === "insiders" && (
               <>
-                {/* Mobile: Dropdowns */}
+                {/* Mobile */}
                 <div className="flex items-center gap-3 sm:hidden">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-foreground/60 font-medium">
-                      Min USD:
-                    </span>
-                    <Select
-                      value={insiderMinUsd}
-                      onValueChange={setInsiderMinUsd}
+                  <Select
+                    value={insiderSensitivity}
+                    onValueChange={(v) =>
+                      setInsiderSensitivity(v as InsiderSensitivity)
+                    }
+                  >
+                    <SelectTrigger
+                      className="h-9 px-3 bg-amber-500 text-white border-amber-500 rounded-xl font-semibold"
+                      aria-label="Sensitivity"
                     >
-                      <SelectTrigger
-                        className="h-9 px-3 bg-amber-500 text-white border-amber-500 rounded-xl font-semibold"
-                        aria-label="Minimum USD value"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INSIDER_USD_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-foreground/60 font-medium">
-                      Shares:
-                    </span>
-                    <Select
-                      value={insiderMinShares}
-                      onValueChange={setInsiderMinShares}
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        Object.keys(SENSITIVITY_PRESETS) as InsiderSensitivity[]
+                      ).map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {SENSITIVITY_PRESETS[k].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={insiderSortMode}
+                    onValueChange={(v) =>
+                      setInsiderSortMode(v as InsiderSortMode)
+                    }
+                  >
+                    <SelectTrigger
+                      className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
+                      aria-label="Sort by"
                     >
-                      <SelectTrigger
-                        className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl font-semibold"
-                        aria-label="Minimum shares"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INSIDER_SHARES_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INSIDER_SORT_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {/* Desktop: Pill buttons */}
+                {/* Desktop */}
                 <div className="hidden sm:flex items-center gap-4">
-                  {/* Min USD Value */}
                   <div className="flex items-center gap-3">
+                    <Gauge className="h-4 w-4 text-foreground/60" />
                     <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
-                      Min Value:
+                      Sensitivity:
                     </span>
                     <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                      {INSIDER_USD_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setInsiderMinUsd(option.value)}
-                          className={cn(
-                            "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
-                            insiderMinUsd === option.value
-                              ? "bg-amber-500 text-white shadow-md"
-                              : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
-                          )}
-                        >
-                          {option.label}
-                        </button>
+                      {(
+                        Object.keys(SENSITIVITY_PRESETS) as InsiderSensitivity[]
+                      ).map((k) => (
+                        <TooltipProvider key={k}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => setInsiderSensitivity(k)}
+                                className={cn(
+                                  "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
+                                  insiderSensitivity === k
+                                    ? "bg-amber-500 text-white shadow-md"
+                                    : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                                )}
+                              >
+                                {SENSITIVITY_PRESETS[k].label}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {SENSITIVITY_PRESETS[k].description}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       ))}
                     </div>
                   </div>
-
-                  {/* Divider */}
                   <div className="h-10 w-px bg-slate-300 dark:bg-slate-600" />
-
-                  {/* Min Shares */}
                   <div className="flex items-center gap-3">
+                    <SortAsc className="h-4 w-4 text-foreground/60" />
                     <span className="text-sm text-foreground/80 font-semibold whitespace-nowrap">
-                      Min Shares:
+                      Sort:
                     </span>
                     <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                      {INSIDER_SHARES_OPTIONS.map((option) => (
+                      {INSIDER_SORT_OPTIONS.map((o) => (
                         <button
-                          key={option.value}
+                          key={o.value}
                           type="button"
-                          onClick={() => setInsiderMinShares(option.value)}
+                          onClick={() => setInsiderSortMode(o.value)}
                           className={cn(
                             "px-3 py-2 rounded-lg text-sm font-semibold transition-[background-color,box-shadow] duration-150",
-                            insiderMinShares === option.value
+                            insiderSortMode === o.value
                               ? "bg-purple-500 text-white shadow-md"
                               : "text-foreground/70 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
                         >
-                          {option.label}
+                          {o.label}
                         </button>
                       ))}
                     </div>
@@ -1436,10 +1521,9 @@ export default function WhalesPage() {
               </>
             )}
 
-            {/* Spacer */}
             <div className="flex-1" />
 
-            {/* Refresh Button */}
+            {/* Refresh */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1469,23 +1553,45 @@ export default function WhalesPage() {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Stats Badge - Whale View */}
+            {/* Freshness + Stats */}
             {activeTab === "whales" && data && (
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-sm text-foreground/80 font-medium">
-                  Tracking{" "}
-                  <span className="font-bold text-foreground">
-                    {data.whaleCount}
-                  </span>{" "}
-                  whales
-                </span>
-                <span className="text-slate-400 dark:text-slate-500">•</span>
-                <span className="text-sm text-foreground/80 font-medium">
-                  <span className="font-bold text-foreground">
-                    {filteredActivities.length}
-                  </span>{" "}
-                  trades
-                </span>
+              <div className="hidden md:flex items-center gap-3">
+                <DataFreshnessBadge
+                  lastUpdated={data.lastUpdated}
+                  dataAge={data.dataAge}
+                  isLive={isLiveConnected}
+                />
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <span className="text-sm text-foreground/80 font-medium">
+                    <span className="font-bold text-foreground">
+                      {data.whaleCount}
+                    </span>{" "}
+                    whales
+                  </span>
+                  <span className="text-slate-400 dark:text-slate-500">•</span>
+                  <span className="text-sm text-foreground/80 font-medium">
+                    <span className="font-bold text-foreground">
+                      {filteredActivities.length}
+                    </span>{" "}
+                    trades
+                  </span>
+                  {stats.globalScanCount > 0 && (
+                    <>
+                      <span className="text-slate-400 dark:text-slate-500">
+                        •
+                      </span>
+                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                        <Zap className="h-3 w-3 inline mr-0.5" />
+                        {stats.globalScanCount} new
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+            {activeTab === "insiders" && insiderData && (
+              <div className="hidden md:flex items-center gap-3">
+                <DataFreshnessBadge lastUpdated={insiderData.lastUpdated} />
               </div>
             )}
           </div>
@@ -1494,10 +1600,7 @@ export default function WhalesPage() {
         {/* ========== WHALE VIEW ========== */}
         {activeTab === "whales" && (
           <>
-            {/* Loading State */}
             {isLoading && <LoadingSkeleton />}
-
-            {/* Error State */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1519,9 +1622,55 @@ export default function WhalesPage() {
               </motion.div>
             )}
 
-            {/* Main Content */}
             {!isLoading && !error && data && (
               <>
+                {/* Live Feed Banner */}
+                {isLiveConnected && liveTrades.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wifi className="h-4 w-4 text-cyan-600 dark:text-cyan-400 animate-pulse" />
+                      <span className="text-sm font-bold text-cyan-700 dark:text-cyan-300">
+                        Live Feed
+                      </span>
+                      <span className="text-xs text-cyan-600 dark:text-cyan-400">
+                        {liveTradeCount} trades detected
+                      </span>
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {liveTrades.slice(0, 5).map((trade) => (
+                        <div
+                          key={trade.id}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          <span
+                            className={cn(
+                              "font-bold",
+                              trade.side === "BUY"
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                            )}
+                          >
+                            {trade.side}
+                          </span>
+                          <span className="font-bold text-foreground">
+                            {formatCurrencyCompact(trade.usdcAmount)}
+                          </span>
+                          <span className="text-foreground/60">
+                            @ {(trade.price * 100).toFixed(0)}¢
+                          </span>
+                          <span className="text-foreground/40 ml-auto">
+                            {formatTimeAgo(trade.timestamp)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Stats Row */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -1553,14 +1702,12 @@ export default function WhalesPage() {
                     title="Market Sentiment"
                     value={
                       stats.sentiment === "bullish"
-                        ? "🐂 Bullish"
+                        ? "Bullish"
                         : stats.sentiment === "bearish"
-                          ? "🐻 Bearish"
-                          : "⚖️ Neutral"
+                          ? "Bearish"
+                          : "Neutral"
                     }
-                    subtitle={`${(stats.buyRatio * 100).toFixed(
-                      0
-                    )}% of volume is buying`}
+                    subtitle={`${(stats.buyRatio * 100).toFixed(0)}% of volume is buying`}
                     icon={Activity}
                     trend={
                       stats.sentiment === "bullish"
@@ -1572,7 +1719,7 @@ export default function WhalesPage() {
                   />
                 </motion.div>
 
-                {/* Buy vs Sell Area Chart */}
+                {/* Buy vs Sell Chart */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1596,7 +1743,6 @@ export default function WhalesPage() {
 
                 {/* Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Left Column - Hot Markets */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1618,12 +1764,8 @@ export default function WhalesPage() {
                       <CardContent className="px-4 pb-4 pt-0">
                         {hotMarkets.length > 0 ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {hotMarkets.map((market, index) => (
-                              <HotMarketCard
-                                key={market.id}
-                                market={market}
-                                index={index}
-                              />
+                            {hotMarkets.map((m, i) => (
+                              <HotMarketCard key={m.id} market={m} index={i} />
                             ))}
                           </div>
                         ) : (
@@ -1637,8 +1779,6 @@ export default function WhalesPage() {
                       </CardContent>
                     </Card>
                   </motion.div>
-
-                  {/* Right Column - Top Whales */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1655,12 +1795,8 @@ export default function WhalesPage() {
                       </CardHeader>
                       <CardContent className="space-y-2 px-4 pb-4 pt-0">
                         {topWhales.length > 0 ? (
-                          topWhales.map((whale, index) => (
-                            <TopWhaleCard
-                              key={whale.address}
-                              whale={whale}
-                              index={index}
-                            />
+                          topWhales.map((w, i) => (
+                            <TopWhaleCard key={w.address} whale={w} index={i} />
                           ))
                         ) : (
                           <div className="text-center py-8 text-foreground/60">
@@ -1670,7 +1806,6 @@ export default function WhalesPage() {
                             </p>
                           </div>
                         )}
-
                         <Link href="/leaderboard">
                           <Button
                             variant="outline"
@@ -1708,7 +1843,6 @@ export default function WhalesPage() {
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
                       {filteredActivities.length > 0 ? (
-                        // Virtualized list - now shows up to 100 items efficiently
                         <VList style={{ height: 500 }} className="pr-2">
                           {filteredActivities
                             .slice(0, 100)
@@ -1718,6 +1852,7 @@ export default function WhalesPage() {
                                 activity={activity}
                                 index={index}
                                 animatedIds={animatedActivityIdsRef.current}
+                                maxIds={MAX_ANIMATED_IDS}
                               />
                             ))}
                         </VList>
@@ -1735,60 +1870,6 @@ export default function WhalesPage() {
                     </CardContent>
                   </Card>
                 </motion.div>
-
-                {/* Info Section */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 }}
-                  className="mt-8 p-6 rounded-2xl bg-linear-to-br from-cyan-100/80 to-blue-100/80 dark:from-cyan-900/30 dark:to-blue-900/30 border border-cyan-300 dark:border-cyan-700 shadow-sm"
-                >
-                  <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-foreground">
-                    <Fish className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                    How to use Whale Tracker
-                  </h3>
-                  <ul className="text-sm text-foreground/80 space-y-2.5">
-                    <li className="flex items-start gap-3">
-                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                        •
-                      </span>
-                      <span>
-                        <strong className="text-foreground">Hot Markets</strong>{" "}
-                        shows where top traders are placing the most money
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                        •
-                      </span>
-                      <span>
-                        <strong className="text-foreground">
-                          Buy/Sell ratio
-                        </strong>{" "}
-                        indicates market sentiment - green bars mean more buying
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                        •
-                      </span>
-                      <span>
-                        <strong className="text-foreground">
-                          Most Active Whales
-                        </strong>{" "}
-                        are the top traders by volume in your selected period
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-cyan-600 dark:text-cyan-400 font-bold text-lg leading-none">
-                        •
-                      </span>
-                      <span>
-                        Click any market or trader to see more details
-                      </span>
-                    </li>
-                  </ul>
-                </motion.div>
               </>
             )}
           </>
@@ -1797,10 +1878,7 @@ export default function WhalesPage() {
         {/* ========== INSIDER DETECTION VIEW ========== */}
         {activeTab === "insiders" && (
           <>
-            {/* Loading State */}
             {insiderLoading && <InsiderLoadingSkeleton />}
-
-            {/* Error State */}
             {insiderError && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1824,10 +1902,9 @@ export default function WhalesPage() {
               </motion.div>
             )}
 
-            {/* Main Insider Content */}
             {!insiderLoading && !insiderError && insiderData && (
               <>
-                {/* Insider Stats Row */}
+                {/* Stats Row */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1837,9 +1914,18 @@ export default function WhalesPage() {
                   <InsiderStatCard
                     title="Suspicious Activities"
                     value={insiderData.stats.suspiciousActivities}
-                    subtitle={`From ${insiderData.stats.newAccountsFound} new accounts`}
+                    subtitle={`${insiderData.stats.newAccountsFound} new accounts`}
                     icon={AlertTriangle}
                     trend="warning"
+                  />
+                  <InsiderStatCard
+                    title="Critical / High"
+                    value={`${insiderData.stats.criticalCount} / ${insiderData.stats.highCount}`}
+                    subtitle="Highest confidence flags"
+                    icon={Shield}
+                    trend={
+                      insiderData.stats.criticalCount > 0 ? "down" : "neutral"
+                    }
                   />
                   <InsiderStatCard
                     title="Total Volume"
@@ -1848,20 +1934,13 @@ export default function WhalesPage() {
                     icon={BarChart3}
                   />
                   <InsiderStatCard
-                    title="Contrarian Trades"
-                    value={insiderStats.contrarianCount}
-                    subtitle="Against market sentiment"
-                    icon={Target}
+                    title="Repeat Offenders"
+                    value={insiderData.stats.repeatOffenders}
+                    subtitle="Active across multiple markets"
+                    icon={Repeat}
                     trend={
-                      insiderStats.contrarianCount > 0 ? "warning" : "neutral"
+                      insiderData.stats.repeatOffenders > 0 ? "warning" : "up"
                     }
-                  />
-                  <InsiderStatCard
-                    title="High Risk"
-                    value={insiderStats.highScoreCount}
-                    subtitle="Suspicion score ≥ 60"
-                    icon={Shield}
-                    trend={insiderStats.highScoreCount > 0 ? "down" : "up"}
                   />
                 </motion.div>
 
@@ -1880,16 +1959,17 @@ export default function WhalesPage() {
                             Suspicious Activity
                           </span>
                         </div>
-                        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-3 py-1 rounded-lg">
-                          {insiderData.activities.length} flagged
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-3 py-1 rounded-lg">
+                            {sortedInsiderActivities.length} flagged
+                          </span>
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
-                      {insiderData.activities.length > 0 ? (
-                        // Virtualized list for performance with large datasets (500+ items)
+                      {sortedInsiderActivities.length > 0 ? (
                         <VList style={{ height: 600 }} className="pr-2">
-                          {insiderData.activities.map((activity, index) => (
+                          {sortedInsiderActivities.map((activity, index) => (
                             <InsiderActivityRow
                               key={`${activity.id}-${index}`}
                               activity={activity}
@@ -1904,8 +1984,8 @@ export default function WhalesPage() {
                             No suspicious activity detected
                           </p>
                           <p className="text-sm mt-2 text-foreground/50">
-                            All clear! No new accounts with unusual positions
-                            found.
+                            All clear! Try the &quot;Aggressive&quot;
+                            sensitivity to cast a wider net.
                           </p>
                         </div>
                       )}
@@ -1913,7 +1993,7 @@ export default function WhalesPage() {
                   </Card>
                 </motion.div>
 
-                {/* Insider Info Section */}
+                {/* Info Section */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1931,9 +2011,20 @@ export default function WhalesPage() {
                       </span>
                       <span>
                         <strong className="text-foreground">
-                          New Accounts
+                          Confidence Levels
                         </strong>{" "}
-                        — Detects accounts created within the last 7 days
+                        — CRITICAL, HIGH, MEDIUM, LOW based on a weighted
+                        multi-factor score
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold text-lg leading-none">
+                        •
+                      </span>
+                      <span>
+                        <strong className="text-foreground">Factors</strong> —
+                        Account age, trade count, contrarian position, trade
+                        size, repeat patterns, size/age ratio
                       </span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -1942,10 +2033,10 @@ export default function WhalesPage() {
                       </span>
                       <span>
                         <strong className="text-foreground">
-                          Contrarian Positions
+                          Repeat Offenders
                         </strong>{" "}
-                        — Flags trades against market consensus (e.g., buying
-                        YES when market favors NO)
+                        — Wallets flagged across multiple different markets are
+                        scored higher
                       </span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -1954,10 +2045,10 @@ export default function WhalesPage() {
                       </span>
                       <span>
                         <strong className="text-foreground">
-                          Suspicion Score
+                          Sensitivity Presets
                         </strong>{" "}
-                        — Combines account age, trade count, position size, and
-                        market sentiment
+                        — Conservative for high-confidence only, Aggressive to
+                        catch more (with more false positives)
                       </span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -1965,7 +2056,7 @@ export default function WhalesPage() {
                         •
                       </span>
                       <span>
-                        <strong className="text-red-500">⚠️ Disclaimer</strong> —
+                        <strong className="text-red-500">Disclaimer</strong> —
                         This is for informational purposes only. Not all flagged
                         activity is malicious.
                       </span>
@@ -1993,7 +2084,7 @@ export default function WhalesPage() {
             <span>•</span>
             <span>Powered by Polymarket</span>
           </div>
-          <span className="font-medium">© {new Date().getFullYear()}</span>
+          <span className="font-medium">&copy; {new Date().getFullYear()}</span>
         </div>
       </footer>
     </div>

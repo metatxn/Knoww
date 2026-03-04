@@ -3,10 +3,12 @@ import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
- * Whale Activity API Route
+ * Whale Activity API Route v2
  *
- * Aggregates recent large trades from top traders (whales) across all markets.
- * Uses the leaderboard to identify whales, then fetches their recent activity.
+ * Improvements over v1:
+ * - Combines leaderboard whales + global /trades scan for large non-whale flows
+ * - Deduplicates activities by transaction hash
+ * - Returns data freshness metadata for the UI
  */
 
 export interface WhaleActivity {
@@ -34,7 +36,9 @@ export interface WhaleActivity {
     slug: string;
     eventSlug: string;
     image?: string;
+    tokenId?: string;
   };
+  source: "leaderboard" | "global_scan";
 }
 
 export interface WhaleActivityResponse {
@@ -43,6 +47,7 @@ export interface WhaleActivityResponse {
   whaleCount: number;
   totalTrades: number;
   lastUpdated: string;
+  dataAge: number;
   error?: string;
 }
 
@@ -57,7 +62,7 @@ interface LeaderboardTrader {
 
 interface TradeActivity {
   id?: string;
-  timestamp: number; // Unix timestamp in seconds
+  timestamp: number;
   type: string;
   side: "BUY" | "SELL";
   size: number;
@@ -74,11 +79,26 @@ interface TradeActivity {
   asset?: string;
 }
 
-/**
- * Fetch top traders from leaderboard
- * @param limit - Number of traders to fetch
- * @param timePeriod - Time period: DAY, WEEK, MONTH, ALL
- */
+interface GlobalTradeData {
+  proxyWallet: string;
+  side: "BUY" | "SELL";
+  asset: string;
+  conditionId: string;
+  size: number;
+  price: number;
+  timestamp: number;
+  title: string;
+  slug: string;
+  icon?: string;
+  eventSlug: string;
+  outcome: string;
+  outcomeIndex: number;
+  name: string | null;
+  pseudonym: string | null;
+  profileImage: string | null;
+  transactionHash: string;
+}
+
 async function fetchTopTraders(
   limit = 20,
   timePeriod: "DAY" | "WEEK" | "MONTH" | "ALL" = "WEEK"
@@ -88,56 +108,62 @@ async function fetchTopTraders(
       `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?category=OVERALL&timePeriod=${timePeriod}&orderBy=VOL&limit=${limit}`,
       {
         headers: { Accept: "application/json" },
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        next: { revalidate: 300 },
       }
     );
-
     if (!response.ok) return [];
-    const data: LeaderboardTrader[] = await response.json();
-    return data;
+    return await response.json();
   } catch {
     return [];
   }
 }
 
-/**
- * Fetch recent activity for a specific trader
- */
 async function fetchTraderActivity(
   address: string,
   limit = 50
 ): Promise<TradeActivity[]> {
   try {
-    // Fetch more activities to ensure we have enough data for all time periods
     const response = await fetch(
-      `${
-        POLYMARKET_API.DATA.BASE
-      }/activity?user=${address.toLowerCase()}&limit=${Math.min(limit, 100)}`,
+      `${POLYMARKET_API.DATA.BASE}/activity?user=${address.toLowerCase()}&limit=${Math.min(limit, 100)}`,
       {
         headers: { Accept: "application/json" },
-        next: { revalidate: 60 }, // Cache for 1 minute
+        next: { revalidate: 60 },
       }
     );
-
     if (!response.ok) return [];
-    const data: TradeActivity[] = await response.json();
-    return data;
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+async function fetchGlobalLargeTrades(limit = 200): Promise<GlobalTradeData[]> {
+  try {
+    const response = await fetch(
+      `${POLYMARKET_API.DATA.BASE}/trades?limit=${limit}`,
+      {
+        headers: { Accept: "application/json" },
+        next: { revalidate: 60 },
+      }
+    );
+    if (!response.ok) return [];
+    return await response.json();
   } catch {
     return [];
   }
 }
 
 export async function GET(request: NextRequest) {
-  // Rate limit: 15 requests per minute (expensive endpoint — many upstream API calls)
   const rateLimitResponse = checkRateLimit(request, {
     uniqueTokenPerInterval: 15,
   });
   if (rateLimitResponse) return rateLimitResponse;
 
+  const fetchStartTime = Date.now();
+
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
     const whaleCount = Math.min(
       Math.max(Number.parseInt(searchParams.get("whaleCount") || "25", 10), 5),
       100
@@ -157,7 +183,6 @@ export async function GET(request: NextRequest) {
       100
     );
 
-    // Get time period from query params (DAY, WEEK, MONTH, ALL)
     const timePeriodParam = searchParams.get("timePeriod") || "WEEK";
     const validTimePeriods = ["DAY", "WEEK", "MONTH", "ALL"] as const;
     const timePeriod = validTimePeriods.includes(
@@ -166,116 +191,167 @@ export async function GET(request: NextRequest) {
       ? (timePeriodParam as "DAY" | "WEEK" | "MONTH" | "ALL")
       : "WEEK";
 
-    // Step 1: ALWAYS fetch top traders from the SELECTED time period leaderboard
-    // This ensures we show "who's active in this period" - which is the correct behavior
-    // The time period filter on activities ensures we only count trades within that period
-    const topTraders = await fetchTopTraders(whaleCount, timePeriod);
-
-    if (topTraders.length === 0) {
-      return NextResponse.json({
-        success: true,
-        activities: [],
-        whaleCount: 0,
-        totalTrades: 0,
-        lastUpdated: new Date().toISOString(),
-      });
-    }
-
-    // Step 2: Fetch recent activity for each whale in parallel
-    // For longer time periods, fetch more trades to capture historical data
+    // Step 1: Fetch leaderboard whales + global large trades in parallel
     const tradesMultiplier: Record<string, number> = {
       DAY: 1,
       WEEK: 1,
-      MONTH: 2, // Fetch 2x more trades for monthly data
-      ALL: 2, // Fetch 2x more trades for all-time data
+      MONTH: 2,
+      ALL: 2,
     };
     const adjustedTradesPerWhale = Math.min(
       tradesPerWhale * (tradesMultiplier[timePeriod] || 1),
-      100 // API limit
+      100
     );
 
-    const activityPromises = topTraders.map(async (trader) => {
-      const activities = await fetchTraderActivity(
-        trader.proxyWallet,
-        adjustedTradesPerWhale
-      );
-      return { trader, activities };
-    });
+    const [topTraders, globalTrades] = await Promise.all([
+      fetchTopTraders(whaleCount, timePeriod),
+      fetchGlobalLargeTrades(200),
+    ]);
 
-    const results = await Promise.all(activityPromises);
-
-    // Step 3: Transform and filter activities
+    const seenTxHashes = new Set<string>();
     const allActivities: WhaleActivity[] = [];
+    const leaderboardWallets = new Set(
+      topTraders.map((t) => t.proxyWallet.toLowerCase())
+    );
 
-    for (const { trader, activities } of results) {
-      for (const activity of activities) {
-        // Only include TRADE type activities
-        if (activity.type !== "TRADE") continue;
+    // Step 2: Fetch activity for each leaderboard whale (batched to avoid overwhelming the API)
+    const BATCH_SIZE = 10;
+    if (topTraders.length > 0) {
+      const results: {
+        trader: LeaderboardTrader;
+        activities: TradeActivity[];
+      }[] = [];
 
-        const usdcAmount = activity.usdcSize || 0;
+      for (let i = 0; i < topTraders.length; i += BATCH_SIZE) {
+        const batch = topTraders.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (trader) => {
+            const activities = await fetchTraderActivity(
+              trader.proxyWallet,
+              adjustedTradesPerWhale
+            );
+            return { trader, activities };
+          })
+        );
+        results.push(...batchResults);
+      }
 
-        // Filter by minimum trade size
-        if (usdcAmount < minTradeSize) continue;
+      for (const { trader, activities } of results) {
+        for (const activity of activities) {
+          if (activity.type !== "TRADE") continue;
 
-        // Convert Unix timestamp (seconds) to ISO string
-        const timestampISO = new Date(activity.timestamp * 1000).toISOString();
+          const usdcAmount = activity.usdcSize || 0;
+          if (usdcAmount < minTradeSize) continue;
 
-        allActivities.push({
-          id:
+          const txHash =
             activity.transactionHash ||
-            `${trader.proxyWallet}-${activity.timestamp}-${activity.outcomeIndex}-${activity.size}`,
-          timestamp: timestampISO,
-          trader: {
-            address: trader.proxyWallet,
-            name: trader.userName,
-            profileImage: trader.profileImage,
-            rank: Number.parseInt(trader.rank, 10),
-            totalPnl: trader.pnl,
-            totalVolume: trader.vol,
-          },
-          trade: {
-            side: activity.side,
-            size: activity.size || 0,
-            price: activity.price || 0,
-            usdcAmount,
-            outcome: activity.outcome,
-            outcomeIndex: activity.outcomeIndex,
-          },
-          market: {
-            conditionId: activity.conditionId || activity.asset || "",
-            title: activity.title || "Unknown Market",
-            slug: activity.slug || "",
-            eventSlug: activity.eventSlug || "",
-            image: activity.icon,
-          },
-        });
+            `${trader.proxyWallet}-${activity.timestamp}-${activity.outcomeIndex}-${activity.size}`;
+
+          if (seenTxHashes.has(txHash)) continue;
+          seenTxHashes.add(txHash);
+
+          const timestampISO = new Date(
+            activity.timestamp * 1000
+          ).toISOString();
+
+          allActivities.push({
+            id: txHash,
+            timestamp: timestampISO,
+            trader: {
+              address: trader.proxyWallet,
+              name: trader.userName,
+              profileImage: trader.profileImage,
+              rank: Number.parseInt(trader.rank, 10) || 0,
+              totalPnl: trader.pnl,
+              totalVolume: trader.vol,
+            },
+            trade: {
+              side: activity.side,
+              size: activity.size || 0,
+              price: activity.price || 0,
+              usdcAmount,
+              outcome: activity.outcome,
+              outcomeIndex: activity.outcomeIndex,
+            },
+            market: {
+              conditionId: activity.conditionId || "",
+              title: activity.title || "Unknown Market",
+              slug: activity.slug || "",
+              tokenId: activity.asset || "",
+              eventSlug: activity.eventSlug || "",
+              image: activity.icon,
+            },
+            source: "leaderboard",
+          });
+        }
       }
     }
 
-    // Step 4: Filter activities by time period
+    // Step 3: Add large trades from global scan (non-leaderboard wallets)
+    const globalMinTradeSize = Math.max(minTradeSize, 500);
+    for (const trade of globalTrades) {
+      if (leaderboardWallets.has(trade.proxyWallet.toLowerCase())) continue;
+
+      const usdValue = trade.size * trade.price;
+      if (usdValue < globalMinTradeSize) continue;
+
+      const txHash =
+        trade.transactionHash ||
+        `global-${trade.proxyWallet}-${trade.timestamp}`;
+      if (seenTxHashes.has(txHash)) continue;
+      seenTxHashes.add(txHash);
+
+      allActivities.push({
+        id: txHash,
+        timestamp: new Date(trade.timestamp * 1000).toISOString(),
+        trader: {
+          address: trade.proxyWallet,
+          name: trade.name || trade.pseudonym || null,
+          profileImage: trade.profileImage,
+          rank: 0,
+          totalPnl: 0,
+          totalVolume: 0,
+        },
+        trade: {
+          side: trade.side,
+          size: trade.size,
+          price: trade.price,
+          usdcAmount: usdValue,
+          outcome: trade.outcome,
+          outcomeIndex: trade.outcomeIndex,
+        },
+        market: {
+          conditionId: trade.conditionId,
+          title: trade.title || "Unknown Market",
+          slug: trade.slug || "",
+          eventSlug: trade.eventSlug || "",
+          image: trade.icon,
+          tokenId: trade.asset || "",
+        },
+        source: "global_scan",
+      });
+    }
+
+    // Step 4: Filter by time period
     const now = Date.now();
     const timePeriodMs: Record<string, number> = {
-      DAY: 24 * 60 * 60 * 1000, // 24 hours
-      WEEK: 7 * 24 * 60 * 60 * 1000, // 7 days
-      MONTH: 30 * 24 * 60 * 60 * 1000, // 30 days
+      DAY: 24 * 60 * 60 * 1000,
+      WEEK: 7 * 24 * 60 * 60 * 1000,
+      MONTH: 30 * 24 * 60 * 60 * 1000,
       ALL: Infinity,
     };
     const cutoffMs = timePeriodMs[timePeriod] || timePeriodMs.WEEK;
     const cutoffTime = cutoffMs === Infinity ? 0 : now - cutoffMs;
 
-    // Filter activities within the time period
     const filteredByTime = allActivities.filter((activity) => {
-      const activityTime = new Date(activity.timestamp).getTime();
-      return activityTime >= cutoffTime;
+      return new Date(activity.timestamp).getTime() >= cutoffTime;
     });
 
-    // Sort by timestamp (most recent first)
     filteredByTime.sort(
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    // Limit total results - use higher limits for longer time periods
     const resultLimit: Record<string, number> = {
       DAY: 500,
       WEEK: 500,
@@ -285,12 +361,15 @@ export async function GET(request: NextRequest) {
     const maxResults = resultLimit[timePeriod] || 500;
     const limitedActivities = filteredByTime.slice(0, maxResults);
 
+    const dataAge = now - fetchStartTime;
+
     return NextResponse.json({
       success: true,
       activities: limitedActivities,
       whaleCount: topTraders.length,
       totalTrades: limitedActivities.length,
       lastUpdated: new Date().toISOString(),
+      dataAge,
     } satisfies WhaleActivityResponse);
   } catch (error) {
     console.error("Whale activity API error:", error);
@@ -301,6 +380,7 @@ export async function GET(request: NextRequest) {
         whaleCount: 0,
         totalTrades: 0,
         lastUpdated: new Date().toISOString(),
+        dataAge: Date.now() - fetchStartTime,
         error: error instanceof Error ? error.message : "Unknown error",
       } satisfies WhaleActivityResponse,
       { status: 500 }

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ConnectionState } from "@/hooks/use-market-websocket";
+import type { ConnectionState } from "@/hooks/use-shared-websocket";
 import { useTopHolders } from "@/hooks/use-top-holders";
 import type { Position } from "@/hooks/use-user-positions";
 import { formatPrice, formatVolume } from "@/lib/formatters";

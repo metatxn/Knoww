@@ -9,8 +9,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useMemo } from "react";
-import type { ConnectionState } from "@/hooks/use-market-websocket";
 import { useLastTrade, useOrderBook } from "@/hooks/use-orderbook-store";
+import type { ConnectionState } from "@/hooks/use-shared-websocket";
 import { cn } from "@/lib/utils";
 
 /**
