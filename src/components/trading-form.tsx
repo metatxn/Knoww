@@ -160,9 +160,9 @@ export function TradingForm(props: TradingFormProps) {
                 </span>
               )}
               <span className="text-xs text-emerald-500 font-medium">
-                {yesProbability ??
-                  Math.round((selectedOutcome?.price ?? 0) * 100)}
-                % {selectedOutcome?.name || "Yes"}
+                {yesProbability != null
+                  ? `${yesProbability}% Yes`
+                  : `${Math.round((selectedOutcome?.price ?? 0) * 100)}% ${selectedOutcome?.name || "Yes"}`}
               </span>
             </div>
           </div>

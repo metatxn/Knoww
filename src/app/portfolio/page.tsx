@@ -14,6 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useConnection } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
 import { Navbar } from "@/components/navbar";
@@ -167,10 +168,15 @@ export default function PortfolioPage() {
     try {
       const result = await redeemPositions(conditionId, tradingAddress);
       if (result.success) {
+        toast.success("Position closed successfully");
         refetchTrades();
         refetchPositions();
         refreshProxyWallet();
+      } else {
+        toast.error("Failed to close position");
       }
+    } catch {
+      toast.error("Failed to close position");
     } finally {
       setClosingConditionId(null);
     }

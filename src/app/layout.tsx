@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { headers } from "next/headers";
+import { Toaster } from "sonner";
 import { MainContent } from "@/components/main-content";
 import { SidebarDesktopNoSSR } from "@/components/sidebar-desktop";
 import ContextProvider from "@/context";
@@ -133,6 +134,12 @@ export default async function RootLayout({
           <SidebarDesktopNoSSR />
           {/* Main content with responsive margin */}
           <MainContent>{children}</MainContent>
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            richColors
+            closeButton
+          />
         </ContextProvider>
       </body>
     </html>

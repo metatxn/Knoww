@@ -19,13 +19,13 @@ export function TabNav({
   ];
 
   return (
-    <div className="flex items-center border-b border-border">
+    <div className="flex items-center border-b border-border overflow-x-auto">
       {tabs.map((tab) => (
         <button
           type="button"
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
-          className={`relative px-5 py-3.5 text-sm font-medium transition-colors ${
+          className={`relative shrink-0 px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors ${
             activeTab === tab.id
               ? "text-foreground"
               : "text-muted-foreground hover:text-foreground"

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { isAllowedOrigin } from "@/lib/origin-guard";
 
 /**
  * Server-side RPC Proxy for Polygon
@@ -55,62 +56,19 @@ const BLOCKED_RPC_METHODS = new Set([
   "personal_importRawKey",
 ]);
 
-// Allowed origins whitelist - add your production/staging domains here
-const ALLOWED_ORIGINS_WHITELIST = [
-  "http://localhost:8000",
-  "http://localhost:8787",
-  "https://knoww.app",
-  "https://www.knoww.app",
-  // Add more allowed origins as needed
-];
-
 /**
- * Validates the request origin against the whitelist or env-configured value.
- * Returns the validated origin if allowed, or null if not allowed.
- */
-function getValidatedOrigin(requestOrigin: string | null): string | null {
-  if (!requestOrigin) {
-    return null;
-  }
-
-  // Priority 1: Check env-configured allowed origin (single origin)
-  const envAllowedOrigin = process.env.ALLOWED_ORIGIN;
-  if (envAllowedOrigin && requestOrigin === envAllowedOrigin) {
-    return requestOrigin;
-  }
-
-  // Priority 2: Check env-configured allowed origins (comma-separated list)
-  const envAllowedOrigins = process.env.ALLOWED_ORIGINS;
-  if (envAllowedOrigins) {
-    const originsArray = envAllowedOrigins.split(",").map((o) => o.trim());
-    if (originsArray.includes(requestOrigin)) {
-      return requestOrigin;
-    }
-  }
-
-  // Priority 3: Check against hardcoded whitelist
-  if (ALLOWED_ORIGINS_WHITELIST.includes(requestOrigin)) {
-    return requestOrigin;
-  }
-
-  return null;
-}
-
-/**
- * Generates CORS headers with the validated origin.
- * If origin is not validated, returns headers without Access-Control-Allow-Origin.
+ * Generates CORS headers for the validated origin.
+ * Uses the shared isAllowedOrigin() from origin-guard.ts so the
+ * whitelist is maintained in a single place.
  */
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
-  const validatedOrigin = getValidatedOrigin(requestOrigin);
-
   const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  if (validatedOrigin) {
-    headers["Access-Control-Allow-Origin"] = validatedOrigin;
-    // Vary header is important when origin can change based on request
+  if (requestOrigin && isAllowedOrigin(requestOrigin)) {
+    headers["Access-Control-Allow-Origin"] = requestOrigin;
     headers.Vary = "Origin";
   }
 
@@ -137,22 +95,15 @@ function getServerRpcUrl(): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Get the request origin for CORS validation
   const requestOrigin = request.headers.get("origin");
-  const validatedOrigin = getValidatedOrigin(requestOrigin);
 
-  // Reject requests from disallowed origins to prevent proxy abuse
-  if (!validatedOrigin) {
+  if (!requestOrigin || !isAllowedOrigin(requestOrigin)) {
     console.warn(
       "[RPC Proxy] Rejected request from disallowed origin:",
       requestOrigin || "(no origin)"
     );
     return NextResponse.json(
-      {
-        error: "Forbidden",
-        message:
-          "Origin not allowed. Cross-origin requests from this domain are not permitted.",
-      },
+      { error: "Forbidden: origin not allowed" },
       { status: 403 }
     );
   }
@@ -289,28 +240,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle preflight requests for CORS
 export async function OPTIONS(request: NextRequest) {
-  // Get the request origin for CORS validation
   const requestOrigin = request.headers.get("origin");
-  const validatedOrigin = getValidatedOrigin(requestOrigin);
 
-  // Reject preflight requests from disallowed origins
-  if (!validatedOrigin) {
-    console.warn(
-      "[RPC Proxy] Rejected OPTIONS preflight from disallowed origin:",
-      requestOrigin || "(no origin)"
-    );
-    return new NextResponse(null, {
-      status: 403,
-      statusText: "Forbidden - Origin not allowed",
-    });
+  if (!requestOrigin || !isAllowedOrigin(requestOrigin)) {
+    return new NextResponse(null, { status: 403 });
   }
-
-  const corsHeaders = getCorsHeaders(requestOrigin);
 
   return new NextResponse(null, {
     status: 200,
-    headers: corsHeaders,
+    headers: getCorsHeaders(requestOrigin),
   });
 }

@@ -7,7 +7,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   type PnLDataPoint,
@@ -312,11 +312,17 @@ export function PnLChart({
   const isPositive = (data?.summary?.endPnl || 0) >= 0;
   const hasData = data?.data && data.data.length > 0;
 
-  // Responsive height
-  const chartHeight =
-    typeof window !== "undefined" && window.innerWidth < 640
-      ? Math.min(height, 160)
-      : height;
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 639px)");
+    setIsSmallScreen(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  const chartHeight = isSmallScreen ? Math.min(height, 160) : height;
 
   return (
     <div className="rounded-xl sm:rounded-2xl bg-card border border-border overflow-hidden">

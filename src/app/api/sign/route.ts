@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { checkOriginAndFetchSite } from "@/lib/origin-guard";
 
 /**
  * Server-side proxy for the Builder Signing Server.
@@ -10,6 +11,12 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
  *
  * Flow:
  *   SDK (browser) → POST /api/sign  → this route → signing.knoww.app/sign
+ *
+ * Security layers:
+ *   1. Origin + Sec-Fetch-Site validation (blocks external / cross-origin callers)
+ *   2. Per-IP rate limiting (30 req/min)
+ *   3. Body size limit (10 KB)
+ *   4. Request timeout (15 s)
  *
  * Environment variables (server-only, NO NEXT_PUBLIC_ prefix):
  *   BUILDER_SIGNING_SERVER_URL – the upstream signing server URL
@@ -28,7 +35,11 @@ function getAuthToken(): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  // Rate limit: 30 requests per minute per IP
+  // Layer 1: Verify the request comes from our own app in a real browser
+  const originResponse = checkOriginAndFetchSite(request);
+  if (originResponse) return originResponse;
+
+  // Layer 2: Rate limit — 30 requests per minute per IP
   const rateLimitResponse = checkRateLimit(request, {
     uniqueTokenPerInterval: 30,
   });

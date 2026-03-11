@@ -230,9 +230,22 @@ export default function LiveMarketsPage() {
     return all.filter((event) => {
       if (liveIds.has(event.id)) return false;
       if (event.live || event.ended) return false;
-      const gst = event.markets?.[0]?.gameStartTime;
-      if (!gst) return false;
-      const startMs = new Date(gst).getTime();
+
+      // Use event.startDate first, then scan markets for earliest gameStartTime
+      let startMs = Number.NaN;
+      if (event.startDate) {
+        startMs = new Date(event.startDate).getTime();
+      }
+      if (Number.isNaN(startMs) && event.markets) {
+        for (const m of event.markets) {
+          if (!m.gameStartTime) continue;
+          const ms = new Date(m.gameStartTime).getTime();
+          if (!Number.isNaN(ms) && (Number.isNaN(startMs) || ms < startMs)) {
+            startMs = ms;
+          }
+        }
+      }
+      if (Number.isNaN(startMs)) return false;
       return startMs > now && startMs - now < 48 * 60 * 60 * 1000;
     });
   }, [scheduledData, rawEventsBase]);
@@ -396,7 +409,7 @@ export default function LiveMarketsPage() {
     if (!firstEvent?.markets?.length) return;
     const moneyline = findMoneyline(firstEvent.markets);
     const targetMarket = moneyline?.market ?? firstEvent.markets[0];
-    const info = buildSelectedMarket(firstEvent, targetMarket);
+    const { info } = buildSelectedMarket(firstEvent, targetMarket);
     if (info.outcomes.length >= 2 && info.outcomes.some((o) => o.tokenId)) {
       setSelectedMarket(info);
       setSelectedOutcomeIndex(0);
@@ -417,15 +430,14 @@ export default function LiveMarketsPage() {
     const outcomePrices = parseStringArray(market.outcomePrices).map(Number);
     const tokenIds = market.clobTokenIds || [];
 
-    const refreshedOutcomes = rawOutcomeNames.map((name, i) => {
-      const price = outcomePrices[i] ?? 0;
-      return {
+    const refreshedOutcomes = rawOutcomeNames
+      .map((name, i) => ({
         name,
         tokenId: tokenIds[i] || "",
-        price,
-        probability: Math.round(price * 100),
-      };
-    });
+        price: outcomePrices[i] ?? 0,
+        probability: Math.round((outcomePrices[i] ?? 0) * 100),
+      }))
+      .filter((o) => o.tokenId);
 
     const companionSlug =
       "_companionSlug" in market
@@ -445,6 +457,8 @@ export default function LiveMarketsPage() {
     };
 
     const isSame =
+      (nextSelectedMarket.eventSlug ?? "") ===
+        (selectedMarket.eventSlug ?? "") &&
       nextSelectedMarket.marketTitle === selectedMarket.marketTitle &&
       nextSelectedMarket.marketImage === selectedMarket.marketImage &&
       nextSelectedMarket.conditionId === selectedMarket.conditionId &&

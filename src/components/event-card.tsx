@@ -75,8 +75,12 @@ export function EventCard({
       ? `/events/detail/${event.id}`
       : "#";
   const marketCount = event.markets?.length || 0;
-  const hasLiveGame = liveGame && isGameLive(liveGame.status);
-  const hasFinishedGame = liveGame && isGameFinished(liveGame.status);
+  const hasLiveGame = liveGame
+    ? isGameLive(liveGame.status)
+    : event.live === true;
+  const hasFinishedGame = liveGame
+    ? isGameFinished(liveGame.status)
+    : event.ended === true;
 
   // Parse volume values
   const volume24hr =

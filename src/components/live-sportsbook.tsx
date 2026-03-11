@@ -459,18 +459,26 @@ function buildMoneylineDisplayData(
   };
 }
 
-function resolveOutcomeTokenIds(
-  market: EventMarket
-): Array<{ name: string; tokenId: string; price: number }> {
+function resolveOutcomeTokenIds(market: EventMarket): Array<{
+  name: string;
+  tokenId: string;
+  price: number;
+  originalIndex: number;
+}> {
+  if (!market.conditionId) return [];
+
   const outcomes: string[] = safeParse(market.outcomes, []);
   const prices: number[] = safeParse(market.outcomePrices, []).map(Number);
   const tokenIds = market.clobTokenIds || [];
 
-  return outcomes.map((name, i) => ({
-    name,
-    tokenId: tokenIds[i] || "",
-    price: prices[i] ?? 0,
-  }));
+  return outcomes
+    .map((name, i) => ({
+      name,
+      tokenId: tokenIds[i] || "",
+      price: prices[i] ?? 0,
+      originalIndex: i,
+    }))
+    .filter((o) => o.tokenId);
 }
 
 function normalizePrice(price: number): number {
@@ -799,26 +807,36 @@ export function mapOutcomeNames(
 export function buildSelectedMarket(
   event: LiveEvent,
   market: EventMarket
-): SelectedMarketInfo {
+): { info: SelectedMarketInfo; mapRawIndex: (raw: number) => number } {
   const resolved = resolveOutcomeTokenIds(market);
   const companionSlug =
     "_companionSlug" in market
       ? (market as { _companionSlug: string })._companionSlug
       : undefined;
+
+  // Build a map from original market outcome index → filtered array index
+  const rawToFiltered = new Map<number, number>();
+  resolved.forEach((o, filteredIdx) => {
+    rawToFiltered.set(o.originalIndex, filteredIdx);
+  });
+
   return {
-    marketId: market.id,
-    eventId: event.id,
-    eventSlug: companionSlug || event.slug,
-    eventTitle: event.title,
-    marketTitle: market.groupItemTitle || market.question || event.title,
-    marketImage: market.image ?? market.icon ?? event.image,
-    outcomes: resolved.map((o) => ({
-      name: o.name,
-      tokenId: o.tokenId,
-      price: o.price,
-      probability: Math.round(o.price * 100),
-    })),
-    conditionId: market.conditionId,
+    info: {
+      marketId: market.id,
+      eventId: event.id,
+      eventSlug: companionSlug || event.slug,
+      eventTitle: event.title,
+      marketTitle: market.groupItemTitle || market.question || event.title,
+      marketImage: market.image ?? market.icon ?? event.image,
+      outcomes: resolved.map((o) => ({
+        name: o.name,
+        tokenId: o.tokenId,
+        price: o.price,
+        probability: Math.round(o.price * 100),
+      })),
+      conditionId: market.conditionId,
+    },
+    mapRawIndex: (raw: number) => rawToFiltered.get(raw) ?? 0,
   };
 }
 
@@ -1335,8 +1353,10 @@ function SportEventRow({
 
   const handleRowClick = () => {
     if (!primaryMarket) return;
-    onMarketSelect(primaryMarket.market, 0);
-    setExpandedOutcomeIndex(0);
+    const displayedIndex =
+      moneylineDisplay.home?.outcomeIndex ?? primaryMarket.idx?.[0] ?? 0;
+    onMarketSelect(primaryMarket.market, displayedIndex);
+    setExpandedOutcomeIndex(displayedIndex);
     onToggleExpand(primaryMarket.market.id);
   };
 
@@ -1656,10 +1676,18 @@ function CompactEventRow({
   event,
   game,
   onMarketSelect,
+  expandedMarketId,
+  onToggleExpand,
+  onOpenExpand,
+  variant = "live",
 }: {
   event: LiveEvent;
   game: LiveGameState | null;
   onMarketSelect: (market: EventMarket, outcomeIndex: number) => void;
+  expandedMarketId: string | null;
+  onToggleExpand: (marketId: string) => void;
+  onOpenExpand: (marketId: string) => void;
+  variant?: "live" | "scheduled";
 }) {
   const moneyline = useMemo(
     () => (event.markets ? findMoneyline(event.markets) : null),
@@ -1687,21 +1715,133 @@ function CompactEventRow({
     event.markets?.find((m) => m.icon)?.icon ??
     event.image;
 
+  const expandedMarket = useMemo(() => {
+    if (!expandedMarketId) return null;
+    return event.markets?.find((m) => m.id === expandedMarketId) ?? null;
+  }, [event.markets, expandedMarketId]);
+  const [expandedOutcomeIndex, setExpandedOutcomeIndex] = useState(0);
+
+  const moneylineChartTokens = useMemo((): MoneylineChartToken[] => {
+    const CHART_COLORS = [
+      "hsl(221, 83%, 53%)",
+      "hsl(142, 76%, 36%)",
+      "hsl(35, 92%, 50%)",
+      "hsl(280, 100%, 70%)",
+    ];
+    const ml = moneylineDisplay;
+    if (!ml.primaryLine) return [];
+    const primaryMarketObj = ml.primaryLine.market;
+    const primaryOutcomes: string[] = safeParse(primaryMarketObj.outcomes, []);
+    if (
+      !isYesNoOutcomes(primaryOutcomes) &&
+      primaryMarketObj.clobTokenIds?.length
+    ) {
+      return ml.primaryLine.outcomes
+        .map((name, i) => {
+          const tokenId = primaryMarketObj.clobTokenIds?.[i] || "";
+          return tokenId
+            ? { tokenId, name, color: CHART_COLORS[i % CHART_COLORS.length] }
+            : null;
+        })
+        .filter((t): t is MoneylineChartToken => t !== null);
+    }
+    const tokens: MoneylineChartToken[] = [];
+    let colorIdx = 0;
+    if (ml.home) {
+      const tid = tokenIdForOutcome(ml.home.line.market, ml.home.outcomeIndex);
+      if (tid)
+        tokens.push({
+          tokenId: tid,
+          name: ml.teamNames[0],
+          color: CHART_COLORS[colorIdx++ % CHART_COLORS.length],
+        });
+    }
+    if (ml.away) {
+      const tid = tokenIdForOutcome(ml.away.line.market, ml.away.outcomeIndex);
+      if (tid)
+        tokens.push({
+          tokenId: tid,
+          name: ml.teamNames[1],
+          color: CHART_COLORS[colorIdx++ % CHART_COLORS.length],
+        });
+    }
+    if (ml.draw) {
+      const tid = tokenIdForOutcome(ml.draw.line.market, ml.draw.outcomeIndex);
+      if (tid)
+        tokens.push({
+          tokenId: tid,
+          name: "Draw",
+          color: CHART_COLORS[colorIdx % CHART_COLORS.length],
+        });
+    }
+    return tokens;
+  }, [moneylineDisplay]);
+
+  const primaryMarket = moneylineDisplay.primaryLine;
+
+  const handleCardTap = () => {
+    if (!primaryMarket) return;
+    const displayedIndex =
+      moneylineDisplay.home?.outcomeIndex ?? primaryMarket.idx?.[0] ?? 0;
+    onMarketSelect(primaryMarket.market, displayedIndex);
+    setExpandedOutcomeIndex(displayedIndex);
+    onToggleExpand(primaryMarket.market.id);
+  };
+
+  const handlePriceClick = (
+    e: React.MouseEvent,
+    choice: { line: ParsedBettingLine; outcomeIndex: number } | null
+  ) => {
+    e.stopPropagation();
+    if (!choice) return;
+    onMarketSelect(choice.line.market, choice.outcomeIndex);
+    setExpandedOutcomeIndex(choice.outcomeIndex);
+    onOpenExpand(choice.line.market.id);
+  };
+
   return (
-    <div className="border border-border/40 rounded-lg bg-card/50 backdrop-blur-sm overflow-hidden">
+    /* biome-ignore lint/a11y/useSemanticElements: can't use <button> — contains child <button> and <a> elements */
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleCardTap}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") handleCardTap();
+      }}
+      className={cn(
+        "border rounded-lg bg-card/50 backdrop-blur-sm overflow-hidden cursor-pointer transition-colors",
+        expandedMarket ? "border-primary/30" : "border-border/40"
+      )}
+    >
       <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border/30">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-600/90 text-white">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-            </span>
-            <span className="text-xs font-bold uppercase">LIVE</span>
-          </div>
-          {game?.period && (
-            <span className="text-xs font-semibold text-foreground/70">
-              {game.period}
-            </span>
+          {variant === "live" ? (
+            <>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-600/90 text-white">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                </span>
+                <span className="text-xs font-bold uppercase">LIVE</span>
+              </div>
+              {game?.period && (
+                <span className="text-xs font-semibold text-foreground/70">
+                  {game.period}
+                </span>
+              )}
+            </>
+          ) : (
+            (() => {
+              const gameStart = getGameStartTime(event);
+              return (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-sky-600/80 text-white">
+                  <Clock className="h-3 w-3" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {gameStart ? formatStartTime(gameStart) : "Scheduled"}
+                  </span>
+                </div>
+              );
+            })()
           )}
           {volume && (
             <span className="text-xs text-muted-foreground">
@@ -1709,13 +1849,16 @@ function CompactEventRow({
             </span>
           )}
         </div>
-        <Link
-          href={href}
-          className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-        >
-          Game View
-          <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: propagation guard */}
+        <span role="presentation" onClick={(e) => e.stopPropagation()}>
+          <Link
+            href={href}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+          >
+            Game View
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </span>
       </div>
       <div>
         <div
@@ -1739,10 +1882,16 @@ function CompactEventRow({
               price={moneylineDisplay.home.price}
               isFavored={homeFavored}
               className="text-xs px-2.5 py-1.5"
-              onClick={() => {
-                const choice = moneylineDisplay.home;
-                if (!choice) return;
-                onMarketSelect(choice.line.market, choice.outcomeIndex);
+              onClick={(e) => {
+                handlePriceClick(
+                  e,
+                  moneylineDisplay.home
+                    ? {
+                        line: moneylineDisplay.home.line,
+                        outcomeIndex: moneylineDisplay.home.outcomeIndex,
+                      }
+                    : null
+                );
               }}
             />
           )}
@@ -1751,10 +1900,16 @@ function CompactEventRow({
           <div className="flex justify-center px-3 py-0.5">
             <DrawButton
               price={moneylineDisplay.draw.price}
-              onClick={() => {
-                const choice = moneylineDisplay.draw;
-                if (!choice) return;
-                onMarketSelect(choice.line.market, choice.outcomeIndex);
+              onClick={(e) => {
+                handlePriceClick(
+                  e,
+                  moneylineDisplay.draw
+                    ? {
+                        line: moneylineDisplay.draw.line,
+                        outcomeIndex: moneylineDisplay.draw.outcomeIndex,
+                      }
+                    : null
+                );
               }}
             />
           </div>
@@ -1781,16 +1936,34 @@ function CompactEventRow({
                 price={moneylineDisplay.away.price}
                 isFavored={!homeFavored}
                 className="text-xs px-2.5 py-1.5"
-                onClick={() => {
-                  const choice = moneylineDisplay.away;
-                  if (!choice) return;
-                  onMarketSelect(choice.line.market, choice.outcomeIndex);
+                onClick={(e) => {
+                  handlePriceClick(
+                    e,
+                    moneylineDisplay.away
+                      ? {
+                          line: moneylineDisplay.away.line,
+                          outcomeIndex: moneylineDisplay.away.outcomeIndex,
+                        }
+                      : null
+                  );
                 }}
               />
             )}
           </div>
         )}
       </div>
+
+      {expandedMarket && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: propagation guard for expanded panel
+        <div role="presentation" onClick={(e) => e.stopPropagation()}>
+          <ExpandedMarketPanel
+            market={expandedMarket}
+            isExpanded
+            defaultOutcomeIndex={expandedOutcomeIndex}
+            moneylineChartTokens={moneylineChartTokens}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1876,6 +2049,9 @@ function LeagueSection({
                 <CompactEventRow
                   event={event}
                   game={game}
+                  expandedMarketId={expandedMarketId}
+                  onToggleExpand={onToggleExpand}
+                  onOpenExpand={onOpenExpand}
                   onMarketSelect={(market, idx) =>
                     onMarketSelect(event, market, idx)
                   }
@@ -1892,10 +2068,25 @@ function LeagueSection({
 // ── Time formatting for scheduled events ────────────────────────────
 
 function getGameStartTime(event: LiveEvent): Date | null {
-  const gst = event.markets?.[0]?.gameStartTime;
-  if (!gst) return null;
-  const d = new Date(gst);
-  return Number.isNaN(d.getTime()) ? null : d;
+  // Prefer event-level startDate
+  if (event.startDate) {
+    const d = new Date(event.startDate);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // Scan all markets for the earliest valid gameStartTime
+  if (event.markets) {
+    let earliest: Date | null = null;
+    for (const m of event.markets) {
+      if (!m.gameStartTime) continue;
+      const d = new Date(m.gameStartTime);
+      if (Number.isNaN(d.getTime())) continue;
+      if (!earliest || d.getTime() < earliest.getTime()) earliest = d;
+    }
+    if (earliest) return earliest;
+  }
+
+  return null;
 }
 
 function formatStartTime(date: Date): string {
@@ -2011,6 +2202,10 @@ function ScheduledLeagueSection({
                 <CompactEventRow
                   event={event}
                   game={game}
+                  variant="scheduled"
+                  expandedMarketId={expandedMarketId}
+                  onToggleExpand={onToggleExpand}
+                  onOpenExpand={onOpenExpand}
                   onMarketSelect={(market, idx) =>
                     onMarketSelect(event, market, idx)
                   }
@@ -2047,7 +2242,8 @@ export function LiveSportsbook({
   const handleMarketSelect = useCallback(
     (event: LiveEvent, market: EventMarket, outcomeIndex: number) => {
       if (!onMarketSelect) return;
-      onMarketSelect(buildSelectedMarket(event, market), outcomeIndex);
+      const { info, mapRawIndex } = buildSelectedMarket(event, market);
+      onMarketSelect(info, mapRawIndex(outcomeIndex));
     },
     [onMarketSelect]
   );
@@ -2147,7 +2343,8 @@ export function ScheduledSportsbook({
   const handleMarketSelect = useCallback(
     (event: LiveEvent, market: EventMarket, outcomeIndex: number) => {
       if (!onMarketSelect) return;
-      onMarketSelect(buildSelectedMarket(event, market), outcomeIndex);
+      const { info, mapRawIndex } = buildSelectedMarket(event, market);
+      onMarketSelect(info, mapRawIndex(outcomeIndex));
     },
     [onMarketSelect]
   );

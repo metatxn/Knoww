@@ -220,6 +220,8 @@ export function HistoryTable({
                 {isLost && onCloseLostPosition && trade.market.conditionId ? (
                   <button
                     type="button"
+                    aria-label="Close lost position"
+                    title="Close lost position"
                     onClick={() =>
                       onCloseLostPosition(trade.market.conditionId as string)
                     }
@@ -237,6 +239,8 @@ export function HistoryTable({
                     href={`https://polygonscan.com/tx/${trade.transactionHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="View transaction on Polygonscan"
+                    title="View transaction on Polygonscan"
                     className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
                   >
                     <ExternalLink className="h-4 w-4" />

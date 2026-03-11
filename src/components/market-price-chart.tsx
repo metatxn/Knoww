@@ -481,10 +481,15 @@ export function MarketPriceChart({
                           const config = chartConfig[configKey];
                           const label = config?.label || entry.name;
                           const color = entry.color || config?.color || "#888";
+                          const entryKey =
+                            typeof entry.dataKey === "string" ||
+                            typeof entry.dataKey === "number"
+                              ? entry.dataKey
+                              : String(configKey);
 
                           return (
                             <div
-                              key={entry.dataKey}
+                              key={entryKey}
                               className="flex items-center gap-2"
                             >
                               <span

@@ -207,7 +207,7 @@ export function usePaginatedEvents({
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     initialPageParam: 0,
-    staleTime: refetchInterval > 0 ? refetchInterval : 60000,
+    staleTime: refetchInterval > 0 ? refetchInterval : undefined,
     refetchInterval: refetchInterval > 0 ? refetchInterval : false,
     refetchOnWindowFocus: false,
     enabled,

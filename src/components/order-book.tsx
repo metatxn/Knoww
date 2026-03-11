@@ -492,19 +492,17 @@ export function OrderBook({
           <div className={embedded ? "" : "border-t border-border"}>
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <thead>
-                <tr className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-4 py-2 w-16">
-                    Trade {currentOutcome?.name}
-                  </th>
-                  <th className="text-right px-4 py-2">Price</th>
-                  <th className="text-right px-4 py-2">Shares</th>
-                  <th className="text-right px-4 py-2">Total</th>
+                <tr className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="text-left px-2 sm:px-4 py-2" />
+                  <th className="text-right px-2 sm:px-4 py-2">Price</th>
+                  <th className="text-right px-2 sm:px-4 py-2">Shares</th>
+                  <th className="text-right px-2 sm:px-4 py-2">Total</th>
                 </tr>
               </thead>
             </table>
@@ -514,10 +512,10 @@ export function OrderBook({
           <div className="relative">
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <tbody>
                 {processedData.asks.map((level, index) => {
@@ -532,7 +530,7 @@ export function OrderBook({
                         onPriceClick?.(Number.parseFloat(level.price), "SELL")
                       }
                     >
-                      <td className="relative px-4 py-1.5 w-16">
+                      <td className="relative px-2 sm:px-4 py-1.5">
                         <div
                           className="absolute left-0 top-0 bottom-0 bg-red-500/20 transition-all duration-300"
                           style={{
@@ -540,18 +538,18 @@ export function OrderBook({
                           }}
                         />
                         {index === processedData.asks.length - 1 && (
-                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                          <span className="relative text-[10px] font-medium px-1 sm:px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
                             Asks
                           </span>
                         )}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-red-400 font-medium text-sm">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-red-400 font-medium text-sm">
                         {formatPrice(level.price)}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm tabular-nums">
                         {formatSize(size)}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
                         {formatDollar(processedData.askCumTotals[index])}
                       </td>
                     </tr>
@@ -561,14 +559,14 @@ export function OrderBook({
             </table>
 
             {processedData.asks.length === 0 && (
-              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+              <div className="px-2 sm:px-4 py-4 text-center text-xs text-muted-foreground">
                 No asks available
               </div>
             )}
           </div>
 
           {/* Spread Divider */}
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border-y border-border">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-muted/20 border-y border-border">
             <div className="text-xs text-muted-foreground">
               Last:{" "}
               <span className="text-foreground font-medium">
@@ -587,10 +585,10 @@ export function OrderBook({
           <div className="relative">
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <tbody>
                 {processedData.bids.map((level, index) => {
@@ -605,7 +603,7 @@ export function OrderBook({
                         onPriceClick?.(Number.parseFloat(level.price), "BUY")
                       }
                     >
-                      <td className="relative px-4 py-1.5 w-16">
+                      <td className="relative px-2 sm:px-4 py-1.5">
                         <div
                           className="absolute left-0 top-0 bottom-0 bg-green-500/20 transition-all duration-300"
                           style={{
@@ -613,18 +611,18 @@ export function OrderBook({
                           }}
                         />
                         {index === 0 && (
-                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
+                          <span className="relative text-[10px] font-medium px-1 sm:px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                             Bids
                           </span>
                         )}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-green-400 font-medium text-sm">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-green-400 font-medium text-sm">
                         {formatPrice(level.price)}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm tabular-nums">
                         {formatSize(size)}
                       </td>
-                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
                         {formatDollar(processedData.bidCumTotals[index])}
                       </td>
                     </tr>
@@ -634,7 +632,7 @@ export function OrderBook({
             </table>
 
             {processedData.bids.length === 0 && (
-              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+              <div className="px-2 sm:px-4 py-4 text-center text-xs text-muted-foreground">
                 No bids available
               </div>
             )}

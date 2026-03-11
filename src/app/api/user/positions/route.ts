@@ -140,61 +140,72 @@ export async function GET(request: NextRequest) {
       queryParams.set("market", market);
     }
 
-    const fullUrl = `${DATA_API_BASE}/positions?${queryParams.toString()}`;
-
-    // Fetch positions from Polymarket Data API
-    const response = await fetch(fullUrl, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[positions] API error:", errorText);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to fetch positions from Polymarket",
-          details: response.status,
-        },
-        { status: response.status }
-      );
-    }
-
-    const allPositions: PolymarketPosition[] = await response.json();
-
-    // Separate active/winning positions from resolved-lost positions.
+    // Fetch pages from upstream until we have `limit` active positions
+    // or exhaust all upstream records. This avoids returning fewer active
+    // positions than requested when some rows are lost/redeemable.
     const positions: PolymarketPosition[] = [];
     const lostPositions: PolymarketPosition[] = [];
+    let upstreamOffset = offset;
+    const maxUpstreamPages = 5;
 
-    for (const p of allPositions) {
-      if (p.redeemable && p.curPrice === 0) {
-        lostPositions.push(p);
-      } else {
-        positions.push(p);
+    for (let page = 0; page < maxUpstreamPages; page++) {
+      queryParams.set("offset", upstreamOffset.toString());
+      const fullUrl = `${DATA_API_BASE}/positions?${queryParams.toString()}`;
+
+      const response = await fetch(fullUrl, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[positions] API error:", errorText);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to fetch positions from Polymarket",
+            details: response.status,
+          },
+          { status: response.status }
+        );
       }
+
+      const batch: PolymarketPosition[] = await response.json();
+
+      for (const p of batch) {
+        if (p.redeemable && p.curPrice === 0) {
+          lostPositions.push(p);
+        } else {
+          positions.push(p);
+        }
+      }
+
+      // Stop if upstream returned fewer rows than limit (last page) or we have enough
+      if (batch.length < limit || positions.length >= limit) break;
+      upstreamOffset += batch.length;
     }
 
+    const hasMore = positions.length > limit;
+    const trimmedPositions = positions.slice(0, limit);
+
     // Calculate totals using actual field names from API
-    const totalValue = positions.reduce(
+    const totalValue = trimmedPositions.reduce(
       (sum, p) => sum + (p.currentValue || 0),
       0
     );
 
-    const totalUnrealizedPnl = positions.reduce(
+    const totalUnrealizedPnl = trimmedPositions.reduce(
       (sum, p) => sum + (p.cashPnl || 0),
       0
     );
 
-    const totalRealizedPnl = positions.reduce(
+    const totalRealizedPnl = trimmedPositions.reduce(
       (sum, p) => sum + (p.realizedPnl || 0),
       0
     );
 
     // Transform positions for frontend
-    const transformedPositions = positions.map((p) => ({
+    const transformedPositions = trimmedPositions.map((p) => ({
       id: `${p.conditionId}-${p.outcomeIndex}`,
       asset: p.asset,
       conditionId: p.conditionId,
@@ -253,12 +264,12 @@ export async function GET(request: NextRequest) {
         totalUnrealizedPnl,
         totalRealizedPnl,
         totalPnl: totalUnrealizedPnl + totalRealizedPnl,
-        positionCount: positions.length,
+        positionCount: trimmedPositions.length,
       },
       pagination: {
         limit,
         offset,
-        hasMore: positions.length === limit,
+        hasMore,
       },
     });
   } catch (error) {

@@ -11,12 +11,13 @@ export function formatVolume(vol?: number | string) {
 }
 
 /**
- * Format a price (0-1) into cents (e.g., 0.5 -> 50¢)
+ * Format a price (0-1) into cents with one decimal (e.g., 0.753 -> 75.3¢)
+ * Uses one decimal place for sub-cent precision consistent with order book and trading UI.
  */
 export function formatPrice(price: string | number) {
   const num = typeof price === "string" ? Number.parseFloat(price) : price;
-  if (Number.isNaN(num)) return "0¢";
-  return `${(num * 100).toFixed(0)}¢`;
+  if (Number.isNaN(num)) return "0.0¢";
+  return `${(num * 100).toFixed(1)}¢`;
 }
 
 /**
