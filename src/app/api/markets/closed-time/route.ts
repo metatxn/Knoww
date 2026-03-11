@@ -4,6 +4,12 @@ import { getCacheHeaders } from "@/lib/cache-headers";
 import { getClobHost } from "@/lib/polymarket";
 
 /**
+ * Polymarket condition IDs are hex strings, optionally 0x-prefixed.
+ * Reject anything that could cause path traversal or URL manipulation.
+ */
+const CONDITION_ID_RE = /^(?:0x)?[a-fA-F0-9]{1,128}$/;
+
+/**
  * GET /api/markets/closed-time?ids=conditionId1,conditionId2,...
  *
  * Returns `end_date_iso` for each condition ID by querying the CLOB API.
@@ -37,12 +43,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  if (conditionIds.some((id) => !CONDITION_ID_RE.test(id))) {
+    return NextResponse.json(
+      { success: false, error: "Invalid condition ID format" },
+      { status: 400 }
+    );
+  }
+
   const host = getClobHost();
   const closedTimes: Record<string, string> = {};
 
   const results = await Promise.allSettled(
     conditionIds.map(async (id) => {
-      const res = await fetch(`${host}/markets/${id}`);
+      const res = await fetch(`${host}/markets/${encodeURIComponent(id)}`);
       if (!res.ok) return { id, date: null };
       const data = (await res.json()) as {
         end_date_iso?: string;
