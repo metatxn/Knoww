@@ -58,6 +58,7 @@ const BLOCKED_RPC_METHODS = new Set([
 // Allowed origins whitelist - add your production/staging domains here
 const ALLOWED_ORIGINS_WHITELIST = [
   "http://localhost:8000",
+  "http://localhost:8787",
   "https://knoww.app",
   "https://www.knoww.app",
   // Add more allowed origins as needed

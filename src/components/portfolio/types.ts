@@ -62,6 +62,7 @@ export interface Trade {
   outcome: string;
   transactionHash: string;
   market: {
+    conditionId?: string;
     title: string;
     slug: string;
     icon: string;

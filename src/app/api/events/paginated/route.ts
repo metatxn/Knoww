@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     const closed = searchParams.get("closed") || "false";
     const order = searchParams.get("order") || "volume24hr";
     const ascending = searchParams.get("ascending") || "false";
+    const fullMarkets = searchParams.get("markets") === "full";
 
     // Extract filter parameters
     const volume24hrMin = searchParams.get("volume24hr_min");
@@ -177,10 +178,31 @@ export async function GET(request: NextRequest) {
       ended: event.ended,
       competitive: event.competitive,
       negRisk: event.enableNegRisk || event.negRiskAugmented,
+      score: event.score,
       startDate: event.startDate,
       endDate: event.endDate,
-      // Only return what's necessary for market count
-      markets: event.markets?.map((m: GammaMarket) => ({ id: m.id })),
+      markets: event.markets?.map((m: GammaMarket) =>
+        fullMarkets
+          ? {
+              id: m.id,
+              question: m.question,
+              outcomes: m.outcomes,
+              outcomePrices: m.outcomePrices,
+              groupItemTitle: m.groupItemTitle,
+              image: m.image,
+              icon: m.icon,
+              clobTokenIds: (() => {
+                try {
+                  return JSON.parse(m.clobTokenIds || "[]");
+                } catch {
+                  return [];
+                }
+              })(),
+              conditionId: m.conditionId,
+              gameStartTime: m.gameStartTime,
+            }
+          : { id: m.id }
+      ),
       tags: event.tags?.map((t: GammaTag | string) =>
         typeof t === "string" ? t : { id: t.id, slug: t.slug, label: t.label }
       ),

@@ -165,16 +165,17 @@ export async function GET(request: NextRequest) {
 
     const allPositions: PolymarketPosition[] = await response.json();
 
-    // Filter to show only OPEN positions (not redeemable = market not resolved)
-    // - redeemable: false = market is still open/active (show these)
-    // - redeemable: true = market is resolved (hide unless won)
-    // - curPrice > 0 = position has value
-    // - curPrice = 0 = position is worthless (lost bet on resolved market)
-    const positions = allPositions.filter((p) => {
-      const isOpenPosition = !p.redeemable;
-      const isWinningRedeemable = p.redeemable && p.curPrice > 0;
-      return isOpenPosition || isWinningRedeemable;
-    });
+    // Separate active/winning positions from resolved-lost positions.
+    const positions: PolymarketPosition[] = [];
+    const lostPositions: PolymarketPosition[] = [];
+
+    for (const p of allPositions) {
+      if (p.redeemable && p.curPrice === 0) {
+        lostPositions.push(p);
+      } else {
+        positions.push(p);
+      }
+    }
 
     // Calculate totals using actual field names from API
     const totalValue = positions.reduce(
@@ -223,10 +224,30 @@ export async function GET(request: NextRequest) {
       },
     }));
 
+    const transformedLostPositions = lostPositions.map((p) => ({
+      id: `${p.conditionId}-${p.outcomeIndex}`,
+      asset: p.asset,
+      conditionId: p.conditionId,
+      outcomeIndex: p.outcomeIndex,
+      outcome: p.outcome,
+      size: p.size,
+      avgPrice: p.avgPrice,
+      initialValue: p.initialValue,
+      endDate: p.endDate,
+      market: {
+        title: p.title,
+        slug: p.slug,
+        eventSlug: p.eventSlug,
+        eventId: p.eventId,
+        icon: p.icon,
+      },
+    }));
+
     return NextResponse.json({
       success: true,
       user,
       positions: transformedPositions,
+      lostPositions: transformedLostPositions,
       summary: {
         totalValue,
         totalUnrealizedPnl,

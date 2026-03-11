@@ -630,6 +630,15 @@ html.softpop {
   }
 }
 
+@media (min-width: 1024px) {
+  .event-grid-live {
+    grid-template-columns: auto auto minmax(220px, 380px) auto auto auto;
+  }
+  .event-grid-scheduled {
+    grid-template-columns: auto minmax(220px, 380px) auto auto auto;
+  }
+}
+
 @keyframes gradient-x {
   0% {
     background-position: 0% 50%;

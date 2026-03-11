@@ -26,6 +26,7 @@ export interface GammaEvent {
   competitive?: number;
   enableNegRisk?: boolean;
   negRiskAugmented?: boolean;
+  score?: string;
   startDate?: string;
   endDate?: string;
   markets?: GammaMarket[];
@@ -39,6 +40,14 @@ export interface GammaMarket {
   id: string;
   question?: string;
   slug?: string;
+  outcomes?: string;
+  outcomePrices?: string;
+  groupItemTitle?: string;
+  image?: string;
+  icon?: string;
+  clobTokenIds?: string;
+  conditionId?: string;
+  gameStartTime?: string;
 }
 
 /**

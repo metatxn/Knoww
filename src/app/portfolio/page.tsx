@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "wagmi";
 import { DepositModal } from "@/components/deposit-modal";
 import { Navbar } from "@/components/navbar";
@@ -32,9 +32,11 @@ import type {
   SortDirection,
   SortField,
   TabType,
+  Trade,
 } from "@/components/portfolio/types";
 import { Button } from "@/components/ui/button";
 import { WithdrawModal } from "@/components/withdraw-modal";
+import { useCtfOperations } from "@/hooks/use-ctf-operations";
 import { useCancelOrder, useOpenOrders } from "@/hooks/use-open-orders";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useUserDetails } from "@/hooks/use-user-details";
@@ -42,6 +44,17 @@ import { useUserPnL } from "@/hooks/use-user-pnl";
 import { useUserPositions } from "@/hooks/use-user-positions";
 import { useUserTrades } from "@/hooks/use-user-trades";
 import { formatAddress, formatCurrency } from "@/lib/formatters";
+
+function areClosedTimesEqual(
+  prev: Record<string, string>,
+  next: Record<string, string>
+) {
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+
+  if (prevKeys.length !== nextKeys.length) return false;
+  return prevKeys.every((key) => prev[key] === next[key]);
+}
 
 export default function PortfolioPage() {
   const { isConnected, address } = useConnection();
@@ -105,6 +118,10 @@ export default function PortfolioPage() {
 
   const { mutate: cancelOrder } = useCancelOrder();
   const [cancellingOrderId, setCancellingOrderId] = useState<string>();
+  const { redeemPositions, isLoading: isRedeemingLost } = useCtfOperations();
+  const [closingConditionId, setClosingConditionId] = useState<string | null>(
+    null
+  );
 
   // Sell position modal state
   const [sellPosition, setSellPosition] = useState<Position | null>(null);
@@ -144,32 +161,52 @@ export default function PortfolioPage() {
     }
   };
 
+  const handleCloseLostPosition = async (conditionId: string) => {
+    if (!tradingAddress || isRedeemingLost) return;
+    setClosingConditionId(conditionId);
+    try {
+      const result = await redeemPositions(conditionId, tradingAddress);
+      if (result.success) {
+        refetchTrades();
+        refetchPositions();
+        refreshProxyWallet();
+      }
+    } finally {
+      setClosingConditionId(null);
+    }
+  };
+
   // Handle sell position
   const handleSellPosition = (position: Position) => {
     setSellPosition(position);
     setShowSellModal(true);
   };
 
+  const sellRefetchTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearSellRefetchTimers = useCallback(() => {
+    for (const id of sellRefetchTimers.current) clearTimeout(id);
+    sellRefetchTimers.current = [];
+  }, []);
+
+  useEffect(() => clearSellRefetchTimers, [clearSellRefetchTimers]);
+
   const handleSellSuccess = () => {
-    // Immediate refetch
+    clearSellRefetchTimers();
+
     refetchPositions();
     refreshProxyWallet();
 
-    // Multiple delayed refetches to catch backend updates
     // Polymarket's Data API can take 10-30 seconds to update positions
     const refetchAll = () => {
       refetchPositions();
       refreshProxyWallet();
     };
 
-    // More aggressive refetch schedule to catch Polymarket backend updates
-    setTimeout(refetchAll, 1000);
-    setTimeout(refetchAll, 3000);
-    setTimeout(refetchAll, 5000);
-    setTimeout(refetchAll, 10000);
-    setTimeout(refetchAll, 15000);
-    setTimeout(refetchAll, 20000);
-    setTimeout(refetchAll, 30000);
+    const delays = [1000, 3000, 5000, 10000, 15000, 20000, 30000];
+    for (const ms of delays) {
+      sellRefetchTimers.current.push(setTimeout(refetchAll, ms));
+    }
 
     setSellPosition(null);
   };
@@ -186,6 +223,92 @@ export default function PortfolioPage() {
     );
   }, [positionsData?.positions]);
   const pnlPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+
+  // Resolve accurate closedTime timestamps for lost positions via same-origin API.
+  const lostPositions = useMemo(
+    () => positionsData?.lostPositions ?? [],
+    [positionsData?.lostPositions]
+  );
+  const [closedTimes, setClosedTimes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!lostPositions.length) {
+      setClosedTimes((prev) => (Object.keys(prev).length ? {} : prev));
+      return;
+    }
+
+    const conditionIds = [...new Set(lostPositions.map((p) => p.conditionId))];
+    let cancelled = false;
+
+    fetch(`/api/markets/closed-time?ids=${conditionIds.join(",")}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const payload = data as { closedTimes?: Record<string, string> } | null;
+        if (!cancelled && payload?.closedTimes) {
+          const nextClosedTimes = payload.closedTimes;
+          setClosedTimes((prev) =>
+            areClosedTimesEqual(prev, nextClosedTimes) ? prev : nextClosedTimes
+          );
+        }
+      })
+      .catch(() => {
+        // keep fallback timestamps
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lostPositions]);
+
+  const mergedHistory = useMemo<Trade[]>(() => {
+    const trades: Trade[] = tradesData?.trades || [];
+    if (!lostPositions.length) return trades;
+
+    const syntheticLost: Trade[] = lostPositions.map((lp) => {
+      const resolvedTimestamp = closedTimes[lp.conditionId] || lp.endDate;
+      const timestamp = resolvedTimestamp.includes("T")
+        ? resolvedTimestamp
+        : `${resolvedTimestamp}T23:59:59Z`;
+
+      return {
+        id: `lost-${lp.conditionId}-${lp.outcomeIndex}`,
+        timestamp,
+        type: "REDEEM",
+        side: null,
+        size: lp.size,
+        price: lp.avgPrice,
+        usdcAmount: 0,
+        outcome: lp.outcome,
+        transactionHash: "",
+        market: {
+          conditionId: lp.conditionId,
+          title: lp.market.title,
+          slug: lp.market.slug,
+          icon: lp.market.icon,
+        },
+      };
+    });
+
+    // Avoid duplicate entries if activity already contains a matching redeem row.
+    const knownLostKeys = new Set(
+      trades
+        .filter((t) => t.type === "REDEEM")
+        .map((t) => `${t.market.conditionId}-${t.outcome}`)
+    );
+
+    const merged = [
+      ...trades,
+      ...syntheticLost.filter(
+        (t) => !knownLostKeys.has(`${t.market.conditionId}-${t.outcome}`)
+      ),
+    ];
+
+    merged.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    return merged;
+  }, [tradesData?.trades, lostPositions, closedTimes]);
 
   // Not connected state
   if (!isConnected) {
@@ -410,9 +533,11 @@ export default function PortfolioPage() {
                 exit={{ opacity: 0 }}
               >
                 <HistoryTable
-                  trades={tradesData?.trades || []}
-                  isLoading={loadingTrades}
+                  trades={mergedHistory}
+                  isLoading={loadingTrades || loadingPositions}
                   searchQuery={searchQuery}
+                  onCloseLostPosition={handleCloseLostPosition}
+                  closingPositionId={closingConditionId}
                 />
               </motion.div>
             )}

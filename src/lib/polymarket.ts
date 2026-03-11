@@ -95,7 +95,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://knoww.app",
   "https://www.knoww.app",
   "http://localhost:8000",
-  "http://localhost:3000",
+  "http://localhost:8787",
 ] as const;
 
 /**

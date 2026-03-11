@@ -51,6 +51,7 @@ export function TradingForm(props: TradingFormProps) {
     isLiveData = false,
     maxSlippagePercent = 2,
     conditionId,
+    disableSticky = false,
   } = props;
 
   const { open } = useAppKit();
@@ -127,7 +128,7 @@ export function TradingForm(props: TradingFormProps) {
   const formatCents = (price: number) => `${(price * 100).toFixed(1)}¢`;
 
   return (
-    <div className="sticky top-4 w-full">
+    <div className={disableSticky ? "w-full" : "sticky top-4 w-full"}>
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
         {/* Market Header */}
         <div className="flex items-center gap-3 p-4 border-b border-border">
@@ -161,7 +162,7 @@ export function TradingForm(props: TradingFormProps) {
               <span className="text-xs text-emerald-500 font-medium">
                 {yesProbability ??
                   Math.round((selectedOutcome?.price ?? 0) * 100)}
-                % Yes
+                % {selectedOutcome?.name || "Yes"}
               </span>
             </div>
           </div>
@@ -174,7 +175,7 @@ export function TradingForm(props: TradingFormProps) {
             <div className="flex-1 min-w-0">
               <OrderTypeToggle orderType={orderType} onChange={setOrderType} />
             </div>
-            {/* More Menu - Only show when user has credentials and conditionId is available */}
+            {/* More Menu — Split/Merge require a conditionId */}
             {hasCredentials && conditionId && (
               <div className="relative shrink-0" ref={moreMenuRef}>
                 <button
@@ -508,7 +509,7 @@ export function TradingForm(props: TradingFormProps) {
       )}
 
       {/* Merge Shares Modal */}
-      {conditionId && outcomes.length >= 2 && (
+      {conditionId && (
         <MergeSharesModal
           open={showMergeModal}
           onOpenChange={setShowMergeModal}
