@@ -94,6 +94,19 @@ export function useWhaleLiveFeed(options: UseWhaleLiveFeedOptions = {}) {
 
       if (usdcAmount < minTradeSizeRef.current) return;
 
+      const raw = event.timestamp;
+      let isoTimestamp = raw;
+      if (raw && raw !== "") {
+        const numericTs = Number(raw);
+        if (Number.isFinite(numericTs) && numericTs > 0) {
+          const ms = numericTs > 1e12 ? numericTs : numericTs * 1000;
+          const d = new Date(ms);
+          if (Number.isFinite(d.getTime())) {
+            isoTimestamp = d.toISOString();
+          }
+        }
+      }
+
       const trade: LiveTrade = {
         id: `live-${event.asset_id}-${event.timestamp}-${Math.random().toString(36).slice(2, 8)}`,
         assetId: event.asset_id,
@@ -101,7 +114,7 @@ export function useWhaleLiveFeed(options: UseWhaleLiveFeedOptions = {}) {
         price,
         size,
         side: event.side,
-        timestamp: event.timestamp,
+        timestamp: isoTimestamp,
         usdcAmount,
       };
 

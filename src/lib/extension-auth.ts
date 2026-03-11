@@ -2,7 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const MAX_TIMESTAMP_DRIFT_MS = 60_000;
 
-const ALLOWED_ORIGINS = ["chrome-extension://ialnajflhafkmfnglapjaegjpbdifcmc"];
+const ALLOWED_ORIGINS = [
+  "chrome-extension://ialnajflhafkmfnglapjaegjpbdifcmc",
+  "chrome-extension://naoaonihikedoiemhbolbnolibpmojgf",
+];
 
 const ALLOWED_REFERER_HOSTS = new Set(["knoww.app", "www.knoww.app"]);
 

@@ -918,7 +918,7 @@ export default function EventDetailClient({
 
         {/* Main Content: Chart + Trading Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Left Column: Chart + Outcomes Table + Comments */}
+          {/* Left Column: Chart + Outcomes Table */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Chart */}
             <Card>
@@ -1002,25 +1002,10 @@ export default function EventDetailClient({
                 onSellSuccess={handleSellSuccess}
               />
             </ErrorBoundary>
-
-            {/* Comments Section - Now inside the left column on desktop */}
-            {event?.id && (
-              <ErrorBoundary name="Comments Section">
-                <CommentsSection
-                  eventId={Number.parseInt(event.id, 10)}
-                  variant="card"
-                  tokenMarketMap={tokenMarketMap}
-                  // TODO: Uncomment when POST comments API is available
-                  // isConnected={hasProxyWallet}
-                  // userAddress={proxyAddress}
-                />
-              </ErrorBoundary>
-            )}
           </div>
 
-          {/* Trading Panel - Sticky on desktop */}
-          <div className="lg:col-span-1 lg:sticky lg:top-20 lg:self-start">
-            {/* Trading Form with Merged Header */}
+          {/* Trading Panel - Sticky on desktop, spans both rows so it sticks alongside comments too */}
+          <div className="lg:col-span-1 lg:row-span-2 lg:sticky lg:top-20 lg:self-start">
             {selectedMarket && tradingOutcomes.length > 0 && (
               <ErrorBoundary name="Trading Form">
                 <TradingForm
@@ -1048,6 +1033,19 @@ export default function EventDetailClient({
               </ErrorBoundary>
             )}
           </div>
+
+          {/* Comments Section - appears after trading form on mobile, below outcomes on desktop */}
+          {event?.id && (
+            <div className="lg:col-span-2">
+              <ErrorBoundary name="Comments Section">
+                <CommentsSection
+                  eventId={Number.parseInt(event.id, 10)}
+                  variant="card"
+                  tokenMarketMap={tokenMarketMap}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
         </div>
       </main>
     </div>

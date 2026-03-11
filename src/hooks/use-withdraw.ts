@@ -6,6 +6,7 @@ import { encodeFunctionData, parseUnits } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
 import { USDC_E_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { createBuilderConfig } from "@/lib/remote-builder-config";
 import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 import { PROXY_WALLET_QUERY_KEY, useProxyWallet } from "./use-proxy-wallet";
 
@@ -208,12 +209,8 @@ export function useWithdraw() {
 
     // Dynamic import to avoid SSR issues
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
-    const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
-
-    const builderConfig = new BuilderConfig({
-      remoteBuilderConfig: {
-        url: signProxyUrl,
-      },
+    const builderConfig = createBuilderConfig({
+      url: signProxyUrl,
     });
 
     const client = new RelayClient(

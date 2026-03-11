@@ -354,15 +354,26 @@ export function useClobCredentials() {
       let creds: { key: string; secret: string; passphrase: string };
 
       try {
-        console.log("[ClobCredentials] Using createOrDeriveApiKey...");
-        creds = await clobClient.createOrDeriveApiKey();
-        console.log("[ClobCredentials] Successfully obtained API credentials");
-      } catch (sdkErr) {
-        console.log(
-          "[ClobCredentials] SDK failed, using API fallback...",
-          sdkErr
-        );
-        return await deriveCredentialsViaApi();
+        // Try deriveApiKey first — most users already have keys from a
+        // previous session, so this avoids the wasted createApiKey 400
+        // and the extra wallet signature that createOrDeriveApiKey causes.
+        console.log("[ClobCredentials] Trying deriveApiKey first...");
+        creds = await clobClient.deriveApiKey();
+        console.log("[ClobCredentials] Successfully derived existing API key");
+      } catch {
+        try {
+          console.log(
+            "[ClobCredentials] Derive failed, creating new API key..."
+          );
+          creds = await clobClient.createApiKey();
+          console.log("[ClobCredentials] Successfully created new API key");
+        } catch (sdkErr) {
+          console.log(
+            "[ClobCredentials] SDK failed, using API fallback...",
+            sdkErr
+          );
+          return await deriveCredentialsViaApi();
+        }
       }
 
       const apiCreds: ApiKeyCreds = {

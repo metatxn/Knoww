@@ -12,11 +12,17 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import {
+  isGameFinished,
+  isGameLive,
+  LiveGameBadge,
+} from "@/components/live-game-badge";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { LiveGameState } from "@/hooks/use-sports-websocket";
 import { formatVolume } from "@/lib/formatters";
 
 interface EventCardProps {
@@ -41,17 +47,26 @@ interface EventCardProps {
     negRisk?: boolean;
     startDate?: string;
     endDate?: string;
-    markets?: Array<{ id: string; question: string }>;
+    markets?: Array<{
+      id: string;
+      question?: string;
+      outcomes?: string;
+      outcomePrices?: string;
+      groupItemTitle?: string;
+    }>;
     tags?: Array<string | { id?: string; slug?: string; label?: string }>;
   };
   index?: number;
   priority?: boolean;
+  /** Live game data from sports websocket, if available */
+  liveGame?: LiveGameState | null;
 }
 
 export function EventCard({
   event,
   index = 0,
   priority = false,
+  liveGame,
 }: EventCardProps) {
   // Prefer slug for SEO-friendly URLs, fallback to ID
   const href = event.slug
@@ -60,7 +75,12 @@ export function EventCard({
       ? `/events/detail/${event.id}`
       : "#";
   const marketCount = event.markets?.length || 0;
-  const isActive = event.active !== false && !event.closed;
+  const hasLiveGame = liveGame
+    ? isGameLive(liveGame.status)
+    : event.live === true;
+  const hasFinishedGame = liveGame
+    ? isGameFinished(liveGame.status)
+    : event.ended === true;
 
   // Parse volume values
   const volume24hr =
@@ -138,7 +158,7 @@ export function EventCard({
 
             {/* Top Left Badges - Smaller on mobile */}
             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex items-center gap-1.5 sm:gap-2">
-              {isActive ? (
+              {hasLiveGame && (
                 <span className="relative px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white rounded-md sm:rounded-lg shadow-lg shadow-emerald-500/30 border border-emerald-400/30 flex items-center gap-1">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
@@ -146,9 +166,10 @@ export function EventCard({
                   </span>
                   Live
                 </span>
-              ) : (
+              )}
+              {hasFinishedGame && (
                 <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-zinc-600/80 text-white rounded-md sm:rounded-lg backdrop-blur-md border border-white/10">
-                  Closed
+                  Final
                 </span>
               )}
               {event.negRisk && (
@@ -244,7 +265,14 @@ export function EventCard({
             <h3 className="relative font-bold sm:font-black text-sm sm:text-base md:text-lg leading-tight line-clamp-2 sm:group-hover:text-transparent sm:group-hover:bg-clip-text sm:group-hover:bg-linear-to-r sm:group-hover:from-foreground sm:group-hover:to-primary transition-all duration-300 wrap-break-word tracking-tight">
               {event.title || "Untitled Event"}
             </h3>
-            {event.description && (
+
+            {/* Live game scoreboard — only for in-progress or finished games */}
+            {(hasLiveGame || hasFinishedGame) && liveGame && (
+              <LiveGameBadge game={liveGame} />
+            )}
+
+            {/* Show description unless game badge is displayed */}
+            {event.description && !hasLiveGame && !hasFinishedGame && (
               <p className="relative text-[11px] sm:text-xs font-medium text-muted-foreground line-clamp-2 leading-relaxed wrap-break-word opacity-80 sm:opacity-70 sm:group-hover:opacity-100 transition-opacity">
                 {event.description}
               </p>

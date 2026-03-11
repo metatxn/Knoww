@@ -9,6 +9,7 @@ import {
   USDC_E_DECIMALS,
 } from "@/constants/contracts";
 import { SignatureType } from "@/lib/polymarket";
+import { createBuilderConfig } from "@/lib/remote-builder-config";
 import { getRpcUrl } from "@/lib/rpc";
 import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 import { useClobCredentials } from "./use-clob-credentials";
@@ -91,16 +92,13 @@ export function useClobClient() {
     if (!credentials) throw new Error("API credentials not available");
     if (!proxyAddress) throw new Error("Proxy wallet not found");
 
-    const [{ ClobClient }, { BuilderConfig }, signer] = await Promise.all([
+    const [{ ClobClient }, signer] = await Promise.all([
       import("@polymarket/clob-client"),
-      import("@polymarket/builder-signing-sdk"),
       getEthersSigner(),
     ]);
 
-    const builderConfig = new BuilderConfig({
-      remoteBuilderConfig: {
-        url: getBuilderSignProxyUrl(),
-      },
+    const builderConfig = createBuilderConfig({
+      url: getBuilderSignProxyUrl(),
     });
 
     const creds = {

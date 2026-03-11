@@ -19,11 +19,20 @@ interface PaginatedEvent {
   liquidity?: number | string;
   liquidityClob?: number | string;
   competitive?: number;
+  score?: string;
   live?: boolean;
   ended?: boolean;
   markets?: Array<{
     id: string;
-    question: string;
+    question?: string;
+    outcomes?: string;
+    outcomePrices?: string;
+    groupItemTitle?: string;
+    image?: string;
+    icon?: string;
+    clobTokenIds?: string[];
+    conditionId?: string;
+    gameStartTime?: string;
   }>;
   tags?: Array<string | { id?: string; slug?: string; label?: string }>;
   negRisk?: boolean;
@@ -69,6 +78,10 @@ interface UsePaginatedEventsParams {
   filters?: EventFilterParams;
   // Enable/disable the query
   enabled?: boolean;
+  // Auto-refetch interval in ms (0 = disabled)
+  refetchInterval?: number;
+  // Request full market data (outcomes, prices, tokenIds) — only use on pages that need it
+  fullMarkets?: boolean;
 }
 
 export function usePaginatedEvents({
@@ -81,6 +94,8 @@ export function usePaginatedEvents({
   ascending = false,
   filters,
   enabled = true,
+  refetchInterval = 0,
+  fullMarkets = false,
 }: UsePaginatedEventsParams = {}) {
   return useInfiniteQuery({
     queryKey: [
@@ -93,6 +108,7 @@ export function usePaginatedEvents({
       closed,
       order,
       ascending,
+      fullMarkets,
       // Include filters in query key for proper cache invalidation
       filters?.volume24hrMin ?? null,
       filters?.volumeWeeklyMin ?? null,
@@ -120,6 +136,10 @@ export function usePaginatedEvents({
       // Add tag filter
       if (tagSlug) {
         params.set("tag_slug", tagSlug);
+      }
+
+      if (fullMarkets) {
+        params.set("markets", "full");
       }
 
       // Add server-side filters
@@ -187,7 +207,8 @@ export function usePaginatedEvents({
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     initialPageParam: 0,
-    staleTime: 60000, // 1 minute
+    staleTime: refetchInterval > 0 ? refetchInterval : undefined,
+    refetchInterval: refetchInterval > 0 ? refetchInterval : false,
     refetchOnWindowFocus: false,
     enabled,
   });

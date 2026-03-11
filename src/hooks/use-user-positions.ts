@@ -31,6 +31,25 @@ export interface Position {
   };
 }
 
+export interface LostPosition {
+  id: string;
+  asset: string;
+  conditionId: string;
+  outcomeIndex: number;
+  outcome: string;
+  size: number;
+  avgPrice: number;
+  initialValue: number;
+  endDate: string;
+  market: {
+    title: string;
+    slug: string;
+    eventSlug: string;
+    eventId: string;
+    icon: string;
+  };
+}
+
 /**
  * Positions summary data
  */
@@ -49,6 +68,7 @@ interface PositionsResponse {
   success: boolean;
   user: string;
   positions: Position[];
+  lostPositions: LostPosition[];
   summary: PositionsSummary;
   pagination: {
     limit: number;

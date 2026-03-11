@@ -149,17 +149,27 @@ function formatSize(size: string | number): string {
   });
 }
 
-/**
- * Format total value
- */
-function formatTotal(price: string | number, size: string | number): string {
-  const priceNum = typeof price === "string" ? Number.parseFloat(price) : price;
-  const sizeNum = typeof size === "string" ? Number.parseFloat(size) : size;
-  const total = priceNum * sizeNum;
-  return `$${total.toLocaleString("en-US", {
+function formatDollar(value: number): string {
+  return `$${value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+/**
+ * Build cumulative totals for orderbook levels.
+ * Each entry is the sum of (price × size) for that level and all levels
+ * closer to the spread.
+ */
+function buildCumulativeTotals(levels: OrderBookLevel[]): number[] {
+  const totals: number[] = [];
+  let cumulative = 0;
+  for (const level of levels) {
+    cumulative +=
+      Number.parseFloat(level.price) * Number.parseFloat(level.size);
+    totals.push(cumulative);
+  }
+  return totals;
 }
 
 /**
@@ -316,28 +326,38 @@ export function OrderBook({
   const processedData = useMemo(() => {
     if (!orderBook) return null;
 
-    // Sort and limit levels
     const bids = [...(orderBook.bids || [])]
       .sort((a, b) => Number.parseFloat(b.price) - Number.parseFloat(a.price))
       .slice(0, maxLevels);
 
-    const asks = [...(orderBook.asks || [])]
+    const sortedAsks = [...(orderBook.asks || [])]
       .sort((a, b) => Number.parseFloat(a.price) - Number.parseFloat(b.price))
       .slice(0, maxLevels);
 
-    // Calculate spread and midpoint
     const bestBid = bids[0] ? Number.parseFloat(bids[0].price) : 0;
-    const bestAsk = asks[0] ? Number.parseFloat(asks[0].price) : 1;
+    const bestAsk = sortedAsks[0] ? Number.parseFloat(sortedAsks[0].price) : 1;
     const spread = bestAsk - bestBid;
     const midpoint = (bestBid + bestAsk) / 2;
 
-    // Calculate max sizes for depth visualization
-    const allLevels = [...bids, ...asks];
+    const allLevels = [...bids, ...sortedAsks];
     const maxSize = calculateMaxSize(allLevels);
+
+    // Reversed for display: highest ask at top, best ask at bottom
+    const asks = sortedAsks.reverse();
+
+    // Cumulative totals: accumulate from the spread outward.
+    // Asks display top→bottom = farthest→nearest, so cumulate bottom→top.
+    const askCumFromBest = buildCumulativeTotals([...asks].reverse());
+    const askCumTotals = [...askCumFromBest].reverse();
+
+    // Bids display top→bottom = best bid first, so cumulate top→bottom.
+    const bidCumTotals = buildCumulativeTotals(bids);
 
     return {
       bids,
-      asks: asks.reverse(), // Reverse asks so highest is at bottom (closest to spread)
+      asks,
+      askCumTotals,
+      bidCumTotals,
       spread,
       midpoint,
       maxSize,
@@ -472,19 +492,17 @@ export function OrderBook({
           <div className={embedded ? "" : "border-t border-border"}>
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <thead>
-                <tr className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-4 py-2 w-16">
-                    Trade {currentOutcome?.name}
-                  </th>
-                  <th className="text-right px-4 py-2">Price</th>
-                  <th className="text-right px-4 py-2">Shares</th>
-                  <th className="text-right px-4 py-2">Total</th>
+                <tr className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="text-left px-2 sm:px-4 py-2" />
+                  <th className="text-right px-2 sm:px-4 py-2">Price</th>
+                  <th className="text-right px-2 sm:px-4 py-2">Shares</th>
+                  <th className="text-right px-2 sm:px-4 py-2">Total</th>
                 </tr>
               </thead>
             </table>
@@ -494,10 +512,10 @@ export function OrderBook({
           <div className="relative">
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <tbody>
                 {processedData.asks.map((level, index) => {
@@ -512,9 +530,7 @@ export function OrderBook({
                         onPriceClick?.(Number.parseFloat(level.price), "SELL")
                       }
                     >
-                      {/* Label column */}
-                      <td className="relative px-4 py-1.5 w-16">
-                        {/* Depth bar */}
+                      <td className="relative px-2 sm:px-4 py-1.5">
                         <div
                           className="absolute left-0 top-0 bottom-0 bg-red-500/20 transition-all duration-300"
                           style={{
@@ -522,22 +538,19 @@ export function OrderBook({
                           }}
                         />
                         {index === processedData.asks.length - 1 && (
-                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                          <span className="relative text-[10px] font-medium px-1 sm:px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
                             Asks
                           </span>
                         )}
                       </td>
-                      {/* Price */}
-                      <td className="text-right px-4 py-1.5 text-red-400 font-medium text-sm">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-red-400 font-medium text-sm">
                         {formatPrice(level.price)}
                       </td>
-                      {/* Shares */}
-                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm tabular-nums">
                         {formatSize(size)}
                       </td>
-                      {/* Total */}
-                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
-                        {formatTotal(level.price, level.size)}
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                        {formatDollar(processedData.askCumTotals[index])}
                       </td>
                     </tr>
                   );
@@ -545,16 +558,15 @@ export function OrderBook({
               </tbody>
             </table>
 
-            {/* Empty asks placeholder */}
             {processedData.asks.length === 0 && (
-              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+              <div className="px-2 sm:px-4 py-4 text-center text-xs text-muted-foreground">
                 No asks available
               </div>
             )}
           </div>
 
           {/* Spread Divider */}
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border-y border-border">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-muted/20 border-y border-border">
             <div className="text-xs text-muted-foreground">
               Last:{" "}
               <span className="text-foreground font-medium">
@@ -573,10 +585,10 @@ export function OrderBook({
           <div className="relative">
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
+                <col className="w-[42px] sm:w-[18%]" />
+                <col className="w-auto sm:w-[22%]" />
+                <col className="w-auto sm:w-[30%]" />
+                <col className="w-auto sm:w-[30%]" />
               </colgroup>
               <tbody>
                 {processedData.bids.map((level, index) => {
@@ -591,9 +603,7 @@ export function OrderBook({
                         onPriceClick?.(Number.parseFloat(level.price), "BUY")
                       }
                     >
-                      {/* Label column */}
-                      <td className="relative px-4 py-1.5 w-16">
-                        {/* Depth bar */}
+                      <td className="relative px-2 sm:px-4 py-1.5">
                         <div
                           className="absolute left-0 top-0 bottom-0 bg-green-500/20 transition-all duration-300"
                           style={{
@@ -601,22 +611,19 @@ export function OrderBook({
                           }}
                         />
                         {index === 0 && (
-                          <span className="relative text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
+                          <span className="relative text-[10px] font-medium px-1 sm:px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                             Bids
                           </span>
                         )}
                       </td>
-                      {/* Price */}
-                      <td className="text-right px-4 py-1.5 text-green-400 font-medium text-sm">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-green-400 font-medium text-sm">
                         {formatPrice(level.price)}
                       </td>
-                      {/* Shares */}
-                      <td className="text-right px-4 py-1.5 text-sm tabular-nums">
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm tabular-nums">
                         {formatSize(size)}
                       </td>
-                      {/* Total */}
-                      <td className="text-right px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
-                        {formatTotal(level.price, level.size)}
+                      <td className="text-right px-2 sm:px-4 py-1.5 text-sm text-muted-foreground tabular-nums">
+                        {formatDollar(processedData.bidCumTotals[index])}
                       </td>
                     </tr>
                   );
@@ -624,9 +631,8 @@ export function OrderBook({
               </tbody>
             </table>
 
-            {/* Empty bids placeholder */}
             {processedData.bids.length === 0 && (
-              <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+              <div className="px-2 sm:px-4 py-4 text-center text-xs text-muted-foreground">
                 No bids available
               </div>
             )}

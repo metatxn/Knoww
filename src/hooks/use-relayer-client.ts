@@ -22,6 +22,7 @@ import {
 } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
 
+import { createBuilderConfig } from "@/lib/remote-builder-config";
 // Shared RPC utilities
 import {
   clearDeploymentCache,
@@ -90,12 +91,8 @@ export function useRelayerClient() {
 
     // Dynamic import to avoid SSR issues
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
-    const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
-
-    const builderConfig = new BuilderConfig({
-      remoteBuilderConfig: {
-        url: signProxyUrl,
-      },
+    const builderConfig = createBuilderConfig({
+      url: signProxyUrl,
     });
 
     const client = new RelayClient(

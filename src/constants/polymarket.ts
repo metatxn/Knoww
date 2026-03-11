@@ -43,6 +43,8 @@ export const POLYMARKET_API = {
     MARKET: "wss://ws-subscriptions-clob.polymarket.com/ws/market",
     /** WebSocket endpoint for user-specific data (requires authentication) */
     USER: "wss://ws-subscriptions-clob.polymarket.com/ws/user",
+    /** WebSocket endpoint for live sports scores & game state (no auth required) */
+    SPORTS: "wss://sports-api.polymarket.com/ws",
   },
 } as const;
 

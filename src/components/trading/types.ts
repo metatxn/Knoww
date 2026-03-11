@@ -46,4 +46,6 @@ export interface TradingFormProps {
   initialShares?: number;
   /** Condition ID for the market (required for split/merge) */
   conditionId?: string;
+  /** Disable internal sticky wrapper when parent already handles sticky */
+  disableSticky?: boolean;
 }

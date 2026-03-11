@@ -15,14 +15,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 const SidebarDesktop = dynamic(() => import("./sidebar-desktop-inner"), {
   ssr: false,
   loading: () => (
-    // Minimal skeleton to prevent layout shift
-    <div className="hidden xl:block w-[280px] shrink-0">
+    <aside className="hidden xl:flex fixed left-0 top-0 z-40 h-screen w-56 flex-col border-r border-gray-200 dark:border-border/40 bg-white dark:bg-background">
       <div className="p-4 space-y-4">
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-8 w-full rounded-lg" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full rounded-md" />
+          ))}
+        </div>
+        <Skeleton className="h-px w-full" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full rounded-md" />
+          ))}
+        </div>
       </div>
-    </div>
+    </aside>
   ),
 });
 

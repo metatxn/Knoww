@@ -44,6 +44,8 @@ interface MarketPriceChartProps {
   outcomePrices?: string[];
   /** ISO date string for when the market/event started */
   startDate?: string;
+  /** Default time range selection (defaults to "ALL") */
+  defaultTimeRange?: TimeRange;
 }
 
 type TimeRange = "1H" | "6H" | "1D" | "1W" | "1M" | "ALL";
@@ -113,8 +115,9 @@ export function MarketPriceChart({
   tokens = [],
   outcomes = [],
   outcomePrices = [],
+  defaultTimeRange = "ALL",
 }: MarketPriceChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>("ALL");
+  const [timeRange, setTimeRange] = useState<TimeRange>(defaultTimeRange);
 
   // Calculate startTs based on time range (seconds since epoch)
   const startTs =
@@ -478,10 +481,15 @@ export function MarketPriceChart({
                           const config = chartConfig[configKey];
                           const label = config?.label || entry.name;
                           const color = entry.color || config?.color || "#888";
+                          const entryKey =
+                            typeof entry.dataKey === "string" ||
+                            typeof entry.dataKey === "number"
+                              ? entry.dataKey
+                              : String(configKey);
 
                           return (
                             <div
-                              key={entry.dataKey}
+                              key={entryKey}
                               className="flex items-center gap-2"
                             >
                               <span

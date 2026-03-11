@@ -15,6 +15,7 @@ import { useCallback, useState } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 import { CONTRACTS, CTF_ADDRESS, USDC_E_DECIMALS } from "@/constants/contracts";
 import { POLYGON_CHAIN_ID, RELAYER_API_URL } from "@/constants/polymarket";
+import { createBuilderConfig } from "@/lib/remote-builder-config";
 import { getBuilderSignProxyUrl } from "@/lib/sign-proxy-url";
 
 // ============================================================================
@@ -218,12 +219,8 @@ export function useCtfOperations() {
     }
 
     const { RelayClient } = await import("@polymarket/builder-relayer-client");
-    const { BuilderConfig } = await import("@polymarket/builder-signing-sdk");
-
-    const builderConfig = new BuilderConfig({
-      remoteBuilderConfig: {
-        url: signProxyUrl,
-      },
+    const builderConfig = createBuilderConfig({
+      url: signProxyUrl,
     });
 
     return new RelayClient(
