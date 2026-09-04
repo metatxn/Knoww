@@ -25,7 +25,9 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
+    "viem": "catalog:",
     "vitest": "^4.1.11"
   }
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { type Config, cookieToInitialState } from "wagmi";
 import { AppRouteProviders } from "@/components/app-route-providers";
 import { config } from "@/config";
+import { readFeatureFlags } from "@/lib/feature-flags.server";
 
 /**
  * Request-bound wallet state is scoped to product routes so static/editorial
@@ -18,9 +19,10 @@ export async function WalletRouteProviders({
     config as Config,
     requestHeaders.get("cookie")
   );
+  const flags = await readFeatureFlags();
 
   return (
-    <AppRouteProviders initialState={initialState}>
+    <AppRouteProviders initialState={initialState} flags={flags}>
       {children}
     </AppRouteProviders>
   );

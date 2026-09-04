@@ -1,8 +1,18 @@
+import type {
+  CanonicalMarket,
+  CanonicalOutcome,
+  MarketCapabilities,
+  PlatformDetails,
+  PlatformId,
+} from "@knoww/services/core";
+import { MARKET_CAPABILITY_KEYS } from "@knoww/services/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import posthog from "posthog-js";
 import { useState } from "react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OutcomeData } from "@/types/market";
+import type { TradingFormProps } from "./trading/types";
 import { TradingForm } from "./trading-form";
 
 const useTradingFormStateMock = vi.hoisted(() => vi.fn());
@@ -113,26 +123,90 @@ function makeTradingFormState(overrides = {}) {
   };
 }
 
+const capabilities = {} as MarketCapabilities;
+for (const key of MARKET_CAPABILITY_KEYS) {
+  capabilities[key] = true;
+}
+
+interface FormFixture {
+  title: string;
+  outcomes: OutcomeData[];
+  selectedIndex?: number;
+  bestBid?: number;
+  bestAsk?: number;
+  negRisk?: boolean;
+  platform?: PlatformId;
+  conditionId?: string;
+}
+
+/**
+ * Canonical props for a market given in the legacy outcome shape. Ids follow
+ * the `<platform>:<source id>` contract, independent of the mount mappers.
+ */
+function canonicalFormProps({
+  title,
+  outcomes,
+  selectedIndex = 0,
+  bestBid,
+  bestAsk,
+  negRisk = false,
+  platform = "polymarket",
+  conditionId = "0xcondition",
+}: FormFixture): TradingFormProps {
+  const canonicalOutcomes: CanonicalOutcome[] = outcomes.map((outcome) => ({
+    id: `${platform}:${outcome.tokenId}`,
+    sourceOutcomeId: outcome.tokenId,
+    label: outcome.name,
+    price: String(outcome.price),
+  }));
+  const market: CanonicalMarket = {
+    schemaVersion: "1",
+    id: `${platform}:${conditionId}`,
+    platform,
+    sourceMarketId: conditionId,
+    title,
+    status: "active",
+    outcomes: canonicalOutcomes,
+    capabilities,
+    fetchedAt: "2024-01-01T00:00:00.000Z",
+  };
+  const platformDetails: PlatformDetails =
+    platform === "polymarket"
+      ? { platform, conditionId, negRisk }
+      : { platform };
+  return {
+    market,
+    outcome: canonicalOutcomes[selectedIndex],
+    onOutcomeChange: () => {},
+    quote: { bestBid, bestAsk, platformDetails },
+    disableSticky: true,
+  };
+}
+
+const FRANCE_OUTCOMES: OutcomeData[] = [
+  { name: "YES", tokenId: "france-token", price: 0.6, probability: 60 },
+  { name: "NO", tokenId: "not-france-token", price: 0.4, probability: 40 },
+];
+
 /** A plain two-outcome market, for tests that only care about the mocked state. */
 function renderDefaultForm() {
   return render(
     <TradingForm
-      marketTitle="France"
-      tokenId="france-token"
-      outcomes={[
-        { name: "YES", tokenId: "france-token", price: 0.6, probability: 60 },
-        {
-          name: "NO",
-          tokenId: "not-france-token",
-          price: 0.4,
-          probability: 40,
-        },
-      ]}
-      selectedOutcomeIndex={0}
-      onOutcomeChange={() => {}}
-      bestBid={0.59}
-      bestAsk={0.6}
-      disableSticky
+      {...canonicalFormProps({
+        title: "France",
+        outcomes: [
+          { name: "YES", tokenId: "france-token", price: 0.6, probability: 60 },
+          {
+            name: "NO",
+            tokenId: "not-france-token",
+            price: 0.4,
+            probability: 40,
+          },
+        ],
+        selectedIndex: 0,
+        bestBid: 0.59,
+        bestAsk: 0.6,
+      })}
     />
   );
 }
@@ -143,30 +217,143 @@ describe("TradingForm", () => {
     useTradingFormStateMock.mockReturnValue(makeTradingFormState());
   });
 
+  it("derives the ticket the state hook prices from the canonical market", () => {
+    useTradingFormStateMock.mockReturnValue(makeTradingFormState());
+    render(
+      <TradingForm
+        {...canonicalFormProps({
+          title: "France",
+          outcomes: FRANCE_OUTCOMES,
+          selectedIndex: 1,
+          bestBid: 0.39,
+          bestAsk: 0.4,
+          negRisk: true,
+          conditionId: "0xfrance",
+        })}
+      />
+    );
+
+    expect(useTradingFormStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        marketTitle: "France",
+        tokenId: "not-france-token",
+        conditionId: "0xfrance",
+        negRisk: true,
+        selectedOutcomeIndex: 1,
+        bestBid: 0.39,
+        bestAsk: 0.4,
+        outcomes: [
+          { name: "YES", tokenId: "france-token", price: 0.6, probability: 60 },
+          {
+            name: "NO",
+            tokenId: "not-france-token",
+            price: 0.4,
+            probability: 40,
+          },
+        ],
+      })
+    );
+  });
+
+  it("reports the picked outcome back as a canonical outcome", () => {
+    useTradingFormStateMock.mockReturnValue(makeTradingFormState());
+    const onOutcomeChange = vi.fn();
+    render(
+      <TradingForm
+        {...canonicalFormProps({ title: "France", outcomes: FRANCE_OUTCOMES })}
+        onOutcomeChange={onOutcomeChange}
+      />
+    );
+
+    fireEvent.click(screen.getByText("NO"));
+
+    expect(onOutcomeChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "polymarket:not-france-token",
+        sourceOutcomeId: "not-france-token",
+      })
+    );
+  });
+
+  it("shows the platform's market badge from the quote details", () => {
+    useTradingFormStateMock.mockReturnValue(makeTradingFormState());
+    const plain = render(
+      <TradingForm
+        {...canonicalFormProps({ title: "France", outcomes: FRANCE_OUTCOMES })}
+      />
+    );
+    expect(screen.queryByText("Neg Risk")).not.toBeInTheDocument();
+    plain.unmount();
+
+    render(
+      <TradingForm
+        {...canonicalFormProps({
+          title: "France",
+          outcomes: FRANCE_OUTCOMES,
+          negRisk: true,
+        })}
+      />
+    );
+    expect(screen.getByText("Neg Risk")).toBeInTheDocument();
+  });
+
+  it("offers the platform's extra actions only with credentials on a platform that has them", () => {
+    useTradingFormStateMock.mockReturnValue(makeTradingFormState());
+    const signedOut = render(
+      <TradingForm
+        {...canonicalFormProps({ title: "France", outcomes: FRANCE_OUTCOMES })}
+      />
+    );
+    expect(screen.queryByTitle("More options")).not.toBeInTheDocument();
+    signedOut.unmount();
+
+    useTradingFormStateMock.mockReturnValue(
+      makeTradingFormState({ hasCredentials: true })
+    );
+    const polymarket = render(
+      <TradingForm
+        {...canonicalFormProps({ title: "France", outcomes: FRANCE_OUTCOMES })}
+      />
+    );
+    expect(screen.getByTitle("More options")).toBeInTheDocument();
+    polymarket.unmount();
+
+    render(
+      <TradingForm
+        {...canonicalFormProps({
+          title: "Rain in Chicago",
+          outcomes: FRANCE_OUTCOMES,
+          platform: "kalshi",
+          conditionId: "KXRAIN-26SEP04",
+        })}
+      />
+    );
+    expect(screen.queryByTitle("More options")).not.toBeInTheDocument();
+  });
+
   it("uses outcome names as price-selector labels", () => {
     render(
       <TradingForm
-        marketTitle="India vs Afghanistan"
-        tokenId="india-token"
-        outcomes={[
-          {
-            name: "IND4",
-            tokenId: "india-token",
-            price: 0.6,
-            probability: 60,
-          },
-          {
-            name: "AFG2",
-            tokenId: "afghanistan-token",
-            price: 0.42,
-            probability: 42,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.59}
-        bestAsk={0.6}
-        disableSticky
+        {...canonicalFormProps({
+          title: "India vs Afghanistan",
+          outcomes: [
+            {
+              name: "IND4",
+              tokenId: "india-token",
+              price: 0.6,
+              probability: 60,
+            },
+            {
+              name: "AFG2",
+              tokenId: "afghanistan-token",
+              price: 0.42,
+              probability: 42,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.59,
+          bestAsk: 0.6,
+        })}
       />
     );
 
@@ -195,27 +382,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="France"
-        tokenId="france-token"
-        outcomes={[
-          {
-            name: "YES",
-            tokenId: "france-token",
-            price: 0.176,
-            probability: 18,
-          },
-          {
-            name: "NO",
-            tokenId: "not-france-token",
-            price: 0.825,
-            probability: 82,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.175}
-        bestAsk={0.176}
-        disableSticky
+        {...canonicalFormProps({
+          title: "France",
+          outcomes: [
+            {
+              name: "YES",
+              tokenId: "france-token",
+              price: 0.176,
+              probability: 18,
+            },
+            {
+              name: "NO",
+              tokenId: "not-france-token",
+              price: 0.825,
+              probability: 82,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.175,
+          bestAsk: 0.176,
+        })}
       />
     );
 
@@ -290,27 +476,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="Portugal"
-        tokenId="portugal-token"
-        outcomes={[
-          {
-            name: "Portugal",
-            tokenId: "portugal-token",
-            price: 0.08,
-            probability: 8,
-          },
-          {
-            name: "Field",
-            tokenId: "field-token",
-            price: 0.92,
-            probability: 92,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.079}
-        bestAsk={0.08}
-        disableSticky
+        {...canonicalFormProps({
+          title: "Portugal",
+          outcomes: [
+            {
+              name: "Portugal",
+              tokenId: "portugal-token",
+              price: 0.08,
+              probability: 8,
+            },
+            {
+              name: "Field",
+              tokenId: "field-token",
+              price: 0.92,
+              probability: 92,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.079,
+          bestAsk: 0.08,
+        })}
       />
     );
 
@@ -341,27 +526,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="Portugal"
-        tokenId="portugal-token"
-        outcomes={[
-          {
-            name: "Portugal",
-            tokenId: "portugal-token",
-            price: 0.08,
-            probability: 8,
-          },
-          {
-            name: "Field",
-            tokenId: "field-token",
-            price: 0.92,
-            probability: 92,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.079}
-        bestAsk={0.08}
-        disableSticky
+        {...canonicalFormProps({
+          title: "Portugal",
+          outcomes: [
+            {
+              name: "Portugal",
+              tokenId: "portugal-token",
+              price: 0.08,
+              probability: 8,
+            },
+            {
+              name: "Field",
+              tokenId: "field-token",
+              price: 0.92,
+              probability: 92,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.079,
+          bestAsk: 0.08,
+        })}
       />
     );
 
@@ -401,27 +585,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="France"
-        tokenId="france-token"
-        outcomes={[
-          {
-            name: "YES",
-            tokenId: "france-token",
-            price: 0.176,
-            probability: 18,
-          },
-          {
-            name: "NO",
-            tokenId: "not-france-token",
-            price: 0.825,
-            probability: 82,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.175}
-        bestAsk={0.176}
-        disableSticky
+        {...canonicalFormProps({
+          title: "France",
+          outcomes: [
+            {
+              name: "YES",
+              tokenId: "france-token",
+              price: 0.176,
+              probability: 18,
+            },
+            {
+              name: "NO",
+              tokenId: "not-france-token",
+              price: 0.825,
+              probability: 82,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.175,
+          bestAsk: 0.176,
+        })}
       />
     );
 
@@ -457,27 +640,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="Portugal"
-        tokenId="portugal-token"
-        outcomes={[
-          {
-            name: "Portugal",
-            tokenId: "portugal-token",
-            price: 0.08,
-            probability: 8,
-          },
-          {
-            name: "Field",
-            tokenId: "field-token",
-            price: 0.92,
-            probability: 92,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.079}
-        bestAsk={0.08}
-        disableSticky
+        {...canonicalFormProps({
+          title: "Portugal",
+          outcomes: [
+            {
+              name: "Portugal",
+              tokenId: "portugal-token",
+              price: 0.08,
+              probability: 8,
+            },
+            {
+              name: "Field",
+              tokenId: "field-token",
+              price: 0.92,
+              probability: 92,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.079,
+          bestAsk: 0.08,
+        })}
       />
     );
 
@@ -501,27 +683,26 @@ describe("TradingForm", () => {
 
     render(
       <TradingForm
-        marketTitle="Switzerland"
-        tokenId="switzerland-token"
-        outcomes={[
-          {
-            name: "Switzerland",
-            tokenId: "switzerland-token",
-            price: 0.63,
-            probability: 63,
-          },
-          {
-            name: "Field",
-            tokenId: "field-token",
-            price: 0.38,
-            probability: 38,
-          },
-        ]}
-        selectedOutcomeIndex={0}
-        onOutcomeChange={() => {}}
-        bestBid={0.62}
-        bestAsk={0.63}
-        disableSticky
+        {...canonicalFormProps({
+          title: "Switzerland",
+          outcomes: [
+            {
+              name: "Switzerland",
+              tokenId: "switzerland-token",
+              price: 0.63,
+              probability: 63,
+            },
+            {
+              name: "Field",
+              tokenId: "field-token",
+              price: 0.38,
+              probability: 38,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.62,
+          bestAsk: 0.63,
+        })}
       />
     );
 
@@ -546,27 +727,26 @@ describe("TradingForm", () => {
     try {
       render(
         <TradingForm
-          marketTitle="Portugal"
-          tokenId="portugal-token"
-          outcomes={[
-            {
-              name: "Portugal",
-              tokenId: "portugal-token",
-              price: 0.08,
-              probability: 8,
-            },
-            {
-              name: "Field",
-              tokenId: "field-token",
-              price: 0.92,
-              probability: 92,
-            },
-          ]}
-          selectedOutcomeIndex={0}
-          onOutcomeChange={() => {}}
-          bestBid={0.079}
-          bestAsk={0.08}
-          disableSticky
+          {...canonicalFormProps({
+            title: "Portugal",
+            outcomes: [
+              {
+                name: "Portugal",
+                tokenId: "portugal-token",
+                price: 0.08,
+                probability: 8,
+              },
+              {
+                name: "Field",
+                tokenId: "field-token",
+                price: 0.92,
+                probability: 92,
+              },
+            ],
+            selectedIndex: 0,
+            bestBid: 0.079,
+            bestAsk: 0.08,
+          })}
         />
       );
 
@@ -593,14 +773,13 @@ describe("TradingForm", () => {
     function renderForm() {
       render(
         <TradingForm
-          marketTitle="Guyana vs Lahore"
-          tokenId="lah-token"
-          outcomes={outcomes}
-          selectedOutcomeIndex={1}
-          onOutcomeChange={() => {}}
-          bestBid={0.38}
-          bestAsk={0.39}
-          disableSticky
+          {...canonicalFormProps({
+            title: "Guyana vs Lahore",
+            outcomes: outcomes,
+            selectedIndex: 1,
+            bestBid: 0.38,
+            bestAsk: 0.39,
+          })}
         />
       );
     }
@@ -735,14 +914,13 @@ describe("TradingForm", () => {
     function renderForm() {
       render(
         <TradingForm
-          marketTitle="Guyana vs Lahore"
-          tokenId="lah-token"
-          outcomes={outcomes}
-          selectedOutcomeIndex={1}
-          onOutcomeChange={() => {}}
-          bestBid={0.38}
-          bestAsk={0.39}
-          disableSticky
+          {...canonicalFormProps({
+            title: "Guyana vs Lahore",
+            outcomes: outcomes,
+            selectedIndex: 1,
+            bestBid: 0.38,
+            bestAsk: 0.39,
+          })}
         />
       );
     }

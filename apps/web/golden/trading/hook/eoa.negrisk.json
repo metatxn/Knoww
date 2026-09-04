@@ -1,0 +1,1809 @@
+{
+  "mode": "eoa",
+  "market": "negrisk",
+  "wallet": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "personality": "approved",
+  "cases": {
+    "limit-buy-gtc": {
+      "params": {
+        "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721",
+        "conditionId": "0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+        "negRisk": true,
+        "side": "BUY",
+        "orderType": "GTC",
+        "price": 0.5,
+        "size": 10
+      },
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/auth/api-keys",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Gxzzyak5iW9YNMcgUjtCnGa5ycb3qyGjVZgL9RKgMjU=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/data/orders",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "4g0H9I1Lb2ITpIHUOVC-Mk1Tw9qkMdw8cFVhIYw52XE=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x82ad56cb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003e000000000000000000000000000000000000000000000000000000000000004c000000000000000000000000000000000000000000000000000000000000005a00000000000000000000000000000000000000000000000000000000000000680000000000000000000000000000000000000000000000000000000000000076000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000920000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea047604500000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f5900000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab000000000000000000000000000000000000000000000000000000000000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000093070a847efef7f70739046a929d47a521f5b8ee000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab00000000000000000000000000000000000000000000000000000000",
+                "to": "0xca11bde05977b3631167028862be2a173976ca11"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            },
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x93070a847efEf7F70739046A929D47a521F5B8ee"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0xdd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0xdd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x70a0823100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "balanceOf",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x70a0823100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "balanceOf",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/markets-by-token/5615282760875985231868508008056959876238536896643315063916840237042205273721",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "C9yw60dGSK49_PMAlyEebj8mXIvWW13qQZJpi_lxSB0=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "5000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "BUY",
+              "signature": "0x2b3eef481f0e79aa89471ea12cab64df6d9d4c502126e043802e304eb2c50bd21801a2f367a956d3ae6dbba99ad0a3309461d9421ec4181178b5241e80f414b11c",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "10000000",
+              "timestamp": "1700000000000",
+              "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+            },
+            "orderType": "GTC",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "wallet": [
+        {
+          "method": "eth_signTypedData_v4",
+          "params": [
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            {
+              "domain": {
+                "chainId": 137,
+                "name": "Polymarket CTF Exchange",
+                "verifyingContract": "0xe2222d279d744050d28e00520010520000310f59",
+                "version": "2"
+              },
+              "message": {
+                "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "maker": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "makerAmount": "5000000",
+                "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "salt": "1978051601041159",
+                "side": 0,
+                "signatureType": 0,
+                "signer": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "takerAmount": "10000000",
+                "timestamp": "1700000000000",
+                "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+              },
+              "primaryType": "Order",
+              "types": {
+                "EIP712Domain": [
+                  {
+                    "name": "name",
+                    "type": "string"
+                  },
+                  {
+                    "name": "version",
+                    "type": "string"
+                  },
+                  {
+                    "name": "chainId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "verifyingContract",
+                    "type": "address"
+                  }
+                ],
+                "Order": [
+                  {
+                    "name": "salt",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maker",
+                    "type": "address"
+                  },
+                  {
+                    "name": "signer",
+                    "type": "address"
+                  },
+                  {
+                    "name": "tokenId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "makerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "takerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "side",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "signatureType",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "timestamp",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "metadata",
+                    "type": "bytes32"
+                  },
+                  {
+                    "name": "builder",
+                    "type": "bytes32"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "approvals": [],
+      "result": {
+        "success": true,
+        "order": {
+          "ok": true,
+          "orderId": "0xabababababababababababababababababababababababababababababababab",
+          "status": "live",
+          "makingAmount": "0",
+          "takingAmount": "0",
+          "tradeIds": [],
+          "transactionsHashes": []
+        }
+      }
+    },
+    "market-buy-fak": {
+      "params": {
+        "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721",
+        "conditionId": "0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+        "negRisk": true,
+        "side": "BUY",
+        "orderType": "FAK",
+        "price": 0,
+        "size": 0,
+        "amount": 25
+      },
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/auth/api-keys",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Gxzzyak5iW9YNMcgUjtCnGa5ycb3qyGjVZgL9RKgMjU=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/data/orders",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "4g0H9I1Lb2ITpIHUOVC-Mk1Tw9qkMdw8cFVhIYw52XE=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x82ad56cb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003e000000000000000000000000000000000000000000000000000000000000004c000000000000000000000000000000000000000000000000000000000000005a00000000000000000000000000000000000000000000000000000000000000680000000000000000000000000000000000000000000000000000000000000076000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000920000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea047604500000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f5900000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab000000000000000000000000000000000000000000000000000000000000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000093070a847efef7f70739046a929d47a521f5b8ee000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab00000000000000000000000000000000000000000000000000000000",
+                "to": "0xca11bde05977b3631167028862be2a173976ca11"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            },
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x93070a847efEf7F70739046A929D47a521F5B8ee"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0xdd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0xdd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x70a0823100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "balanceOf",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x70a0823100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "balanceOf",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/book?token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "86P7gwpR63m2PXq7Tspv0QD0Ub9QVQ60L6rFbFi6HDo=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "25000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "BUY",
+              "signature": "0x24ec5296022b44c6aae6676984993c31d63804c7b09c388398da0b1f5a45a1040c1ae8600f104bce621661ae949001ed8a1c603e273f0ef173e1692032bab1da1c",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "42372800",
+              "timestamp": "1700000000000",
+              "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+            },
+            "orderType": "FAK",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "wallet": [
+        {
+          "method": "eth_signTypedData_v4",
+          "params": [
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            {
+              "domain": {
+                "chainId": 137,
+                "name": "Polymarket CTF Exchange",
+                "verifyingContract": "0xe2222d279d744050d28e00520010520000310f59",
+                "version": "2"
+              },
+              "message": {
+                "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "maker": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "makerAmount": "25000000",
+                "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "salt": "1978051601041159",
+                "side": 0,
+                "signatureType": 0,
+                "signer": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "takerAmount": "42372800",
+                "timestamp": "1700000000000",
+                "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+              },
+              "primaryType": "Order",
+              "types": {
+                "EIP712Domain": [
+                  {
+                    "name": "name",
+                    "type": "string"
+                  },
+                  {
+                    "name": "version",
+                    "type": "string"
+                  },
+                  {
+                    "name": "chainId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "verifyingContract",
+                    "type": "address"
+                  }
+                ],
+                "Order": [
+                  {
+                    "name": "salt",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maker",
+                    "type": "address"
+                  },
+                  {
+                    "name": "signer",
+                    "type": "address"
+                  },
+                  {
+                    "name": "tokenId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "makerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "takerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "side",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "signatureType",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "timestamp",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "metadata",
+                    "type": "bytes32"
+                  },
+                  {
+                    "name": "builder",
+                    "type": "bytes32"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "approvals": [],
+      "result": {
+        "success": true,
+        "order": {
+          "ok": true,
+          "orderId": "0xabababababababababababababababababababababababababababababababab",
+          "status": "live",
+          "makingAmount": "0",
+          "takingAmount": "0",
+          "tradeIds": [],
+          "transactionsHashes": []
+        }
+      }
+    },
+    "limit-sell-gtc": {
+      "params": {
+        "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721",
+        "conditionId": "0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+        "negRisk": true,
+        "side": "SELL",
+        "orderType": "GTC",
+        "price": 0.62,
+        "size": 7.5
+      },
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/auth/api-keys",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Gxzzyak5iW9YNMcgUjtCnGa5ycb3qyGjVZgL9RKgMjU=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x4e1273f400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000000000000000000000000000000000000000000010c6a232d8b7ebad17d093c8cc5f7b2326b41052074f4ae9883e22ab7e9f52e79",
+                "to": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+              "functionName": "balanceOfBatch",
+              "args": [
+                [
+                  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                ],
+                [
+                  "5615282760875985231868508008056959876238536896643315063916840237042205273721n"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x82ad56cb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003e000000000000000000000000000000000000000000000000000000000000004c000000000000000000000000000000000000000000000000000000000000005a00000000000000000000000000000000000000000000000000000000000000680000000000000000000000000000000000000000000000000000000000000076000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000920000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea047604500000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f5900000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab000000000000000000000000000000000000000000000000000000000000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000093070a847efef7f70739046a929d47a521f5b8ee000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab00000000000000000000000000000000000000000000000000000000",
+                "to": "0xca11bde05977b3631167028862be2a173976ca11"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            },
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x93070a847efEf7F70739046A929D47a521F5B8ee"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/markets-by-token/5615282760875985231868508008056959876238536896643315063916840237042205273721",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "BtFEU_ZC6t9UXZZ5ZFyHErMdvPmpDUsij_Bi5bxckJU=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "7500000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "SELL",
+              "signature": "0x587c5373a9e47af3249924c2a954e4126232edb4ee97918bc4f97c2a14c4cd041407487959474344dbdd3b76bc71cff9cb0d33a1f612bfcb76751acb38facab41b",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "4650000",
+              "timestamp": "1700000000000",
+              "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+            },
+            "orderType": "GTC",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "wallet": [
+        {
+          "method": "eth_signTypedData_v4",
+          "params": [
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            {
+              "domain": {
+                "chainId": 137,
+                "name": "Polymarket CTF Exchange",
+                "verifyingContract": "0xe2222d279d744050d28e00520010520000310f59",
+                "version": "2"
+              },
+              "message": {
+                "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "maker": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "makerAmount": "7500000",
+                "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "salt": "1978051601041159",
+                "side": 1,
+                "signatureType": 0,
+                "signer": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "takerAmount": "4650000",
+                "timestamp": "1700000000000",
+                "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+              },
+              "primaryType": "Order",
+              "types": {
+                "EIP712Domain": [
+                  {
+                    "name": "name",
+                    "type": "string"
+                  },
+                  {
+                    "name": "version",
+                    "type": "string"
+                  },
+                  {
+                    "name": "chainId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "verifyingContract",
+                    "type": "address"
+                  }
+                ],
+                "Order": [
+                  {
+                    "name": "salt",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maker",
+                    "type": "address"
+                  },
+                  {
+                    "name": "signer",
+                    "type": "address"
+                  },
+                  {
+                    "name": "tokenId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "makerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "takerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "side",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "signatureType",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "timestamp",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "metadata",
+                    "type": "bytes32"
+                  },
+                  {
+                    "name": "builder",
+                    "type": "bytes32"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "approvals": [],
+      "result": {
+        "success": true,
+        "order": {
+          "ok": true,
+          "orderId": "0xabababababababababababababababababababababababababababababababab",
+          "status": "live",
+          "makingAmount": "0",
+          "takingAmount": "0",
+          "tradeIds": [],
+          "transactionsHashes": []
+        }
+      }
+    },
+    "market-sell-fok": {
+      "params": {
+        "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721",
+        "conditionId": "0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+        "negRisk": true,
+        "side": "SELL",
+        "orderType": "FOK",
+        "price": 0.4,
+        "size": 12
+      },
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/auth/api-keys",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Gxzzyak5iW9YNMcgUjtCnGa5ycb3qyGjVZgL9RKgMjU=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x4e1273f400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000000000000000000000000000000000000000000010c6a232d8b7ebad17d093c8cc5f7b2326b41052074f4ae9883e22ab7e9f52e79",
+                "to": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0x4d97dcd97ec945f40cf65f87097ace5ea0476045",
+              "functionName": "balanceOfBatch",
+              "args": [
+                [
+                  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                ],
+                [
+                  "5615282760875985231868508008056959876238536896643315063916840237042205273721n"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "url": "/api/rpc/polygon",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_call",
+            "params": [
+              {
+                "data": "0x82ad56cb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003e000000000000000000000000000000000000000000000000000000000000004c000000000000000000000000000000000000000000000000000000000000005a00000000000000000000000000000000000000000000000000000000000000680000000000000000000000000000000000000000000000000000000000000076000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000920000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea047604500000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f5900000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f00000000000000000000000000000000000000000000000000000000000000000000000000000000c011a7e12a19f7b1f670d46f03b03f3342e82dfb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab000000000000000000000000000000000000000000000000000000000000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044dd62ed3e00000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c800000000000000000000000093070a847efef7f70739046a929d47a521f5b8ee000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e111180000d2663c0091e4f400237545b87b996b000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000e2222d279d744050d28e00520010520000310f59000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada100db00ca00073811820692005400218fce1f000000000000000000000000000000000000000000000000000000000000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044e985e9c500000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c8000000000000000000000000ada2005600dec949baf300f4c6120000bdb6eaab00000000000000000000000000000000000000000000000000000000",
+                "to": "0xca11bde05977b3631167028862be2a173976ca11"
+              },
+              "latest"
+            ]
+          },
+          "decoded": [
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            },
+            {
+              "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+              "functionName": "allowance",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0x93070a847efEf7F70739046A929D47a521F5B8ee"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xE111180000d2663C0091e4f400237545B87B996B"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xe2222d279d744050d28e00520010520000310F59"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xAdA100Db00Ca00073811820692005400218FcE1f"
+              ]
+            },
+            {
+              "to": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+              "functionName": "isApprovedForAll",
+              "args": [
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "0xadA2005600Dec949baf300f4C6120000bDB6eAab"
+              ]
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/markets-by-token/5615282760875985231868508008056959876238536896643315063916840237042205273721",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=COLLATERAL&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance/update?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "YwvF-z-D0H45638V1of_mYOwn5DxwjrO0w3ohtEmE58=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/balance-allowance?asset_type=CONDITIONAL&token_id=5615282760875985231868508008056959876238536896643315063916840237042205273721&signature_type=0",
+          "headers": {
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "7sNNKh8J45Qt3mybPDV2Wal05yNQuc0jn4exnFlxjm8=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Nyn2KQRgtZ_PlQc_ZonvtIg_WbqTMhvl1mzjEBSfaEE=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "12000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "SELL",
+              "signature": "0xb8774e4f3f3f95d57b3f9eed6add2808c92a25b367c068b2db15c78366ae9bee5e36af42bb6eeb4a9aa1c25d36fb111276d0ca2cbf8e433db38aaeb3f99d4cf51c",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "4800000",
+              "timestamp": "1700000000000",
+              "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+            },
+            "orderType": "FOK",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "wallet": [
+        {
+          "method": "eth_signTypedData_v4",
+          "params": [
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            {
+              "domain": {
+                "chainId": 137,
+                "name": "Polymarket CTF Exchange",
+                "verifyingContract": "0xe2222d279d744050d28e00520010520000310f59",
+                "version": "2"
+              },
+              "message": {
+                "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "maker": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "makerAmount": "12000000",
+                "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "salt": "1978051601041159",
+                "side": 1,
+                "signatureType": 0,
+                "signer": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+                "takerAmount": "4800000",
+                "timestamp": "1700000000000",
+                "tokenId": "5615282760875985231868508008056959876238536896643315063916840237042205273721"
+              },
+              "primaryType": "Order",
+              "types": {
+                "EIP712Domain": [
+                  {
+                    "name": "name",
+                    "type": "string"
+                  },
+                  {
+                    "name": "version",
+                    "type": "string"
+                  },
+                  {
+                    "name": "chainId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "verifyingContract",
+                    "type": "address"
+                  }
+                ],
+                "Order": [
+                  {
+                    "name": "salt",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maker",
+                    "type": "address"
+                  },
+                  {
+                    "name": "signer",
+                    "type": "address"
+                  },
+                  {
+                    "name": "tokenId",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "makerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "takerAmount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "side",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "signatureType",
+                    "type": "uint8"
+                  },
+                  {
+                    "name": "timestamp",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "metadata",
+                    "type": "bytes32"
+                  },
+                  {
+                    "name": "builder",
+                    "type": "bytes32"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "approvals": [],
+      "result": {
+        "success": true,
+        "order": {
+          "ok": true,
+          "orderId": "0xabababababababababababababababababababababababababababababababab",
+          "status": "live",
+          "makingAmount": "0",
+          "takingAmount": "0",
+          "tradeIds": [],
+          "transactionsHashes": []
+        }
+      }
+    }
+  }
+}

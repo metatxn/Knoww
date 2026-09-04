@@ -1,0 +1,219 @@
+{
+  "mode": "eoa",
+  "market": "plain",
+  "wallet": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "setup": [
+    {
+      "method": "GET",
+      "url": "https://clob.polymarket.com/auth/api-keys",
+      "headers": {
+        "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "poly_api_key": "00000000-0000-0000-0000-000000000000",
+        "poly_passphrase": "test-passphrase",
+        "poly_signature": "Gxzzyak5iW9YNMcgUjtCnGa5ycb3qyGjVZgL9RKgMjU=",
+        "poly_timestamp": "1700000000"
+      },
+      "body": null
+    }
+  ],
+  "cases": {
+    "limit-buy-gtc": {
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/markets-by-token/111677288788322716285721802321462214269337893592189338144026898987337904380415",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/clob-markets/0x8ac0ba0e2bf6866038b9a1f2a765f17fee577e3facccf794ff98d992bbb7cd6d",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "9o8f3jo37r7vI7bHG3NqhajkqlZ8-Uy6zCv1H0nl1Cs=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "5000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "BUY",
+              "signature": "0x410b5131f604de441f1ce179f2e5a700303527fb6949a98f8d39637a8e24b9d03dd56123d2d539ca7509c0c5a570b1829e0bd0e9d5e33fcff1bce0eaa399e7ed1c",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "10000000",
+              "timestamp": "1700000000000",
+              "tokenId": "111677288788322716285721802321462214269337893592189338144026898987337904380415"
+            },
+            "orderType": "GTC",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "posted": {
+        "ok": true,
+        "orderId": "0xabababababababababababababababababababababababababababababababab",
+        "status": "live",
+        "makingAmount": "0",
+        "takingAmount": "0",
+        "tradeIds": [],
+        "transactionsHashes": []
+      }
+    },
+    "limit-sell-gtd": {
+      "requests": [
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "qhWP39tBpyJagAWZz65VNmILOsNTXYZOO_JCcvPSVgo=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "1700086400",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "7500000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "SELL",
+              "signature": "0x5b5dce6b0dc54e1391d8010ba002ccae99066725cd22e34c13c917ce0afafaa95a03513fa9510a9203000a7523f51df8368c65c083fb5d7492b2bdcb722589f81b",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "4650000",
+              "timestamp": "1700000000000",
+              "tokenId": "111677288788322716285721802321462214269337893592189338144026898987337904380415"
+            },
+            "orderType": "GTD",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "posted": {
+        "ok": true,
+        "orderId": "0xabababababababababababababababababababababababababababababababab",
+        "status": "live",
+        "makingAmount": "0",
+        "takingAmount": "0",
+        "tradeIds": [],
+        "transactionsHashes": []
+      }
+    },
+    "market-buy-fak-book-walk": {
+      "requests": [
+        {
+          "method": "GET",
+          "url": "https://clob.polymarket.com/book?token_id=111677288788322716285721802321462214269337893592189338144026898987337904380415",
+          "headers": {},
+          "body": null
+        },
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "71ZmJ0D_lfR3gBkLLWwQpNwzYrCJ4eWPRY53ITH14no=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "25000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "BUY",
+              "signature": "0x84676db5056c49b82ac665d142fcb4c2881c19b57210fdedafa10d9ab23d6e5b7f411dc96babc9944230475678f1f608f3249f134ebecd70a55426d75b70a4751b",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "67567500",
+              "timestamp": "1700000000000",
+              "tokenId": "111677288788322716285721802321462214269337893592189338144026898987337904380415"
+            },
+            "orderType": "FAK",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "posted": {
+        "ok": true,
+        "orderId": "0xabababababababababababababababababababababababababababababababab",
+        "status": "live",
+        "makingAmount": "0",
+        "takingAmount": "0",
+        "tradeIds": [],
+        "transactionsHashes": []
+      }
+    },
+    "market-sell-fok-min-price": {
+      "requests": [
+        {
+          "method": "POST",
+          "url": "https://clob.polymarket.com/order",
+          "headers": {
+            "content-type": "application/json",
+            "poly_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "poly_api_key": "00000000-0000-0000-0000-000000000000",
+            "poly_passphrase": "test-passphrase",
+            "poly_signature": "Vy0-_eFskPF3i2q_uIKNarMXBIp_CP9hPowpRUXA6x4=",
+            "poly_timestamp": "1700000000"
+          },
+          "body": {
+            "deferExec": false,
+            "order": {
+              "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "expiration": "0",
+              "maker": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "makerAmount": "12000000",
+              "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "salt": 1978051601041159,
+              "side": "SELL",
+              "signature": "0x0a1be14b8cd98b4d6d733ba05a5f77dd314b859b14405353a18949439af2034f6541f207fce01d8f0162bac9e52e98260d96f40a3e9f158e7e6f4a7f747a66411c",
+              "signatureType": 0,
+              "signer": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+              "takerAmount": "4800000",
+              "timestamp": "1700000000000",
+              "tokenId": "111677288788322716285721802321462214269337893592189338144026898987337904380415"
+            },
+            "orderType": "FOK",
+            "owner": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ],
+      "posted": {
+        "ok": true,
+        "orderId": "0xabababababababababababababababababababababababababababababababab",
+        "status": "live",
+        "makingAmount": "0",
+        "takingAmount": "0",
+        "tradeIds": [],
+        "transactionsHashes": []
+      }
+    }
+  }
+}

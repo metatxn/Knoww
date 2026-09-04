@@ -15,7 +15,14 @@ export type PlatformOperation =
   | "getPriceHistory"
   | "getMarketTrades"
   | "listTags"
-  | "resolveAdapter";
+  | "resolveAdapter"
+  | "connectionStatus"
+  | "getAccountPositions"
+  | "getAccountActivity"
+  | "getAccountOrders"
+  | "previewOrder"
+  | "placeOrder"
+  | "cancelOrder";
 
 export type PlatformErrorKind =
   | "upstream"
@@ -23,7 +30,18 @@ export type PlatformErrorKind =
   | "invalid_input"
   | "disabled"
   | "unsupported"
-  | "timeout";
+  | "timeout"
+  /** The draft's short expiration passed before `placeOrder`. */
+  | "draft_expired"
+  /**
+   * The market changed between preview and place (status, price bounds,
+   * outcome, minimum size, tick size, fees, eligibility or policy).
+   */
+  | "draft_rejected"
+  /** No signer or credentials are bound for the identity, or they belong to another address. */
+  | "unauthenticated"
+  /** The identity may not trade here (region, capability or platform policy). */
+  | "ineligible";
 
 export interface PlatformErrorInit {
   platform: PlatformId;

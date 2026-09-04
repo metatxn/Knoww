@@ -16,6 +16,11 @@ export {
   resolvePolymarketBaseUrls,
 } from "./client";
 export {
+  type ClobMarketRecord,
+  createClobMarket,
+  type PolymarketClobMarket,
+} from "./clob-market";
+export {
   createClobOrderbook,
   type OrderbookLevel,
   type OrderbookSnapshot,
@@ -109,4 +114,11 @@ export {
   type PolymarketPublicData,
   type TraderLeaderboardParams,
 } from "./public-data";
+export { POLYMARKET_REGION_POLICY } from "./region-policy";
 export { type GammaStatusFlags, mapPolymarketStatus } from "./status";
+export {
+  createPolymarketTradingAdapter,
+  type PolymarketTradingAdapter,
+  type PolymarketTradingAdapterInit,
+  type PolymarketTradingSigner,
+} from "./trading-adapter";

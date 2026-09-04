@@ -1,4 +1,10 @@
 import type {
+  CanonicalMarket,
+  CanonicalOutcome,
+  PlatformDetails,
+} from "@knoww/services/core";
+import type { ComponentType } from "react";
+import type {
   OrderBook,
   OutcomeData,
   PreparedTradeTicket,
@@ -6,53 +12,90 @@ import type {
 } from "@/types/market";
 
 /**
- * Props for the TradingForm component
+ * What a mount prices the ticket against: the live book, the platform's tick
+ * and minimum size, and the platform specifics that only the platform's own
+ * slot components and the ticket's order path read.
+ */
+export interface MarketQuote {
+  bestBid?: number;
+  bestAsk?: number;
+  orderBook?: OrderBook;
+  tickSize?: number;
+  minOrderSize?: number;
+  platformDetails?: PlatformDetails;
+}
+
+/**
+ * Every TradingForm mount passes a canonical market, the selected canonical
+ * outcome and the quote for it. The toggle list is `market.outcomes`.
+ * See docs/decisions/2026-09-03-aggregator-platform-adapters.md, "Trading".
  */
 export interface TradingFormProps {
-  /** Market question/title */
-  marketTitle: string;
-  /** Token ID for the selected outcome */
-  tokenId: string;
-  /** Available outcomes for this market */
-  outcomes: OutcomeData[];
-  /** Currently selected outcome index */
-  selectedOutcomeIndex: number;
-  /** Callback when outcome selection changes */
-  onOutcomeChange: (index: number) => void;
-  /** Whether this is a negative risk market */
-  negRisk?: boolean;
-  /** User's USDC balance (optional) */
+  market: CanonicalMarket;
+  outcome: CanonicalOutcome;
+  onOutcomeChange: (outcome: CanonicalOutcome) => void;
+  quote: MarketQuote;
   userBalance?: number;
-  /** Market tick size (default: 0.01) */
-  tickSize?: number;
-  /** Market minimum order size in shares (default: 1) */
-  minOrderSize?: number;
-  /** Best bid price from order book (for spread warning) */
-  bestBid?: number;
-  /** Best ask price from order book (for spread warning) */
-  bestAsk?: number;
-  /** Full order book for slippage calculation */
-  orderBook?: OrderBook;
-  /** Max slippage percentage for market orders (default: 2 = 2%) */
   maxSlippagePercent?: number;
-  /** Callback after successful order submission */
   onOrderSuccess?: (order: unknown) => void;
-  /** Callback after order error */
   onOrderError?: (error: Error) => void;
-  /** Market image URL for header */
-  marketImage?: string;
-  /** Yes probability for header display */
   yesProbability?: number;
-  /** Whether order book data is from live WebSocket */
   isLiveData?: boolean;
-  /** Initial side for the trading form (BUY or SELL) */
   initialSide?: TradingSide;
-  /** Initial number of shares */
   initialShares?: number;
-  /** Validated draft used to prefill the form without submitting it */
   preparedTradeTicket?: PreparedTradeTicket;
-  /** Condition ID for the market (required for split/merge) */
-  conditionId?: string;
-  /** Disable internal sticky wrapper when parent already handles sticky */
   disableSticky?: boolean;
+}
+
+/** What a platform's optional trading slots receive. */
+export interface TradingSlotProps {
+  market: CanonicalMarket;
+  outcome: CanonicalOutcome;
+  details: PlatformDetails | undefined;
+}
+
+/**
+ * A platform's optional trading UI. Each slot renders from the canonical
+ * market and the quote's platform details; the ticket decides when a slot is
+ * shown (the extras only once the user can trade on the platform).
+ */
+export interface PlatformTradingUi {
+  /** Inline badge beside the market title, such as Polymarket's "Neg Risk". */
+  MarketBadge?: ComponentType<TradingSlotProps>;
+  /** Extra actions beside the order-type tabs, such as split and merge. */
+  TradingExtras?: ComponentType<TradingSlotProps>;
+}
+
+/**
+ * The ticket's own props, derived from TradingFormProps by TradingForm. Token
+ * ids, the condition id and neg-risk keep the CLOB's shape here until the
+ * CLOB hooks sit behind the trading adapter; nothing outside the ticket and
+ * its state hook should build these.
+ */
+export interface TradingTicketProps {
+  marketTitle: string;
+  tokenId: string;
+  outcomes: OutcomeData[];
+  selectedOutcomeIndex: number;
+  onOutcomeChange: (index: number) => void;
+  negRisk?: boolean;
+  userBalance?: number;
+  tickSize?: number;
+  minOrderSize?: number;
+  bestBid?: number;
+  bestAsk?: number;
+  orderBook?: OrderBook;
+  maxSlippagePercent?: number;
+  onOrderSuccess?: (order: unknown) => void;
+  onOrderError?: (error: Error) => void;
+  marketImage?: string;
+  yesProbability?: number;
+  isLiveData?: boolean;
+  initialSide?: TradingSide;
+  initialShares?: number;
+  preparedTradeTicket?: PreparedTradeTicket;
+  conditionId?: string;
+  disableSticky?: boolean;
+  platformUi?: PlatformTradingUi;
+  slot?: TradingSlotProps;
 }

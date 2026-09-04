@@ -2,6 +2,20 @@ import type { ServiceFetchOptions } from "../fetch-options";
 import type { MarketCapabilities } from "./capabilities";
 import type { PlatformId } from "./ids";
 import type {
+  AccountActivityPage,
+  AccountOrderPage,
+  AccountPositions,
+  AccountReadInput,
+  CancelOrderInput,
+  CanonicalOrderIntent,
+  ConnectionStatusInput,
+  OrderDraft,
+  OrderResult,
+  PlaceDraftInput,
+  PlatformConnectionStatus,
+} from "./orders";
+import type { RegionPolicy } from "./region";
+import type {
   CanonicalEvent,
   CanonicalMarket,
   CanonicalOrderbook,
@@ -113,10 +127,31 @@ export interface MarketDataAdapter {
 }
 
 /**
- * Trading contract placeholder. Methods (connectionStatus, account reads,
- * previewOrder, placeOrder, cancelOrder) are specified in M3; the registry
- * already returns `null` for discovery-only platforms.
+ * Trading contract (ADR: Adapters and the registry > Trading adapter (M3)).
+ * One implementation per platform, bound to its signer by the platform
+ * folder's factory; the registry returns `null` while a platform is
+ * discovery-only.
+ *
+ * `previewOrder` -> `placeOrder` is the only way to trade. The draft carries
+ * the quote and the fee estimate, and `placeOrder` takes the draft id and an
+ * idempotency key, never a second copy of the trade. Every method rejects
+ * with a PlatformError whose `operation` is the method name.
  */
 export interface TradingAdapter {
   readonly platform: PlatformId;
+  /**
+   * Where the platform blocks trading or allows closing only. A static
+   * declaration; the apps evaluate the visitor's location against it with
+   * `evaluateRegionTrading` on the server.
+   */
+  regionPolicy(): RegionPolicy;
+  connectionStatus(
+    input: ConnectionStatusInput
+  ): Promise<PlatformConnectionStatus>;
+  getAccountPositions(input: AccountReadInput): Promise<AccountPositions>;
+  getAccountActivity(input: AccountReadInput): Promise<AccountActivityPage>;
+  getAccountOrders(input: AccountReadInput): Promise<AccountOrderPage>;
+  previewOrder(input: CanonicalOrderIntent): Promise<OrderDraft>;
+  placeOrder(input: PlaceDraftInput): Promise<OrderResult>;
+  cancelOrder(input: CancelOrderInput): Promise<OrderResult>;
 }

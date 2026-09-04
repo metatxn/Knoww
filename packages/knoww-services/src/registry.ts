@@ -11,10 +11,12 @@ import {
 } from "./core";
 import {
   createPolymarketMarketDataAdapter,
+  createPolymarketTradingAdapter,
   DEFAULT_POLYMARKET_BASE_URLS,
   POLYMARKET_CAPABILITIES,
   type PolymarketBaseUrls,
   type PolymarketMarketDataAdapter,
+  type PolymarketTradingAdapterInit,
 } from "./platforms/polymarket";
 
 /**
@@ -86,6 +88,15 @@ export interface PlatformRegistryInit {
   now?: () => Date;
   polymarket?: {
     baseUrls?: Partial<PolymarketBaseUrls>;
+    /**
+     * Signer and CLOB credentials for the trading adapter. Without them the
+     * adapter still previews orders and reads accounts; `connectionStatus`
+     * reports what is missing and `placeOrder` throws `unauthenticated`.
+     */
+    trading?: Pick<
+      PolymarketTradingAdapterInit,
+      "signer" | "credentials" | "builderCode" | "draftTtlMs"
+    >;
   };
 }
 
@@ -94,7 +105,10 @@ export interface PlatformRegistry {
   getEnabledPlatforms(): PlatformId[];
   /** The generic market-data adapter, or a `disabled` PlatformError. */
   getMarketDataAdapter(platform: PlatformId): MarketDataAdapter;
-  /** The trading adapter, `null` while the platform is discovery-only. */
+  /**
+   * The trading adapter, `null` for a platform that is discovery-only here
+   * (read-only integrations), or a `disabled` PlatformError when it is off.
+   */
   getTradingAdapter(platform: PlatformId): TradingAdapter | null;
   /** Typed escape hatch: the concrete adapter with its platform-specific client. */
   getPlatformAdapter(platform: "polymarket"): PolymarketMarketDataAdapter;
@@ -146,6 +160,15 @@ export function createPlatformRegistry(
           ),
         });
         marketData.set(platform, polymarket);
+        trading.set(
+          platform,
+          createPolymarketTradingAdapter({
+            baseUrls: init.polymarket?.baseUrls,
+            fetchImpl: init.fetchImpl,
+            now: init.now,
+            ...init.polymarket?.trading,
+          })
+        );
         break;
       default:
         // Listed in PLATFORM_IDS but without an adapter yet (Kalshi until M2).

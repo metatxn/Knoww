@@ -17,6 +17,7 @@
       "!**/.readability/**/*.json",
       "!apps/web/golden/fixtures",
       "!apps/web/golden/responses",
+      "!apps/web/golden/trading",
       "!**/cloudflare-env.d.ts",
       "!.vscode",
       "!.wrangler",

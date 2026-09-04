@@ -30,7 +30,7 @@ import {
   roundUpToTick,
 } from "@/lib/slippage";
 import type { OrderTypeSelection, TradingSide } from "@/types/market";
-import type { TradingFormProps } from "../types";
+import type { TradingTicketProps } from "../types";
 
 const DEFAULT_MAX_SLIPPAGE_PERCENT = 2;
 // Default USD budget for a MARKET BUY. Market buys are denominated in dollars
@@ -57,8 +57,8 @@ export function useTradingFormState({
   initialSide,
   initialShares,
   preparedTradeTicket,
-}: Partial<TradingFormProps> & {
-  outcomes: TradingFormProps["outcomes"];
+}: Partial<TradingTicketProps> & {
+  outcomes: TradingTicketProps["outcomes"];
   selectedOutcomeIndex: number;
 }) {
   const { isConnected } = useConnection();

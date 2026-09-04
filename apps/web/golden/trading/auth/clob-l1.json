@@ -1,0 +1,43 @@
+{
+  "typedData": {
+    "domain": {
+      "name": "ClobAuthDomain",
+      "version": "1",
+      "chainId": 137
+    },
+    "types": {
+      "ClobAuth": [
+        {
+          "name": "address",
+          "type": "address"
+        },
+        {
+          "name": "timestamp",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "primaryType": "ClobAuth",
+    "message": {
+      "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "timestamp": "1700000000",
+      "nonce": "0n",
+      "message": "This message attests that I control the given wallet"
+    }
+  },
+  "signature": "0xa6eac9a1927262c9ea8ff8e59f701392c16873a714b0f976f1481df77b438a1829c5e7fc70854d68b320b4ca7beff251202adb8ff00ad00456eab408e3a95ce41c",
+  "headers": {
+    "POLY_ADDRESS": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "POLY_SIGNATURE": "0xa6eac9a1927262c9ea8ff8e59f701392c16873a714b0f976f1481df77b438a1829c5e7fc70854d68b320b4ca7beff251202adb8ff00ad00456eab408e3a95ce41c",
+    "POLY_TIMESTAMP": "1700000000",
+    "POLY_NONCE": "0"
+  }
+}

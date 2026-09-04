@@ -50,9 +50,48 @@ describe("createPlatformRegistry", () => {
     expect(adapter.capabilities()).toMatchObject({
       marketData: true,
       orderbook: true,
-      createOrder: false,
+      createOrder: true,
+      cancelOrder: true,
     });
-    expect(registry.getTradingAdapter("polymarket")).toBeNull();
+    expect(registry.getTradingAdapter("polymarket")?.platform).toBe(
+      "polymarket"
+    );
+  });
+
+  it("hands the trading binding to the Polymarket trading adapter", async () => {
+    const identity = {
+      kind: "wallet",
+      platform: "polymarket",
+      address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      accountType: "eoa",
+    } as const;
+
+    const unbound = createPlatformRegistry({ env: {} });
+    await expect(
+      unbound.getTradingAdapter("polymarket")?.connectionStatus({ identity })
+    ).resolves.toMatchObject({
+      connected: false,
+      canTrade: false,
+      reasons: ["no_signer", "no_credentials"],
+    });
+
+    const withCredentials = createPlatformRegistry({
+      env: {},
+      polymarket: {
+        trading: {
+          credentials: {
+            apiKey: "00000000-0000-0000-0000-000000000000",
+            apiSecret: "dGVzdC1zZWNyZXQ=",
+            apiPassphrase: "test-passphrase",
+          },
+        },
+      },
+    });
+    await expect(
+      withCredentials
+        .getTradingAdapter("polymarket")
+        ?.connectionStatus({ identity })
+    ).resolves.toMatchObject({ connected: false, reasons: ["no_signer"] });
   });
 
   it("keeps the environment's order and drops platforms without an adapter", () => {
