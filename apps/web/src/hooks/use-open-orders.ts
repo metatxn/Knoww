@@ -89,7 +89,7 @@ async function fetchMarketInfo(tokenId: string): Promise<{
   icon?: string;
 } | null> {
   try {
-    const response = await fetch(`/api/markets/by-token/${tokenId}`);
+    const response = await fetch(`/api/polymarket/markets/by-token/${tokenId}`);
     if (!response.ok) return null;
 
     const data: MarketInfoResponse = await response.json();

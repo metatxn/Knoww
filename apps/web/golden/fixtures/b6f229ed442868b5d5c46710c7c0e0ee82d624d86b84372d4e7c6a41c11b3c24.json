@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://gamma-api.polymarket.com/tags/slug/politics"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "cache-control": "public, max-age=1800",
+      "content-type": "application/json",
+      "link": "</schemas/Tag.json>; rel=\"describedBy\"",
+      "server": "cloudflare",
+      "speculation-rules": "\"/cdn-cgi/speculation\"",
+      "strict-transport-security": "max-age=7776000; includeSubDomains",
+      "vary": "Accept-Encoding,Origin",
+      "x-envoy-upstream-service-time": "4"
+    },
+    "body": "{\"$schema\":\"https://gamma-api.polymarket.com/schemas/Tag.json\",\"id\":\"2\",\"label\":\"Politics\",\"slug\":\"politics\",\"forceShow\":false,\"publishedAt\":\"2023-10-25 18:55:50.674+00\",\"updatedBy\":13,\"createdAt\":\"2023-10-25T18:55:50.681Z\",\"updatedAt\":\"2026-04-17T20:39:54.201881Z\",\"forceHide\":true,\"requiresTranslation\":false}\n"
+  }
+}

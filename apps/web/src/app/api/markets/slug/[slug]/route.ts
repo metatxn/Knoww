@@ -1,8 +1,8 @@
 import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
+import { fetchOpenMarketRecordBySlug } from "@/polymarket/market-reads";
 
 const log = createLogger("api.markets.slug");
 
@@ -58,30 +58,13 @@ export async function GET(
       );
     }
 
-    // Fetch market using slug query (recommended by API team)
-    // Always filter closed=false unless specifically requesting historical data
-    const slugResponse = await fetch(
-      `${POLYMARKET_API.GAMMA.MARKETS}?slug=${encodeURIComponent(
-        slug
-      )}&closed=false`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        next: { revalidate: 60 }, // Cache for 1 minute
-      }
-    );
+    // The open market behind the slug, as Gamma sent it. A settled market
+    // counts as missing. Cached for a minute.
+    const market = await fetchOpenMarketRecordBySlug(slug, {
+      revalidateSeconds: 60,
+    });
 
-    if (!slugResponse.ok) {
-      throw new Error(`Gamma API error: ${slugResponse.statusText}`);
-    }
-
-    const slugData = (await slugResponse.json()) as Array<
-      Record<string, unknown>
-    >;
-
-    // Gamma returns an array, get first match
-    if (!slugData || slugData.length === 0) {
+    if (market === null) {
       return NextResponse.json(
         {
           success: false,
@@ -90,8 +73,6 @@ export async function GET(
         { status: 404 }
       );
     }
-
-    const market = slugData[0];
 
     return NextResponse.json(
       {

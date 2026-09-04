@@ -221,7 +221,7 @@ export function useSellPosition({
 
       // Multi-outcome markets use the Neg Risk CTF Exchange contract, so the
       // signed order's verifying contract must match. Pull the flag from the
-      // position (surfaced by /api/user/positions) — hardcoding `false` here
+      // position (surfaced by /api/polymarket/user/positions) — hardcoding `false` here
       // caused neg-risk Quick Sells to be signed against the wrong exchange
       // and rejected server-side. See docs.polymarket.com/trading/orders
       // /overview#negative-risk.

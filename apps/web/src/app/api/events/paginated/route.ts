@@ -1,11 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { CACHE_DURATION } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
-import { fetchGammaKeysetPage, toSlimGammaEvent } from "@/lib/gamma-keyset";
+import { toSlimGammaEvent } from "@/lib/gamma-keyset";
 import { logger } from "@/lib/logger";
 import { normalizeTagSlug } from "@/lib/tag-slugs";
+import { fetchKeysetEventPage } from "@/polymarket/event-reads";
 import type { GammaEvent } from "@/types/gamma-api";
 
 const DEFAULT_LIMIT = 20;
@@ -248,56 +249,30 @@ export async function GET(request: NextRequest) {
     // `limit` unique items.
     const gammaLimit = afterCursor ? limit + 1 : limit;
 
-    const params = new URLSearchParams({
-      limit: String(gammaLimit),
-      closed: String(closed),
-      order,
-      ascending: String(ascending),
-    });
-
-    if (afterCursor) {
-      params.set("after_cursor", afterCursor);
-    }
-    if (seriesId) {
-      // series_id is the precise filter Polymarket's UI uses; prefer it
-      // over tag_slug when both are supplied.
-      params.set("series_id", seriesId);
-      params.set("active", "true");
-    } else if (tagSlug) {
-      params.set("tag_slug", tagSlug);
-    }
-    if (volume24hrMin) {
-      params.set("volume_min", volume24hrMin);
-    }
-    if (volume1wkMin) {
-      params.set("volume_min", volume1wkMin);
-    }
-    if (liquidityMin) {
-      params.set("liquidity_min", liquidityMin);
-    }
-    if (live) {
-      params.set("live", "true");
-    }
-    if (startDateMin) {
-      params.set("start_date_min", startDateMin);
-    }
-    if (startDateMax) {
-      params.set("start_date_max", startDateMax);
-    }
-    if (endDateMin) {
-      params.set("end_date_min", endDateMin);
-    }
-    if (endDateMax) {
-      params.set("end_date_max", endDateMax);
-    }
-
-    const page = await fetchGammaKeysetPage<GammaEvent>(
+    const page = await fetchKeysetEventPage(
       {
-        endpoint: POLYMARKET_API.GAMMA.EVENTS_KEYSET,
-        params,
-        revalidate: CACHE_DURATION.EVENTS,
+        limit: gammaLimit,
+        closed,
+        order,
+        ascending,
+        cursor: afterCursor ?? undefined,
+        // series_id is the precise filter Polymarket's UI uses; prefer it
+        // over tag_slug when both are supplied.
+        ...(seriesId
+          ? { seriesIds: [Number(seriesId)], active: true }
+          : tagSlug
+            ? { tagSlug }
+            : {}),
+        // Both floors map to Gamma's single volume_min; the week floor wins.
+        volumeMin: volume1wkMin || volume24hrMin || undefined,
+        liquidityMin: liquidityMin || undefined,
+        live: live || undefined,
+        startDateMin: startDateMin || undefined,
+        startDateMax: startDateMax || undefined,
+        endDateMin: endDateMin || undefined,
+        endDateMax: endDateMax || undefined,
       },
-      ["events", "data"]
+      { revalidateSeconds: CACHE_DURATION.EVENTS }
     );
 
     // Drop ONLY the cursor item (it was the last item of the previous page).
@@ -307,13 +282,17 @@ export async function GET(request: NextRequest) {
     // next page start after a never-shown event.
     const cursorItemId = afterCursor ? decodeCursorItemId(afterCursor) : null;
     const pageItems = cursorItemId
-      ? page.items.filter((e) => String(e.id) !== cursorItemId)
-      : page.items;
+      ? page.rawEvents.filter((e) => String(e.id) !== cursorItemId)
+      : page.rawEvents;
 
     return NextResponse.json(
       {
         success: true,
-        data: pageItems.map((event) => toSlimGammaEvent(event, fullMarkets)),
+        // The records are Gamma events as sent; the slim mapper reads the
+        // legacy type.
+        data: pageItems.map((event) =>
+          toSlimGammaEvent(event as GammaEvent, fullMarkets)
+        ),
         pagination: {
           hasMore: Boolean(page.nextCursor),
           nextCursor: page.nextCursor,

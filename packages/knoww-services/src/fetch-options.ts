@@ -1,7 +1,39 @@
+/**
+ * Cache hint carried on the request init. Services never import Next; an
+ * injected fetch (see the web app) reads the hint with `readCacheHint` and
+ * maps it onto its own cache options. Plain fetch ignores the extra key.
+ */
+export interface ServiceCacheHint {
+  revalidateSeconds?: number;
+  tags?: string[];
+}
+
+export interface ServiceRequestInit extends RequestInit {
+  knowwCache?: ServiceCacheHint;
+}
+
 export interface ServiceFetchOptions {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   signal?: AbortSignal;
+  cache?: ServiceCacheHint;
+}
+
+export function readCacheHint(
+  init: RequestInit | undefined
+): ServiceCacheHint | undefined {
+  return (init as ServiceRequestInit | undefined)?.knowwCache;
+}
+
+function withCacheHint(
+  fetchImpl: typeof fetch,
+  cache: ServiceCacheHint | undefined
+): typeof fetch {
+  if (!cache) return fetchImpl;
+  return (input, init) => {
+    const hinted: ServiceRequestInit = { ...init, knowwCache: cache };
+    return fetchImpl(input, hinted);
+  };
 }
 
 function abortReason(signal: AbortSignal): unknown {
@@ -19,7 +51,7 @@ export async function withUpstreamTimeout<T>(
   defaultTimeoutMs: number,
   run: (fetchImpl: typeof fetch, signal: AbortSignal) => Promise<T>
 ): Promise<T> {
-  const fetchImpl = options?.fetchImpl ?? fetch;
+  const fetchImpl = withCacheHint(options?.fetchImpl ?? fetch, options?.cache);
   const controller = new AbortController();
   const callerSignal = options?.signal;
 
@@ -28,10 +60,12 @@ export async function withUpstreamTimeout<T>(
   }
 
   const abortFromCaller = () => {
-    if (callerSignal) controller.abort(abortReason(callerSignal));
+    if (callerSignal) {
+      controller.abort(abortReason(callerSignal));
+    }
   };
-  callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
 
+  callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
   const timeoutId = setTimeout(
     () => controller.abort(),
     options?.timeoutMs ?? defaultTimeoutMs

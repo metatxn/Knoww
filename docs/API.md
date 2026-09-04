@@ -1799,7 +1799,7 @@ GET /api/profile/0x1111111111111111111111111111111111111111 HTTP/1.1
 }
 ```
 
-### GET `/api/trader/x-profile`
+### GET `/api/polymarket/trader/x-profile`
 
 Description: Resolves an X handle to a public Polymarket trader profile using a short-lived cached leaderboard index.
 
@@ -1893,7 +1893,7 @@ GET /api/markets/by-tag?tag_id=342&limit=2 HTTP/1.1
 }
 ```
 
-### GET `/api/markets/by-token/:tokenId`
+### GET `/api/polymarket/markets/by-token/:tokenId`
 
 Description: Resolves a market from a CLOB token ID using Gamma and returns a normalized subset used by the UI.
 
@@ -1927,7 +1927,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/by-token/101 HTTP/1.1
+GET /api/polymarket/markets/by-token/101 HTTP/1.1
 ```
 
 ```json
@@ -2401,7 +2401,7 @@ GET /api/price/pol HTTP/1.1
 }
 ```
 
-### GET `/api/price/tokens`
+### GET `/api/polymarket/price/tokens`
 
 Description: Returns USD prices for a fixed token set and wrapped aliases, backed by CoinMarketCap with fallback values when the API is unavailable.
 
@@ -2437,7 +2437,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/price/tokens HTTP/1.1
+GET /api/polymarket/price/tokens HTTP/1.1
 ```
 
 ```json
@@ -3018,7 +3018,7 @@ GET /api/tags/bitcoin HTTP/1.1
 
 ## User
 
-### GET `/api/user/details`
+### GET `/api/polymarket/user/details`
 
 Description: Looks up leaderboard-derived profile stats for a single user.
 
@@ -3059,7 +3059,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/details?user=0x1111111111111111111111111111111111111111&timePeriod=week HTTP/1.1
+GET /api/polymarket/user/details?user=0x1111111111111111111111111111111111111111&timePeriod=week HTTP/1.1
 ```
 
 ```json
@@ -3192,7 +3192,7 @@ GET /api/user/portfolio-value?user=0x2222222222222222222222222222222222222222 HT
 }
 ```
 
-### GET `/api/user/positions`
+### GET `/api/polymarket/user/positions`
 
 Description: Returns current positions, plus separately tracked lost positions filtered from the upstream feed.
 
@@ -3238,7 +3238,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/positions?user=0x2222222222222222222222222222222222222222&limit=2 HTTP/1.1
+GET /api/polymarket/user/positions?user=0x2222222222222222222222222222222222222222&limit=2 HTTP/1.1
 ```
 
 ```json
@@ -3286,7 +3286,7 @@ GET /api/user/positions?user=0x2222222222222222222222222222222222222222&limit=2 
 }
 ```
 
-### GET `/api/user/trades`
+### GET `/api/polymarket/user/trades`
 
 Description: Returns transformed user activity history with summary aggregates.
 
@@ -3331,7 +3331,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/trades?user=0x2222222222222222222222222222222222222222&type=TRADE&limit=2 HTTP/1.1
+GET /api/polymarket/user/trades?user=0x2222222222222222222222222222222222222222&type=TRADE&limit=2 HTTP/1.1
 ```
 
 ```json

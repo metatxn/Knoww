@@ -8,7 +8,7 @@ const ROUTE_CACHE_PROFILES = new Map<string, string>([
   ["markets/info/[conditionID]/route.ts", "events"],
   ["markets/trades/[tokenID]/route.ts", "realtime"],
   ["markets/by-tag/route.ts", "events"],
-  ["markets/by-token/[tokenId]/route.ts", "events"],
+  ["polymarket/markets/by-token/[tokenId]/route.ts", "events"],
   ["markets/slug/[slug]/route.ts", "events"],
   ["events/list/route.ts", "events"],
   ["sports/list/route.ts", "static"],
@@ -17,9 +17,9 @@ const ROUTE_CACHE_PROFILES = new Map<string, string>([
   ["comments/route.ts", "search"],
   ["profile/[address]/route.ts", "leaderboard"],
   ["price/pol/route.ts", "priceHistory"],
-  ["price/tokens/route.ts", "priceHistory"],
+  ["polymarket/price/tokens/route.ts", "priceHistory"],
   ["user/public-profile/route.ts", "leaderboard"],
-  ["user/details/route.ts", "leaderboard"],
+  ["polymarket/user/details/route.ts", "leaderboard"],
 ]);
 
 describe("public API cache headers", () => {

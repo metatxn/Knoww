@@ -15,6 +15,8 @@
       "!build",
       "!**/.readability/**/*.html",
       "!**/.readability/**/*.json",
+      "!apps/web/golden/fixtures",
+      "!apps/web/golden/responses",
       "!**/cloudflare-env.d.ts",
       "!.vscode",
       "!.wrangler",
@@ -95,6 +97,73 @@
         "rules": {
           "complexity": {
             "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/knoww-services/src/**",
+        "!packages/knoww-services/src/registry.ts",
+        "!packages/knoww-services/src/platforms/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "next": "@knoww/services is framework-free. Next and React imports are not allowed here.",
+                  "react": "@knoww/services is framework-free. Next and React imports are not allowed here.",
+                  "react-dom": "@knoww/services is framework-free. Next and React imports are not allowed here.",
+                  "@knoww/shared-types/polymarket": "Vendor API types and SDKs stay inside src/platforms/<platform>/. Use the canonical types from ./core."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "**/platforms/**",
+                      "./platforms",
+                      "../platforms",
+                      "../../platforms"
+                    ],
+                    "message": "Only src/registry.ts may import a platform folder. Go through the registry (ADR 2026-09-03-aggregator-platform-adapters)."
+                  },
+                  {
+                    "group": ["@polymarket/**"],
+                    "message": "Vendor API types and SDKs stay inside src/platforms/<platform>/. Use the canonical types from ./core."
+                  },
+                  {
+                    "group": ["next/**", "react/**", "react-dom/**"],
+                    "message": "@knoww/services is framework-free. Next and React imports are not allowed here."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/web/src/**",
+        "!apps/web/src/polymarket/**",
+        "!apps/web/src/app/api/polymarket/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@knoww/services/platforms/**"],
+                    "message": "apps/web reaches platform folders only from src/polymarket/ and src/app/api/polymarket/. Use @knoww/services/registry (ADR 2026-09-03-aggregator-platform-adapters)."
+                  }
+                ]
+              }
+            }
           }
         }
       }

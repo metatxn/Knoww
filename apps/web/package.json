@@ -13,6 +13,8 @@
     "soak": "node scripts/soak-memory.mjs",
     "soak:assert": "SOAK_ASSERT=1 node scripts/soak-memory.mjs",
     "indexnow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/submit-indexnow.mts",
+    "golden:record": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/golden.mts record",
+    "golden:replay": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/golden.mts replay",
     "lint": "biome check",
     "format": "biome format --write",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",

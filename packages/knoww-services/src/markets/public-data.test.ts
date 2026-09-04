@@ -88,6 +88,26 @@ describe("public market data clients", () => {
     });
   });
 
+  it("passes the active flag through and reports the total the page carries", async () => {
+    const { calls, fetchImpl } = recordingFetch(() =>
+      jsonResponse({ events: [], next_cursor: null, total_results: 42 })
+    );
+
+    const page = await fetchEventPage(
+      { limit: 10, seriesIds: [42], active: true },
+      { fetchImpl }
+    );
+
+    expect(calls[0].url.searchParams.get("series_id")).toBe("42");
+    expect(calls[0].url.searchParams.get("active")).toBe("true");
+    expect(page).toEqual({
+      events: [],
+      rawEvents: [],
+      nextCursor: null,
+      totalResults: 42,
+    });
+  });
+
   it("requests bounded trades by condition id", async () => {
     const { calls, fetchImpl } = recordingFetch(() =>
       jsonResponse([

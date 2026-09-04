@@ -241,7 +241,11 @@ describe("fetchChildEvents", () => {
 
     const result = await fetchChildEvents("35908", { fetchImpl });
 
-    expect(result).toEqual({ events: [child], truncated: false });
+    expect(result).toEqual({
+      events: [child],
+      rawEvents: [child],
+      truncated: false,
+    });
     const url = new URL(calls[0].url);
     expect(`${url.origin}${url.pathname}`).toBe(
       "https://gamma-api.polymarket.com/events"
@@ -249,6 +253,21 @@ describe("fetchChildEvents", () => {
     expect(url.searchParams.get("parent_event_id")).toBe("35908");
     expect(url.searchParams.get("closed")).toBe("false");
     expect(url.searchParams.get("limit")).toBe("51");
+  });
+
+  it("keeps the child records as Gamma sent them", async () => {
+    const child = {
+      ...PARENT_EVENT,
+      id: "41001",
+      title: "Most Sixes",
+      volume: 1234,
+    };
+    const { fetchImpl } = recordingFetch(() => jsonResponse([child]));
+
+    const result = await fetchChildEvents("35908", { fetchImpl });
+
+    expect(result.rawEvents).toEqual([child]);
+    expect(result.rawEvents[0]?.volume).toBe(1234);
   });
 
   it("returns the bounded child page with an explicit truncation flag", async () => {

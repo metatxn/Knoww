@@ -1,0 +1,647 @@
+status: 200
+
+{
+  "events": [
+    {
+      "_source": "search",
+      "active": true,
+      "archived": false,
+      "closed": false,
+      "endDate": "2026-09-16T00:00:00Z",
+      "ended": false,
+      "id": "481717",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/fed-decision-in-september-762-c4RyWuxRPo1L.jpg",
+      "markets": [
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "50+ bps decrease",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed decrease interest rates by 50+ bps after the September 2026 meeting?",
+          "slug": "will-the-fed-decrease-interest-rates-by-50-bps-after-the-september-2026-meeting-863",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.007,
+          "bestBid": 0.006,
+          "closed": false,
+          "groupItemTitle": "25 bps decrease",
+          "lastTradePrice": 0.007,
+          "outcomePrices": [
+            "0.0065",
+            "0.9935"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed decrease interest rates by 25 bps after the September 2026 meeting?",
+          "slug": "will-the-fed-decrease-interest-rates-by-25-bps-after-the-september-2026-meeting-586",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.57,
+          "bestBid": 0.56,
+          "closed": false,
+          "groupItemTitle": "No change",
+          "lastTradePrice": 0.57,
+          "outcomePrices": [
+            "0.565",
+            "0.435"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will there be no change in Fed interest rates after the September 2026 meeting?",
+          "slug": "will-there-be-no-change-in-fed-interest-rates-after-the-september-2026-meeting-615",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.43,
+          "bestBid": 0.42,
+          "closed": false,
+          "groupItemTitle": "25 bps increase",
+          "lastTradePrice": 0.43,
+          "outcomePrices": [
+            "0.425",
+            "0.575"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed increase interest rates by 25 bps after the September 2026 meeting?",
+          "slug": "will-the-fed-increase-interest-rates-by-25-bps-after-the-september-2026-meeting-649",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.005,
+          "bestBid": 0.004,
+          "closed": false,
+          "groupItemTitle": "50+ bps increase",
+          "lastTradePrice": 0.004,
+          "outcomePrices": [
+            "0.0045",
+            "0.9955"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed increase interest rates by 50+ bps after the September 2026 meeting?",
+          "slug": "will-the-fed-increase-interest-rates-by-50-bps-after-the-september-2026-meeting-664",
+          "spread": 0.001
+        }
+      ],
+      "negRisk": true,
+      "slug": "fed-decision-in-september-762",
+      "startDate": "2026-05-13T21:23:09.737806Z",
+      "title": "Fed Decision in September?",
+      "topOutcome": {
+        "name": "No change",
+        "price": 0.565
+      }
+    },
+    {
+      "_source": "search",
+      "active": true,
+      "archived": false,
+      "closed": false,
+      "endDate": "2026-12-31T00:00:00Z",
+      "ended": false,
+      "id": "51456",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/how-many-fed-rate-cuts-in-2025-9qstZkSL1dn0.jpg",
+      "markets": [
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.888,
+          "bestBid": 0.887,
+          "closed": false,
+          "groupItemTitle": "0 (0 bps)",
+          "lastTradePrice": 0.887,
+          "outcomePrices": [
+            "0.8875",
+            "0.1125"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will no Fed rate cuts happen in 2026?",
+          "slug": "will-no-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.09,
+          "bestBid": 0.08,
+          "closed": false,
+          "groupItemTitle": "1 (25 bps)",
+          "lastTradePrice": 0.08,
+          "outcomePrices": [
+            "0.085",
+            "0.915"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 1 Fed rate cut happen in 2026?",
+          "slug": "will-1-fed-rate-cut-happen-in-2026",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.027,
+          "bestBid": 0.024,
+          "closed": false,
+          "groupItemTitle": "2 (50 bps)",
+          "lastTradePrice": 0.025,
+          "outcomePrices": [
+            "0.0255",
+            "0.9745"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 2 Fed rate cuts happen in 2026?",
+          "slug": "will-2-fed-rate-cuts-happen-in-2026",
+          "spread": 0.003
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.005,
+          "bestBid": 0.004,
+          "closed": false,
+          "groupItemTitle": "3 (75 bps)",
+          "lastTradePrice": 0.005,
+          "outcomePrices": [
+            "0.0045",
+            "0.9955"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 3 Fed rate cuts happen in 2026?",
+          "slug": "will-3-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.003,
+          "bestBid": 0.002,
+          "closed": false,
+          "groupItemTitle": "4 (100 bps)",
+          "lastTradePrice": 0.002,
+          "outcomePrices": [
+            "0.0025",
+            "0.9975"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 4 Fed rate cuts happen in 2026?",
+          "slug": "will-4-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "5 (125 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 5 Fed rate cuts happen in 2026?",
+          "slug": "will-5-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "6 (150 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 6 Fed rate cuts happen in 2026?",
+          "slug": "will-6-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "7 (175 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 7 Fed rate cuts happen in 2026?",
+          "slug": "will-7-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "8 (200 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 8 Fed rate cuts happen in 2026?",
+          "slug": "will-8-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.001,
+          "closed": false,
+          "groupItemTitle": "9 (225 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0005",
+            "0.9995"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 9 Fed rate cuts happen in 2026?",
+          "slug": "will-9-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.001,
+          "closed": false,
+          "groupItemTitle": "10 (250 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0005",
+            "0.9995"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 10 Fed rate cuts happen in 2026?",
+          "slug": "will-10-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.001,
+          "closed": false,
+          "groupItemTitle": "11 (275 bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0005",
+            "0.9995"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 11 Fed rate cuts happen in 2026?",
+          "slug": "will-11-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.002,
+          "bestBid": 0.001,
+          "closed": false,
+          "groupItemTitle": "12+ (300+ bps)",
+          "lastTradePrice": 0.001,
+          "outcomePrices": [
+            "0.0015",
+            "0.9985"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will 12 or more Fed rate cuts happen in 2026?",
+          "slug": "will-12-or-more-fed-rate-cuts-happen-in-2026",
+          "spread": 0.001
+        }
+      ],
+      "negRisk": true,
+      "slug": "how-many-fed-rate-cuts-in-2026",
+      "startDate": "2025-09-29T22:24:45.988997Z",
+      "title": "How many Fed rate cuts in 2026?",
+      "topOutcome": {
+        "name": "0 (0 bps)",
+        "price": 0.8875
+      }
+    },
+    {
+      "_source": "search",
+      "active": true,
+      "archived": false,
+      "closed": false,
+      "endDate": "2026-10-28T23:59:00Z",
+      "ended": false,
+      "id": "606422",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/fed-decision-in-september-762-c4RyWuxRPo1L.jpg",
+      "markets": [
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.011,
+          "bestBid": 0.01,
+          "closed": false,
+          "groupItemTitle": "50+ bps decrease",
+          "lastTradePrice": 0.01,
+          "outcomePrices": [
+            "0.0105",
+            "0.9895"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed decrease interest rates by 50+ bps after the October 2026 meeting?",
+          "slug": "will-the-fed-decrease-interest-rates-by-50-bps-after-the-october-2026-meeting-20260617190324029",
+          "spread": 0.001
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.041,
+          "bestBid": 0.038,
+          "closed": false,
+          "groupItemTitle": "25 bps decrease",
+          "lastTradePrice": 0.051,
+          "outcomePrices": [
+            "0.0395",
+            "0.9605"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed decrease interest rates by 25 bps after the October 2026 meeting?",
+          "slug": "will-the-fed-decrease-interest-rates-by-25-bps-after-the-october-2026-meeting-20260617190324030",
+          "spread": 0.003
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.71,
+          "bestBid": 0.7,
+          "closed": false,
+          "groupItemTitle": "No change",
+          "lastTradePrice": 0.7,
+          "outcomePrices": [
+            "0.705",
+            "0.295"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+          "slug": "will-there-be-no-change-in-fed-interest-rates-after-the-october-2026-meeting-20260617190324031",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.27,
+          "bestBid": 0.26,
+          "closed": false,
+          "groupItemTitle": "25 bps increase",
+          "lastTradePrice": 0.27,
+          "outcomePrices": [
+            "0.265",
+            "0.735"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed increase interest rates by 25 bps after the October 2026 meeting?",
+          "slug": "will-the-fed-increase-interest-rates-by-25-bps-after-the-october-2026-meeting-20260617190324032",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.008,
+          "bestBid": 0.007,
+          "closed": false,
+          "groupItemTitle": "50+ bps increase",
+          "lastTradePrice": 0.007,
+          "outcomePrices": [
+            "0.0075",
+            "0.9925"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Will the Fed increase interest rates by 50+ bps after the October 2026 meeting?",
+          "slug": "will-the-fed-increase-interest-rates-by-50-bps-after-the-october-2026-meeting-20260617190324033",
+          "spread": 0.001
+        }
+      ],
+      "negRisk": true,
+      "slug": "fed-decision-in-october-20260617190323537",
+      "startDate": "2026-06-17T23:34:28.470106Z",
+      "title": "Fed Decision in October?",
+      "topOutcome": {
+        "name": "No change",
+        "price": 0.705
+      }
+    },
+    {
+      "_source": "search",
+      "active": true,
+      "archived": false,
+      "closed": false,
+      "endDate": "2026-12-09T00:00:00Z",
+      "ended": false,
+      "id": "101936",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/will-the-fed-raise-interest-rates-in-2025-PQTEYZMvmAGr.jpg",
+      "markets": [
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.62,
+          "bestBid": 0.61,
+          "closed": false,
+          "groupItemTitle": "",
+          "lastTradePrice": 0.63,
+          "outcomePrices": [
+            "0.615",
+            "0.385"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Fed rate hike in 2026?",
+          "slug": "fed-rate-hike-in-2026",
+          "spread": 0.01
+        }
+      ],
+      "slug": "fed-rate-hike-in-2026",
+      "startDate": "<timestamp>",
+      "title": "Fed rate hike in 2026?",
+      "topOutcome": {
+        "name": "Yes",
+        "price": 0.615
+      }
+    },
+    {
+      "_source": "search",
+      "active": true,
+      "archived": false,
+      "closed": false,
+      "endDate": "2026-10-29T00:00:00Z",
+      "ended": false,
+      "id": "329566",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/fed-rate-hike-by-8cpilck5mcVg.jpg",
+      "markets": [
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.42,
+          "bestBid": 0.41,
+          "closed": false,
+          "groupItemTitle": "September Meeting",
+          "lastTradePrice": 0.42,
+          "outcomePrices": [
+            "0.415",
+            "0.585"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Fed Rate Hike by September 2026 Meeting?",
+          "slug": "fed-rate-hike-by-september-2026-meeting",
+          "spread": 0.01
+        },
+        {
+          "active": true,
+          "archived": false,
+          "bestAsk": 0.56,
+          "bestBid": 0.55,
+          "closed": false,
+          "groupItemTitle": "October Meeting",
+          "lastTradePrice": 0.56,
+          "outcomePrices": [
+            "0.555",
+            "0.445"
+          ],
+          "outcomes": [
+            "Yes",
+            "No"
+          ],
+          "question": "Fed Rate Hike by October 2026 Meeting?",
+          "slug": "fed-rate-hike-by-october-2026-meeting",
+          "spread": 0.01
+        }
+      ],
+      "negRisk": false,
+      "slug": "fed-rate-hike-by",
+      "startDate": "<timestamp>",
+      "title": "Fed rate hike by...?",
+      "topOutcome": {
+        "name": "October Meeting",
+        "price": 0.555
+      }
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "totalResults": 5
+  },
+  "profiles": [],
+  "tags": [
+    {
+      "event_count": 14,
+      "id": "159",
+      "label": "Fed",
+      "slug": "fed"
+    },
+    {
+      "event_count": 19,
+      "id": "100196",
+      "label": "Fed Rates",
+      "slug": "fed-rates"
+    },
+    {
+      "event_count": 1,
+      "id": "101717",
+      "label": "Federal",
+      "slug": "federal"
+    }
+  ]
+}

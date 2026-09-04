@@ -20,7 +20,7 @@ const DYNAMIC_ROUTE_PARENTS = new Set([
   "/api/markets/price-history",
   "/api/markets/orderbook",
   "/api/markets/trades",
-  "/api/markets/by-token",
+  "/api/polymarket/markets/by-token",
   "/api/markets/slug",
   "/api/profile",
   "/api/tags",
@@ -67,7 +67,7 @@ function normalizeRoutePath(pathname: string): string {
  * Build a per-route rate limit key: `normalizedRoute:ip`.
  *
  * Each route template gets its own bucket so that:
- * - Hitting /api/search doesn't consume tokens from /api/user/positions
+ * - Hitting /api/search doesn't consume tokens from /api/polymarket/user/positions
  * - Hitting /api/markets/orderbook/tokenA shares the bucket with /tokenB
  *   (dynamic segments are normalized)
  */

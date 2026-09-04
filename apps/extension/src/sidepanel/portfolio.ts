@@ -1397,7 +1397,7 @@ export function createPortfolioSidepanel(
     const marketEntries = await Promise.all(
       tokenIds.map(async (tokenId) => {
         const market = await fetchKnowwJson<MarketByTokenResponse>(
-          `/api/markets/by-token/${encodeURIComponent(tokenId)}`,
+          `/api/polymarket/markets/by-token/${encodeURIComponent(tokenId)}`,
           KNOWW_APP_URL
         );
         return [tokenId, market?.market] as const;
@@ -1541,15 +1541,15 @@ export function createPortfolioSidepanel(
       openOrders,
     ] = await Promise.all([
       fetchKnowwJson<PortfolioPositionsResponse>(
-        `/api/user/positions?user=${user}&limit=${PORTFOLIO_POSITIONS_FETCH_LIMIT}&offset=0&active=true`,
+        `/api/polymarket/user/positions?user=${user}&limit=${PORTFOLIO_POSITIONS_FETCH_LIMIT}&offset=0&active=true`,
         KNOWW_APP_URL
       ),
       fetchKnowwJson<PortfolioTradesResponse>(
-        `/api/user/trades?user=${user}&limit=${PORTFOLIO_HISTORY_FETCH_LIMIT}&offset=0`,
+        `/api/polymarket/user/trades?user=${user}&limit=${PORTFOLIO_HISTORY_FETCH_LIMIT}&offset=0`,
         KNOWW_APP_URL
       ),
       fetchKnowwJson<PortfolioDetailsResponse>(
-        `/api/user/details?user=${user}&timePeriod=all`,
+        `/api/polymarket/user/details?user=${user}&timePeriod=all`,
         KNOWW_APP_URL
       ),
       tradingStatusPromise,

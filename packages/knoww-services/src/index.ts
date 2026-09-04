@@ -6,7 +6,12 @@ export {
   UpstreamPublicDataError,
   UpstreamSearchError,
 } from "./errors";
-export type { ServiceFetchOptions } from "./fetch-options";
+export type {
+  ServiceCacheHint,
+  ServiceFetchOptions,
+  ServiceRequestInit,
+} from "./fetch-options";
+export { readCacheHint } from "./fetch-options";
 export type { GammaMarketDetail, MarketIdentifier } from "./markets/detail";
 export { fetchMarketByIdentifier } from "./markets/detail";
 export type {
