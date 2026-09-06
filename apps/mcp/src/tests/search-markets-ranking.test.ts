@@ -135,7 +135,7 @@ describe("search_markets ranked market results", () => {
           | Array<{ id: string }>
           | undefined
       )?.map(({ id }) => id)
-    ).toEqual(["evt-war-2"]);
+    ).toEqual(["polymarket:evt-war-2"]);
     expect(secondResult.structuredContent?.page).toEqual({
       returnedResults: 1,
       totalResults: 2,
@@ -164,7 +164,9 @@ describe("search_markets ranked market results", () => {
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.markets).toEqual([
       {
-        id: "mkt-war-funding",
+        id: "polymarket:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        sourceMarketId:
+          "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         slug: "war-funding",
         conditionId:
           "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -182,14 +184,18 @@ describe("search_markets ranked market results", () => {
           { name: "No", price: "0.55", tokenId: "22" },
         ],
         event: {
-          id: "evt-war",
+          id: "polymarket:evt-war",
+          platform: "polymarket",
+          sourceEventId: "evt-war",
           slug: "geopolitical-outcomes",
           title: "Geopolitical outcomes",
           url: "https://knoww.app/events/detail/geopolitical-outcomes",
         },
       },
       {
-        id: "mkt-war-end",
+        id: "polymarket:0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        sourceMarketId:
+          "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         slug: "war-end",
         conditionId:
           "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -206,7 +212,9 @@ describe("search_markets ranked market results", () => {
           { name: "No", price: "0.8", tokenId: "32" },
         ],
         event: {
-          id: "evt-war",
+          id: "polymarket:evt-war",
+          platform: "polymarket",
+          sourceEventId: "evt-war",
           slug: "geopolitical-outcomes",
           title: "Geopolitical outcomes",
           url: "https://knoww.app/events/detail/geopolitical-outcomes",
@@ -269,8 +277,8 @@ describe("search_markets ranked market results", () => {
       | Array<{ id: string }>
       | undefined;
     expect(secondMarkets?.map(({ id }) => id)).toEqual([
-      "mkt-war-funding",
-      "mkt-war-end",
+      "polymarket:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "polymarket:0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     ]);
     expect(secondResult.structuredContent?.page).toEqual({
       totalResults: 4,
@@ -332,7 +340,9 @@ describe("search_markets ranked market results", () => {
     const markets = result.structuredContent?.markets as
       | Array<{ id: string }>
       | undefined;
-    expect(markets?.map(({ id }) => id)).toEqual(["mkt-donald-trump"]);
+    expect(markets?.map(({ id }) => id)).toEqual([
+      "polymarket:mkt-donald-trump",
+    ]);
   });
 
   it("rejects an invalid cursor before calling the upstream search", async () => {

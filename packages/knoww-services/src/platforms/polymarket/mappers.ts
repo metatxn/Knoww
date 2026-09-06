@@ -21,7 +21,7 @@ import { mapPolymarketStatus } from "./status";
 
 const log = createLogger("services.polymarket.mappers");
 
-export const POLYMARKET_PLATFORM: PlatformId = "polymarket";
+export const POLYMARKET_PLATFORM = "polymarket" satisfies PlatformId;
 const SETTLEMENT_UNIT = "USD";
 const POLYMARKET_SITE = "https://polymarket.com";
 

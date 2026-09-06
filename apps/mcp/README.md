@@ -29,7 +29,7 @@ For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the
 
 ## What is implemented
 
-The Worker currently provides 20 tools:
+The Worker currently advertises 33 tool names: the 20 original tools, `list_platforms`, and a `polymarket_*` canonical name for each of the 12 Polymarket-only tools. The original names stay registered as permanent aliases:
 
 - `search_markets`
 - `get_market`
@@ -51,6 +51,9 @@ The Worker currently provides 20 tools:
 - `get_closed_positions`
 - `get_wallet_pnl`
 - `get_wallet_portfolio_value`
+- `list_platforms`
+
+The 12 Polymarket-only tools (`get_market_quotes`, `get_market_holders`, `get_open_interest`, `get_event_live_volume`, `get_trader_leaderboard`, `list_sports_markets`, `get_public_profile`, `get_wallet_positions`, `get_wallet_activity`, `get_closed_positions`, `get_wallet_pnl`, `get_wallet_portfolio_value`) also answer under a `polymarket_` prefix, for example `polymarket_get_open_interest`. Both names run the same handler and return the same payload. The alias table lives in `src/tool-catalog.ts`.
 
 The implementation includes:
 
@@ -143,6 +146,8 @@ MCP requests remain stateless and need no session affinity. A Durable Object is 
 
 All current tools are read-only and require `markets:read`. Production requests are checked before MCP dispatch, and each tool repeats the scope check at execution time.
 
+The eight cross-platform tools (`search_markets`, `get_market`, `get_event`, `get_orderbook`, `get_price_history`, `list_events`, `get_market_trades`, `list_tags`) accept an optional `platform` input that defaults to `polymarket`. A platform this server does not enable fails with `PLATFORM_DISABLED`; `list_platforms` reports the enabled set and each platform's capabilities. Every market and event carries `platform`, a canonical `id` (`polymarket:` followed by the condition id or event id), and `sourceMarketId` or `sourceEventId`.
+
 ### `search_markets`
 
 Searches active prediction-market events.
@@ -167,13 +172,15 @@ Both result types include `page.totalResults`, `page.returnedResults`, and `page
 
 ### `get_market`
 
-Fetches one market using exactly one identifier.
+Fetches one market using exactly one of `id`, `slug`, `conditionId`, or `tokenId`.
 
 | Input | Type | Rules |
 |---|---|---|
+| `id` | string | Canonical id: `polymarket:` followed by the `0x` condition id |
 | `slug` | string | Lowercase letters, digits, and dashes |
 | `conditionId` | string | `0x` followed by 64 hexadecimal characters |
 | `tokenId` | string | 1 to 80 decimal digits |
+| `platform` | string | Optional; must match the prefix of `id` when both are given |
 
 The response contains lifecycle status, outcomes, prices, token IDs, volume, liquidity, selected price fields, resolution data, and a reference to the parent event when available.
 
@@ -185,7 +192,8 @@ Fetches one event using exactly one identifier and returns a page of markets.
 
 | Input | Type | Rules |
 |---|---|---|
-| `id` | string | 1 to 20 decimal digits |
+| `id` | string | Numeric event id (1 to 20 digits) or the canonical form `polymarket:<id>` |
+| `platform` | string | Optional; defaults to `polymarket` |
 | `slug` | string | Lowercase letters, digits, and dashes |
 | `cursor` | string | Optional opaque market-page cursor |
 | `marketOffset` | integer | Optional, 0 to 10,000, defaults to 0 |
@@ -225,14 +233,14 @@ An empty history is a successful result. Polymarket does not distinguish an unkn
 
 | Tool | Required input | Optional controls | Result |
 |---|---|---|---|
-| `list_events` | None | Keyset cursor, closed or live state, tag, series, date bounds, order, limit | Events, tags, bounded market summaries, and `meta.nextCursor` |
-| `get_market_trades` | Exactly one of `conditionIds` or `eventIds` | Wallet, side, time bounds, limit, cursor, offset | Public trades with decimal-string size and price |
+| `list_events` | None | Platform, keyset cursor, closed or live state, tag, series, date bounds, order, limit | Events, tags, bounded market summaries, and `meta.nextCursor` |
+| `get_market_trades` | Exactly one of `conditionIds` or `eventIds` | Platform, wallet, side, time bounds, limit, cursor, offset | Public trades with decimal-string size and price |
 | `get_market_quotes` | `tokenIds` | None | BUY/SELL price, midpoint, spread, and last trade |
 | `get_market_holders` | `conditionIds` | Limit and minimum balance | Largest public holders for each market |
 | `get_open_interest` | `conditionIds` | None | Open interest by market |
 | `get_event_live_volume` | Positive integer `eventId` | None | Event total and per-market live volume |
 | `get_trader_leaderboard` | None | Category, period, PnL or volume order, trader filters, limit, cursor, offset | Public trader ranks, volume, and PnL |
-| `list_tags` | None | Limit, cursor, and offset | Category tags for filtering |
+| `list_tags` | None | Platform, limit, cursor, and offset | Category tags for filtering |
 | `list_sports_markets` | None | Sport, league, cursor, team offset, limit | Sports metadata, market types, teams, and tagged markets |
 
 List inputs are bounded even when Polymarket accepts larger pages. New callers should use `meta.nextCursor`; offsets remain available for compatibility. Market titles, event descriptions, profile fields, outcomes, sports rules, and team names are quoted upstream data, not instructions.
@@ -311,6 +319,7 @@ VALIDATION_ERROR
 UNAUTHENTICATED
 FORBIDDEN
 NOT_FOUND
+PLATFORM_DISABLED
 RATE_LIMITED
 CONFLICT
 UPSTREAM_TIMEOUT
@@ -667,6 +676,8 @@ apps/mcp/
     server.ts                MCP server and tool registration
     config.ts                Environment configuration parser
     context.ts               Request-scoped request ID, analytics, and verified principal
+    platforms.ts             Enabled-platform constant, registry access, and the PLATFORM_DISABLED error
+    tool-catalog.ts          Tool names, the polymarket_* alias table, and alias registration
     analytics.ts             Request-scoped PostHog batch capture and bounded metadata
     health.ts                Liveness and stateful-binding readiness probes
     quota.ts                 Edge, plan, principal, and tool quota enforcement
@@ -685,6 +696,7 @@ apps/mcp/
       get-event.ts
       get-orderbook.ts
       get-price-history.ts
+      list-platforms.ts
       public-markets.ts      Event, market-data, leaderboard, tag, and sports getters
       public-wallets.ts      Public profile, position, activity, PnL, and value getters
       public-read.ts         Shared validation, scope, quota, and error mapping
@@ -695,13 +707,16 @@ apps/mcp/
       helpers.ts             Worker dispatch and upstream fetch stubs
       worker.test.ts         Transport and Worker boundary coverage
       get-*.test.ts          Tool integration coverage
+      platforms.test.ts        Alias, list_platforms, canonical id, and PLATFORM_DISABLED contract coverage
       public-read-tools.test.ts Public getter catalog and execution coverage
 
 packages/knoww-services/
   src/
     fetch-options.ts         Caller cancellation and upstream timeouts
     validation.ts            Shared Zod and Decimal.js validators
-    markets/                 Gamma, Data API, and CLOB service implementations
+    core/                    Canonical types, adapter interfaces, PlatformError, and id helpers
+    registry.ts              Platform registry, the only module that imports a platform folder
+    platforms/polymarket/    Gamma, Data API, and CLOB client, mappers, adapters, and upstream errors
 ```
 
 Tool files should remain thin adapters. Provider calls, payload validation, normalization, caching rules, and business logic belong in `@knoww/services`.

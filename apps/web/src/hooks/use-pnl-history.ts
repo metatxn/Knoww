@@ -79,7 +79,7 @@ async function fetchPnLHistory(
   });
 
   return fetchJson<PnLHistoryResponse>(
-    `/api/user/pnl-history?${params.toString()}`
+    `/api/polymarket/user/pnl-history?${params.toString()}`
   );
 }
 

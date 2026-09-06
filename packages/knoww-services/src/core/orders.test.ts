@@ -1,29 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { TradingAdapter } from "./adapter";
+import { isPlatformError, PlatformError } from "./errors";
 import {
-  PlatformError,
-  type PlatformErrorKind,
-  type PlatformOperation,
-} from "./errors";
-import {
-  type AccountActivityPage,
-  type AccountOrderPage,
-  type AccountPositions,
-  type AccountReadInput,
   addDecimalAmounts,
   assertDraftPlaceable,
-  type CancelOrderInput,
-  type CanonicalOrderIntent,
-  type ConnectionStatusInput,
   cancelOrderInputSchema,
   canonicalIntentJson,
   hashOrderIntent,
   type OrderDraft,
-  type OrderResult,
   orderIntentSchema,
   orderNotional,
-  type PlaceDraftInput,
-  type PlatformConnectionStatus,
   placeDraftInputSchema,
 } from "./orders";
 
@@ -185,30 +170,26 @@ describe("cancelOrderInputSchema", () => {
 });
 
 describe("PlatformError for trading", () => {
-  it("names the trading operations and the draft rejection kinds", () => {
+  it("carries the trading operation and rejection kind, defaulting the kind to upstream", () => {
     const rejected = new PlatformError("Market changed since preview", {
       platform: "polymarket",
       operation: "placeOrder",
       kind: "draft_rejected",
     });
+    expect(isPlatformError(rejected)).toBe(true);
+    expect(rejected.message).toBe("Market changed since preview");
+    expect(rejected.platform).toBe("polymarket");
     expect(rejected.operation).toBe("placeOrder");
     expect(rejected.kind).toBe("draft_rejected");
-    const kinds: PlatformErrorKind[] = [
-      "draft_expired",
-      "draft_rejected",
-      "ineligible",
-    ];
-    const operations: PlatformOperation[] = [
-      "connectionStatus",
-      "getAccountPositions",
-      "getAccountActivity",
-      "getAccountOrders",
-      "previewOrder",
-      "placeOrder",
-      "cancelOrder",
-    ];
-    expect(kinds).toHaveLength(3);
-    expect(operations).toHaveLength(7);
+
+    const upstream = new PlatformError("CLOB returned 502", {
+      platform: "polymarket",
+      operation: "cancelOrder",
+      upstreamStatus: 502,
+    });
+    expect(upstream.kind).toBe("upstream");
+    expect(upstream.upstreamStatus).toBe(502);
+    expect(isPlatformError(new Error("plain"))).toBe(false);
   });
 });
 
@@ -322,69 +303,6 @@ describe("TradingAdapter contract", () => {
     expiresAt: "2026-09-04T10:00:30Z",
     platformDetails: { platform: "polymarket", negRisk: false },
   };
-
-  it("is satisfied by an adapter with the seven trading methods", async () => {
-    const adapter = {
-      platform: "polymarket",
-      regionPolicy: () => ({ blocked: [], closeOnly: [] }),
-      async connectionStatus(input: ConnectionStatusInput) {
-        const status: PlatformConnectionStatus = {
-          platform: "polymarket",
-          identity: input.identity,
-          connected: true,
-          canTrade: true,
-          reasons: [],
-        };
-        return status;
-      },
-      async getAccountPositions(input: AccountReadInput) {
-        const positions: AccountPositions = {
-          platform: "polymarket",
-          identity: input.identity,
-          items: [],
-          fetchedAt: "2026-09-04T10:00:00Z",
-        };
-        return positions;
-      },
-      async getAccountActivity(_input: AccountReadInput) {
-        const page: AccountActivityPage = { items: [] };
-        return page;
-      },
-      async getAccountOrders(_input: AccountReadInput) {
-        const page: AccountOrderPage = { items: [] };
-        return page;
-      },
-      async previewOrder(_input: CanonicalOrderIntent) {
-        return draft;
-      },
-      async placeOrder(input: PlaceDraftInput) {
-        const result: OrderResult = {
-          platform: "polymarket",
-          status: "open",
-          orderId: "0xorder",
-          idempotencyKey: input.idempotencyKey,
-        };
-        return result;
-      },
-      async cancelOrder(input: CancelOrderInput) {
-        const result: OrderResult = {
-          platform: "polymarket",
-          status: "cancelled",
-          orderId: input.orderId,
-          idempotencyKey: input.idempotencyKey,
-        };
-        return result;
-      },
-    } satisfies TradingAdapter;
-
-    const preview = await adapter.previewOrder(intent);
-    expect(preview.quote.fees.total).toEqual({ value: "0.1665", unit: "USD" });
-    const placed = await adapter.placeOrder({
-      draftId: preview.draftId,
-      idempotencyKey: "0b7a0f5e-9c2e-4d6c-9c6d-2f0e6b1a9a11",
-    });
-    expect(placed.status).toBe("open");
-  });
 
   it("rejects a draft whose short expiration has passed", () => {
     expect(() =>

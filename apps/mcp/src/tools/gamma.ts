@@ -1,4 +1,8 @@
-import type { GammaMarketDetail } from "@knoww/services";
+import { buildCanonicalId } from "@knoww/services/core";
+import {
+  type GammaMarketDetail,
+  POLYMARKET_PLATFORM,
+} from "@knoww/services/platforms/polymarket";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { z } from "zod";
 import { toDecimalString } from "./decimal";
@@ -14,6 +18,32 @@ export const MAX_OUTCOMES_PER_MARKET = 20;
 export const MAX_DESCRIPTION_LENGTH = 2000;
 
 export const SLUG_PATTERN = /^[a-z0-9-]{1,200}$/;
+
+/**
+ * Canonical market id: the condition id when Gamma reports one (it is the
+ * on-chain identifier every Polymarket surface shares), else the Gamma id.
+ */
+/**
+ * The source part of a market's canonical id: the on-chain condition id, or
+ * the Gamma id for legacy rows that never had one, so no market is dropped.
+ */
+export function marketSourceId(market: {
+  id: string;
+  conditionId?: string | undefined;
+}): string {
+  return market.conditionId || market.id;
+}
+
+export function canonicalMarketId(market: {
+  id: string;
+  conditionId?: string | undefined;
+}): string {
+  return buildCanonicalId(POLYMARKET_PLATFORM, marketSourceId(market));
+}
+
+export function canonicalEventId(eventId: string): string {
+  return buildCanonicalId(POLYMARKET_PLATFORM, eventId);
+}
 
 export function knowwEventUrl(slug: string): string {
   return `${KNOWW_EVENT_URL_BASE}/${slug}`;

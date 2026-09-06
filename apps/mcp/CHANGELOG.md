@@ -18,6 +18,9 @@
 - Flat `search_markets` results with bounded word or phrase matching, individual lifetime-volume sorting, enriched market fields, and opaque cursor pagination.
 - Machine-readable tool-error metadata with retryability, retry delay, and request ID fields.
 - A shared opaque cursor and page contract across every collection-returning tool, including wrapped Data API offsets and composite sports pagination.
+- `platform`, a canonical `id`, and `sourceMarketId` or `sourceEventId` on every market and event, with `get_market` and `get_event` accepting the canonical id.
+- An optional `platform` input on the eight cross-platform tools, a `list_platforms` tool, and the `PLATFORM_DISABLED` error code.
+- `polymarket_*` canonical names for the 12 Polymarket-only tools; the original names stay as permanent aliases.
 
 ### Fixed
 

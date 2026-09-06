@@ -102,7 +102,6 @@ function makeTradingFormState(overrides = {}) {
     effectiveBalance: undefined,
     hasInsufficientBalance: false,
     hasInsufficientAllowance: false,
-    hasNoAllowance: false,
     hasMissingTradingApprovals: false,
     isCheckingTradingApprovals: false,
     isBelowMarketableBuyMinNotional: false,

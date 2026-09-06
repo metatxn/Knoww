@@ -1,8 +1,8 @@
-import { UpstreamPublicDataError } from "@knoww/services";
-import type {
-  DataApiLeaderboardRecord,
-  GammaTagRecord,
-  TraderLeaderboardParams,
+import {
+  type DataApiLeaderboardRecord,
+  type GammaTagRecord,
+  isUpstreamPublicDataError,
+  type TraderLeaderboardParams,
 } from "@knoww/services/platforms/polymarket";
 import type { ServiceCacheHint } from "@knoww/services/registry";
 import { getPlatformRegistry } from "@/lib/platform-registry";
@@ -44,5 +44,5 @@ export async function fetchTagRecord(
  * timeout, malformed body).
  */
 export function upstreamStatus(error: unknown): number | undefined {
-  return error instanceof UpstreamPublicDataError ? error.status : undefined;
+  return isUpstreamPublicDataError(error) ? error.status : undefined;
 }

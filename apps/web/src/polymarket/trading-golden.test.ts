@@ -72,7 +72,7 @@ async function openLegacyClient(wallet: Address) {
     wallet,
     credentials: FAKE_CLOB_CREDENTIALS,
   });
-  // The hook narrows the same way (use-clob-client.ts getClient).
+  // The read-only client narrows the same way (src/polymarket/read-only-client.ts).
   return adaptUnifiedSecureClientForLegacyClob(
     client as unknown as UnifiedSdkTradingClient,
     { builderCode: undefined }

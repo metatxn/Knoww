@@ -106,7 +106,7 @@ The important code paths are:
 - [`apps/web/src/app/api/search/route.ts`](apps/web/src/app/api/search/route.ts)
   has a 30 second process-local cache, a process-local in-flight map, and a
   60 requests per minute client limiter.
-- [`packages/knoww-services/src/markets/search.ts`](packages/knoww-services/src/markets/search.ts)
+- [`packages/knoww-services/src/platforms/polymarket/gamma-search.ts`](packages/knoww-services/src/platforms/polymarket/gamma-search.ts)
   calls Gamma `/public-search` and can add two `/events/keyset` requests for tag
   fallbacks. Its upstream timeout is 8.5 seconds.
 - [`apps/extension/src/content/api.ts`](apps/extension/src/content/api.ts)

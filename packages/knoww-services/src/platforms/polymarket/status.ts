@@ -72,11 +72,11 @@ export function mapPolymarketStatus(flags: GammaStatusFlags): MarketStatus {
   if (flags.active === true) {
     return flags.acceptingOrders === false ? "paused" : "active";
   }
-  if (
-    flags.active === false &&
-    flags.closed === false &&
-    flags.acceptingOrders !== true
-  ) {
+  // Gamma's `active` flag says whether the venue has opened the market;
+  // `acceptingOrders` only tells "paused" from "active" once it has. A market
+  // whose book already takes orders while the venue still lists it inactive
+  // is one the public cannot see yet, so it is unopened, not unknown.
+  if (flags.active === false && flags.closed === false) {
     return "unopened";
   }
   log.warn("market_status.unknown", {

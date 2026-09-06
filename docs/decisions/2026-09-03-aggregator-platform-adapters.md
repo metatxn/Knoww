@@ -44,7 +44,7 @@ Removing a platform means deleting the registry entry. Its pages return 404 with
 
 ## Package layout
 
-The contract and the adapters live in `@knoww/services`. The package has a single root export today. The subpaths are new.
+The contract and the adapters live in `@knoww/services`. The package had a single root export before M1. The subpaths replaced it, and M5 removed the root export on 2026-09-05.
 
 ```text
 packages/knoww-services/src/
@@ -54,16 +54,14 @@ packages/knoww-services/src/
     polymarket/         client, zod schemas, mappers, market-data adapter, trading adapter (M3)
     kalshi/             M2 and M4
   fixtures/             recorded upstream responses for mapper tests
-  markets/              legacy Gamma-shaped modules, thin wrappers over the Polymarket adapter until M5
-  profiles/             same
 ```
 
 | Subpath | Contents | Who imports it |
 | --- | --- | --- |
-| `@knoww/services` | The legacy root export, unchanged shapes. | MCP until M5. Nothing new. |
-| `@knoww/services/core` | Canonical types, adapter interfaces, errors, id helpers, flag types. | apps/web, extension later, MCP at M5. |
+| `@knoww/services` | Removed at M5 (2026-09-05). The package has no root export; every import names a subpath. | Nothing. |
+| `@knoww/services/core` | Canonical types, adapter interfaces, errors, id helpers, flag types. | apps/web, MCP, extension later. |
 | `@knoww/services/registry` | `getMarketDataAdapter`, `getTradingAdapter`, `getEnabledPlatforms`, `getPlatformAdapter`. | apps/web route handlers and server modules. |
-| `@knoww/services/platforms/polymarket` | The concrete adapter type and its extra methods. | Only the escape-hatch folders, see below. |
+| `@knoww/services/platforms/polymarket` | The concrete adapter type, its extra methods and the Polymarket upstream errors. | Only the escape-hatch folders, see below. |
 | `@knoww/services/platforms/kalshi` | Same, from M2. | Same. |
 
 Everything Polymarket-specific moves behind the platform folder. The generic contract carries only what the shared read paths need.
@@ -146,6 +144,8 @@ Two server-side inputs, read once at startup:
 | `KNOWW_ENABLED_PLATFORMS` | Comma list of enabled platform ids. | `polymarket` |
 | `KNOWW_PLATFORM_CAPABILITY_OVERRIDES` | Comma list of `platform.capability=off` entries so discovery can ship while trading stays off. | none |
 
+The MCP Worker reads neither variable. `apps/mcp/src/platforms.ts` declares `ENABLED_PLATFORMS` as a constant (owner decision, 2026-09-05): one deploy ships one platform set, and the registry treats an explicit list as authoritative over process.env. The web app keeps the variables.
+
 Trading also carries a per-region capability, evaluated server-side from the request's country. Flags are evaluated on the server and reach the client through a provider. This is the web app's first feature-flag helper.
 
 ## Boundary rules
@@ -158,11 +158,11 @@ Biome's restricted-imports rule enforces these, scoped with per-folder overrides
 | No `@knoww/services/platforms/*` import outside the escape-hatch folders. | apps/web | M1 |
 | No `@polymarket/*`, Gamma, CLOB or Data API type import outside the platform folder and the escape-hatch folders. | `packages/knoww-services` in M1, apps/web from M3 when the trading hooks move. | M1, M3 |
 | No `next` or `react` import. | `packages/knoww-services` | M1 |
-| Legacy `src/markets/*` and `src/profiles/*` reach Polymarket only through the registry. | `packages/knoww-services` | M1 |
+| Legacy `src/markets/*` and `src/profiles/*` reach Polymarket only through the registry. Moot since M5 deleted them. | `packages/knoww-services` | M1 |
 
 ### Escape hatch
 
-`getPlatformAdapter("polymarket")` is allowed in exactly two places in apps/web: the `src/polymarket/` folder and API routes under `src/app/api/polymarket/`. This is how the leaderboard, whales, trader profiles, insider resolutions, comments, the sitemap keyset walk, CLOB price history and every WebSocket reach Polymarket code. Nothing else may name a platform.
+`getPlatformAdapter("polymarket")` is allowed in exactly two places in apps/web: the `src/polymarket/` folder and API routes under `src/app/api/polymarket/`. This is how the leaderboard, whales, trader profiles, insider resolutions, comments, the sitemap keyset walk, CLOB price history and every WebSocket reach Polymarket code. Nothing else may name a platform. In the MCP Worker the only escape hatch is `apps/mcp/src/platforms.ts`, whose `requirePolymarketClient` hands the Polymarket-only tools their client and answers `PLATFORM_DISABLED` for anything else.
 
 ## Web app
 
@@ -190,7 +190,7 @@ One interleaved feed with a text-only platform badge on each card and an All, Po
 
 Per-platform connections, no Knoww account. The identity type is a discriminated union from day one: wallet-backed and broker-backed, with only the wallet kind implemented. The wallet identity carries the Polymarket account type, because the CLOB signature type depends on it. The Deposit Wallet is the current default on Polymarket and the Safe path is legacy.
 
-> Contradicts the "Identity and authorization" section of docs/single-api-layer.md (shared Privy application, Session Keys, trading grants). Not worth reopening now: that design served an MCP-first consumer order, and the owner moved the work to the web app with per-platform connections. It is revisited when MCP work resumes at M5.
+> Contradicts the "Identity and authorization" section of docs/single-api-layer.md (shared Privy application, Session Keys, trading grants). Not worth reopening now: that design served an MCP-first consumer order, and the owner moved the work to the web app with per-platform connections. It is revisited in the M5 trading phase, open since the read tools moved on 2026-09-05.
 
 ## Kalshi
 
@@ -217,7 +217,7 @@ These are settled. Status mapping, taxonomy mapping, stream relay, fee display a
 | Gate | | No Kalshi code starts until M1 and M3 are complete and pass their bars. | |
 | 3 | M2 | Kalshi market-data adapter and discovery surfaces: feed, badges, chip filter, tag mapping, Kalshi pages, sitemap segment. | Decided in the Kalshi grilling round. |
 | 4 | M4 | Kalshi hand-off and fee display. Trading on Kalshi waits for a signed route. | Same round. |
-| 5 | M5 | MCP tools move to the canonical API and the legacy wrappers are deleted. Can move earlier if MCP work resumes. | Later. |
+| 5 | M5 | MCP tools move to the canonical API and the legacy wrappers are deleted. Can move earlier if MCP work resumes. Landed for Polymarket on 2026-09-05: canonical ids on every market and event, an optional `platform` input on the eight cross-platform tools, `list_platforms`, `polymarket_*` canonical names with the old names as permanent aliases, the root export and the wrappers deleted. The account and order tools are the open phase. | The MCP suites under recorded fetch stubs, with the contract tests in `apps/mcp/src/tests/platforms.test.ts` covering the alias table, `list_platforms`, canonical ids and `PLATFORM_DISABLED`. |
 
 The order M1, M3, M2, M4 is the owner's. Trading is abstracted while Polymarket is still the only implementation so the harness can catch drift before a second implementation exists.
 
@@ -242,9 +242,9 @@ The following sections of `docs/single-api-layer.md` no longer apply to the web 
 
 | Section | Status |
 | --- | --- |
-| "System architecture" and the MCP-first consumer order in "Decision summary" | Superseded. The web app is the first consumer. MCP moves at M5. |
+| "System architecture" and the MCP-first consumer order in "Decision summary" | Superseded. The web app is the first consumer. MCP moved at M5. |
 | "Repository structure" | Superseded by the package layout above. |
-| "Identity and authorization" (all subsections: Privy, web login, MCP trading grants, Session Keys, account read visibility, MCP scopes) | Superseded for the web restructure. Identity is per-platform connections with no Knoww account. Revisited when MCP resumes. |
+| "Identity and authorization" (all subsections: Privy, web login, MCP trading grants, Session Keys, account read visibility, MCP scopes) | Superseded for the web restructure. Identity is per-platform connections with no Knoww account. Revisited in the M5 trading phase. |
 | "Monetization" | Deferred, not part of the restructure. |
 | "Data and credential storage" | Superseded. No delegated credentials are stored. |
 | "Testing strategy" | Replaced by the milestone bars above. |
@@ -259,7 +259,7 @@ Reused as written: "Goals", "Non-goals", "Platform support and constraints", "Pu
 - Limitless, Opinion and every other platform. Kalshi is the proof that the contract works for a second platform.
 - The agent app and its D1 tables. It gets its own migration when it gets Kalshi.
 - Delegated credentials, a Knoww login and the unified Knoww account.
-- MCP tool migration, until M5.
+- The MCP account and order tools, the open half of M5.
 - The extension's own move onto `@knoww/services`.
 - Shrinking `@knoww/shared-types`.
 - A stream contract, the portfolio abstraction and the Kalshi on-chain route.
@@ -270,6 +270,6 @@ Reused as written: "Goals", "Non-goals", "Platform support and constraints", "Pu
 - Kalshi hand-off route report: https://claude.ai/code/artifact/9425f06c-cad5-423e-ac41-2625388261ea
 - Unified Knoww account report: https://claude.ai/code/artifact/ae233cc1-9e1c-4b66-b1a0-869b4fb32e3a
 - `docs/single-api-layer.md`, the prior accepted design.
-- `docs/decisions/2026-08-31-mcp-trading-authorization.md`, the MCP trading authorization decision, unaffected until M5.
+- `docs/decisions/2026-08-31-mcp-trading-authorization.md`, the MCP trading authorization decision, untouched by the M5 read-tool move and reopened with the trading phase.
 - `CONTEXT-MAP.md` and `docs/agents/domain.md` for the context and ADR conventions.
 - Kalshi API: `GET /trade-api/v2/events/{event_ticker}` is case-sensitive, verified 2026-09-02.

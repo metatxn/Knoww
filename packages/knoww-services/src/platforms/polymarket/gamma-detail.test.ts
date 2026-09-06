@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { UpstreamMarketError } from "../../errors";
 import { DEFAULT_POLYMARKET_BASE_URLS } from "./base-urls";
 import { createPolymarketClientContext } from "./context";
+import { isUpstreamMarketError } from "./errors";
 import { createGammaDetail } from "./gamma-detail";
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -79,6 +79,6 @@ describe("fetchOpenMarketRecordByIdentifier", () => {
         kind: "slug",
         value: "will-the-fed-cut-rates",
       })
-    ).rejects.toBeInstanceOf(UpstreamMarketError);
+    ).rejects.toSatisfy(isUpstreamMarketError);
   });
 });

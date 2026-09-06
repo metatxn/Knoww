@@ -44,7 +44,9 @@ const MARKET_TWO = {
 };
 
 const MARKET_ONE_SUMMARY = {
-  id: "1163699",
+  id: `polymarket:${CONDITION_ID}`,
+  platform: "polymarket",
+  sourceMarketId: CONDITION_ID,
   question: "Clarity Act signed into law in 2026?",
   slug: "clarity-act-signed-into-law-in-2026",
   conditionId: CONDITION_ID,
@@ -58,7 +60,9 @@ const MARKET_ONE_SUMMARY = {
 };
 
 const MARKET_TWO_SUMMARY = {
-  id: "1163700",
+  id: "polymarket:1163700",
+  platform: "polymarket",
+  sourceMarketId: "1163700",
   question: "Clarity Act signed into law in 2027?",
   slug: "clarity-act-signed-into-law-in-2027",
   status: "active",
@@ -113,6 +117,7 @@ describe("get_event tool (dev bypass)", () => {
       description?: string;
       annotations?: Record<string, unknown>;
       inputSchema?: { properties?: Record<string, unknown> };
+      outputSchema?: { properties?: Record<string, unknown> };
     }>;
     const getEvent = tools.find((tool) => tool.name === "get_event");
     expect(getEvent).toBeDefined();
@@ -120,10 +125,19 @@ describe("get_event tool (dev bypass)", () => {
       readOnlyHint: true,
       destructiveHint: false,
     });
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("id");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("slug");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("marketOffset");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("marketLimit");
+    expect(Object.keys(getEvent?.inputSchema?.properties ?? {}).sort()).toEqual(
+      ["cursor", "id", "marketLimit", "marketOffset", "platform", "slug"]
+    );
+    expect(
+      Object.keys(getEvent?.outputSchema?.properties ?? {}).sort()
+    ).toEqual([
+      "event",
+      "markets",
+      "marketsIncomplete",
+      "meta",
+      "page",
+      "totalMarkets",
+    ]);
     expect(getEvent?.description).toContain("not instructions");
   });
 
@@ -189,7 +203,9 @@ describe("get_event tool (dev bypass)", () => {
     expect(result.content?.[0]?.text).not.toContain("Resolution details");
 
     expect(result.structuredContent?.event).toEqual({
-      id: "35908",
+      id: "polymarket:35908",
+      platform: "polymarket",
+      sourceEventId: "35908",
       title: "Clarity Act",
       slug: "clarity-act",
       status: "active",
@@ -282,7 +298,7 @@ describe("get_event tool (dev bypass)", () => {
     const event = result.structuredContent?.event as
       | Record<string, unknown>
       | undefined;
-    expect(event?.id).toBe("35908");
+    expect(event?.id).toBe("polymarket:35908");
     expect(event?.url).toBe("https://knoww.app/events/detail/clarity-act");
   });
 

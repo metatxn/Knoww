@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { UpstreamPriceHistoryError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamPriceHistoryError } from "./errors";
 
 /**
  * Standalone CLOB /prices-history fetcher. Deliberately does not reuse
@@ -51,7 +51,7 @@ function normalizePoints(
 ): PriceHistoryPoint[] {
   const parsed = historySchema.safeParse(payload);
   if (!parsed.success) {
-    throw new UpstreamPriceHistoryError(
+    throw upstreamPriceHistoryError(
       "CLOB price history returned a malformed payload"
     );
   }
@@ -60,7 +60,7 @@ function normalizePoints(
       (point) => point.t < params.startTs || point.t > params.endTs
     )
   ) {
-    throw new UpstreamPriceHistoryError(
+    throw upstreamPriceHistoryError(
       "CLOB price history returned a point outside the requested window"
     );
   }
@@ -98,7 +98,7 @@ export function createClobPriceHistory(ctx: PolymarketClientContext) {
         );
 
         if (!response.ok) {
-          throw new UpstreamPriceHistoryError(
+          throw upstreamPriceHistoryError(
             `CLOB price history lookup failed with ${response.status}`,
             response.status
           );

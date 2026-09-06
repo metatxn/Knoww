@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { isPlatformError } from "./core";
 import gammaEventFixture from "./fixtures/polymarket/gamma-event.json";
-import {
-  createPlatformRegistry,
-  POLYMARKET_BASE_URLS,
-  parseCanonicalId,
-} from "./registry";
+import { createPlatformRegistry, POLYMARKET_BASE_URLS } from "./registry";
 
 const FED_EVENT_ID = "481717";
 
@@ -41,6 +37,27 @@ function catchError(fn: () => unknown): unknown {
 }
 
 describe("createPlatformRegistry", () => {
+  it("takes the enabled list from init over the environment", () => {
+    const registry = createPlatformRegistry({
+      enabledPlatforms: ["polymarket", "kalshi", "polymarket"],
+      env: { KNOWW_ENABLED_PLATFORMS: "kalshi" },
+    });
+
+    expect(registry.getEnabledPlatforms()).toEqual(["polymarket"]);
+    expect(registry.getMarketDataAdapter("polymarket").platform).toBe(
+      "polymarket"
+    );
+  });
+
+  it("enables nothing when init pins an empty list", () => {
+    const registry = createPlatformRegistry({ enabledPlatforms: [], env: {} });
+
+    expect(registry.getEnabledPlatforms()).toEqual([]);
+    const error = catchError(() => registry.getMarketDataAdapter("polymarket"));
+    expect(isPlatformError(error)).toBe(true);
+    expect(error).toMatchObject({ kind: "disabled", platform: "polymarket" });
+  });
+
   it("enables Polymarket alone when no flags are set", () => {
     const registry = createPlatformRegistry({ env: {} });
 
@@ -172,13 +189,6 @@ describe("registry exports", () => {
       gamma: "https://gamma-api.polymarket.com",
       clob: "https://clob.polymarket.com",
       dataApi: "https://data-api.polymarket.com",
-    });
-  });
-
-  it("re-exports parseCanonicalId", () => {
-    expect(parseCanonicalId("polymarket:0xabc")).toEqual({
-      platform: "polymarket",
-      sourceId: "0xabc",
     });
   });
 });

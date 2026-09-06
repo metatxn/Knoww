@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { UpstreamPublicDataError } from "../../errors";
 import { DEFAULT_POLYMARKET_BASE_URLS } from "./base-urls";
 import { createPolymarketClientContext } from "./context";
+import { isUpstreamPublicDataError } from "./errors";
 import { createPublicData } from "./public-data";
 
 const WALLET = `0x${"b".repeat(40)}`;
@@ -99,8 +99,8 @@ describe("fetchTagBySlug", () => {
       status: 404,
     });
     expect(calls[0].pathname).toBe("/tags/slug/a%2Fb%20c");
-    await expect(client.fetchTagBySlug("a/b c")).rejects.toBeInstanceOf(
-      UpstreamPublicDataError
+    await expect(client.fetchTagBySlug("a/b c")).rejects.toSatisfy(
+      isUpstreamPublicDataError
     );
   });
 });

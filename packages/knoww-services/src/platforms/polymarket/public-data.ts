@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { UpstreamPublicDataError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamPublicDataError } from "./errors";
 import { gammaMarketDetailSchema } from "./gamma-detail";
 // Type only: the shape of a Gamma event record the mappers accept.
 import type { GammaEventLike } from "./mappers";
@@ -265,7 +265,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
           signal,
         });
         if (!response.ok) {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             `Public data request failed with ${response.status}`,
             response.status
           );
@@ -275,13 +275,13 @@ export function createPublicData(ctx: PolymarketClientContext) {
         try {
           payload = await response.json();
         } catch {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             "Public data request returned malformed JSON"
           );
         }
         const parsed = schema.safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             "Public data request returned an invalid response"
           );
         }

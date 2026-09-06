@@ -22,14 +22,6 @@ import {
   type PriceHistoryInterval,
   type SearchMarketsInput,
 } from "../../core";
-import {
-  UpstreamEventError,
-  UpstreamMarketError,
-  UpstreamOrderbookError,
-  UpstreamPriceHistoryError,
-  UpstreamPublicDataError,
-  UpstreamSearchError,
-} from "../../errors";
 import type { ServiceFetchOptions } from "../../fetch-options";
 import type { PolymarketBaseUrls } from "./base-urls";
 import { POLYMARKET_CAPABILITIES } from "./capabilities";
@@ -39,6 +31,7 @@ import {
   type PolymarketClientInit,
 } from "./client";
 import type { OrderbookLevel } from "./clob-orderbook";
+import { isUpstreamError } from "./errors";
 import { DEFAULT_SEARCH_LIMIT } from "./gamma-search";
 import { type MapContext, mapGammaEvent, mapGammaMarket } from "./mappers";
 import type { DataApiTrade } from "./public-data";
@@ -90,21 +83,6 @@ export interface PolymarketMarketDataAdapter extends MarketDataAdapter {
   readonly platform: typeof PLATFORM;
   readonly client: PolymarketClient;
   readonly baseUrls: PolymarketBaseUrls;
-}
-
-const UPSTREAM_ERRORS = [
-  UpstreamSearchError,
-  UpstreamMarketError,
-  UpstreamEventError,
-  UpstreamOrderbookError,
-  UpstreamPriceHistoryError,
-  UpstreamPublicDataError,
-] as const;
-
-function isUpstreamError(
-  error: unknown
-): error is Error & { readonly status?: number } {
-  return UPSTREAM_ERRORS.some((ctor) => error instanceof ctor);
 }
 
 /** DOMException-safe: the abort reason may come from another realm. */

@@ -60,9 +60,9 @@ export const POLYMARKET_BASE_URLS: PolymarketBaseUrls =
 
 export type * as Polymarket from "./platforms/polymarket";
 /**
- * Polymarket types and pure helpers for the legacy `src/markets/*` and
- * `src/profiles/*` wrappers, which may not import the platform folder
- * themselves. Nothing re-exported here performs I/O.
+ * Polymarket pure helpers for callers that may not import the platform
+ * folder (apps/web outside its hatch, per the import-boundary lint).
+ * Nothing re-exported here performs I/O.
  */
 export {
   buildEmptySearchResponse,
@@ -80,6 +80,12 @@ export interface RegistryEnv {
 }
 
 export interface PlatformRegistryInit {
+  /**
+   * Platforms to build adapters for, in display order. Wins over the env
+   * flag, for apps that pin the list in a constants file (the MCP server).
+   * Duplicates collapse; an empty list enables nothing.
+   */
+  enabledPlatforms?: readonly PlatformId[];
   /** Flag values. Defaults to `process.env` where a process exists. */
   env?: RegistryEnv;
   /** Fetch implementation handed to every adapter (cache-hint aware in web). */
@@ -125,6 +131,10 @@ function readProcessEnv(): RegistryEnv {
   };
 }
 
+function selectEnabledPlatforms(ids: readonly PlatformId[]): PlatformId[] {
+  return ids.filter((id, index) => ids.indexOf(id) === index);
+}
+
 function disabled(platform: PlatformId): PlatformError {
   return new PlatformError(`Platform ${platform} is not enabled`, {
     platform,
@@ -137,7 +147,9 @@ export function createPlatformRegistry(
   init: PlatformRegistryInit = {}
 ): PlatformRegistry {
   const env = init.env ?? readProcessEnv();
-  const requested = parseEnabledPlatforms(env.KNOWW_ENABLED_PLATFORMS);
+  const requested = init.enabledPlatforms
+    ? selectEnabledPlatforms(init.enabledPlatforms)
+    : parseEnabledPlatforms(env.KNOWW_ENABLED_PLATFORMS);
   const overrides = parseCapabilityOverrides(
     env.KNOWW_PLATFORM_CAPABILITY_OVERRIDES
   );

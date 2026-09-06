@@ -57,6 +57,14 @@ const FLIGHT_PUSH_BOUNDARY =
   /"\]\)<\/script><script(?: nonce="[^"]*")?>self\.__next_f\.push\(\[1,"/g;
 const CSP_NONCE = /nonce="[^"]+"/g;
 /**
+ * The feature-flags payload carries the visitor's location. The runner pins
+ * the country with a `cf-ipcountry` header, but the subdivision comes from
+ * the Cloudflare request context, which is the recording machine's real
+ * region under `next start` and absent in CI, so it is masked here.
+ */
+const FLIGHT_VISITOR_SUBDIVISION =
+  /(\\?"subdivision\\?":)(?:\\?"[A-Z0-9]{1,3}\\?"|null)/g;
+/**
  * Next writes its build id (a 21-character nanoid) right after the doctype
  * and as `"b"` in the first flight chunk. A rebuild changes it and nothing
  * else, so it cannot take part in the comparison.
@@ -121,6 +129,7 @@ export function normalizeHtml(html: string): string {
     .replace(BARE_STATIC_ASSET, "static/<asset>")
     .replace(FLIGHT_CHUNK_ID, "$1<chunk>$2")
     .replace(CSP_NONCE, 'nonce="<nonce>"')
+    .replace(FLIGHT_VISITOR_SUBDIVISION, "$1<subdivision>")
     .replace(NEXT_BUILD_ID_COMMENT, "$1<build-id>$2")
     .replace(NEXT_FLIGHT_BUILD_ID, "$1<build-id>$2")
     .replace(MILLISECOND_ISO, "<timestamp>");

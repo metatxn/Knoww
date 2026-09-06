@@ -9,6 +9,8 @@ import type {
   PlatformTradingUi,
   TradingSlotProps,
 } from "@/components/trading/types";
+import { usePolymarketBuyFeeEstimate } from "./fee-estimate";
+import { usePolymarketOrderReadiness } from "./order-readiness";
 import { isPolymarketTradingDetails } from "./trading-target";
 
 /**
@@ -127,4 +129,6 @@ function PolymarketTradingExtras({ market, details }: TradingSlotProps) {
 export const polymarketTradingUi: PlatformTradingUi = {
   MarketBadge: PolymarketMarketBadge,
   TradingExtras: PolymarketTradingExtras,
+  useOrderReadiness: usePolymarketOrderReadiness,
+  useBuyFeeEstimate: usePolymarketBuyFeeEstimate,
 };

@@ -1,8 +1,8 @@
 /**
  * Polymarket utility functions and constants
  *
- * Note: All ClobClient operations have been moved to the frontend
- * using the useClobClient hook with the real user signer.
+ * Note: All CLOB trading runs in the browser through the platform
+ * trading adapter (`@knoww/services`) with the real user signer.
  *
  * This file now only contains utility functions for backend API routes
  * that need to make direct HTTP calls to the CLOB API.

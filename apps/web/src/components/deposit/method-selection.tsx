@@ -10,6 +10,12 @@ interface MethodSelectionProps {
   isConnected: boolean;
   address?: string;
   walletTokens: TokenBalance[];
+  /**
+   * True when the connected wallet is itself the trading wallet (EOA mode).
+   * Moving pUSD from the wallet to the trading wallet would then be a
+   * self-transfer that costs gas for nothing, so the wallet method is hidden.
+   */
+  walletIsTradingWallet: boolean;
   onSelectMethod: (method: DepositMethod, e?: React.MouseEvent) => void;
 }
 
@@ -111,12 +117,17 @@ export function MethodSelection({
   isConnected,
   address,
   walletTokens,
+  walletIsTradingWallet,
   onSelectMethod,
 }: MethodSelectionProps) {
   const walletUsd = walletTokens.reduce((s, t) => s + t.usdValue, 0);
   const walletLabel = address
     ? `Wallet · ${formatAddress(address)}`
     : "Connect wallet";
+  // Rows are numbered in the order they render, so hiding one keeps the
+  // list contiguous.
+  let position = 0;
+  const nextIndex = () => String(++position).padStart(2, "0");
 
   return (
     <m.div
@@ -126,30 +137,32 @@ export function MethodSelection({
       exit={{ opacity: 0, y: -10 }}
       className="flex flex-col gap-2"
     >
+      {!walletIsTradingWallet && (
+        <MethodRow
+          index={nextIndex()}
+          label={walletLabel}
+          detail={
+            isConnected ? (
+              <>
+                <Seg tone="accent">${walletUsd.toFixed(2)}</Seg>
+                <Sep />
+                <Seg tone="up">Instant</Seg>
+              </>
+            ) : (
+              <>
+                <Seg>Not connected</Seg>
+                <Sep />
+                <Seg tone="up">Instant</Seg>
+              </>
+            )
+          }
+          disabled={!isConnected}
+          recommended={isConnected}
+          onClick={(e) => onSelectMethod("wallet", e)}
+        />
+      )}
       <MethodRow
-        index="01"
-        label={walletLabel}
-        detail={
-          isConnected ? (
-            <>
-              <Seg tone="accent">${walletUsd.toFixed(2)}</Seg>
-              <Sep />
-              <Seg tone="up">Instant</Seg>
-            </>
-          ) : (
-            <>
-              <Seg>Not connected</Seg>
-              <Sep />
-              <Seg tone="up">Instant</Seg>
-            </>
-          )
-        }
-        disabled={!isConnected}
-        recommended={isConnected}
-        onClick={(e) => onSelectMethod("wallet", e)}
-      />
-      <MethodRow
-        index="02"
+        index={nextIndex()}
         label="Transfer Crypto"
         detail={
           <>
@@ -163,7 +176,7 @@ export function MethodSelection({
         onClick={(e) => onSelectMethod("bridge", e)}
       />
       <MethodRow
-        index="03"
+        index={nextIndex()}
         label="Deposit with Card"
         detail={
           <>
@@ -175,7 +188,7 @@ export function MethodSelection({
         comingSoon
       />
       <MethodRow
-        index="04"
+        index={nextIndex()}
         label="Connect Exchange"
         detail={
           <>
@@ -187,7 +200,7 @@ export function MethodSelection({
         comingSoon
       />
       <MethodRow
-        index="05"
+        index={nextIndex()}
         label="Deposit with PayPal"
         detail={
           <>

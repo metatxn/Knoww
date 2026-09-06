@@ -10,6 +10,7 @@ import { registerGetEventTool } from "./tools/get-event";
 import { registerGetMarketTool } from "./tools/get-market";
 import { registerGetOrderbookTool } from "./tools/get-orderbook";
 import { registerGetPriceHistoryTool } from "./tools/get-price-history";
+import { registerListPlatformsTool } from "./tools/list-platforms";
 import { registerPublicMarketTools } from "./tools/public-markets";
 import { registerPublicWalletTools } from "./tools/public-wallets";
 import { registerSearchMarketsTool } from "./tools/search-markets";
@@ -24,7 +25,7 @@ type RegisterTool = (
 ) => unknown;
 
 const TOOL_ERROR_CODE =
-  /^(VALIDATION_ERROR|UNAUTHENTICATED|FORBIDDEN|NOT_FOUND|RATE_LIMITED|CONFLICT|UPSTREAM_TIMEOUT|UPSTREAM_UNAVAILABLE|INTERNAL_ERROR):/u;
+  /^(VALIDATION_ERROR|UNAUTHENTICATED|FORBIDDEN|NOT_FOUND|RATE_LIMITED|CONFLICT|UPSTREAM_TIMEOUT|UPSTREAM_UNAVAILABLE|INTERNAL_ERROR|PLATFORM_DISABLED):/u;
 
 function toolErrorCode(result: unknown): string | undefined {
   if (!result || typeof result !== "object" || !("isError" in result)) {
@@ -108,5 +109,7 @@ export function createKnowwMcpServer(): McpServer {
   registerGetPriceHistoryTool(server);
   registerPublicMarketTools(server);
   registerPublicWalletTools(server);
+  // Last on purpose: worker tests pin search_markets as the first listed tool.
+  registerListPlatformsTool(server);
   return server;
 }

@@ -6,7 +6,7 @@ import type { Position } from "@/components/portfolio/types";
 import { useOrderBookStore } from "./use-orderbook-store";
 import { useSellPosition } from "./use-sell-position";
 
-const clobMocks = vi.hoisted(() => ({
+const placeOrderMocks = vi.hoisted(() => ({
   createOrder: vi.fn(),
 }));
 
@@ -18,15 +18,15 @@ vi.mock("@knoww/shared-types/clob", () => ({
   fetchClobOrderBook: fetchMocks.fetchClobOrderBook,
 }));
 
-vi.mock("@/hooks/use-clob-client", () => ({
+vi.mock("@/hooks/use-place-order", () => ({
   OrderType: {
     FAK: "FAK",
   },
   Side: {
     SELL: "SELL",
   },
-  useClobClient: () => ({
-    createOrder: clobMocks.createOrder,
+  usePlaceOrder: () => ({
+    createOrder: placeOrderMocks.createOrder,
     isLoading: false,
     error: null,
     canTrade: true,
@@ -81,7 +81,7 @@ describe("useSellPosition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useOrderBookStore.getState().clearAllOrderBooks();
-    clobMocks.createOrder.mockResolvedValue({
+    placeOrderMocks.createOrder.mockResolvedValue({
       success: true,
       order: { id: "order-1" },
     });
@@ -107,7 +107,7 @@ describe("useSellPosition", () => {
       await result.current.executeSell();
     });
 
-    expect(clobMocks.createOrder).toHaveBeenCalledWith(
+    expect(placeOrderMocks.createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         price: 0.4325,
         orderType: "FAK",

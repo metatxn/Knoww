@@ -1,4 +1,4 @@
-import { UpstreamPublicDataError } from "@knoww/services";
+import { isUpstreamPublicDataError } from "@knoww/services/platforms/polymarket";
 import type { ServerContext } from "@modelcontextprotocol/server";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import {
@@ -24,7 +24,7 @@ export function cleanQuotedText(
 
 function mapPublicDataError(error: unknown): KnowwToolError {
   if (error instanceof KnowwToolError) return error;
-  if (error instanceof UpstreamPublicDataError) {
+  if (isUpstreamPublicDataError(error)) {
     if (error.status === 429) {
       return new KnowwToolError(
         "RATE_LIMITED",

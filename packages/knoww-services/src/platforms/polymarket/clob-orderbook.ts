@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { UpstreamOrderbookError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamOrderbookError } from "./errors";
 
 /**
  * Standalone CLOB /book fetcher. Deliberately does not reuse
@@ -79,9 +79,7 @@ const snapshotSchema = z
 function normalizeSnapshot(payload: unknown): OrderbookSnapshot {
   const parsed = snapshotSchema.safeParse(payload);
   if (!parsed.success) {
-    throw new UpstreamOrderbookError(
-      "CLOB orderbook returned a malformed payload"
-    );
+    throw upstreamOrderbookError("CLOB orderbook returned a malformed payload");
   }
   const data = parsed.data;
   const assetId = data.asset_id ?? data.tokenId;
@@ -127,7 +125,7 @@ export function createClobOrderbook(ctx: PolymarketClientContext) {
           return null;
         }
         if (!response.ok) {
-          throw new UpstreamOrderbookError(
+          throw upstreamOrderbookError(
             `CLOB orderbook lookup failed with ${response.status}`,
             response.status
           );
@@ -136,7 +134,7 @@ export function createClobOrderbook(ctx: PolymarketClientContext) {
         const payload: unknown = await response.json();
         const snapshot = normalizeSnapshot(payload);
         if (snapshot.assetId !== undefined && snapshot.assetId !== tokenId) {
-          throw new UpstreamOrderbookError(
+          throw upstreamOrderbookError(
             "CLOB orderbook returned a different token"
           );
         }

@@ -20,9 +20,25 @@ never sets it.
 
 `scripts/golden.mts` then fetches each entry in `manifest.json`, normalizes the
 body (sorted JSON keys, flight streaming split points, hashed asset paths,
-webpack chunk ids, the build id, CSP nonces, millisecond ISO timestamps) and writes or compares
+webpack chunk ids, the build id, CSP nonces, millisecond ISO timestamps, the
+visitor subdivision in the feature-flags payload) and writes or compares
 `responses/<name>.<ext>`. Every mask covers something a rebuild or a different
 build environment changes without any source change.
+
+The runner sends `cf-ipcountry: JP` with every request. The app reads that
+header ahead of the Cloudflare request context, and Japan has no entry in any
+platform's region policy, so the region-policy result in the feature-flags
+payload is the same on every machine. The subdivision has no header, so it
+is masked instead: under `next start` the Cloudflare context carries the
+recording machine's real region, and in CI there is none.
+
+The runner also sends a user agent on Next's HTML-limited bot list
+(`knoww-golden/1 (compatible; Chrome-Lighthouse)`). For those user agents Next
+renders the whole page in one pass, so every Suspense boundary lands inline and
+the page metadata stays in the head. For a browser user agent the same page
+streams, and which boundaries make the first chunk depends on timing, so two
+fetches of one page could differ in shape. The app has no user-agent branches
+of its own.
 
 ## Recording
 

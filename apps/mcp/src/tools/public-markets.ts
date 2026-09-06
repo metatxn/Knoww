@@ -1,26 +1,19 @@
 import {
-  CLOB_API_BASE,
-  DATA_API_BASE,
-  fetchEventLiveVolume,
-  fetchEventPage,
-  fetchMarketHolders,
-  fetchMarketPageByTagSlug,
-  fetchMarketQuotes,
-  fetchMarketTrades,
-  fetchOpenInterest,
-  fetchSportsMarketTypes,
-  fetchSportsMetadata,
-  fetchSportsTeams,
-  fetchTags,
-  fetchTraderLeaderboard,
-  GAMMA_API_BASE,
   type GammaMarketDetail,
-} from "@knoww/services";
+  POLYMARKET_PLATFORM,
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { currentRequestId } from "../context";
 import { KnowwToolError } from "../errors/tool-error";
-import { projectMarketOutcomes } from "./gamma";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
+import { registerWithLegacyAlias } from "../tool-catalog";
+import {
+  canonicalEventId,
+  canonicalMarketId,
+  marketSourceId,
+  projectMarketOutcomes,
+} from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 import {
   buildOffsetPage,
@@ -83,7 +76,9 @@ function countText(label: string, count: number): string {
 function projectMarket(market: GammaMarketDetail) {
   const outcomeProjection = projectMarketOutcomes(market);
   return {
-    id: market.id,
+    id: canonicalMarketId(market),
+    platform: POLYMARKET_PLATFORM,
+    sourceMarketId: marketSourceId(market),
     ...(market.slug ? { slug: market.slug } : {}),
     ...(cleanQuotedText(market.question, 500)
       ? { question: cleanQuotedText(market.question, 500) }
@@ -97,6 +92,7 @@ function projectMarket(market: GammaMarketDetail) {
 }
 
 const listEventsInputSchema = z.object({
+  platform: platformInputSchema,
   limit: z.number().int().min(1).max(100).default(20),
   cursor: cursorSchema,
   closed: z.boolean().optional(),
@@ -130,6 +126,7 @@ function registerListEvents(server: McpServer) {
     },
     (args, context) =>
       executePublicRead("list_events", context, async () => {
+        const client = requirePolymarketClient(args.platform);
         const fingerprint = paginationFingerprint([
           args.closed ?? "",
           args.live ?? "",
@@ -152,7 +149,7 @@ function registerListEvents(server: McpServer) {
                   stateSchema: keysetCursorStateSchema,
                 }).upstreamCursor
               : args.cursor;
-        const eventPage = await fetchEventPage(
+        const eventPage = await client.fetchEventPage(
           { ...args, cursor: upstreamCursor },
           {
             signal: context.mcpReq.signal,
@@ -163,7 +160,9 @@ function registerListEvents(server: McpServer) {
           const markets = event.markets.slice(0, 20).map(projectMarket);
           if (event.markets.length > markets.length) nestedTruncated = true;
           return {
-            id: event.id,
+            id: canonicalEventId(event.id),
+            platform: POLYMARKET_PLATFORM,
+            sourceEventId: event.id,
             ...(event.slug ? { slug: event.slug } : {}),
             ...(cleanQuotedText(event.title, 500)
               ? { title: cleanQuotedText(event.title, 500) }
@@ -200,7 +199,7 @@ function registerListEvents(server: McpServer) {
           hasMore: nextCursor !== undefined,
         };
         const meta = sourceMeta(
-          { name: "polymarket-gamma", url: GAMMA_API_BASE },
+          { name: "polymarket-gamma", url: client.baseUrls.gamma },
           {
             ...(nextCursor ? { nextCursor } : {}),
             truncated: nestedTruncated,
@@ -218,6 +217,7 @@ function registerListEvents(server: McpServer) {
 
 const marketTradesInputSchema = z
   .object({
+    platform: platformInputSchema,
     conditionIds: z.array(conditionIdSchema).min(1).max(20).optional(),
     eventIds: z.array(z.number().int().positive()).min(1).max(20).optional(),
     walletAddress: walletAddressSchema.optional(),
@@ -264,6 +264,7 @@ function registerMarketTrades(server: McpServer) {
     },
     (args, context) =>
       executePublicRead("get_market_trades", context, async () => {
+        const client = requirePolymarketClient(args.platform);
         const fingerprint = paginationFingerprint([
           args.conditionIds ?? [],
           args.eventIds ?? [],
@@ -279,7 +280,7 @@ function registerMarketTrades(server: McpServer) {
           fingerprint,
           maxOffset: 10_000,
         });
-        const rows = await fetchMarketTrades(
+        const rows = await client.fetchMarketTrades(
           { ...args, offset },
           {
             signal: context.mcpReq.signal,
@@ -324,7 +325,7 @@ function registerMarketTrades(server: McpServer) {
             trades,
             page: pagination.page,
             meta: sourceMeta(
-              { name: "polymarket-data", url: DATA_API_BASE },
+              { name: "polymarket-data", url: client.baseUrls.dataApi },
               {
                 ...(pagination.nextCursor
                   ? { nextCursor: pagination.nextCursor }
@@ -342,34 +343,49 @@ function registerMarketQuotes(server: McpServer) {
   const inputSchema = z.object({
     tokenIds: z.array(tokenIdSchema).min(1).max(20),
   });
-  server.registerTool(
-    "get_market_quotes",
-    {
-      title: "Get market quotes",
-      description:
-        "Get BUY and SELL prices, midpoint, spread, and last trade for up to 20 CLOB outcome tokens.",
-      inputSchema,
-      outputSchema: z.object({
-        quotes: z.array(recordSchema),
-        meta: toolMetaSchema,
-      }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("get_market_quotes", context, async () => {
-        const quotes = await fetchMarketQuotes(args.tokenIds, {
-          signal: context.mcpReq.signal,
-        });
-        return {
-          content: [
-            { type: "text" as const, text: countText("quote", quotes.length) },
-          ],
-          structuredContent: {
-            quotes,
-            meta: sourceMeta({ name: "polymarket-clob", url: CLOB_API_BASE }),
-          },
-        };
-      })
+  registerWithLegacyAlias(
+    "polymarket_get_market_quotes",
+    "Get BUY and SELL prices, midpoint, spread, and last trade for up to 20 CLOB outcome tokens.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "Get market quotes",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            quotes: z.array(recordSchema),
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_get_market_quotes",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const quotes = await client.fetchMarketQuotes(args.tokenIds, {
+                signal: context.mcpReq.signal,
+              });
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: countText("quote", quotes.length),
+                  },
+                ],
+                structuredContent: {
+                  quotes,
+                  meta: sourceMeta({
+                    name: "polymarket-clob",
+                    url: client.baseUrls.clob,
+                  }),
+                },
+              };
+            }
+          )
+      )
   );
 }
 
@@ -379,47 +395,60 @@ function registerMarketHolders(server: McpServer) {
     limit: z.number().int().min(1).max(20).default(10),
     minBalance: z.number().int().min(0).max(999_999).default(1),
   });
-  server.registerTool(
-    "get_market_holders",
-    {
-      title: "Get market holders",
-      description: "Get the largest public token holders for up to 20 markets.",
-      inputSchema,
-      outputSchema: z.object({
-        markets: z.array(recordSchema),
-        meta: toolMetaSchema,
-      }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("get_market_holders", context, async () => {
-        const markets = await fetchMarketHolders(args, {
-          signal: context.mcpReq.signal,
-        });
-        const projectedMarkets = markets.map((market) => ({
-          tokenId: market.token,
-          holders: market.holders.map((holder) => ({
-            proxyWallet: holder.proxyWallet,
-            tokenId: holder.asset,
-            amount: holder.amount,
-            ...(holder.outcomeIndex !== undefined
-              ? { outcomeIndex: holder.outcomeIndex }
-              : {}),
-          })),
-        }));
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: countText("market", projectedMarkets.length),
-            },
-          ],
-          structuredContent: {
-            markets: projectedMarkets,
-            meta: sourceMeta({ name: "polymarket-data", url: DATA_API_BASE }),
-          },
-        };
-      })
+  registerWithLegacyAlias(
+    "polymarket_get_market_holders",
+    "Get the largest public token holders for up to 20 markets.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "Get market holders",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            markets: z.array(recordSchema),
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_get_market_holders",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const markets = await client.fetchMarketHolders(args, {
+                signal: context.mcpReq.signal,
+              });
+              const projectedMarkets = markets.map((market) => ({
+                tokenId: market.token,
+                holders: market.holders.map((holder) => ({
+                  proxyWallet: holder.proxyWallet,
+                  tokenId: holder.asset,
+                  amount: holder.amount,
+                  ...(holder.outcomeIndex !== undefined
+                    ? { outcomeIndex: holder.outcomeIndex }
+                    : {}),
+                })),
+              }));
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: countText("market", projectedMarkets.length),
+                  },
+                ],
+                structuredContent: {
+                  markets: projectedMarkets,
+                  meta: sourceMeta({
+                    name: "polymarket-data",
+                    url: client.baseUrls.dataApi,
+                  }),
+                },
+              };
+            }
+          )
+      )
   );
 }
 
@@ -427,70 +456,100 @@ function registerOpenInterest(server: McpServer) {
   const inputSchema = z.object({
     conditionIds: z.array(conditionIdSchema).min(1).max(20),
   });
-  server.registerTool(
-    "get_open_interest",
-    {
-      title: "Get open interest",
-      description:
-        "Get public open-interest values for up to 20 market condition IDs.",
-      inputSchema,
-      outputSchema: z.object({
-        markets: z.array(recordSchema),
-        meta: toolMetaSchema,
-      }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("get_open_interest", context, async () => {
-        const markets = await fetchOpenInterest(args.conditionIds, {
-          signal: context.mcpReq.signal,
-        });
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: countText("market", markets.length),
-            },
-          ],
-          structuredContent: {
-            markets,
-            meta: sourceMeta({ name: "polymarket-data", url: DATA_API_BASE }),
-          },
-        };
-      })
+  registerWithLegacyAlias(
+    "polymarket_get_open_interest",
+    "Get public open-interest values for up to 20 market condition IDs.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "Get open interest",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            markets: z.array(recordSchema),
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_get_open_interest",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const markets = await client.fetchOpenInterest(
+                args.conditionIds,
+                {
+                  signal: context.mcpReq.signal,
+                }
+              );
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: countText("market", markets.length),
+                  },
+                ],
+                structuredContent: {
+                  markets,
+                  meta: sourceMeta({
+                    name: "polymarket-data",
+                    url: client.baseUrls.dataApi,
+                  }),
+                },
+              };
+            }
+          )
+      )
   );
 }
 
 function registerEventLiveVolume(server: McpServer) {
   const inputSchema = z.object({ eventId: z.number().int().positive() });
-  server.registerTool(
-    "get_event_live_volume",
-    {
-      title: "Get event live volume",
-      description:
-        "Get live aggregate volume and per-market volume for one event.",
-      inputSchema,
-      outputSchema: z.object({ volume: recordSchema, meta: toolMetaSchema }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("get_event_live_volume", context, async () => {
-        const volume = await fetchEventLiveVolume(args.eventId, {
-          signal: context.mcpReq.signal,
-        });
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Live volume for event ${args.eventId}: ${volume.total}.`,
-            },
-          ],
-          structuredContent: {
-            volume,
-            meta: sourceMeta({ name: "polymarket-data", url: DATA_API_BASE }),
-          },
-        };
-      })
+  registerWithLegacyAlias(
+    "polymarket_get_event_live_volume",
+    "Get live aggregate volume and per-market volume for one event.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "Get event live volume",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            volume: recordSchema,
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_get_event_live_volume",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const volume = await client.fetchEventLiveVolume(args.eventId, {
+                signal: context.mcpReq.signal,
+              });
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: `Live volume for event ${args.eventId}: ${volume.total}.`,
+                  },
+                ],
+                structuredContent: {
+                  volume,
+                  meta: sourceMeta({
+                    name: "polymarket-data",
+                    url: client.baseUrls.dataApi,
+                  }),
+                },
+              };
+            }
+          )
+      )
   );
 }
 
@@ -519,84 +578,93 @@ function registerTraderLeaderboard(server: McpServer) {
     walletAddress: walletAddressSchema.optional(),
     userName: z.string().trim().min(1).max(100).optional(),
   });
-  server.registerTool(
-    "get_trader_leaderboard",
-    {
-      title: "Get trader leaderboard",
-      description:
-        "Get ranked public Polymarket trader volume and PnL statistics with opaque cursor pagination.",
-      inputSchema,
-      outputSchema: z.object({
-        traders: z.array(recordSchema),
-        page: pageInfoSchema,
-        meta: toolMetaSchema,
-      }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("get_trader_leaderboard", context, async () => {
-        const fingerprint = paginationFingerprint([
-          args.category,
-          args.timePeriod,
-          args.orderBy,
-          args.walletAddress ?? "",
-          args.userName ?? "",
-        ]);
-        const offset = resolveOffset({
-          cursor: args.cursor,
-          legacyOffset: args.offset,
-          namespace: "get_trader_leaderboard",
-          fingerprint,
-          maxOffset: 1000,
-        });
-        const rows = await fetchTraderLeaderboard(
-          { ...args, offset },
-          {
-            signal: context.mcpReq.signal,
-          }
-        );
-        const traders = rows.map((row) => ({
-          rank: row.rank,
-          proxyWallet: row.proxyWallet,
-          ...(cleanQuotedText(row.userName, 100)
-            ? { userName: cleanQuotedText(row.userName, 100) }
-            : {}),
-          volume: row.volume,
-          pnl: row.pnl,
-          ...(row.verifiedBadge !== undefined
-            ? { verifiedBadge: row.verifiedBadge }
-            : {}),
-        }));
-        const pagination = buildOffsetPage({
-          namespace: "get_trader_leaderboard",
-          fingerprint,
-          offset,
-          limit: args.limit,
-          returnedResults: traders.length,
-          maxOffset: 1000,
-        });
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: countText("trader", traders.length),
-            },
-          ],
-          structuredContent: {
-            traders,
-            page: pagination.page,
-            meta: sourceMeta(
-              { name: "polymarket-data", url: DATA_API_BASE },
-              {
-                ...(pagination.nextCursor
-                  ? { nextCursor: pagination.nextCursor }
+  registerWithLegacyAlias(
+    "polymarket_get_trader_leaderboard",
+    "Get ranked public Polymarket trader volume and PnL statistics with opaque cursor pagination.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "Get trader leaderboard",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            traders: z.array(recordSchema),
+            page: pageInfoSchema,
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_get_trader_leaderboard",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const fingerprint = paginationFingerprint([
+                args.category,
+                args.timePeriod,
+                args.orderBy,
+                args.walletAddress ?? "",
+                args.userName ?? "",
+              ]);
+              const offset = resolveOffset({
+                cursor: args.cursor,
+                legacyOffset: args.offset,
+                namespace: "get_trader_leaderboard",
+                fingerprint,
+                maxOffset: 1000,
+              });
+              const rows = await client.fetchTraderLeaderboard(
+                { ...args, offset },
+                {
+                  signal: context.mcpReq.signal,
+                }
+              );
+              const traders = rows.map((row) => ({
+                rank: row.rank,
+                proxyWallet: row.proxyWallet,
+                ...(cleanQuotedText(row.userName, 100)
+                  ? { userName: cleanQuotedText(row.userName, 100) }
                   : {}),
-                truncated: pagination.offsetLimitReached,
-              }
-            ),
-          },
-        };
-      })
+                volume: row.volume,
+                pnl: row.pnl,
+                ...(row.verifiedBadge !== undefined
+                  ? { verifiedBadge: row.verifiedBadge }
+                  : {}),
+              }));
+              const pagination = buildOffsetPage({
+                namespace: "get_trader_leaderboard",
+                fingerprint,
+                offset,
+                limit: args.limit,
+                returnedResults: traders.length,
+                maxOffset: 1000,
+              });
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: countText("trader", traders.length),
+                  },
+                ],
+                structuredContent: {
+                  traders,
+                  page: pagination.page,
+                  meta: sourceMeta(
+                    { name: "polymarket-data", url: client.baseUrls.dataApi },
+                    {
+                      ...(pagination.nextCursor
+                        ? { nextCursor: pagination.nextCursor }
+                        : {}),
+                      truncated: pagination.offsetLimitReached,
+                    }
+                  ),
+                },
+              };
+            }
+          )
+      )
   );
 }
 
@@ -605,6 +673,7 @@ function registerListTags(server: McpServer) {
     limit: z.number().int().min(1).max(100).default(50),
     offset: z.number().int().min(0).max(10_000).default(0),
     cursor: cursorInputSchema,
+    platform: platformInputSchema,
   });
   server.registerTool(
     "list_tags",
@@ -622,6 +691,7 @@ function registerListTags(server: McpServer) {
     },
     (args, context) =>
       executePublicRead("list_tags", context, async () => {
+        const client = requirePolymarketClient(args.platform);
         const fingerprint = paginationFingerprint(["tags"]);
         const offset = resolveOffset({
           cursor: args.cursor,
@@ -630,7 +700,7 @@ function registerListTags(server: McpServer) {
           fingerprint,
           maxOffset: 10_000,
         });
-        const tags = await fetchTags(
+        const tags = await client.fetchTags(
           { limit: args.limit, offset },
           { signal: context.mcpReq.signal }
         );
@@ -658,7 +728,7 @@ function registerListTags(server: McpServer) {
             tags: projectedTags,
             page: pagination.page,
             meta: sourceMeta(
-              { name: "polymarket-gamma", url: GAMMA_API_BASE },
+              { name: "polymarket-gamma", url: client.baseUrls.gamma },
               {
                 ...(pagination.nextCursor
                   ? { nextCursor: pagination.nextCursor }
@@ -680,135 +750,150 @@ function registerSportsMarkets(server: McpServer) {
     offset: z.number().int().min(0).max(10_000).default(0),
     cursor: cursorSchema,
   });
-  server.registerTool(
-    "list_sports_markets",
-    {
-      title: "List sports markets",
-      description:
-        "List sports metadata and market types, optionally including teams and markets for a sport or league tag. One opaque cursor continues both nested collections.",
-      inputSchema,
-      outputSchema: z.object({
-        sports: recordSchema,
-        page: pageInfoSchema,
-        meta: toolMetaSchema,
-      }),
-      annotations: READ_ONLY_ANNOTATIONS,
-    },
-    (args, context) =>
-      executePublicRead("list_sports_markets", context, async () => {
-        const tagSlug = args.league ?? args.sport;
-        const fingerprint = paginationFingerprint([
-          args.sport ?? "",
-          args.league ?? "",
-        ]);
-        if (args.cursor !== undefined && args.offset !== 0) {
-          throw new KnowwToolError(
-            "VALIDATION_ERROR",
-            "Do not combine cursor with a non-zero offset."
-          );
-        }
-        const cursorState =
-          args.cursor === undefined
-            ? {
-                marketCursor: tagSlug ? undefined : null,
-                teamOffset: args.league ? args.offset : null,
+  registerWithLegacyAlias(
+    "polymarket_list_sports_markets",
+    "List sports metadata and market types, optionally including teams and markets for a sport or league tag. One opaque cursor continues both nested collections.",
+    (name, description) =>
+      server.registerTool(
+        name,
+        {
+          title: "List sports markets",
+          description,
+          inputSchema,
+          outputSchema: z.object({
+            sports: recordSchema,
+            page: pageInfoSchema,
+            meta: toolMetaSchema,
+          }),
+          annotations: READ_ONLY_ANNOTATIONS,
+        },
+        (args, context) =>
+          executePublicRead(
+            "polymarket_list_sports_markets",
+            context,
+            async () => {
+              const client = requirePolymarketClient();
+              const tagSlug = args.league ?? args.sport;
+              const fingerprint = paginationFingerprint([
+                args.sport ?? "",
+                args.league ?? "",
+              ]);
+              if (args.cursor !== undefined && args.offset !== 0) {
+                throw new KnowwToolError(
+                  "VALIDATION_ERROR",
+                  "Do not combine cursor with a non-zero offset."
+                );
               }
-            : isKnowwCursor(args.cursor)
-              ? decodeStateCursor(args.cursor, {
-                  namespace: "list_sports_markets",
-                  fingerprint,
-                  stateSchema: sportsCursorStateSchema,
-                })
-              : {
-                  marketCursor: args.cursor,
-                  teamOffset: args.league ? args.offset : null,
-                };
-        const [metadata, marketTypes, teams, marketPage] = await Promise.all([
-          fetchSportsMetadata({ signal: context.mcpReq.signal }),
-          fetchSportsMarketTypes({ signal: context.mcpReq.signal }),
-          args.league && cursorState.teamOffset !== null
-            ? fetchSportsTeams(
-                {
-                  league: args.league,
-                  limit: args.limit,
-                  offset: cursorState.teamOffset,
-                },
-                { signal: context.mcpReq.signal }
-              )
-            : Promise.resolve([]),
-          tagSlug && cursorState.marketCursor !== null
-            ? fetchMarketPageByTagSlug(
-                {
-                  tagSlug,
-                  limit: args.limit,
-                  ...(cursorState.marketCursor
-                    ? { cursor: cursorState.marketCursor }
+              const cursorState =
+                args.cursor === undefined
+                  ? {
+                      marketCursor: tagSlug ? undefined : null,
+                      teamOffset: args.league ? args.offset : null,
+                    }
+                  : isKnowwCursor(args.cursor)
+                    ? decodeStateCursor(args.cursor, {
+                        namespace: "list_sports_markets",
+                        fingerprint,
+                        stateSchema: sportsCursorStateSchema,
+                      })
+                    : {
+                        marketCursor: args.cursor,
+                        teamOffset: args.league ? args.offset : null,
+                      };
+              const [metadata, marketTypes, teams, marketPage] =
+                await Promise.all([
+                  client.fetchSportsMetadata({ signal: context.mcpReq.signal }),
+                  client.fetchSportsMarketTypes({
+                    signal: context.mcpReq.signal,
+                  }),
+                  args.league && cursorState.teamOffset !== null
+                    ? client.fetchSportsTeams(
+                        {
+                          league: args.league,
+                          limit: args.limit,
+                          offset: cursorState.teamOffset,
+                        },
+                        { signal: context.mcpReq.signal }
+                      )
+                    : Promise.resolve([]),
+                  tagSlug && cursorState.marketCursor !== null
+                    ? client.fetchMarketPageByTagSlug(
+                        {
+                          tagSlug,
+                          limit: args.limit,
+                          ...(cursorState.marketCursor
+                            ? { cursor: cursorState.marketCursor }
+                            : {}),
+                        },
+                        { signal: context.mcpReq.signal }
+                      )
+                    : Promise.resolve(null),
+                ]);
+              const sports = {
+                metadata: metadata.map((entry) => ({
+                  sport: entry.sport,
+                  ...(entry.image ? { image: entry.image.slice(0, 2000) } : {}),
+                  ...(cleanQuotedText(entry.resolution)
+                    ? { resolution: cleanQuotedText(entry.resolution) }
                     : {}),
-                },
-                { signal: context.mcpReq.signal }
-              )
-            : Promise.resolve(null),
-        ]);
-        const sports = {
-          metadata: metadata.map((entry) => ({
-            sport: entry.sport,
-            ...(entry.image ? { image: entry.image.slice(0, 2000) } : {}),
-            ...(cleanQuotedText(entry.resolution)
-              ? { resolution: cleanQuotedText(entry.resolution) }
-              : {}),
-            ...(entry.ordering ? { ordering: entry.ordering } : {}),
-            ...(entry.tags ? { tagId: entry.tags } : {}),
-            ...(entry.series ? { seriesId: entry.series } : {}),
-          })),
-          marketTypes,
-          teams: teams.map((team) => ({
-            id: team.id,
-            name: cleanQuotedText(team.name, 200) ?? "Unknown team",
-            ...(team.league ? { league: team.league } : {}),
-            ...(team.abbreviation ? { abbreviation: team.abbreviation } : {}),
-          })),
-          markets: marketPage?.markets.map(projectMarket) ?? [],
-        };
-        const teamNextOffset =
-          cursorState.teamOffset !== null && teams.length === args.limit
-            ? cursorState.teamOffset + teams.length
-            : null;
-        const teamOffsetLimitReached =
-          teamNextOffset !== null && teamNextOffset > 10_000;
-        const nextState = {
-          marketCursor: marketPage?.nextCursor ?? null,
-          teamOffset: teamOffsetLimitReached ? null : teamNextOffset,
-        };
-        const hasMore =
-          nextState.marketCursor !== null || nextState.teamOffset !== null;
-        const nextCursor = hasMore
-          ? encodeStateCursor({
-              namespace: "list_sports_markets",
-              fingerprint,
-              state: nextState,
-            })
-          : undefined;
-        const page = {
-          returnedResults: sports.teams.length + sports.markets.length,
-          hasMore,
-        };
-        const meta = sourceMeta(
-          { name: "polymarket-gamma", url: GAMMA_API_BASE },
-          {
-            ...(nextCursor ? { nextCursor } : {}),
-            truncated: teamOffsetLimitReached,
-          }
-        );
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `${sports.metadata.length} sports and ${sports.markets.length} markets returned.`,
-            },
-          ],
-          structuredContent: { sports, page, meta },
-        };
-      })
+                  ...(entry.ordering ? { ordering: entry.ordering } : {}),
+                  ...(entry.tags ? { tagId: entry.tags } : {}),
+                  ...(entry.series ? { seriesId: entry.series } : {}),
+                })),
+                marketTypes,
+                teams: teams.map((team) => ({
+                  id: team.id,
+                  name: cleanQuotedText(team.name, 200) ?? "Unknown team",
+                  ...(team.league ? { league: team.league } : {}),
+                  ...(team.abbreviation
+                    ? { abbreviation: team.abbreviation }
+                    : {}),
+                })),
+                markets: marketPage?.markets.map(projectMarket) ?? [],
+              };
+              const teamNextOffset =
+                cursorState.teamOffset !== null && teams.length === args.limit
+                  ? cursorState.teamOffset + teams.length
+                  : null;
+              const teamOffsetLimitReached =
+                teamNextOffset !== null && teamNextOffset > 10_000;
+              const nextState = {
+                marketCursor: marketPage?.nextCursor ?? null,
+                teamOffset: teamOffsetLimitReached ? null : teamNextOffset,
+              };
+              const hasMore =
+                nextState.marketCursor !== null ||
+                nextState.teamOffset !== null;
+              const nextCursor = hasMore
+                ? encodeStateCursor({
+                    namespace: "list_sports_markets",
+                    fingerprint,
+                    state: nextState,
+                  })
+                : undefined;
+              const page = {
+                returnedResults: sports.teams.length + sports.markets.length,
+                hasMore,
+              };
+              const meta = sourceMeta(
+                { name: "polymarket-gamma", url: client.baseUrls.gamma },
+                {
+                  ...(nextCursor ? { nextCursor } : {}),
+                  truncated: teamOffsetLimitReached,
+                }
+              );
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: `${sports.metadata.length} sports and ${sports.markets.length} markets returned.`,
+                  },
+                ],
+                structuredContent: { sports, page, meta },
+              };
+            }
+          )
+      )
   );
 }
 

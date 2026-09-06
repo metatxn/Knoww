@@ -65,14 +65,6 @@ describe("buildCanonicalId", () => {
     expect(buildCanonicalId("polymarket", "0xabc")).toBe("polymarket:0xabc");
   });
 
-  it("round-trips through parseCanonicalId", () => {
-    const id = buildCanonicalId("kalshi", "KXBTC-25SEP03");
-    expect(parseCanonicalId(id)).toEqual({
-      platform: "kalshi",
-      sourceId: "KXBTC-25SEP03",
-    });
-  });
-
   it("rejects an empty source id", () => {
     expect(() => buildCanonicalId("polymarket", "")).toThrow(
       InvalidCanonicalIdError

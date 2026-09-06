@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { readCacheHint, withUpstreamTimeout } from "./fetch-options";
+import {
+  readCacheHint,
+  type ServiceRequestInit,
+  withUpstreamTimeout,
+} from "./fetch-options";
 
 /**
  * Cache hints travel on the request init so an injected fetch (the web app's
@@ -37,7 +41,12 @@ describe("withUpstreamTimeout cache hints", () => {
 });
 
 describe("readCacheHint", () => {
-  it("returns undefined for a missing init", () => {
+  it("returns the hint carried on the init and undefined when there is none", () => {
+    const hint = { revalidateSeconds: 60, tags: ["events"] };
+    const init: ServiceRequestInit = { knowwCache: hint };
+
+    expect(readCacheHint(init)).toEqual(hint);
+    expect(readCacheHint({})).toBeUndefined();
     expect(readCacheHint(undefined)).toBeUndefined();
   });
 });

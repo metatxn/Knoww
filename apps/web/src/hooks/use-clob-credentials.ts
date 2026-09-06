@@ -307,7 +307,7 @@ export function useClobCredentials() {
 
       const { signature, timestamp, nonce } = await generateL1Signature();
 
-      const response = await fetch("/api/auth/derive-api-key", {
+      const response = await fetch("/api/polymarket/auth/derive-api-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, signature, timestamp, nonce }),

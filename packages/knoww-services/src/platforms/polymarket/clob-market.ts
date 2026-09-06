@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { UpstreamMarketError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
 import type { PolymarketClientContext } from "./context";
+import { upstreamMarketError } from "./errors";
 
 /**
  * The CLOB's own view of a market (`GET /markets/<conditionId>`): the fields
@@ -67,7 +67,7 @@ export function createClobMarket(ctx: PolymarketClientContext) {
           return null;
         }
         if (!response.ok) {
-          throw new UpstreamMarketError(
+          throw upstreamMarketError(
             `CLOB market lookup failed with ${response.status}`,
             response.status
           );
@@ -76,14 +76,12 @@ export function createClobMarket(ctx: PolymarketClientContext) {
         const payload: unknown = await response.json();
         const parsed = clobMarketSchema.safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamMarketError(
-            "CLOB market returned a malformed payload"
-          );
+          throw upstreamMarketError("CLOB market returned a malformed payload");
         }
         if (
           parsed.data.condition_id.toLowerCase() !== conditionId.toLowerCase()
         ) {
-          throw new UpstreamMarketError(
+          throw upstreamMarketError(
             "CLOB market returned a different condition"
           );
         }

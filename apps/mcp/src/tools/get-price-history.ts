@@ -1,9 +1,8 @@
+import type { PlatformId } from "@knoww/services/core";
 import {
-  CLOB_API_BASE,
-  fetchPriceHistoryByTokenId,
+  isUpstreamPriceHistoryError,
   type PriceHistoryPoint,
-  UpstreamPriceHistoryError,
-} from "@knoww/services";
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
@@ -15,6 +14,7 @@ import {
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
 import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
@@ -56,6 +56,7 @@ const inputSchema = {
     .min(1)
     .max(1440)
     .default(DEFAULT_FIDELITY_MINUTES),
+  platform: platformInputSchema,
 };
 
 const outputSchema = {
@@ -71,6 +72,7 @@ const outputSchema = {
 };
 
 interface HistoryArgs {
+  platform?: PlatformId;
   tokenId?: string;
   startTime?: string;
   endTime?: string;
@@ -142,7 +144,7 @@ function mapHistoryError(error: unknown): KnowwToolError {
   if (error instanceof KnowwToolError) {
     return error;
   }
-  if (error instanceof UpstreamPriceHistoryError) {
+  if (isUpstreamPriceHistoryError(error)) {
     if (error.status === 429) {
       return new KnowwToolError(
         "RATE_LIMITED",
@@ -178,13 +180,14 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
         requireToolScope(MARKETS_READ_SCOPE);
         await requireToolQuota("get_price_history");
         const tokenId = resolveTokenId(args);
+        const client = requirePolymarketClient(args.platform);
         const { startMs, endMs } = resolveWindow(args);
         const fidelityMinutes =
           args.fidelityMinutes ?? DEFAULT_FIDELITY_MINUTES;
 
         let raw: PriceHistoryPoint[];
         try {
-          raw = await fetchPriceHistoryByTokenId(
+          raw = await client.fetchPriceHistoryByTokenId(
             tokenId,
             {
               startTs: Math.floor(startMs / 1000),
@@ -220,7 +223,7 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
 
         const meta = buildToolMeta({
           requestId: currentRequestId(),
-          sources: [{ name: "polymarket-clob", url: CLOB_API_BASE }],
+          sources: [{ name: "polymarket-clob", url: client.baseUrls.clob }],
           ...(lastPoint === undefined ? {} : { asOf: lastPoint.timestamp }),
           ...(downsampled ? { truncated: true } : {}),
         });

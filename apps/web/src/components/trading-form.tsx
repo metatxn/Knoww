@@ -254,7 +254,6 @@ function TradingTicket(props: TradingTicketProps) {
     effectiveBalance,
     hasInsufficientBalance,
     hasInsufficientAllowance,
-    hasNoAllowance,
     hasMissingTradingApprovals,
     isCheckingTradingApprovals,
     isBelowMarketableBuyMinNotional,
@@ -306,7 +305,7 @@ function TradingTicket(props: TradingTicketProps) {
   const belowLimitMin = orderType === "LIMIT" && shares < minShares;
   const needsApproval =
     (hasMissingTradingApprovals ||
-      (side === "BUY" && (hasNoAllowance || hasInsufficientAllowance))) &&
+      (side === "BUY" && hasInsufficientAllowance)) &&
     !hasInsufficientBalance;
 
   // Bid/ask values in cents (0..100) — used by the limit-mode header
@@ -960,7 +959,7 @@ function TradingTicket(props: TradingTicketProps) {
                 <div className="tk-warn info">
                   <AlertCircle className="ic h-4 w-4" />
                   <span className="body">
-                    {hasNoAllowance || hasMissingTradingApprovals
+                    {hasMissingTradingApprovals
                       ? "Approve pUSD spending to trade"
                       : `Increase allowance to $${calculations.total.toFixed(2)}`}
                     <span className="sub">

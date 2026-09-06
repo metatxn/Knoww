@@ -67,7 +67,7 @@ flowchart LR
     A --> P["Polymarket APIs\nGamma / CLOB / Data / User PnL / Relayer / Bridge"]
     L --> CF["Cloudflare runtime\nWorkers + R2 incremental cache"]
     OF --> P
-    BG --> K["Knoww web API\n/api/relayer/*, /api/ai/*, /api/extension/session/*, /api/analytics/batch"]
+    BG --> K["Knoww web API\n/api/polymarket/relayer/*, /api/ai/*, /api/extension/session/*, /api/analytics/batch"]
     BG --> P
     BG --> HF["Hugging Face model download/cache\nvia transformers.js"]
 
@@ -97,7 +97,7 @@ flowchart LR
 | Web constants and types | `apps/web/src/constants/*`, `apps/web/src/types/*` | Shared Polymarket constants, API enums, cache durations, and typed response shapes used across routes, hooks, and components | Web app shell, API routes, hooks |
 | Web platform guards | `apps/web/src/middleware.ts`, `apps/web/instrumentation-client.ts` | Applies security headers/CSP and bootstraps browser-side telemetry | Browser, Next.js runtime, PostHog |
 | Extension content runtime | `apps/extension/src/content/index.ts`, `apps/extension/src/content/main.ts`, `apps/extension/src/content/platform-loader.ts`, `apps/extension/src/content/platform-manifest.ts`, `apps/extension/src/content/streaming/stream-markets.ts`, `apps/extension/src/content/ui/*` | Boots the content-script pipeline, lazily loads host adapters from the generated platform manifest, extracts post/article text, ranks relevant markets, renders shared injected UI, and powers stream-surface companion cards such as Twitch's Live Markets module | Background service worker, page bridge, Knoww APIs, Polymarket APIs |
-| Extension in-page trading bridge | `apps/extension/src/content/trading-loader.ts`, `apps/extension/src/content/trading/*`, `apps/extension/src/page-bridge.ts` | Manages lazy trading-runtime loading, content-script trading UI, extension-session bootstrapping, proxy-wallet bridging, and page-world wallet RPC handoff for inline trading flows | Content runtime, background worker, page bridge, `/api/extension/session/*`, `/api/relayer/*` |
+| Extension in-page trading bridge | `apps/extension/src/content/trading-loader.ts`, `apps/extension/src/content/trading/*`, `apps/extension/src/page-bridge.ts` | Manages lazy trading-runtime loading, content-script trading UI, extension-session bootstrapping, proxy-wallet bridging, and page-world wallet RPC handoff for inline trading flows | Content runtime, background worker, page bridge, `/api/extension/session/*`, `/api/polymarket/relayer/*` |
 | Extension background worker | `apps/extension/src/background.ts`, `apps/extension/src/background/*` | Central message router, auth token storage, batched analytics queue, CORS-safe fetch proxy, local NLP/embedding services | Content scripts, offscreen document, Knoww API, analytics ingest proxy, Polymarket APIs |
 | Extension page bridge | `apps/extension/src/page-bridge.ts` | Runs in the page's main world to discover injected wallets via EIP-6963 and bridge EIP-1193 RPC requests between page wallets and the isolated content script | Content runtime, injected wallet providers |
 | Extension platform and host config | `apps/extension/src/supported-hosts.ts`, `apps/extension/src/content/platform-registry.ts`, `apps/extension/src/content/platform-manifest.ts`, `apps/extension/src/content/platforms/*` | Defines match patterns, manifest-driven adapter discovery, registered platform adapters, and site-specific extraction/injection behavior for supported social, editorial, prediction-native, and streaming surfaces | Content runtime, background worker |
@@ -238,27 +238,27 @@ There are two variants, but both rely on the same security idea: signing secrets
 #### Web app
 
 1. The browser uses wallet providers configured in `apps/web/src/config/index.tsx`.
-2. When CLOB credentials are needed, `useClobCredentials()` signs Polymarket’s EIP-712 auth message and calls `/api/auth/derive-api-key`.
+2. When CLOB credentials are needed, `useClobCredentials()` signs Polymarket’s EIP-712 auth message and calls `/api/polymarket/auth/derive-api-key`.
 3. The route creates or derives API credentials from Polymarket CLOB.
 4. When gasless Safe execution is needed, the client uses `apps/web/src/lib/relayer-client.ts` and the hooks built on top of it.
-5. `/api/relayer/[...path]` validates same-origin browser requests or extension bearer sessions, then proxies the allow-listed relayer calls with server-only relayer credentials.
+5. `/api/polymarket/relayer/[...path]` validates same-origin browser requests or extension bearer sessions, then proxies the allow-listed relayer calls with server-only relayer credentials.
 
 #### Extension
 
 1. The extension first creates a signed session via `/api/extension/session/challenge` and `/api/extension/session/verify`.
 2. The background worker stores the resulting bearer token in `chrome.storage.session`.
 3. The offscreen document executes trading actions through `apps/extension/src/background/trading-handler.ts`.
-4. The extension relayer client in `apps/extension/src/background/relayer-client.ts` calls `knoww.app/api/relayer/*` using the extension bearer token.
+4. The extension relayer client in `apps/extension/src/background/relayer-client.ts` calls `knoww.app/api/polymarket/relayer/*` using the extension bearer token.
 5. The offscreen trading layer then talks to Polymarket CLOB, the relayer proxy, Bridge, and Polygon RPC as needed.
 
 ```mermaid
 flowchart TD
-    A["Wallet signs auth message"] --> B["/api/auth/derive-api-key"]
+    A["Wallet signs auth message"] --> B["/api/polymarket/auth/derive-api-key"]
     B --> C["Polymarket CLOB auth endpoints"]
     C --> D["API credentials returned"]
     D --> E["Client or extension builds order"]
     E --> F["apps/web/src/lib/relayer-client.ts\nor extension relayer client"]
-    F --> G["/api/relayer/*"]
+    F --> G["/api/polymarket/relayer/*"]
     G --> H["Polymarket relayer v2"]
     H --> I["CLOB / Relayer / Bridge / Polygon RPC"]
 ```
@@ -266,13 +266,13 @@ flowchart TD
 Relevant files:
 
 - `apps/web/src/hooks/use-clob-credentials.ts`
-- `apps/web/src/app/api/auth/derive-api-key/route.ts`
+- `apps/web/src/app/api/polymarket/auth/derive-api-key/route.ts`
 - `apps/web/src/lib/relayer-client.ts`
 - `apps/web/src/hooks/use-relayer-client.ts`
 - `apps/web/src/lib/auth/extension-session.ts`
 - `apps/web/src/app/api/extension/session/challenge/route.ts`
 - `apps/web/src/app/api/extension/session/verify/route.ts`
-- `apps/web/src/app/api/relayer/[...path]/route.ts`
+- `apps/web/src/app/api/polymarket/relayer/[...path]/route.ts`
 - `apps/extension/src/background/trading-handler.ts`
 - `apps/extension/src/background/relayer-client.ts`
 - `apps/extension/src/offscreen/offscreen.ts`
@@ -385,10 +385,10 @@ Behavior:
 
 | Dependency | Where used | Why it exists |
 | --- | --- | --- |
-| Polymarket Gamma API | `apps/web/src/app/api/events/*`, `apps/web/src/app/api/tags/*`, `apps/web/src/app/api/comments/route.ts`, `apps/web/src/lib/insider/resolved-markets.ts`, `apps/extension/src/content/api.ts` | Market/event/tag/comment discovery plus resolved-market selection for insider backtesting |
-| Polymarket CLOB API | `apps/web/src/app/api/auth/derive-api-key/route.ts`, `apps/web/src/app/api/markets/*`, `apps/web/src/lib/insider/price-history.ts`, `apps/extension/src/background/trading-handler.ts` | Order books, prices, price-history lookups for timing clusters, API-key auth, order placement support |
-| Polymarket Data API | `apps/web/src/app/api/user/*`, `apps/web/src/app/api/leaderboard/route.ts`, `apps/web/src/app/api/profile/[address]/route.ts`, `apps/web/src/app/api/whales/*`, `apps/web/src/lib/insider/backtest.ts` | Portfolio, trader stats, leaderboard, composite profile data, whale activity, and historical trade scans for insider backtesting |
-| Polymarket User PnL API | `apps/web/src/app/api/user/pnl/route.ts`, `apps/web/src/app/api/user/pnl-history/route.ts`, `apps/web/src/app/api/profile/[address]/route.ts` | Time-series and aggregate P&L |
+| Polymarket Gamma API | `apps/web/src/app/api/events/*`, `apps/web/src/app/api/tags/*`, `apps/web/src/app/api/polymarket/comments/route.ts`, `apps/web/src/lib/insider/resolved-markets.ts`, `apps/extension/src/content/api.ts` | Market/event/tag/comment discovery plus resolved-market selection for insider backtesting |
+| Polymarket CLOB API | `apps/web/src/app/api/polymarket/auth/derive-api-key/route.ts`, `apps/web/src/app/api/polymarket/markets/*`, `apps/web/src/lib/insider/price-history.ts`, `apps/extension/src/background/trading-handler.ts` | Order books, prices, price-history lookups for timing clusters, API-key auth, order placement support |
+| Polymarket Data API | `apps/web/src/app/api/polymarket/user/*`, `apps/web/src/app/api/leaderboard/route.ts`, `apps/web/src/app/api/profile/[address]/route.ts`, `apps/web/src/app/api/whales/*`, `apps/web/src/lib/insider/backtest.ts` | Portfolio, trader stats, leaderboard, composite profile data, whale activity, and historical trade scans for insider backtesting |
+| Polymarket User PnL API | `apps/web/src/app/api/polymarket/user/pnl/route.ts`, `apps/web/src/app/api/polymarket/user/pnl-history/route.ts`, `apps/web/src/app/api/profile/[address]/route.ts` | Time-series and aggregate P&L |
 | Polymarket Relayer | `apps/extension/src/background/relayer-client.ts` | Safe transaction execution for extension trading |
 | Polymarket Bridge API | `apps/web/src/hooks/use-bridge.ts`, `apps/extension/src/content/trading/bridge-api.ts` | Deposit/withdraw and supported asset quoting |
 | Polymarket WebSockets | `apps/web/src/lib/websocket-manager.ts`, `apps/web/src/lib/sports-websocket-manager.ts` | Live market and sports updates |
@@ -449,12 +449,12 @@ Why:
 
 - `ALCHEMY_API_KEY`, `INTERNAL_AUTH_TOKEN`, and `EXTENSION_SESSION_SECRET` must not reach the browser bundle
 - `/api/rpc/polygon` hides the RPC key
-- `/api/relayer/*` hides the relayer API key and relayer key owner address
+- `/api/polymarket/relayer/*` hides the relayer API key and relayer key owner address
 
 Where to see it:
 
 - `apps/web/src/app/api/rpc/polygon/route.ts`
-- `apps/web/src/app/api/relayer/[...path]/route.ts`
+- `apps/web/src/app/api/polymarket/relayer/[...path]/route.ts`
 - `apps/web/src/lib/origin-guard.ts`
 
 ### 6.4 Shared package for protocol constants

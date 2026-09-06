@@ -133,6 +133,24 @@ describe("normalizeHtml", () => {
     expect(out).not.toContain("1753");
   });
 
+  it("masks the visitor subdivision in the feature-flags payload and keeps the country", () => {
+    const html = [
+      'self.__next_f.push([1,"\\"flags\\":{\\"schemaVersion\\":1,\\"location\\":{\\"country\\":\\"JP\\",\\"subdivision\\":\\"RJ\\"},\\"platforms\\":{}}"])',
+      'self.__next_f.push([1,"\\"location\\":{\\"country\\":\\"JP\\",\\"subdivision\\":null}"])',
+      '<script type="application/json">{"location":{"country":"JP","subdivision":"13"}}</script>',
+    ].join("\n");
+
+    const out = normalizeHtml(html);
+
+    expect(out).toContain(
+      '\\"country\\":\\"JP\\",\\"subdivision\\":<subdivision>},\\"platforms\\"'
+    );
+    expect(out).toContain('\\"subdivision\\":<subdivision>}"])');
+    expect(out).toContain('{"country":"JP","subdivision":<subdivision>}');
+    expect(out).not.toContain("RJ");
+    expect(out).not.toContain('"13"');
+  });
+
   it("masks the Next build id in the doctype comment and the flight payload", () => {
     const html = [
       '<!DOCTYPE html><!--1_dSG4NimAXynRHkVY4E9--><html lang="en">',

@@ -66,6 +66,24 @@ function firstDifference(expected: string, actual: string): string {
   return "contents differ";
 }
 
+/**
+ * The country the recorded pages see. Cloudflare sets `cf-ipcountry` at the
+ * edge and the app reads it ahead of the request context, so this pins the
+ * region-policy result in the feature-flags payload. Japan has no entry in
+ * any platform's region policy, so every recorded page shows the open state.
+ */
+const GOLDEN_VISITOR_COUNTRY = "JP";
+
+/**
+ * Next streams Suspense boundaries and page metadata to browsers, and whether
+ * a boundary lands in the shell or in a later chunk depends on timing, so two
+ * fetches of one page can differ in shape. For user agents on its HTML-limited
+ * bot list Next renders the whole page in one pass with the metadata in the
+ * head, so the runner presents itself as one. The app has no user-agent
+ * branches of its own.
+ */
+const GOLDEN_USER_AGENT = "knoww-golden/1 (compatible; Chrome-Lighthouse)";
+
 async function main(): Promise<void> {
   const mode = process.argv[2];
   if (mode !== "record" && mode !== "replay") {
@@ -93,7 +111,8 @@ async function main(): Promise<void> {
     const response = await fetch(url, {
       headers: {
         accept: entry.kind === "html" ? "text/html" : "application/json",
-        "user-agent": "knoww-golden/1",
+        "user-agent": GOLDEN_USER_AGENT,
+        "cf-ipcountry": GOLDEN_VISITOR_COUNTRY,
       },
       redirect: "manual",
     });

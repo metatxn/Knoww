@@ -28,6 +28,7 @@ import {
   FIXED_NOW_MS,
   FIXED_NOW_SECONDS,
   installFetchCapture,
+  jsonResponse,
   loadRecordedHookRequests,
   loadRecordedMarkets,
   loadRecordedOrders,
@@ -155,6 +156,14 @@ const ORDER_CASES: Record<string, OrderShape> = {
   },
 };
 
+/** Worked by hand from ORDER_CASES: price times shares, or the notional itself. */
+const EXPECTED_NOTIONAL: Record<string, string> = {
+  "limit-buy-gtc": "5",
+  "limit-sell-gtd": "4.65",
+  "market-buy-fak-book-walk": "25",
+  "market-sell-fok-min-price": "4.8",
+};
+
 function intentFor(
   market: RecordedMarket,
   order: Pick<
@@ -183,56 +192,6 @@ describe("createPolymarketTradingAdapter", () => {
     vi.restoreAllMocks();
   });
 
-  it("previews and places a GTC limit buy with the bytes the pre-migration client signed", async () => {
-    const calls = installFetchCapture(clobRoutes(markets));
-    const adapter = createPolymarketTradingAdapter({
-      signer: openSigner(),
-      credentials: FAKE_CLOB_CREDENTIALS,
-    });
-    expect(adapter.platform).toBe("polymarket");
-
-    const market = markets.plain;
-    const draft = await adapter.previewOrder(
-      intentFor(market, {
-        side: "buy",
-        orderType: "limit",
-        timeInForce: "gtc",
-        price: "0.5",
-        quantity: { kind: "shares", value: "10" },
-      })
-    );
-    expect(draft.platform).toBe("polymarket");
-    expect(draft.sourceMarketId).toBe(market.conditionId);
-    expect(draft.sourceOutcomeId).toBe(market.tokenId);
-    expect(draft.marketStatus).toBe("active");
-    expect(draft.eligibility).toEqual({ eligible: true, reasons: [] });
-    expect(draft.quote.notional).toEqual({ value: "5", unit: "USD" });
-
-    calls.splice(0);
-    const result = await adapter.placeOrder({
-      draftId: draft.draftId,
-      idempotencyKey: "golden-limit-buy-gtc",
-    });
-
-    const recorded = loadRecordedOrders("eoa", "plain").cases["limit-buy-gtc"];
-    expect(postedOrderRequest(calls)).toEqual(
-      postedOrderRequest(recorded.requests)
-    );
-    expect(refreshesBeforeOrder(calls)).toEqual(
-      legacyRefreshesFor(
-        "eoa",
-        "plain",
-        postedTokenId(postedOrderRequest(calls))
-      )
-    );
-    expect(result).toEqual({
-      platform: "polymarket",
-      status: "open",
-      orderId: RECORDED_ORDER_ID,
-      idempotencyKey: "golden-limit-buy-gtc",
-    });
-  });
-
   for (const [mode, identity] of Object.entries(IDENTITIES)) {
     for (const market of Object.values(markets)) {
       it(`signs every recorded order from a ${mode} identity on the ${market.kind} market`, async () => {
@@ -242,14 +201,23 @@ describe("createPolymarketTradingAdapter", () => {
           credentials: FAKE_CLOB_CREDENTIALS,
         });
         const recorded = loadRecordedOrders(mode, market.kind);
+        expect(adapter.platform).toBe("polymarket");
 
         for (const [label, order] of Object.entries(ORDER_CASES)) {
           const draft = await adapter.previewOrder(
             intentFor(market, order, identity)
           );
+          expect(draft.platform, label).toBe("polymarket");
+          expect(draft.sourceMarketId, label).toBe(market.conditionId);
+          expect(draft.sourceOutcomeId, label).toBe(market.tokenId);
+          expect(draft.marketStatus, label).toBe("active");
           expect(draft.eligibility, label).toEqual({
             eligible: true,
             reasons: [],
+          });
+          expect(draft.quote.notional, label).toEqual({
+            value: EXPECTED_NOTIONAL[label],
+            unit: "USD",
           });
           expect(draft.platformDetails?.tradingAddress, label).toBe(
             recorded.wallet
@@ -273,8 +241,12 @@ describe("createPolymarketTradingAdapter", () => {
               postedTokenId(postedOrderRequest(calls))
             )
           );
-          expect(result.status, label).toBe("open");
-          expect(result.orderId, label).toBe(RECORDED_ORDER_ID);
+          expect(result, label).toEqual({
+            platform: "polymarket",
+            status: "open",
+            orderId: RECORDED_ORDER_ID,
+            idempotencyKey: `golden-${mode}-${market.kind}-${label}`,
+          });
         }
       });
     }
@@ -492,6 +464,77 @@ describe("createPolymarketTradingAdapter order lifecycle", () => {
     vi.restoreAllMocks();
   });
 
+  it("tells the on-chain port what a BUY needs: the notional and the fee on top", async () => {
+    installFetchCapture(clobRoutes(markets));
+    const adapter = openAdapter();
+    const draft = await adapter.previewOrder(intentFor(markets.plain, GTC_BUY));
+    // 10 shares at 0.50 is $5.00 of pUSD. The recorded market carries a fee
+    // rate, so the estimate is a number here; the on-chain port needs the two
+    // parts separately because it wraps the notional and reserves the fee.
+    expect(draft.platformDetails).toMatchObject({
+      requiredNotionalRaw: "5000000",
+      estimatedFeeRaw: "125000",
+      requiredCollateralRaw: "5125000",
+    });
+    expect(draft.quote.fees.platform.value).toBe("0.125");
+  });
+
+  it("refuses a SELL the CLOB has not indexed yet, without posting", async () => {
+    // The CLOB's balance-allowance read lags the on-chain transfer. Until it
+    // shows the shares, posting would fail with a misleading 400, so the
+    // adapter walks the refresh ladder and gives up with a plain message.
+    const base = clobRoutes(markets);
+    const calls = installFetchCapture((request, url) =>
+      url.pathname === "/balance-allowance"
+        ? { balance: "0", allowances: {} }
+        : base(request, url)
+    );
+    const adapter = openAdapter({ sleep: async () => {} });
+    const draft = await adapter.previewOrder(
+      intentFor(markets.plain, ORDER_CASES["limit-sell-gtd"])
+    );
+    const error = await platformErrorOf(
+      adapter.placeOrder({
+        draftId: draft.draftId,
+        idempotencyKey: "sell-not-indexed",
+      })
+    );
+    expect(error.message).toContain("has not indexed these shares");
+    expect(
+      calls.some(
+        (call) => call.method === "POST" && call.url.endsWith("/order")
+      )
+    ).toBe(false);
+  });
+
+  it("rides out one failed balance refresh and still posts the order", async () => {
+    const base = clobRoutes(markets);
+    let failingRefreshes = 1;
+    const calls = installFetchCapture((request, url) => {
+      if (
+        url.pathname === "/balance-allowance/update" &&
+        failingRefreshes > 0
+      ) {
+        failingRefreshes -= 1;
+        return jsonResponse({ error: "Bad Gateway" }, 502);
+      }
+      return base(request, url);
+    });
+    const adapter = openAdapter({ sleep: async () => {} });
+    const draft = await adapter.previewOrder(intentFor(markets.plain, GTC_BUY));
+    const result = await adapter.placeOrder({
+      draftId: draft.draftId,
+      idempotencyKey: "one-bad-refresh",
+    });
+    expect(failingRefreshes).toBe(0);
+    expect(result.orderId).toBe(RECORDED_ORDER_ID);
+    expect(
+      calls.filter(
+        (call) => call.method === "POST" && call.url.endsWith("/order")
+      )
+    ).toHaveLength(1);
+  });
+
   it("cancels through the CLOB and replays the result for the same key", async () => {
     const calls = installFetchCapture(clobRoutes(markets));
     const adapter = openAdapter();
@@ -625,6 +668,8 @@ describe("createPolymarketTradingAdapter region policy", () => {
     expect(policy.closeOnly).toEqual(
       expect.arrayContaining(["US", "GB", "FR", "CA-ON", "AU", "SG"])
     );
+    // KP sits in both published lists; the blocked list wins on evaluation.
+    expect(evaluateRegionTrading(policy, { country: "KP" })).toBe("blocked");
   });
 
   it("evaluates a visitor against that policy", () => {

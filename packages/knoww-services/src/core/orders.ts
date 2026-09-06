@@ -306,7 +306,7 @@ export async function hashOrderIntent(
   intent: CanonicalOrderIntent
 ): Promise<string> {
   const bytes = new TextEncoder().encode(canonicalIntentJson(intent));
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");

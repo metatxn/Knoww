@@ -397,3 +397,84 @@ export function toFixtureRequest(request: CapturedRequest) {
   }
   return record;
 }
+
+/**
+ * The chain an EOA's transactions land on: every sent transaction is
+ * mined in the same block at once, so a receipt wait returns on its first
+ * look. Shared by the approval and deposit harnesses.
+ */
+const BLOCK_NUMBER = "0x10";
+const BLOCK_HASH = `0x${"ab".repeat(32)}`;
+const GAS_USED = "0xc350";
+
+interface SentTransaction {
+  to: Address;
+  data: Hex;
+}
+
+export function createChain(walletLog: WalletRequest[]) {
+  const sent = new Map<Hex, SentTransaction>();
+
+  const sendTransaction = (params: unknown) => {
+    const [tx] = params as [SentTransaction];
+    const hash: Hex = `0x${(sent.size + 1).toString(16).padStart(64, "0")}`;
+    sent.set(hash, { to: tx.to, data: tx.data });
+    walletLog.push({ method: "eth_sendTransaction", params });
+    return hash;
+  };
+
+  const lookUp = (params: unknown[] | undefined) => {
+    const [hash] = params as [Hex];
+    const tx = sent.get(hash);
+    if (!tx) throw new Error(`golden harness: unknown transaction ${hash}`);
+    return { hash, ...tx };
+  };
+
+  const rpc: Record<string, RpcHandler> = {
+    eth_blockNumber: () => BLOCK_NUMBER,
+    eth_getTransactionByHash: (params) => {
+      const { hash, to, data } = lookUp(params);
+      return {
+        hash,
+        blockHash: BLOCK_HASH,
+        blockNumber: BLOCK_NUMBER,
+        transactionIndex: "0x0",
+        from: THROWAWAY_EOA,
+        to,
+        input: data,
+        value: "0x0",
+        nonce: "0x0",
+        gas: GAS_USED,
+        maxFeePerGas: "0x1",
+        maxPriorityFeePerGas: "0x1",
+        chainId: "0x89",
+        type: "0x2",
+        accessList: [],
+        v: "0x0",
+        r: "0x0",
+        s: "0x0",
+      };
+    },
+    eth_getTransactionReceipt: (params) => {
+      const { hash, to } = lookUp(params);
+      return {
+        transactionHash: hash,
+        transactionIndex: "0x0",
+        blockHash: BLOCK_HASH,
+        blockNumber: BLOCK_NUMBER,
+        from: THROWAWAY_EOA,
+        to,
+        contractAddress: null,
+        cumulativeGasUsed: GAS_USED,
+        gasUsed: GAS_USED,
+        effectiveGasPrice: "0x1",
+        logs: [],
+        logsBloom: `0x${"00".repeat(256)}`,
+        status: "0x1",
+        type: "0x2",
+      };
+    },
+  };
+
+  return { sendTransaction, rpc };
+}

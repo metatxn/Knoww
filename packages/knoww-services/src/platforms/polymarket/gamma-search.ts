@@ -2,7 +2,6 @@ import { createLogger } from "@knoww/logger";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import Decimal from "decimal.js";
 import { z } from "zod";
-import { UpstreamSearchError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
@@ -14,6 +13,7 @@ import {
   nonNegativeDecimalSchema,
 } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { isUpstreamSearchError, upstreamSearchError } from "./errors";
 
 /**
  * Gamma public search and tag landing fetchers. Behaviour is the legacy
@@ -220,7 +220,7 @@ function parseEventsPayload(payload: unknown): SearchEvent[] {
 
   const parsed = z.array(searchEventSchema).safeParse(events);
   if (!parsed.success) {
-    throw new UpstreamSearchError("Gamma event search returned malformed data");
+    throw upstreamSearchError("Gamma event search returned malformed data");
   }
   return parsed.data as SearchEvent[];
 }
@@ -363,7 +363,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
         });
 
         if (!response.ok) {
-          throw new UpstreamSearchError(
+          throw upstreamSearchError(
             `Gamma search request failed with ${response.status}`,
             response.status
           );
@@ -427,7 +427,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
       .passthrough()
       .safeParse(payload);
     if (!parsed.success) {
-      throw new UpstreamSearchError(
+      throw upstreamSearchError(
         "Gamma public search returned a malformed payload"
       );
     }
@@ -438,7 +438,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
         event.markets?.some((market) => market.id === undefined)
       )
     ) {
-      throw new UpstreamSearchError(
+      throw upstreamSearchError(
         "Gamma full public search omitted a nested market ID"
       );
     }
@@ -502,7 +502,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
       degraded = true;
       log.warn("public_search.upstream_failed", {
         errorName: error instanceof Error ? error.name : "UnknownError",
-        status: error instanceof UpstreamSearchError ? error.status : undefined,
+        status: isUpstreamSearchError(error) ? error.status : undefined,
       });
       return {
         events: [],
@@ -520,8 +520,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
           log.warn("tag_search.upstream_failed", {
             tagSlug,
             errorName: error instanceof Error ? error.name : "UnknownError",
-            status:
-              error instanceof UpstreamSearchError ? error.status : undefined,
+            status: isUpstreamSearchError(error) ? error.status : undefined,
           });
           return { events: [], truncated: false };
         })

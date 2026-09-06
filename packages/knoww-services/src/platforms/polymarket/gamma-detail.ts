@@ -1,6 +1,5 @@
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { z } from "zod";
-import { UpstreamMarketError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
@@ -12,6 +11,7 @@ import {
   nonNegativeDecimalSchema,
 } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamMarketError } from "./errors";
 // Type only: the shape of a Gamma market record the mappers accept.
 import type { GammaMarketLike } from "./mappers";
 
@@ -169,7 +169,7 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
         );
 
         if (!response.ok) {
-          throw new UpstreamMarketError(
+          throw upstreamMarketError(
             `Gamma market lookup failed with ${response.status}`,
             response.status
           );
@@ -178,9 +178,7 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
         const payload: unknown = await response.json();
 
         if (!Array.isArray(payload)) {
-          throw new UpstreamMarketError(
-            "Gamma market lookup returned a non-array"
-          );
+          throw upstreamMarketError("Gamma market lookup returned a non-array");
         }
         if (payload.length === 0) {
           return null;
@@ -188,7 +186,7 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
 
         const market = gammaMarketDetailSchema.safeParse(payload[0]);
         if (!market.success) {
-          throw new UpstreamMarketError(
+          throw upstreamMarketError(
             "Gamma market lookup returned a malformed market"
           );
         }

@@ -1,20 +1,29 @@
 /**
- * M3 golden harness, hook level: `useClobClient().createOrder` end to end.
+ * M3 golden harness, hook level: `usePlaceOrder().createOrder` end to end.
  *
  * The hook runs against the real shared-types trading driver and the real
  * Polymarket SDK. Only the wallet plumbing is faked: wagmi hands the hook a
  * local EIP-1193 provider that signs with the throwaway key, the credential
  * and proxy-wallet hooks return fixed values, and every HTTP call (CLOB,
  * relayer, the app's RPC and relayer proxies) is answered from recorded
- * responses and captured. The fixtures under apps/web/golden/trading/hook/
- * pin every request, every wallet prompt and every approval the hook makes,
- * and must stay byte-identical once trading sits behind the aggregator.
+ * responses and captured.
+ *
+ * The fixtures under apps/web/golden/trading/hook/ are the legacy hook's
+ * recording and stay byte-identical. The hook now previews and places
+ * through the platform adapter, which reads the market and book before it
+ * signs, so the full transcript is no longer the contract. What must not
+ * change is what leaves the browser: every wallet prompt, the signed
+ * `POST /order` (headers included), the balance refreshes the CLOB needs
+ * before it, every relayer transaction, every on-chain read and every
+ * approval. Each case asserts those against the fixture. The relayer's
+ * deployment check is a read the adapter caches per wallet, so it is
+ * asserted once per scenario rather than once per order.
  *
  * The app proxy prefix is normalised (`/api/polymarket/x` records as
- * `/api/x`) because the M3 route move is expected; everything else must
- * not change.
+ * `/api/x`) because the M3 route move was expected.
  */
 
+import { readFileSync } from "node:fs";
 import { act, renderHook } from "@testing-library/react";
 import { createWalletClient, custom } from "viem";
 import {
@@ -44,6 +53,7 @@ import {
   createFakeProvider,
   harnessErrors,
   PERSONALITIES,
+  RPC_PATH,
   relayerProxyRoutes,
   rpcRoutes,
   toFixtureRequest,
@@ -102,13 +112,19 @@ vi.mock("@/hooks/use-proxy-wallet", () => ({
   }),
 }));
 
+// The trading identity derives the wallet mode from chain state on mount;
+// the fixture's mode is the answer.
+vi.mock("@/hooks/use-trading-wallet-mode", () => ({
+  useTradingWalletMode: () => ({ mode: harness.walletMode }),
+}));
+
 vi.mock("@/hooks/use-relayer-client", () => ({
   useRelayerClient: () => ({
     approveUsdcForTrading: harness.approveUsdcForTrading,
   }),
 }));
 
-import { useClobClient } from "@/hooks/use-clob-client";
+import { usePlaceOrder } from "@/hooks/use-place-order";
 
 const markets = loadRecordedMarkets();
 
@@ -221,7 +237,103 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
-describe("M3 golden: useClobClient.createOrder", () => {
+/** A request in fixture form, as `toFixtureRequest` records it. */
+interface FixtureRequest {
+  method: string;
+  url: string;
+  headers?: unknown;
+  body?: unknown;
+  decoded?: unknown;
+}
+
+interface FixtureCase {
+  params: OrderParams;
+  requests: FixtureRequest[];
+  wallet: WalletRequest[];
+  approvals: unknown[][];
+  result: { success: boolean; order: { orderId?: string } };
+}
+
+interface HookFixture {
+  cases: Record<string, FixtureCase>;
+}
+
+function loadFixture(label: string): HookFixture {
+  return JSON.parse(
+    readFileSync(goldenPath("hook", `${label}.json`), "utf8")
+  ) as HookFixture;
+}
+
+const CLOB_ORDER_URL = "https://clob.polymarket.com/order";
+
+function isOrderPost(request: FixtureRequest): boolean {
+  return request.method === "POST" && request.url === CLOB_ORDER_URL;
+}
+
+/** The signed order as it leaves the browser: body and L2 auth headers. */
+function postedOrder(requests: readonly FixtureRequest[]): FixtureRequest {
+  const posts = requests.filter(isOrderPost);
+  expect(posts, "exactly one POST /order").toHaveLength(1);
+  return posts[0];
+}
+
+/**
+ * The balance-allowance refreshes the CLOB needs before it will accept the
+ * order (see the balance-refresh parity note in the adapter golden test).
+ * Distinct and sorted: how many times and in what order is not the contract.
+ */
+function refreshesBeforeOrder(requests: readonly FixtureRequest[]): string[] {
+  const orderAt = requests.findIndex(isOrderPost);
+  const urls = requests
+    .slice(0, orderAt)
+    .filter((request) => request.url.includes("/balance-allowance/update"))
+    .map((request) => request.url);
+  return [...new Set(urls)].sort();
+}
+
+function isRelayerCall(request: FixtureRequest): boolean {
+  return (
+    request.url.startsWith("/api/relayer/") ||
+    request.url.includes("relayer-v2.polymarket.com")
+  );
+}
+
+function isDeploymentCheck(request: FixtureRequest): boolean {
+  return request.method === "GET" && request.url.includes("/deployed?");
+}
+
+/**
+ * Every relayer transaction, through the app proxy or direct, in order:
+ * the nonce, the submit and the receipt poll of a wrap or an approval.
+ */
+function relayerTransactions(requests: readonly FixtureRequest[]) {
+  return requests
+    .filter((request) => isRelayerCall(request) && !isDeploymentCheck(request))
+    .map(({ method, url, body }) => ({ method, url, body }));
+}
+
+/** The distinct deployment reads: which wallets were checked, not how often. */
+function deploymentChecks(requests: readonly FixtureRequest[]): string[] {
+  const urls = requests.filter(isDeploymentCheck).map((request) => request.url);
+  return [...new Set(urls)].sort();
+}
+
+/**
+ * The distinct on-chain reads, decoded where the harness knows the ABI.
+ * Encoded the way the fixture was written, so live bigints match recorded.
+ */
+function chainReads(requests: readonly FixtureRequest[]): string[] {
+  const reads = requests
+    .filter((request) => request.url.startsWith(RPC_PATH))
+    .map((request) =>
+      goldenJson(
+        request.decoded ?? (request.body as { method?: string })?.method
+      )
+    );
+  return [...new Set(reads)].sort();
+}
+
+describe("M3 golden: usePlaceOrder.createOrder", () => {
   beforeAll(() => {
     // The builder code is a deployment setting; the fixtures pin the bare flow.
     delete process.env.NEXT_PUBLIC_POLY_BUILDER_CODE;
@@ -242,6 +354,7 @@ describe("M3 golden: useClobClient.createOrder", () => {
 
   for (const scenario of SCENARIOS) {
     it(`${scenario.label}: ${scenario.cases.join(", ")}`, async () => {
+      const fixture = loadFixture(scenario.label);
       const personality = PERSONALITIES[scenario.personality];
       const walletLog: WalletRequest[] = [];
       // wagmi's wallet client is a viem wallet client over the connector's
@@ -260,36 +373,59 @@ describe("M3 golden: useClobClient.createOrder", () => {
         routes(personality),
         window.location.origin
       );
-      const { result } = renderHook(() => useClobClient());
+      const { result } = renderHook(() => usePlaceOrder());
       expect(result.current.canTrade).toBe(true);
+      const scenarioRequests: FixtureRequest[] = [];
 
-      const cases: Record<string, unknown> = {};
       for (const label of scenario.cases) {
         const params = orderCases(scenario.market)[label];
-        let outcome: unknown;
+        const recorded = fixture.cases[label];
+        expect(recorded, `${label} is in the fixture`).toBeDefined();
+        expect(recorded.params, `${label} fixture params`).toEqual(params);
+
+        let outcome: unknown = null;
         await act(async () => {
           outcome = await result.current.createOrder(params);
         });
         expect(harnessErrors, `${label} harness faults`).toEqual([]);
-        expect(outcome, `${label} outcome`).toMatchObject({ success: true });
-        cases[label] = {
-          params,
-          requests: calls.splice(0).map(toFixtureRequest),
-          wallet: walletLog.splice(0),
-          approvals: harness.approveUsdcForTrading.mock.calls.splice(0),
-          result: outcome,
-        };
+        expect(outcome, `${label} outcome`).toMatchObject({
+          success: true,
+          order: { orderId: recorded.result.order.orderId },
+        });
+
+        const requests = calls
+          .splice(0)
+          .map(toFixtureRequest) as unknown as FixtureRequest[];
+        scenarioRequests.push(...requests);
+        const wallet = walletLog.splice(0);
+        // Through the fixture's encoder: a skipped argument records as null.
+        const approvals = JSON.parse(
+          goldenJson(harness.approveUsdcForTrading.mock.calls.splice(0))
+        ) as unknown[][];
+
+        expect(wallet, `${label} wallet prompts`).toEqual(recorded.wallet);
+        expect(postedOrder(requests), `${label} POST /order`).toEqual(
+          postedOrder(recorded.requests)
+        );
+        expect(
+          refreshesBeforeOrder(requests),
+          `${label} balance refreshes before POST /order`
+        ).toEqual(refreshesBeforeOrder(recorded.requests));
+        expect(
+          relayerTransactions(requests),
+          `${label} relayer transactions`
+        ).toEqual(relayerTransactions(recorded.requests));
+        expect(chainReads(requests), `${label} on-chain reads`).toEqual(
+          chainReads(recorded.requests)
+        );
+        expect(approvals, `${label} approvals`).toEqual(recorded.approvals);
       }
 
-      await expect(
-        goldenJson({
-          mode: scenario.mode,
-          market: scenario.market.kind,
-          wallet: WALLETS[scenario.mode],
-          personality: scenario.personality,
-          cases,
-        })
-      ).toMatchFileSnapshot(goldenPath("hook", `${scenario.label}.json`));
+      expect(deploymentChecks(scenarioRequests), "deployment checks").toEqual(
+        deploymentChecks(
+          scenario.cases.flatMap((label) => fixture.cases[label].requests)
+        )
+      );
     }, 30_000);
   }
 });

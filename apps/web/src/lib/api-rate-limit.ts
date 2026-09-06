@@ -6,7 +6,7 @@ import { rateLimit } from "./rate-limit";
  * Normalize a pathname to its route template so that dynamic segments
  * don't create separate rate-limit buckets.
  *
- * e.g. `/api/markets/orderbook/abc123` → `/api/markets/orderbook/[param]`
+ * e.g. `/api/polymarket/markets/orderbook/abc123` → `/api/polymarket/markets/orderbook/[param]`
  *      `/api/tags/sports`              → `/api/tags/[param]`
  *      `/api/events/list`              → `/api/events/list` (unchanged — static child)
  *
@@ -16,10 +16,10 @@ import { rateLimit } from "./rate-limit";
 
 /** Route parents whose last segment is always dynamic. */
 const DYNAMIC_ROUTE_PARENTS = new Set([
-  "/api/markets/info",
-  "/api/markets/price-history",
-  "/api/markets/orderbook",
-  "/api/markets/trades",
+  "/api/polymarket/markets/info",
+  "/api/polymarket/markets/price-history",
+  "/api/polymarket/markets/orderbook",
+  "/api/polymarket/markets/trades",
   "/api/polymarket/markets/by-token",
   "/api/markets/slug",
   "/api/profile",
@@ -68,7 +68,7 @@ function normalizeRoutePath(pathname: string): string {
  *
  * Each route template gets its own bucket so that:
  * - Hitting /api/search doesn't consume tokens from /api/polymarket/user/positions
- * - Hitting /api/markets/orderbook/tokenA shares the bucket with /tokenB
+ * - Hitting /api/polymarket/markets/orderbook/tokenA shares the bucket with /tokenB
  *   (dynamic segments are normalized)
  */
 function getRateLimitKey(request: NextRequest): string {

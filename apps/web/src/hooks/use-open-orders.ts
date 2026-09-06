@@ -4,11 +4,21 @@ import { createLogger } from "@knoww/logger";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { qk } from "@/lib/query-keys";
+import {
+  isExpectedClobReadFailure,
+  isFreshAuthenticationRequired,
+} from "@/polymarket/errors";
+import {
+  readPolymarketOrderScoring,
+  toOpenOrder,
+} from "@/polymarket/open-orders";
+import { POLYMARKET_PLATFORM } from "@/polymarket/order-bridge";
 
 const log = createLogger("open-orders");
 
-import { useClobClient } from "./use-clob-client";
 import { useClobCredentials } from "./use-clob-credentials";
+import { useProxyWallet } from "./use-proxy-wallet";
+import { useTradingAdapter } from "./use-trading-adapter";
 
 /**
  * Open order data structure
@@ -64,19 +74,6 @@ interface MarketInfoResponse {
   error?: string;
 }
 
-function isExpectedClobReadFailure(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err || "");
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("not found") ||
-    lower.includes("unauthorized") ||
-    lower.includes("forbidden") ||
-    lower.includes("401") ||
-    lower.includes("403") ||
-    lower.includes("404")
-  );
-}
-
 /**
  * Fetch market info for a token ID
  */
@@ -110,53 +107,26 @@ async function fetchMarketInfo(tokenId: string): Promise<{
 }
 
 /**
- * Parse expiration timestamp
- * Handles both Unix timestamps (seconds) and special values like "0" for GTC orders
- */
-function parseExpiration(expiration: string | number | undefined): string {
-  if (!expiration || expiration === "0" || expiration === 0) {
-    return ""; // GTC (Good Till Cancelled) - no expiration
-  }
-
-  const timestamp = Number(expiration);
-
-  // Check if it's a valid timestamp
-  if (Number.isNaN(timestamp) || timestamp <= 0) {
-    return "";
-  }
-
-  // If timestamp is very small (< year 2000 in seconds), it's likely invalid
-  if (timestamp < 946684800) {
-    return "";
-  }
-
-  // If timestamp is in seconds (Unix timestamp), convert to milliseconds
-  // Unix timestamps from Polymarket are typically in seconds
-  const timestampMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-
-  // Check if the resulting date is valid and in the future
-  const date = new Date(timestampMs);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return date.toISOString();
-}
-
-/**
- * Hook to fetch user's open orders using the CLOB client
+ * The wallet's open orders, read through the trading adapter.
  *
- * Uses the ClobClient's getOpenOrders() method which requires
- * wallet authentication (L2 credentials) and a deployed proxy wallet.
+ * Needs stored API credentials and a deployed trading wallet. The read is
+ * passive: rejected credentials clear the stored set instead of opening a
+ * wallet prompt from a polling query.
  *
  * @param options - Query options
  * @returns Query result with open orders
  */
 export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
   const { address, isConnected } = useConnection();
-  const { hasCredentials } = useClobCredentials();
-  const { getOpenOrders, hasProxyWallet, proxyAddress, areOrdersScoring } =
-    useClobClient();
+  const { credentials, hasCredentials, clearCredentials } =
+    useClobCredentials();
+  const {
+    proxyAddress,
+    isDeployed: hasProxyWallet,
+    isEoaMode,
+  } = useProxyWallet();
+  const { identity, isReady, getAdapter } =
+    useTradingAdapter(POLYMARKET_PLATFORM);
 
   // Use provided address or fall back to connected wallet
   const userAddress = options.userAddress || address;
@@ -175,45 +145,27 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
       }
 
       try {
-        const orders = await getOpenOrders();
-
-        // Transform orders to match our interface
-        const transformedOrders: OpenOrder[] = (orders || []).map(
-          (order: {
-            id?: string;
-            order_id?: string;
-            maker?: string;
-            asset_id?: string;
-            token_id?: string;
-            side?: string;
-            price?: string | number;
-            original_size?: string | number;
-            size_matched?: string | number;
-            status?: string;
-            created_at?: string | number;
-            expiration?: string | number;
-          }) => ({
-            id: order.id || order.order_id || "",
-            maker: order.maker || userAddress,
-            tokenId: order.asset_id || order.token_id || "",
-            side: (order.side?.toUpperCase() || "BUY") as "BUY" | "SELL",
-            price: Number(order.price || 0),
-            size: Number(order.original_size || 0),
-            filledSize: Number(order.size_matched || 0),
-            remainingSize:
-              Number(order.original_size || 0) -
-              Number(order.size_matched || 0),
-            status: (order.status?.toUpperCase() || "LIVE") as
-              | "LIVE"
-              | "MATCHED"
-              | "CANCELLED",
-            createdAt:
-              typeof order.created_at === "number"
-                ? new Date(order.created_at * 1000).toISOString()
-                : order.created_at || new Date().toISOString(),
-            expiration: parseExpiration(order.expiration),
-          })
+        if (!identity) throw new Error("Trading wallet not found");
+        const adapter = await getAdapter();
+        const page = await adapter.getAccountOrders({ identity });
+        const transformedOrders: OpenOrder[] = page.items.map((order) =>
+          toOpenOrder(order, userAddress)
         );
+
+        const readScoring = async (
+          orderIds: string[]
+        ): Promise<Record<string, boolean>> => {
+          if (orderIds.length === 0) return {};
+          if (!credentials || !address || !proxyAddress) return {};
+          return readPolymarketOrderScoring(
+            {
+              signerAddress: address,
+              walletAddress: isEoaMode ? address : proxyAddress,
+              credentials,
+            },
+            orderIds
+          );
+        };
 
         // Fetch market info and scoring info in parallel
         const uniqueTokenIds = [
@@ -228,8 +180,11 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
               info: await fetchMarketInfo(tokenId),
             }))
           ),
-          areOrdersScoring(orderIds).catch((err) => {
-            if (isExpectedClobReadFailure(err)) {
+          readScoring(orderIds).catch((err) => {
+            if (isFreshAuthenticationRequired(err)) {
+              clearCredentials();
+              log.debug("scoring.skipped", { reason: "credentials_invalid" });
+            } else if (isExpectedClobReadFailure(err)) {
               log.debug("scoring.skipped");
             } else {
               log.error("scoring.fetch_failed", { error: err });
@@ -275,7 +230,10 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
           orders: filteredOrders,
         };
       } catch (err) {
-        if (isExpectedClobReadFailure(err)) {
+        if (isFreshAuthenticationRequired(err)) {
+          clearCredentials();
+          log.debug("fetch.skipped", { reason: "credentials_invalid" });
+        } else if (isExpectedClobReadFailure(err)) {
           log.debug("fetch.skipped", {
             reason: err instanceof Error ? err.message : String(err),
           });
@@ -299,6 +257,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
       hasCredentials &&
       hasProxyWallet &&
       !!proxyAddress &&
+      isReady &&
       options.enabled !== false,
     staleTime: 10 * 1000, // 10 seconds (orders can change quickly)
     refetchInterval: 15 * 1000, // Refetch every 15 seconds
@@ -306,7 +265,7 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
 }
 
 /**
- * Hook to cancel an order using the CLOB client
+ * Hook to cancel an order through the trading adapter
  *
  * Returns a mutation that can be used to cancel orders.
  * Uses optimistic updates for instant UI feedback.
@@ -315,13 +274,22 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
  */
 export function useCancelOrder() {
   const { address } = useConnection();
-  const { cancelOrder } = useClobClient();
+  const { identity, getAdapter } = useTradingAdapter(POLYMARKET_PLATFORM);
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (orderId: string) => {
       if (!address) throw new Error("Address not available");
-      return cancelOrder(orderId);
+      if (!identity) throw new Error("Trading wallet not found");
+      const adapter = await getAdapter();
+      // The adapter throws when the venue refuses, so a refused cancel
+      // reaches `onError` and the optimistic removal is rolled back.
+      const order = await adapter.cancelOrder({
+        identity,
+        orderId,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      return { success: true, order };
     },
     onMutate: async (orderId: string) => {
       // Cancel any outgoing refetches to prevent overwriting optimistic update
@@ -375,20 +343,27 @@ export function useCancelOrder() {
  */
 export function useCancelAllOrders() {
   const { address } = useConnection();
-  const { getOpenOrders, cancelOrder, proxyAddress } = useClobClient();
+  const { proxyAddress } = useProxyWallet();
+  const { identity, getAdapter } = useTradingAdapter(POLYMARKET_PLATFORM);
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
       if (!address) throw new Error("Address not available");
+      if (!identity) throw new Error("Trading wallet not found");
+      const adapter = await getAdapter();
 
       // First fetch all open orders
-      const orders = await getOpenOrders();
+      const page = await adapter.getAccountOrders({ identity });
 
       // Cancel each order
       const results = await Promise.allSettled(
-        (orders || []).map((order: { id?: string; order_id?: string }) =>
-          cancelOrder(order.id || order.order_id || "")
+        page.items.map((order) =>
+          adapter.cancelOrder({
+            identity,
+            orderId: order.orderId,
+            idempotencyKey: crypto.randomUUID(),
+          })
         )
       );
 
@@ -396,7 +371,7 @@ export function useCancelAllOrders() {
       const successCount = results.filter(
         (r) => r.status === "fulfilled"
       ).length;
-      return { cancelled: successCount, total: orders?.length || 0 };
+      return { cancelled: successCount, total: page.items.length };
     },
     onSuccess: () => {
       // Invalidate all open orders queries

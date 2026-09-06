@@ -37,6 +37,23 @@ export {
   type PolymarketClientContext,
   type PolymarketClientContextInit,
 } from "./context";
+export type { UpstreamError, UpstreamErrorName } from "./errors";
+export {
+  isUpstreamError,
+  isUpstreamEventError,
+  isUpstreamMarketError,
+  isUpstreamOrderbookError,
+  isUpstreamPriceHistoryError,
+  isUpstreamPublicDataError,
+  isUpstreamSearchError,
+  UPSTREAM_ERROR_NAMES,
+  upstreamEventError,
+  upstreamMarketError,
+  upstreamOrderbookError,
+  upstreamPriceHistoryError,
+  upstreamPublicDataError,
+  upstreamSearchError,
+} from "./errors";
 export {
   createGammaDetail,
   type GammaMarketDetail,

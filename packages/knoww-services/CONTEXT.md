@@ -9,9 +9,8 @@ Decision record: `docs/decisions/2026-09-03-aggregator-platform-adapters.md`. Pr
 - The canonical contract in `src/core/`: `CanonicalEvent`, `CanonicalMarket`, `CanonicalOutcome`, the order model from M3, `MarketStatus`, capability and flag types, `PlatformError`.
 - The adapter interfaces `MarketDataAdapter` and `TradingAdapter`.
 - The registry in `src/registry.ts`, which is the only module that imports a platform folder.
-- One folder per platform under `src/platforms/`, each holding its client, schemas, mappers and adapters.
+- One folder per platform under `src/platforms/`, each holding its client, schemas, mappers, upstream errors and adapters.
 - Recorded upstream fixtures under `src/fixtures/` for mapper tests.
-- The legacy Gamma-shaped modules under `src/markets/` and `src/profiles/`, kept as thin wrappers until M5.
 
 ## Does not own
 
@@ -37,12 +36,12 @@ Use these terms in code, tests, issues and docs. The "not" column lists synonyms
 | Canonical model | The platform-neutral event, market, outcome and order shapes in `src/core/`. Widened only by the widening rule. | unified model, common model, DTO |
 | Platform details | The `platformDetails` discriminated union on canonical objects. The only place platform-specific fields live. Optional UI renders from it. For Polymarket it also carries `gamma`, the Gamma record as received, so apps/web rebuilds its legacy payloads from it without loss. | metadata, extras, raw |
 | Capability | A boolean on a platform's `MarketCapabilities` saying what it supports: market data, orderbook, price history, public trades, account positions, account orders, create order, cancel order, redeem, withdrawals. The apps branch on capabilities, never on the platform id. | feature, permission, support flag |
-| Enablement flag | The server-side switch for a platform and for a capability within it. Read once at startup from `KNOWW_ENABLED_PLATFORMS` and `KNOWW_PLATFORM_CAPABILITY_OVERRIDES`. A disabled platform returns 404 with noindex and leaves feeds and the sitemap. | feature flag (that is the web app's delivery helper), toggle, kill switch |
+| Enablement flag | The server-side switch for a platform and for a capability within it. Read once at startup from `KNOWW_ENABLED_PLATFORMS` and `KNOWW_PLATFORM_CAPABILITY_OVERRIDES` in the web app; the MCP Worker declares its set as the `ENABLED_PLATFORMS` constant in `apps/mcp/src/platforms.ts` instead. A disabled platform returns 404 with noindex and leaves feeds and the sitemap. | feature flag (that is the web app's delivery helper), toggle, kill switch |
 | Hand-off | Sending the user to the platform's own site to trade, with a Knoww-side outbound click event. Kalshi's trading mode. | redirect, referral, affiliate link, deep link |
-| Escape hatch | `getPlatformAdapter("polymarket")` returning the concrete adapter with its extra methods. Allowed only in `apps/web/src/polymarket/` and `apps/web/src/app/api/polymarket/`. | backdoor, raw access, bypass |
+| Escape hatch | `getPlatformAdapter("polymarket")` returning the concrete adapter with its extra methods. Allowed only in `apps/web/src/polymarket/`, `apps/web/src/app/api/polymarket/` and `apps/mcp/src/platforms.ts`. | backdoor, raw access, bypass |
 | Widening rule | A new field on a canonical type carries a one-line note on what Kalshi supplies for it, or that it is null. | schema extension |
 | Identity | The discriminated union describing how a user is connected to a platform: wallet-backed with a Polymarket account type (Deposit Wallet by default, Safe as legacy), or broker-backed, unimplemented. | account, session, login, principal (that is the MCP term) |
-| Legacy wrapper | A module under `src/markets/` or `src/profiles/` that keeps its old export signature and forwards to the Polymarket adapter. Deleted at M5. | shim, facade, compat layer |
+| Legacy wrapper | A module under `src/markets/` or `src/profiles/` that kept its old export signature and forwarded to the Polymarket adapter. Deleted at M5 on 2026-09-05 together with the package's root export; the term survives only in older threads. | shim, facade, compat layer |
 | Cache hint | The `cache` field on `ServiceFetchOptions` with revalidate seconds and tags. The adapter passes it to the injected fetch and never caches on its own. | cache policy, TTL config |
 | Fan-out | Calling every enabled platform's adapter in parallel for search and list, then sorting without merging. Partial failures return the platforms that answered plus an error list. | aggregation, federation |
 

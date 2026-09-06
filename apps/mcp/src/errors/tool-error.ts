@@ -1,4 +1,5 @@
 import { createLogger } from "@knoww/logger";
+import { isPlatformError, type PlatformError } from "@knoww/services/core";
 import type { ActiveMcpScope } from "../auth/scopes";
 import { currentPrincipal, currentRequestId } from "../context";
 
@@ -13,7 +14,8 @@ export type KnowwToolErrorCode =
   | "CONFLICT"
   | "UPSTREAM_TIMEOUT"
   | "UPSTREAM_UNAVAILABLE"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "PLATFORM_DISABLED";
 
 const RETRYABLE_CODES: ReadonlySet<KnowwToolErrorCode> = new Set([
   "RATE_LIMITED",
@@ -68,7 +70,66 @@ export function toKnowwToolError(value: unknown): KnowwToolError {
   if (value instanceof KnowwToolError) {
     return value;
   }
+  if (isPlatformError(value)) {
+    return fromPlatformError(value);
+  }
   return new KnowwToolError("INTERNAL_ERROR", "Something went wrong.");
+}
+
+/**
+ * Maps a knoww-services PlatformError by kind. Messages are fixed per code so
+ * no upstream text leaks; only the platform id is interpolated.
+ */
+function fromPlatformError(error: PlatformError): KnowwToolError {
+  switch (error.kind) {
+    case "disabled":
+      return new KnowwToolError(
+        "PLATFORM_DISABLED",
+        `Platform ${error.platform} is not enabled on this server.`
+      );
+    case "not_found":
+      return new KnowwToolError(
+        "NOT_FOUND",
+        "No record matches that identifier."
+      );
+    case "invalid_input":
+    case "unsupported":
+      return new KnowwToolError(
+        "VALIDATION_ERROR",
+        `${error.platform} rejected the request input.`
+      );
+    case "timeout":
+      return new KnowwToolError(
+        "UPSTREAM_TIMEOUT",
+        `${error.platform} took too long to answer.`
+      );
+    case "unauthenticated":
+      return new KnowwToolError(
+        "UNAUTHENTICATED",
+        "Authenticate before calling this tool."
+      );
+    case "ineligible":
+      return new KnowwToolError(
+        "FORBIDDEN",
+        "This account is not eligible for that action."
+      );
+    case "draft_expired":
+    case "draft_rejected":
+      return new KnowwToolError(
+        "CONFLICT",
+        "The order draft is no longer valid."
+      );
+    default:
+      return error.upstreamStatus === 429
+        ? new KnowwToolError(
+            "RATE_LIMITED",
+            `${error.platform} is rate limiting requests.`
+          )
+        : new KnowwToolError(
+            "UPSTREAM_UNAVAILABLE",
+            `${error.platform} is temporarily unavailable.`
+          );
+  }
 }
 
 function retryGuidance(error: KnowwToolError): string {

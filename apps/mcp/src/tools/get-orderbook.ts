@@ -1,10 +1,8 @@
 import {
-  CLOB_API_BASE,
-  fetchOrderbookByTokenId,
+  isUpstreamOrderbookError,
   type OrderbookLevel,
   type OrderbookSnapshot,
-  UpstreamOrderbookError,
-} from "@knoww/services";
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
@@ -16,6 +14,7 @@ import {
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
 import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
@@ -56,6 +55,7 @@ const getOrderbookInputSchema = z.object({
     .max(MAX_BOOK_DEPTH)
     .default(DEFAULT_BOOK_DEPTH)
     .describe("Maximum price levels per side, 1 to 50."),
+  platform: platformInputSchema,
 });
 
 type GetOrderbookInput = z.output<typeof getOrderbookInputSchema>;
@@ -183,7 +183,7 @@ function readSnapshotClock(timestamp: string | undefined): SnapshotClock {
 
 function mapBookError(error: unknown): KnowwToolError {
   if (error instanceof KnowwToolError) return error;
-  if (error instanceof UpstreamOrderbookError) {
+  if (isUpstreamOrderbookError(error)) {
     return error.status === 429
       ? new KnowwToolError(
           "RATE_LIMITED",
@@ -270,9 +270,10 @@ async function handleGetOrderbook(
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("get_orderbook");
     const tokenId = resolveTokenId(args);
+    const client = requirePolymarketClient(args.platform);
     let snapshot: OrderbookSnapshot | null;
     try {
-      snapshot = await fetchOrderbookByTokenId(tokenId, {
+      snapshot = await client.fetchOrderbookByTokenId(tokenId, {
         signal: context.mcpReq.signal,
       });
     } catch (error) {
@@ -291,7 +292,7 @@ async function handleGetOrderbook(
     );
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-clob", url: CLOB_API_BASE }],
+      sources: [{ name: "polymarket-clob", url: client.baseUrls.clob }],
       ...(clock.iso !== undefined ? { asOf: clock.iso } : {}),
       ...(truncated ? { truncated: true } : {}),
     });

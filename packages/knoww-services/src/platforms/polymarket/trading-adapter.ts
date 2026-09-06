@@ -59,18 +59,11 @@ import {
   type TradingAdapter,
   type WalletAccountType,
 } from "../../core";
-import {
-  UpstreamEventError,
-  UpstreamMarketError,
-  UpstreamOrderbookError,
-  UpstreamPriceHistoryError,
-  UpstreamPublicDataError,
-  UpstreamSearchError,
-} from "../../errors";
 import { type PolymarketClientInit, resolvePolymarketBaseUrls } from "./client";
 import { type ClobMarketRecord, createClobMarket } from "./clob-market";
 import { createClobOrderbook } from "./clob-orderbook";
 import { createPolymarketClientContext } from "./context";
+import { isUpstreamError } from "./errors";
 import { createProfiles } from "./profiles";
 import { createPublicData } from "./public-data";
 import { POLYMARKET_REGION_POLICY } from "./region-policy";
@@ -101,15 +94,6 @@ const COLLATERAL_DECIMALS = 6;
 const CLOB_BALANCE_SYNC_DELAYS_MS = [0, 250, 750, 1500, 2500] as const;
 const SHARES_NOT_INDEXED_MESSAGE =
   "Polymarket has not indexed these shares for trading yet. Please try again in a few seconds.";
-
-const UPSTREAM_ERRORS = [
-  UpstreamSearchError,
-  UpstreamMarketError,
-  UpstreamEventError,
-  UpstreamOrderbookError,
-  UpstreamPriceHistoryError,
-  UpstreamPublicDataError,
-] as const;
 
 export type PolymarketTradingSigner = ReturnType<
   typeof createUnifiedPolymarketViemSigner
@@ -263,12 +247,6 @@ const balanceAllowanceSchema = z
     balance: z.union([z.string(), z.number(), z.bigint()]).optional(),
   })
   .passthrough();
-
-function isUpstreamError(
-  error: unknown
-): error is Error & { readonly status?: number } {
-  return UPSTREAM_ERRORS.some((ctor) => error instanceof ctor);
-}
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -615,6 +593,13 @@ export function createPolymarketTradingAdapter(
   const profiles = createProfiles(ctx, createPublicData(ctx));
 
   const clients = new Map<string, Promise<BoundClients>>();
+  /**
+   * Read-only clients for passive polling. The SDK asks the signer for a
+   * fresh L1 signature when the bound credentials are rejected; a background
+   * list must never open a wallet prompt, so these clients refuse that and
+   * surface the shim's fresh-authentication error instead.
+   */
+  const readClients = new Map<string, Promise<OpenOrdersClient>>();
   const drafts = new Map<string, StoredDraft>();
   /** One result per idempotency key, failures included. */
   const placements = new Map<string, Promise<OrderResult>>();
@@ -702,6 +687,28 @@ export function createPolymarketTradingAdapter(
       clients.set(key, pending);
       pending.catch(() => {
         if (clients.get(key) === pending) clients.delete(key);
+      });
+    }
+    return pending;
+  }
+
+  async function readOnlyOrdersClient(
+    account: TradingAccount,
+    operation: PlatformOperation
+  ): Promise<OpenOrdersClient> {
+    const signer = await assertSignerFor(account, operation);
+    const key = account.tradingAddress.toLowerCase();
+    let pending = readClients.get(key);
+    if (!pending) {
+      pending = createUnifiedPolymarketSecureClient({
+        signer,
+        wallet: account.tradingAddress,
+        credentials: init.credentials,
+        allowFreshAuthentication: false,
+      }).then(({ client }) => client as unknown as OpenOrdersClient);
+      readClients.set(key, pending);
+      pending.catch(() => {
+        if (readClients.get(key) === pending) readClients.delete(key);
       });
     }
     return pending;
@@ -856,7 +863,7 @@ export function createPolymarketTradingAdapter(
       const createdAt = now();
       const draft: OrderDraft = {
         schemaVersion: intent.schemaVersion,
-        draftId: globalThis.crypto.randomUUID(),
+        draftId: crypto.randomUUID(),
         platform: PLATFORM,
         intent,
         sourceMarketId: conditionId,
@@ -882,6 +889,14 @@ export function createPolymarketTradingAdapter(
                 requiredCollateralRaw:
                   plan.buy.requiredCollateralRaw.toString(),
                 reservedCollateralRaw: plan.buy.reservedPusdRaw.toString(),
+                // The on-chain port wraps collateral from the notional and
+                // the fee separately, and a fee it could not estimate is
+                // unknown rather than zero (the quote collapses it to $0).
+                requiredNotionalRaw: plan.buy.requiredPusdRaw.toString(),
+                estimatedFeeRaw:
+                  plan.buy.estimatedFeeRaw === null
+                    ? null
+                    : plan.buy.estimatedFeeRaw.toString(),
               }
             : {}),
           ...(plan.sell
@@ -1190,14 +1205,19 @@ export function createPolymarketTradingAdapter(
     });
   }
 
-  /** The CLOB pages open orders at its own size; `limit` is not applied. */
+  /**
+   * The CLOB pages open orders at its own size; `limit` is not applied.
+   * Reads never prompt the wallet: rejected credentials fail with the shim's
+   * fresh-authentication error in `cause`, and the caller decides whether to
+   * drop them.
+   */
   async function getAccountOrders(
     input: AccountReadInput
   ): Promise<AccountOrderPage> {
     return run("getAccountOrders", async () => {
       const operation = "getAccountOrders";
       const account = resolveTradingAccount(input.identity, operation);
-      const { orders } = await boundClients(account, operation);
+      const orders = await readOnlyOrdersClient(account, operation);
       if (!orders.listOpenOrders) {
         throw fail(
           operation,

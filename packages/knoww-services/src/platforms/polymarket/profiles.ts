@@ -1,12 +1,12 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
-import { UpstreamPublicDataError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamPublicDataError } from "./errors";
 import type { PolymarketPublicData } from "./public-data";
 
 /**
@@ -232,7 +232,7 @@ export function createProfiles(
         });
         if (allowNotFound && response.status === 404) return null;
         if (!response.ok) {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             `Public profile request failed with ${response.status}`,
             response.status
           );
@@ -242,13 +242,13 @@ export function createProfiles(
         try {
           payload = await response.json();
         } catch {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             "Public profile request returned malformed JSON"
           );
         }
         const parsed = schema.safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamPublicDataError(
+          throw upstreamPublicDataError(
             "Public profile request returned an invalid response"
           );
         }

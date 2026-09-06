@@ -82,10 +82,13 @@ describe("get_price_history tool", () => {
     const inputSchema = tool?.inputSchema as {
       properties: Record<string, unknown>;
     };
-    expect(inputSchema.properties).toHaveProperty("tokenId");
-    expect(inputSchema.properties).toHaveProperty("startTime");
-    expect(inputSchema.properties).toHaveProperty("endTime");
-    expect(inputSchema.properties).toHaveProperty("fidelityMinutes");
+    expect(Object.keys(inputSchema.properties).sort()).toEqual([
+      "endTime",
+      "fidelityMinutes",
+      "platform",
+      "startTime",
+      "tokenId",
+    ]);
     expect(String(tool?.description)).toContain("price history");
     expect(String(tool?.description)).toContain("trade");
   });

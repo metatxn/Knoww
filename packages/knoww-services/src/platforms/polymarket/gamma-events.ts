@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { UpstreamEventError } from "../../errors";
 import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
@@ -9,6 +8,7 @@ import {
   nonNegativeDecimalSchema,
 } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { upstreamEventError } from "./errors";
 import {
   type GammaMarketDetail,
   gammaMarketDetailSchema,
@@ -124,7 +124,7 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
           return null;
         }
         if (!response.ok) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             `Gamma event lookup failed with status ${response.status}`,
             response.status
           );
@@ -135,7 +135,7 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
         }
         const parsed = gammaEventDetailSchema.safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamEventError("Gamma event payload was malformed");
+          throw upstreamEventError("Gamma event payload was malformed");
         }
         // Validated above; the transforms only normalise, so the untouched
         // payload already satisfies GammaEventLike.
@@ -178,20 +178,20 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
       async (fetchImpl, signal) => {
         const response = await fetchImpl(url.toString(), requestInit(signal));
         if (!response.ok) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             `Gamma child event lookup failed with status ${response.status}`,
             response.status
           );
         }
         const payload: unknown = await response.json();
         if (!Array.isArray(payload)) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             "Gamma child event payload was not an array"
           );
         }
         const parsed = z.array(gammaEventDetailSchema).safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             "Gamma child event payload contained malformed data"
           );
         }
@@ -228,20 +228,20 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
       async (fetchImpl, signal) => {
         const response = await fetchImpl(url.toString(), requestInit(signal));
         if (!response.ok) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             `Gamma event market lookup failed with status ${response.status}`,
             response.status
           );
         }
         const payload: unknown = await response.json();
         if (!Array.isArray(payload)) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             "Gamma event market payload was not an array"
           );
         }
         const parsed = z.array(gammaMarketDetailSchema).safeParse(payload);
         if (!parsed.success) {
-          throw new UpstreamEventError(
+          throw upstreamEventError(
             "Gamma event market payload contained malformed data"
           );
         }

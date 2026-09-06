@@ -41,7 +41,7 @@ interface PostCommentResponse {
 async function postComment(
   payload: PostCommentPayload
 ): Promise<PostCommentResponse> {
-  const response = await fetch("/api/comments", {
+  const response = await fetch("/api/polymarket/comments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

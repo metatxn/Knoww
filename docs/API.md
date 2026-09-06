@@ -782,7 +782,7 @@ Origin: chrome-extension://ialnajflhafkmfnglapjaegjpbdifcmc
 
 ## Auth And Extension Sessions
 
-### POST `/api/auth/derive-api-key`
+### POST `/api/polymarket/auth/derive-api-key`
 
 Description: Creates a first-time Polymarket API key or derives an existing one using signed L1 auth headers supplied in the JSON body.
 
@@ -821,7 +821,7 @@ Rate limiting
 Example
 
 ```http
-POST /api/auth/derive-api-key HTTP/1.1
+POST /api/polymarket/auth/derive-api-key HTTP/1.1
 Content-Type: application/json
 
 {
@@ -1081,7 +1081,7 @@ Rate limiting
 
 ## Comments
 
-### GET `/api/comments`
+### GET `/api/polymarket/comments`
 
 Description: Fetches comments from the Polymarket Gamma comments API.
 
@@ -1125,7 +1125,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/comments?parent_entity_type=Event&parent_entity_id=35908&limit=2 HTTP/1.1
+GET /api/polymarket/comments?parent_entity_type=Event&parent_entity_id=35908&limit=2 HTTP/1.1
 ```
 
 ```json
@@ -1166,7 +1166,7 @@ GET /api/comments?parent_entity_type=Event&parent_entity_id=35908&limit=2 HTTP/1
 }
 ```
 
-### POST `/api/comments`
+### POST `/api/polymarket/comments`
 
 Description: Posts a new comment or reply to Polymarket using L1 auth values in the request body.
 
@@ -1209,7 +1209,7 @@ Rate limiting
 Example
 
 ```http
-POST /api/comments HTTP/1.1
+POST /api/polymarket/comments HTTP/1.1
 Content-Type: application/json
 
 {
@@ -1991,7 +1991,7 @@ GET /api/markets/closed-time?ids=0xabc,0xdef HTTP/1.1
 }
 ```
 
-### GET `/api/markets/info/:conditionID`
+### GET `/api/polymarket/markets/info/:conditionID`
 
 Description: Passes through the raw CLOB market payload for a condition ID.
 
@@ -2025,7 +2025,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/info/0xabc HTTP/1.1
+GET /api/polymarket/markets/info/0xabc HTTP/1.1
 ```
 
 ```json
@@ -2038,7 +2038,7 @@ GET /api/markets/info/0xabc HTTP/1.1
 }
 ```
 
-### GET `/api/markets/orderbook/:tokenID`
+### GET `/api/polymarket/markets/orderbook/:tokenID`
 
 Description: Passes through the raw CLOB order book for a token.
 
@@ -2071,7 +2071,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/orderbook/101 HTTP/1.1
+GET /api/polymarket/markets/orderbook/101 HTTP/1.1
 ```
 
 ```json
@@ -2085,7 +2085,7 @@ GET /api/markets/orderbook/101 HTTP/1.1
 }
 ```
 
-### GET `/api/markets/price-history/:tokenId`
+### GET `/api/polymarket/markets/price-history/:tokenId`
 
 Description: Fetches historical price candles for a token from the CLOB API.
 
@@ -2130,7 +2130,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/price-history/1010101010?startTs=1710000000&fidelity=60 HTTP/1.1
+GET /api/polymarket/markets/price-history/1010101010?startTs=1710000000&fidelity=60 HTTP/1.1
 ```
 
 ```json
@@ -2146,7 +2146,7 @@ GET /api/markets/price-history/1010101010?startTs=1710000000&fidelity=60 HTTP/1.
 }
 ```
 
-### POST `/api/markets/price-history/batch`
+### POST `/api/polymarket/markets/price-history/batch`
 
 Description: Fetches historical price candles for multiple token IDs in one request. The handler deduplicates `tokenIds`, fans out to the CLOB `/prices-history` endpoint, and returns one combined payload.
 
@@ -2185,7 +2185,7 @@ Rate limiting
 Example
 
 ```http
-POST /api/markets/price-history/batch HTTP/1.1
+POST /api/polymarket/markets/price-history/batch HTTP/1.1
 Content-Type: application/json
 
 {
@@ -2213,7 +2213,7 @@ Content-Type: application/json
 }
 ```
 
-### GET `/api/markets/price`
+### GET `/api/polymarket/markets/price`
 
 Description: Passes through the CLOB price response for a token.
 
@@ -2247,7 +2247,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/price?tokenID=101&side=BUY HTTP/1.1
+GET /api/polymarket/markets/price?tokenID=101&side=BUY HTTP/1.1
 ```
 
 ```json
@@ -2307,7 +2307,7 @@ GET /api/markets/slug/bitcoin-above-100k-in-2026 HTTP/1.1
 }
 ```
 
-### GET `/api/markets/trades/:tokenID`
+### GET `/api/polymarket/markets/trades/:tokenID`
 
 Description: Passes through recent CLOB trades for a token.
 
@@ -2340,7 +2340,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/markets/trades/101 HTTP/1.1
+GET /api/polymarket/markets/trades/101 HTTP/1.1
 ```
 
 ```json
@@ -2565,7 +2565,7 @@ GET /api/search?q=bitcoin&limit=2 HTTP/1.1
 
 ## Relayer And RPC
 
-### GET `/api/relayer/:path*`
+### GET `/api/polymarket/relayer/:path*`
 
 Description: Server-side proxy for a small allow-listed subset of Polymarket relayer endpoints. Used by web and extension trading flows so relayer credentials stay server-side.
 
@@ -2602,7 +2602,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/relayer/deployed?address=0x1234... HTTP/1.1
+GET /api/polymarket/relayer/deployed?address=0x1234... HTTP/1.1
 Origin: https://knoww.app
 Sec-Fetch-Site: same-origin
 ```
@@ -2613,7 +2613,7 @@ Sec-Fetch-Site: same-origin
 }
 ```
 
-### POST `/api/relayer/:path*`
+### POST `/api/polymarket/relayer/:path*`
 
 Description: Same relayer proxy for JSON POST requests such as transaction submission.
 
@@ -2652,7 +2652,7 @@ Rate limiting
 Example
 
 ```http
-POST /api/relayer/submit HTTP/1.1
+POST /api/polymarket/relayer/submit HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer eyJ...
 
@@ -3081,7 +3081,7 @@ GET /api/polymarket/user/details?user=0x1111111111111111111111111111111111111111
 }
 ```
 
-### GET `/api/user/public-profile`
+### GET `/api/polymarket/user/public-profile`
 
 Description: Fetches a public profile from Gamma.
 
@@ -3117,7 +3117,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/public-profile?address=0x1111111111111111111111111111111111111111 HTTP/1.1
+GET /api/polymarket/user/public-profile?address=0x1111111111111111111111111111111111111111 HTTP/1.1
 ```
 
 ```json
@@ -3135,7 +3135,7 @@ GET /api/user/public-profile?address=0x1111111111111111111111111111111111111111 
 }
 ```
 
-### GET `/api/user/portfolio-value`
+### GET `/api/polymarket/user/portfolio-value`
 
 Description: Returns marked-to-market portfolio value in USD.
 
@@ -3174,7 +3174,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/portfolio-value?user=0x2222222222222222222222222222222222222222 HTTP/1.1
+GET /api/polymarket/user/portfolio-value?user=0x2222222222222222222222222222222222222222 HTTP/1.1
 ```
 
 ```json
@@ -3387,7 +3387,7 @@ GET /api/polymarket/user/trades?user=0x2222222222222222222222222222222222222222&
 }
 ```
 
-### GET `/api/user/pnl-history`
+### GET `/api/polymarket/user/pnl-history`
 
 Description: Returns chart-ready P&L time series plus summary stats.
 
@@ -3427,7 +3427,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/pnl-history?user=0x2222222222222222222222222222222222222222&interval=1m&fidelity=1d HTTP/1.1
+GET /api/polymarket/user/pnl-history?user=0x2222222222222222222222222222222222222222&interval=1m&fidelity=1d HTTP/1.1
 ```
 
 ```json
@@ -3456,7 +3456,7 @@ GET /api/user/pnl-history?user=0x2222222222222222222222222222222222222222&interv
 }
 ```
 
-### GET `/api/user/pnl`
+### GET `/api/polymarket/user/pnl`
 
 Description: Computes aggregate P&L, portfolio, trading, and performance metrics by combining multiple upstream sources.
 
@@ -3499,7 +3499,7 @@ Rate limiting
 Example
 
 ```http
-GET /api/user/pnl?user=0x2222222222222222222222222222222222222222&period=30d&includeHistory=true HTTP/1.1
+GET /api/polymarket/user/pnl?user=0x2222222222222222222222222222222222222222&period=30d&includeHistory=true HTTP/1.1
 ```
 
 ```json
@@ -3599,48 +3599,6 @@ Content-Type: application/json
   "userAddress": "0x1111111111111111111111111111111111111111",
   "isValid": true,
   "message": "Valid Ethereum address"
-}
-```
-
-### GET `/api/wallet/positions`
-
-Description: Deprecated. Always returns `410 Gone`.
-
-Headers
-
-- Auth: none
-
-Request body
-
-- None
-
-Success
-
-- No `200/201` success path exists.
-
-Errors
-
-- `400`: Not used.
-- `401`: Not used.
-- `404`: Not used.
-- `500`: Not used.
-- `410`: `{ success: false, error: string, hint: string }`
-
-Rate limiting
-
-- `60` requests/minute/IP
-
-Example
-
-```http
-GET /api/wallet/positions HTTP/1.1
-```
-
-```json
-{
-  "success": false,
-  "error": "This endpoint has been deprecated. Use the frontend useClobClient hook's getOpenOrders() method instead.",
-  "hint": "Wallet operations require user wallet authentication which is now handled on the frontend."
 }
 ```
 

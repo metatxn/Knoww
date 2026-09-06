@@ -357,7 +357,7 @@ know a market is in its dispute window before treating a price as free money.
 
 | Canonical | Kalshi | Polymarket |
 | --- | --- | --- |
-| `unopened` | `initialized` | not yet accepting orders and not closed |
+| `unopened` | `initialized` | not active and not closed, whatever the order book says |
 | `active` | `active` | active and accepting orders |
 | `paused` | `inactive` | active but not accepting orders |
 | `closed` | `closed` | closed, no resolution proposed |
@@ -460,6 +460,11 @@ The registry, not request input, owns provider base URLs. A user-controlled URL
 must never reach a server-side fetch.
 
 ## Repository structure
+
+> Superseded by the package layout in the aggregator ADR. The tree below is the
+> MCP-first plan; the shipped layout is `core/`, `registry.ts` and
+> `platforms/polymarket/` with no root export, and the legacy `markets/` and
+> `profiles/` modules were deleted at M5 on 2026-09-05.
 
 ```text
 apps/mcp/src/
@@ -591,6 +596,13 @@ budget. Polymarket responses may be cached under the existing rules. Kalshi
 responses are not cached until Kalshi authorizes it.
 
 ## Identity and authorization
+
+> Superseded for the web restructure. The aggregator ADR
+> (`decisions/2026-09-03-aggregator-platform-adapters.md`, sections "Identity"
+> and "Supersedes") models a trader as one connection per platform, wallet-backed
+> today, with no Knoww account. The subsections below record the MCP-first
+> design (shared Privy application, Session Keys, trading grants) and stay for
+> the M5 trading phase, open since the read tools moved on 2026-09-05.
 
 ### Two login paths, one authorization server
 
@@ -994,6 +1006,10 @@ The Polymarket trading adapter also needs:
 - proof that secrets never reach responses or logs.
 
 ## Delivery plan
+
+> Replaced by milestones M1 to M5 in the aggregator ADR. Phase 1 landed for
+> Polymarket at M5 on 2026-09-05, and `list_platforms` plus the `platform`
+> filter from Phase 2 landed with it. The Kalshi items wait for M2.
 
 ### Phase 0: freeze contracts
 

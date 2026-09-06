@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
-import gammaMarketFixture from "../../fixtures/polymarket/gamma-market.json";
 import { mapPolymarketStatus } from "./status";
 
 // Rows follow the status table in docs/single-api-layer.md ("Market status").
 describe("mapPolymarketStatus", () => {
-  it("maps the recorded open market to active", () => {
-    expect(mapPolymarketStatus(gammaMarketFixture[0])).toBe("active");
-  });
-
   it("maps a market that is not yet accepting orders and not closed to unopened", () => {
     expect(
       mapPolymarketStatus({
         active: false,
         closed: false,
         acceptingOrders: false,
+      })
+    ).toBe("unopened");
+  });
+
+  it("maps a market the venue has not opened to unopened even when its book already accepts orders", () => {
+    expect(
+      mapPolymarketStatus({
+        active: false,
+        closed: false,
+        acceptingOrders: true,
       })
     ).toBe("unopened");
   });

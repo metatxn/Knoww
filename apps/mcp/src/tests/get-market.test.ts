@@ -111,6 +111,7 @@ describe("get_market tool (dev bypass)", () => {
       description?: string;
       annotations?: Record<string, unknown>;
       inputSchema?: { properties?: Record<string, unknown> };
+      outputSchema?: { properties?: Record<string, unknown> };
     }>;
     const getMarket = tools.find((tool) => tool.name === "get_market");
     expect(getMarket).toBeDefined();
@@ -118,9 +119,12 @@ describe("get_market tool (dev bypass)", () => {
       readOnlyHint: true,
       destructiveHint: false,
     });
-    expect(getMarket?.inputSchema?.properties).toHaveProperty("slug");
-    expect(getMarket?.inputSchema?.properties).toHaveProperty("conditionId");
-    expect(getMarket?.inputSchema?.properties).toHaveProperty("tokenId");
+    expect(
+      Object.keys(getMarket?.inputSchema?.properties ?? {}).sort()
+    ).toEqual(["conditionId", "id", "platform", "slug", "tokenId"]);
+    expect(
+      Object.keys(getMarket?.outputSchema?.properties ?? {}).sort()
+    ).toEqual(["market", "meta"]);
     expect(getMarket?.description).toContain("not instructions");
   });
 
@@ -201,7 +205,9 @@ describe("get_market tool (dev bypass)", () => {
     expect(result.content?.[0]?.text).not.toContain("Resolves YES");
 
     expect(result.structuredContent?.market).toEqual({
-      id: "1163699",
+      id: `polymarket:${CONDITION_ID}`,
+      platform: "polymarket",
+      sourceMarketId: CONDITION_ID,
       question: "Clarity Act signed into law in 2026?",
       slug: "clarity-act-signed-into-law-in-2026",
       conditionId: CONDITION_ID,
@@ -223,7 +229,9 @@ describe("get_market tool (dev bypass)", () => {
       spread: "0.01",
       oneDayPriceChange: "-0.005",
       event: {
-        id: "evt-9",
+        id: "polymarket:evt-9",
+        platform: "polymarket",
+        sourceEventId: "evt-9",
         slug: "clarity-act",
         title: "Clarity Act",
         url: "https://knoww.app/events/detail/clarity-act",
@@ -294,7 +302,7 @@ describe("get_market tool (dev bypass)", () => {
     const market = result.structuredContent?.market as
       | Record<string, unknown>
       | undefined;
-    expect(market?.id).toBe("1163699");
+    expect(market?.id).toBe(`polymarket:${CONDITION_ID}`);
   });
 
   it("looks up by tokenId through the clob_token_ids param", async () => {
@@ -313,7 +321,7 @@ describe("get_market tool (dev bypass)", () => {
     const market = result.structuredContent?.market as
       | Record<string, unknown>
       | undefined;
-    expect(market?.id).toBe("1163699");
+    expect(market?.id).toBe(`polymarket:${CONDITION_ID}`);
   });
 
   it("retries with closed=true and reports a settled legacy market as closed", async () => {
@@ -337,7 +345,9 @@ describe("get_market tool (dev bypass)", () => {
     expect(result.content?.[0]?.text).toContain("closed");
 
     const market = result.structuredContent?.market as Record<string, unknown>;
-    expect(market.id).toBe("12");
+    // Legacy rows without a condition id fall back to the Gamma id.
+    expect(market.id).toBe("polymarket:12");
+    expect(market.sourceMarketId).toBe("12");
     // active:true on a settled market is noise; closed wins.
     expect(market.status).toBe("closed");
     // Both prices are zero, so no winner may be inferred.

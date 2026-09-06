@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { isPlatformError, type PlatformError } from "../../core";
-import { UpstreamEventError } from "../../errors";
 import clobBookFixture from "../../fixtures/polymarket/clob-book.json";
 import clobPricesHistoryFixture from "../../fixtures/polymarket/clob-prices-history.json";
 import dataTradesFixture from "../../fixtures/polymarket/data-trades.json";
 import gammaEventFixture from "../../fixtures/polymarket/gamma-event.json";
 import gammaMarketFixture from "../../fixtures/polymarket/gamma-market.json";
 import gammaTagsFixture from "../../fixtures/polymarket/gamma-tags.json";
+import { isUpstreamEventError } from "./errors";
 import type { PolymarketEventDetails } from "./mappers";
 import { createPolymarketMarketDataAdapter } from "./market-data-adapter";
 
@@ -139,7 +139,7 @@ describe("createPolymarketMarketDataAdapter", () => {
         kind: "upstream",
         upstreamStatus: 503,
       });
-      expect(error.cause).toBeInstanceOf(UpstreamEventError);
+      expect(isUpstreamEventError(error.cause)).toBe(true);
     });
 
     it("reports a timeout as a timeout error", async () => {
