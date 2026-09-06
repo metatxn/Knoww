@@ -1,3 +1,9 @@
+import {
+  isQueueWaitError,
+  type QueueWaitError,
+  queueWaitError,
+} from "./queue-wait-error";
+
 const DEFAULT_RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
 type Wait = (delayMs: number) => Promise<void>;
@@ -6,24 +12,42 @@ function defaultWait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-export class SearchQueueCapacityError extends Error {
-  readonly queueWaitMs: number;
+export type SearchQueueCapacityError =
+  QueueWaitError<"SearchQueueCapacityError">;
 
-  constructor(queueWaitMs = 0) {
-    super("Pending search work was dropped to keep the queue bounded");
-    this.name = "SearchQueueCapacityError";
-    this.queueWaitMs = queueWaitMs;
-  }
+export function searchQueueCapacityError(
+  queueWaitMs = 0
+): SearchQueueCapacityError {
+  return queueWaitError(
+    "SearchQueueCapacityError",
+    "Pending search work was dropped to keep the queue bounded",
+    queueWaitMs
+  );
 }
 
-export class SearchQueueDeadlineError extends Error {
-  readonly queueWaitMs: number;
+export function isSearchQueueCapacityError(
+  value: unknown
+): value is SearchQueueCapacityError {
+  return isQueueWaitError(value, "SearchQueueCapacityError");
+}
 
-  constructor(queueWaitMs = 0) {
-    super("Pending search work expired before it could start");
-    this.name = "SearchQueueDeadlineError";
-    this.queueWaitMs = queueWaitMs;
-  }
+export type SearchQueueDeadlineError =
+  QueueWaitError<"SearchQueueDeadlineError">;
+
+export function searchQueueDeadlineError(
+  queueWaitMs = 0
+): SearchQueueDeadlineError {
+  return queueWaitError(
+    "SearchQueueDeadlineError",
+    "Pending search work expired before it could start",
+    queueWaitMs
+  );
+}
+
+export function isSearchQueueDeadlineError(
+  value: unknown
+): value is SearchQueueDeadlineError {
+  return isQueueWaitError(value, "SearchQueueDeadlineError");
 }
 
 interface PendingSearchWork {
@@ -72,7 +96,7 @@ export function createSearchRequestScheduler(
       try {
         let queueWaitMs = now() - next.queuedAt;
         if (queueWaitMs > maximumQueueWaitMs) {
-          throw new SearchQueueDeadlineError(queueWaitMs);
+          throw searchQueueDeadlineError(queueWaitMs);
         }
 
         const startDelayMs =
@@ -83,7 +107,7 @@ export function createSearchRequestScheduler(
 
         queueWaitMs = now() - next.queuedAt;
         if (queueWaitMs > maximumQueueWaitMs) {
-          throw new SearchQueueDeadlineError(queueWaitMs);
+          throw searchQueueDeadlineError(queueWaitMs);
         }
 
         lastStartedAt = now();
@@ -103,9 +127,7 @@ export function createSearchRequestScheduler(
         if (pending.length >= maximumPending) {
           const oldest = pending.shift();
           if (oldest) {
-            oldest.reject(
-              new SearchQueueCapacityError(now() - oldest.queuedAt)
-            );
+            oldest.reject(searchQueueCapacityError(now() - oldest.queuedAt));
           }
         }
 

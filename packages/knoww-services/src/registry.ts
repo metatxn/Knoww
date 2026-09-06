@@ -2,11 +2,12 @@ import { createLogger } from "@knoww/logger";
 import {
   applyCapabilityOverrides,
   type MarketDataAdapter,
-  PlatformError,
+  type PlatformError,
   type PlatformId,
   parseCanonicalId,
   parseCapabilityOverrides,
   parseEnabledPlatforms,
+  platformError,
   type TradingAdapter,
 } from "./core";
 import {
@@ -136,7 +137,7 @@ function selectEnabledPlatforms(ids: readonly PlatformId[]): PlatformId[] {
 }
 
 function disabled(platform: PlatformId): PlatformError {
-  return new PlatformError(`Platform ${platform} is not enabled`, {
+  return platformError(`Platform ${platform} is not enabled`, {
     platform,
     operation: "resolveAdapter",
     kind: "disabled",

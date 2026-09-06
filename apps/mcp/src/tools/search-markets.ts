@@ -14,19 +14,18 @@ import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toolFailureContent,
 } from "../errors/tool-error";
-import { platformInputSchema, requirePolymarketClient } from "../platforms";
+import {
+  DEFAULT_PLATFORM,
+  platformInputSchema,
+  requirePolymarketClient,
+} from "../platforms";
 import { requireToolQuota } from "../quota";
 import { toDecimalString } from "./decimal";
-import {
-  canonicalEventId,
-  canonicalMarketId,
-  knowwEventUrl,
-  marketSourceId,
-} from "./gamma";
+import { canonicalEventId, knowwEventUrl, marketIdentity } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 import {
   buildOffsetPage,
@@ -227,19 +226,15 @@ function marketOutcomes(market: Market): {
   };
 }
 
-function summarizeMarket(market: Market): MarketSummary {
-  if (!market.id) {
-    throw new KnowwToolError(
-      "UPSTREAM_UNAVAILABLE",
-      "Search returned a market without a stable identifier."
-    );
-  }
+/** Null for a market without a condition id: it has no canonical id. */
+function summarizeMarket(market: Market): MarketSummary | null {
+  const identity = marketIdentity(market);
+  if (identity === null) return null;
   const { outcomes, totalOutcomes, truncated } = marketOutcomes(market);
-  const ids = { id: market.id, conditionId: market.conditionId };
   return {
-    id: canonicalMarketId(ids),
+    id: identity.id,
     platform: POLYMARKET_PLATFORM,
-    sourceMarketId: marketSourceId(ids),
+    sourceMarketId: identity.sourceMarketId,
     ...(market.slug !== undefined ? { slug: market.slug } : {}),
     ...(market.conditionId !== undefined
       ? { conditionId: market.conditionId }
@@ -261,7 +256,10 @@ function summarizeEvent(event: SearchEvent): {
   const topOutcome = getExactTopOutcome(allMarkets);
   const markets = allMarkets
     .slice(0, MAX_MARKETS_PER_EVENT)
-    .map(summarizeMarket);
+    .flatMap((market) => {
+      const summary = summarizeMarket(market);
+      return summary === null ? [] : [summary];
+    });
   const marketsTruncated = allMarkets.length > MAX_MARKETS_PER_EVENT;
   const outcomesTruncated = markets.some(
     (market) => market.outcomesTruncated === true
@@ -315,8 +313,12 @@ function textMatches(
   return boundedQuery.test(normalizedValue);
 }
 
-function rankedMarketFrom(event: SearchEvent, market: Market): RankedMarket {
+function rankedMarketFrom(
+  event: SearchEvent,
+  market: Market
+): RankedMarket | null {
   const summary = summarizeMarket(market);
+  if (summary === null) return null;
   const volume = toDecimalString(market.volume ?? market.volumeNum);
   const liquidity = toDecimalString(market.liquidity ?? market.liquidityNum);
   const startDate = market.startDate ?? event.startDate;
@@ -376,6 +378,7 @@ function cursorFingerprint(
   categorySlug: string | undefined
 ): string {
   return paginationFingerprint([
+    args.platform ?? DEFAULT_PLATFORM,
     normalizeSearchText(args.query),
     categorySlug ?? "",
     args.resultType,
@@ -405,7 +408,8 @@ function rankedMarketPage(
       ) {
         continue;
       }
-      matches.push(rankedMarketFrom(event, market));
+      const ranked = rankedMarketFrom(event, market);
+      if (ranked !== null) matches.push(ranked);
     }
   }
   if (args.sortBy === "volume") {
@@ -452,7 +456,7 @@ async function handleSearchMarkets(
     if (args.category !== undefined) {
       const slug = normalizeCategorySlug(args.category);
       if (!slug) {
-        throw new KnowwToolError(
+        throw knowwToolError(
           "VALIDATION_ERROR",
           "category could not be normalized to a slug; use letters, numbers, spaces, or dashes."
         );
@@ -477,7 +481,7 @@ async function handleSearchMarkets(
       { signal: context.mcpReq.signal, fullMarketRecords: true }
     );
     if (data.degraded && data.events.length === 0) {
-      throw new KnowwToolError(
+      throw knowwToolError(
         "UPSTREAM_UNAVAILABLE",
         "Search is temporarily unavailable upstream."
       );
@@ -508,7 +512,7 @@ async function handleSearchMarkets(
     const events = summaries.map((entry) => entry.summary);
     const page = marketPage?.page ?? eventPagination?.page;
     if (!page) {
-      throw new KnowwToolError(
+      throw knowwToolError(
         "INTERNAL_ERROR",
         "Search pagination could not be prepared."
       );

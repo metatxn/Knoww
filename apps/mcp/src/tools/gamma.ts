@@ -19,26 +19,28 @@ export const MAX_DESCRIPTION_LENGTH = 2000;
 
 export const SLUG_PATTERN = /^[a-z0-9-]{1,200}$/;
 
-/**
- * Canonical market id: the condition id when Gamma reports one (it is the
- * on-chain identifier every Polymarket surface shares), else the Gamma id.
- */
-/**
- * The source part of a market's canonical id: the on-chain condition id, or
- * the Gamma id for legacy rows that never had one, so no market is dropped.
- */
-export function marketSourceId(market: {
+/** The canonical identity of a Gamma market. */
+export interface MarketIdentity {
+  /** Canonical id: `polymarket:` followed by the condition id. */
   id: string;
-  conditionId?: string | undefined;
-}): string {
-  return market.conditionId || market.id;
+  /** The condition id, the on-chain identifier every Polymarket surface shares. */
+  sourceMarketId: string;
 }
 
-export function canonicalMarketId(market: {
-  id: string;
+/**
+ * Canonical market ids are condition ids only. A Gamma row that never had
+ * one (a handful of 2020-era markets) has no canonical id, so the tools omit
+ * it, as the services market mapper does.
+ */
+export function marketIdentity(market: {
   conditionId?: string | undefined;
-}): string {
-  return buildCanonicalId(POLYMARKET_PLATFORM, marketSourceId(market));
+}): MarketIdentity | null {
+  const conditionId = market.conditionId?.trim();
+  if (!conditionId) return null;
+  return {
+    id: buildCanonicalId(POLYMARKET_PLATFORM, conditionId),
+    sourceMarketId: conditionId,
+  };
 }
 
 export function canonicalEventId(eventId: string): string {

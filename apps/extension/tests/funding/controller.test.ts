@@ -5,7 +5,7 @@ import {
 } from "../../src/funding/controller";
 import {
   type FundingGateway,
-  FundingGatewayError,
+  fundingGatewayError,
 } from "../../src/funding/gateway";
 import type { FundingState } from "../../src/funding/machine";
 import type {
@@ -238,7 +238,7 @@ describe("createFundingController", () => {
     const freshAttempt = makeAttempt();
     gw.beginAttempt.mockResolvedValueOnce(freshAttempt);
     gw.execute.mockRejectedValueOnce(
-      new FundingGatewayError({
+      fundingGatewayError({
         code: "AMBIGUOUS_OUTCOME",
         message: "Could not confirm whether the transaction was sent.",
         retryable: true,
@@ -277,7 +277,7 @@ describe("createFundingController", () => {
     controller.dispatch({ type: "SUBMIT" });
 
     gw.beginAttempt.mockRejectedValueOnce(
-      new FundingGatewayError({
+      fundingGatewayError({
         code: "PENDING_RECONCILIATION",
         message: "A prior attempt is still reconciling.",
         retryable: false,
@@ -307,7 +307,7 @@ describe("createFundingController", () => {
     controller.dispatch({ type: "SUBMIT" });
 
     gw.beginAttempt.mockRejectedValueOnce(
-      new FundingGatewayError({
+      fundingGatewayError({
         code: "IDEMPOTENCY_FINGERPRINT_MISMATCH",
         message: "This command no longer matches the stored attempt.",
         retryable: false,

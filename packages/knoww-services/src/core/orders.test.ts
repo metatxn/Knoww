@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlatformError, PlatformError } from "./errors";
+import { isPlatformError, type PlatformError, platformError } from "./errors";
 import {
   addDecimalAmounts,
   assertDraftPlaceable,
@@ -171,7 +171,7 @@ describe("cancelOrderInputSchema", () => {
 
 describe("PlatformError for trading", () => {
   it("carries the trading operation and rejection kind, defaulting the kind to upstream", () => {
-    const rejected = new PlatformError("Market changed since preview", {
+    const rejected = platformError("Market changed since preview", {
       platform: "polymarket",
       operation: "placeOrder",
       kind: "draft_rejected",
@@ -182,7 +182,7 @@ describe("PlatformError for trading", () => {
     expect(rejected.operation).toBe("placeOrder");
     expect(rejected.kind).toBe("draft_rejected");
 
-    const upstream = new PlatformError("CLOB returned 502", {
+    const upstream = platformError("CLOB returned 502", {
       platform: "polymarket",
       operation: "cancelOrder",
       upstreamStatus: 502,
@@ -307,11 +307,11 @@ describe("TradingAdapter contract", () => {
   it("rejects a draft whose short expiration has passed", () => {
     expect(() =>
       assertDraftPlaceable(draft, new Date("2026-09-04T10:00:31Z"))
-    ).toThrow(PlatformError);
+    ).toThrow("expired at");
     try {
       assertDraftPlaceable(draft, new Date("2026-09-04T10:00:31Z"));
     } catch (error) {
-      expect(error).toBeInstanceOf(PlatformError);
+      expect(isPlatformError(error)).toBe(true);
       expect((error as PlatformError).kind).toBe("draft_expired");
       expect((error as PlatformError).operation).toBe("placeOrder");
     }

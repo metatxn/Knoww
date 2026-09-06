@@ -20,8 +20,8 @@ export const POLYMARKET_TOOL_ALIASES = {
 
 export type PolymarketToolName = keyof typeof POLYMARKET_TOOL_ALIASES;
 
-/** Every advertised tool in registration order; each alias follows its canonical name. */
-export const KNOWW_MCP_TOOL_NAMES = [
+/** The public tools in registration order; each alias follows its canonical name. */
+export const PUBLIC_MCP_TOOL_NAMES = [
   "search_markets",
   "get_market",
   "get_event",
@@ -57,7 +57,46 @@ export const KNOWW_MCP_TOOL_NAMES = [
   "list_platforms",
 ] as const;
 
-const toolNameSet = new Set<string>(KNOWW_MCP_TOOL_NAMES);
+/**
+ * Account and order tools, one per `TradingAdapter` method, in registration
+ * order. Implemented in `tools/trading.ts`; registered only when
+ * `EXPOSE_TRADING_TOOLS` is on.
+ */
+export const TRADING_TOOL_NAMES = [
+  "get_trading_connection",
+  "get_account_positions",
+  "get_account_activity",
+  "get_account_orders",
+  "preview_order",
+  "place_order",
+  "cancel_order",
+] as const;
+
+export type TradingToolName = (typeof TRADING_TOOL_NAMES)[number];
+
+/**
+ * Owner decision (2026-09-06): the trading tools ship in the codebase but stay
+ * off the public tool list until MCP callers can be tied to a wallet (ADR
+ * 2026-08-31, grilling Q1). Flip this constant to advertise them. It is a
+ * constant rather than an env var on purpose: one deploy ships one tool set.
+ */
+export const EXPOSE_TRADING_TOOLS = false;
+
+export function advertisedToolNames(
+  exposeTradingTools: boolean = EXPOSE_TRADING_TOOLS
+): readonly string[] {
+  return exposeTradingTools
+    ? [...PUBLIC_MCP_TOOL_NAMES, ...TRADING_TOOL_NAMES]
+    : PUBLIC_MCP_TOOL_NAMES;
+}
+
+/** Every advertised tool in registration order. */
+export const KNOWW_MCP_TOOL_NAMES: readonly string[] = advertisedToolNames();
+
+const toolNameSet = new Set<string>([
+  ...PUBLIC_MCP_TOOL_NAMES,
+  ...TRADING_TOOL_NAMES,
+]);
 
 export function knownMcpToolName(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;

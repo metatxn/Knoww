@@ -13,7 +13,9 @@ import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
@@ -23,14 +25,14 @@ import { requireToolQuota } from "../quota";
 import { toDecimalString } from "./decimal";
 import {
   canonicalEventId,
-  canonicalMarketId,
   cleanDescription,
   deriveMarketStatus,
   descriptionIsTruncated,
   isAbortLike,
   knowwEventUrl,
+  type MarketIdentity,
+  marketIdentity,
   marketOutcomeSchema,
-  marketSourceId,
   marketStatusSchema,
   projectMarketOutcomes,
   SLUG_PATTERN,
@@ -162,14 +164,14 @@ function resolveIdentifier(args: GetMarketInput): MarketIdentifier {
     provided.push({ kind: "tokenId", value: args.tokenId.trim() });
   }
   if (provided.length !== 1) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Provide exactly one of id, slug, conditionId, or tokenId."
     );
   }
   const identifier = provided[0];
   if (identifier.kind === "slug" && !SLUG_PATTERN.test(identifier.value)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "slug may contain only lowercase letters, digits, and dashes."
     );
@@ -178,7 +180,7 @@ function resolveIdentifier(args: GetMarketInput): MarketIdentifier {
     identifier.kind === "conditionId" &&
     !CONDITION_ID_PATTERN.test(identifier.value)
   ) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "conditionId must be 0x followed by 64 hex characters."
     );
@@ -187,7 +189,7 @@ function resolveIdentifier(args: GetMarketInput): MarketIdentifier {
     identifier.kind === "tokenId" &&
     !TOKEN_ID_PATTERN.test(identifier.value)
   ) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "tokenId must be a string of up to 80 decimal digits."
     );
@@ -216,7 +218,7 @@ function resolveLookup(args: GetMarketInput): MarketLookup {
     args.conditionId !== undefined ||
     args.tokenId !== undefined
   ) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Provide exactly one of id, slug, conditionId, or tokenId."
     );
@@ -225,17 +227,17 @@ function resolveLookup(args: GetMarketInput): MarketLookup {
   try {
     parts = parseCanonicalId(args.id.trim());
   } catch {
-    throw new KnowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
   }
   if (args.platform !== undefined && args.platform !== parts.platform) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "platform must match the platform prefix of id."
     );
   }
   const client = requirePolymarketClient(parts.platform);
   if (!CONDITION_ID_PATTERN.test(parts.sourceId)) {
-    throw new KnowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
   }
   return {
     client,
@@ -292,7 +294,10 @@ function summarizeParentEvent(
   };
 }
 
-function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
+function buildMarketDetail(
+  detail: GammaMarketDetail,
+  identity: MarketIdentity
+): MarketDetail {
   const names = parseGammaStringArray(detail.outcomes);
   const prices = parseGammaStringArray(detail.outcomePrices);
   const status = deriveMarketStatus(detail);
@@ -311,9 +316,9 @@ function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
   const event = summarizeParentEvent(detail);
 
   return {
-    id: canonicalMarketId(detail),
+    id: identity.id,
     platform: POLYMARKET_PLATFORM,
-    sourceMarketId: marketSourceId(detail),
+    sourceMarketId: identity.sourceMarketId,
     ...(detail.question !== undefined ? { question: detail.question } : {}),
     ...(detail.slug !== undefined ? { slug: detail.slug } : {}),
     ...(detail.conditionId !== undefined
@@ -346,20 +351,20 @@ function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
 }
 
 function mapLookupError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) return error;
+  if (isKnowwToolError(error)) return error;
   if (isUpstreamMarketError(error)) {
     return error.status === 429
-      ? new KnowwToolError(
+      ? knowwToolError(
           "RATE_LIMITED",
           "The market data source is rate limiting requests."
         )
-      : new KnowwToolError(
+      : knowwToolError(
           "UPSTREAM_UNAVAILABLE",
           "Market data is temporarily unavailable upstream."
         );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The market data source timed out."
     );
@@ -405,13 +410,16 @@ async function handleGetMarket(args: GetMarketInput, context: ServerContext) {
     } catch (error) {
       throw mapLookupError(error);
     }
-    if (detail === null) {
-      throw new KnowwToolError(
+    const identity = detail === null ? null : marketIdentity(detail);
+    if (detail === null || identity === null) {
+      throw knowwToolError(
         "NOT_FOUND",
-        "No market matches that identifier."
+        detail === null
+          ? "No market matches that identifier."
+          : "That market has no condition id, so it has no canonical id."
       );
     }
-    const market = buildMarketDetail(detail);
+    const market = buildMarketDetail(detail, identity);
     const truncated =
       market.outcomesTruncated === true || market.descriptionTruncated === true;
     const meta = buildToolMeta({

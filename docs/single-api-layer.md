@@ -204,14 +204,14 @@ The `get_wallet_*` tools read public Data API records for any address. They are
 not the same as the account tools below, which read the authenticated
 principal's own account.
 
+Status 2026-09-06: `get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders`, `preview_order`, `place_order` and `cancel_order` exist in `apps/mcp/src/tools/trading.ts` but are not advertised. `EXPOSE_TRADING_TOOLS` in `apps/mcp/src/tool-catalog.ts` stays `false`, and their scopes are reserved but never granted, until caller identity (grilling Q1) is settled. Account P&L and portfolio value stay on the public `get_wallet_pnl` and `get_wallet_portfolio_value` tools (owner decision 2026-09-06).
+
 Account and order tools, added in the trading phase, `platform` required:
 
 - `get_account_positions`
 - `get_account_activity`
 - `get_account_orders` (orders placed through this connection only; see
   "Account read visibility")
-- `get_account_pnl`
-- `get_account_portfolio_value`
 - `preview_order`
 - `place_order`
 - `cancel_order`
@@ -777,7 +777,7 @@ Consequences:
   the tool description says so.
 - Positions, trade history, activity, and P&L come from the public Data API
   keyed by wallet address, so `get_account_positions`, `get_account_activity`,
-  `get_account_pnl`, and `get_account_portfolio_value` are complete regardless
+  `get_wallet_pnl`, and `get_wallet_portfolio_value` are complete regardless
   of which credential traded.
 - Because Knoww holds the Session Key, the web app can later show agent-placed
   orders through a Knoww endpoint, so the user gets one full picture in the web
@@ -809,7 +809,7 @@ Active today:
 
 Added in the trading phase:
 
-- `accounts:read`
+- `account:read`
 - `orders:read`
 - `orders:create`
 - `orders:cancel`

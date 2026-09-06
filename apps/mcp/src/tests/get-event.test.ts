@@ -14,6 +14,7 @@ import {
 } from "./helpers";
 
 const CONDITION_ID = `0x${"cd".repeat(32)}`;
+const CONDITION_ID_TWO = `0x${"ce".repeat(32)}`;
 const TOKEN_ID = "53135072462907880191400140706440867753044989936304433583131";
 
 /**
@@ -38,6 +39,7 @@ const MARKET_TWO = {
   id: "1163700",
   question: "Clarity Act signed into law in 2027?",
   slug: "clarity-act-signed-into-law-in-2027",
+  conditionId: CONDITION_ID_TWO,
   closed: false,
   outcomes: '["Yes", "No"]',
   outcomePrices: '["0.4", "0.6"]',
@@ -60,11 +62,12 @@ const MARKET_ONE_SUMMARY = {
 };
 
 const MARKET_TWO_SUMMARY = {
-  id: "polymarket:1163700",
+  id: `polymarket:${CONDITION_ID_TWO}`,
   platform: "polymarket",
-  sourceMarketId: "1163700",
+  sourceMarketId: CONDITION_ID_TWO,
   question: "Clarity Act signed into law in 2027?",
   slug: "clarity-act-signed-into-law-in-2027",
+  conditionId: CONDITION_ID_TWO,
   status: "active",
   totalOutcomes: 2,
   outcomes: [
@@ -497,6 +500,23 @@ describe("get_event tool (dev bypass)", () => {
     const result = message.result as ToolCallResult;
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.markets).toEqual([MARKET_TWO_SUMMARY]);
+    expect(result.structuredContent?.totalMarkets).toBe(1);
+  });
+
+  it("omits a market without a condition id, which has no canonical id", async () => {
+    expectGammaFetch("event by id", gammaUrl("/events/35908"), () =>
+      Response.json({
+        ...PARENT_EVENT,
+        markets: [MARKET_ONE, { ...MARKET_TWO, conditionId: undefined }],
+      })
+    );
+
+    const { message } = await callTool("get_event", 71, { id: "35908" });
+
+    const result = message.result as ToolCallResult;
+    expect(result.isError).toBeFalsy();
+    expect(result.content?.[0]?.text).toContain("Markets 1-1 of 1");
+    expect(result.structuredContent?.markets).toEqual([MARKET_ONE_SUMMARY]);
     expect(result.structuredContent?.totalMarkets).toBe(1);
   });
 

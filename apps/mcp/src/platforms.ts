@@ -2,6 +2,7 @@ import {
   isPlatformError,
   PLATFORM_IDS,
   type PlatformId,
+  type TradingAdapter,
 } from "@knoww/services/core";
 import {
   POLYMARKET_PLATFORM,
@@ -12,7 +13,7 @@ import {
   type PlatformRegistry,
 } from "@knoww/services/registry";
 import { z } from "zod";
-import { KnowwToolError } from "./errors/tool-error";
+import { type KnowwToolError, knowwToolError } from "./errors/tool-error";
 
 /**
  * Platforms this worker serves. A constant, not an env var (owner decision,
@@ -50,7 +51,7 @@ export function isPlatformEnabled(platform: PlatformId): boolean {
 }
 
 export function platformDisabledError(platform: string): KnowwToolError {
-  return new KnowwToolError(
+  return knowwToolError(
     "PLATFORM_DISABLED",
     `Platform ${platform} is not enabled on this server.`
   );
@@ -75,7 +76,7 @@ export function requirePolymarketClient(
 ): PolymarketClient {
   const platform = requirePlatform(requested);
   if (platform !== POLYMARKET_PLATFORM) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       `This tool does not serve ${platform} yet. Omit platform or pass "${POLYMARKET_PLATFORM}".`
     );
@@ -88,4 +89,29 @@ export function requirePolymarketClient(
     }
     throw error;
   }
+}
+
+/**
+ * The trading adapter for an enabled platform. Discovery-only platforms have
+ * none and are refused as VALIDATION_ERROR, so callers learn the platform is
+ * known but cannot trade here.
+ */
+export function requireTradingAdapter(requested: PlatformId): TradingAdapter {
+  const platform = requirePlatform(requested);
+  let adapter: TradingAdapter | null;
+  try {
+    adapter = platformRegistry().getTradingAdapter(platform);
+  } catch (error) {
+    if (isPlatformError(error) && error.kind === "disabled") {
+      throw platformDisabledError(platform);
+    }
+    throw error;
+  }
+  if (!adapter) {
+    throw knowwToolError(
+      "VALIDATION_ERROR",
+      `${platform} is discovery-only on this server; it has no trading adapter.`
+    );
+  }
+  return adapter;
 }

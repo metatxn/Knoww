@@ -175,6 +175,48 @@ describe("public read tools", () => {
     });
   });
 
+  it("accepts a list_events cursor issued without platform when polymarket is passed explicitly", async () => {
+    expectGammaFetch("events", gammaUrl("/events/keyset", "limit=1"), () =>
+      jsonResponse({
+        events: [
+          {
+            id: "7",
+            title: "Fed decision",
+            volume: 1200.5,
+            liquidity: "900.25",
+            markets: [],
+            tags: [],
+          },
+        ],
+        next_cursor: "next-page",
+      })
+    );
+    const first = await callTool("list_events", 217, { limit: 1 });
+    const firstResult = first.message.result as ToolCallResult;
+    expect(firstResult.isError).toBeFalsy();
+    const cursor = (
+      firstResult.structuredContent?.meta as { nextCursor?: string }
+    )?.nextCursor;
+    expect(cursor).toEqual(expect.any(String));
+
+    expectGammaFetch(
+      "events continuation",
+      gammaUrl("/events/keyset", "after_cursor=next-page"),
+      () => jsonResponse({ events: [], next_cursor: null })
+    );
+    const second = await callTool("list_events", 218, {
+      limit: 1,
+      cursor,
+      platform: "polymarket",
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.isError).toBeFalsy();
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+  });
+
   it("combines all CLOB quote sources", async () => {
     expectGammaFetch("prices", clobUrl("/prices"), () =>
       jsonResponse({ [TOKEN_ID]: { BUY: 0.44, SELL: 0.46 } })

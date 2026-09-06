@@ -1,4 +1,7 @@
-import { ClobRequestError } from "@knoww/shared-types/clob";
+import {
+  type ClobRequestError,
+  clobRequestError,
+} from "@knoww/shared-types/clob";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,7 +13,7 @@ import { fetchOrderBook } from "@/lib/polymarket";
 import { GET } from "./route";
 
 function clobError(message: string, status: number): ClobRequestError {
-  return new ClobRequestError(message, {
+  return clobRequestError(message, {
     ok: false,
     status,
     statusText: "Error",

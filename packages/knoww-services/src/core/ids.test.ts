@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCanonicalId,
-  InvalidCanonicalIdError,
+  isInvalidCanonicalIdError,
   isPlatformId,
   parseCanonicalId,
 } from "./ids";
+
+function expectInvalidCanonicalId(run: () => unknown): void {
+  let thrown: unknown;
+  try {
+    run();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(isInvalidCanonicalIdError(thrown)).toBe(true);
+}
 
 /**
  * Identifier rules come from docs/decisions/2026-09-03-aggregator-platform-adapters.md
@@ -36,27 +46,19 @@ describe("parseCanonicalId", () => {
   });
 
   it("rejects an unknown platform", () => {
-    expect(() => parseCanonicalId("limitless:abc")).toThrow(
-      InvalidCanonicalIdError
-    );
+    expectInvalidCanonicalId(() => parseCanonicalId("limitless:abc"));
   });
 
   it("rejects a missing separator", () => {
-    expect(() => parseCanonicalId("polymarket")).toThrow(
-      InvalidCanonicalIdError
-    );
+    expectInvalidCanonicalId(() => parseCanonicalId("polymarket"));
   });
 
   it("rejects an empty source id", () => {
-    expect(() => parseCanonicalId("polymarket:")).toThrow(
-      InvalidCanonicalIdError
-    );
+    expectInvalidCanonicalId(() => parseCanonicalId("polymarket:"));
   });
 
   it("does not lowercase the platform segment", () => {
-    expect(() => parseCanonicalId("Polymarket:0xabc")).toThrow(
-      InvalidCanonicalIdError
-    );
+    expectInvalidCanonicalId(() => parseCanonicalId("Polymarket:0xabc"));
   });
 });
 
@@ -66,9 +68,7 @@ describe("buildCanonicalId", () => {
   });
 
   it("rejects an empty source id", () => {
-    expect(() => buildCanonicalId("polymarket", "")).toThrow(
-      InvalidCanonicalIdError
-    );
+    expectInvalidCanonicalId(() => buildCanonicalId("polymarket", ""));
   });
 });
 

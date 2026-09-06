@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { KnowwToolError } from "../errors/tool-error";
+import {
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
+} from "../errors/tool-error";
 
 const CURSOR_PREFIX = "k1.";
 
@@ -40,7 +44,7 @@ const stateCursorSchema = z.object({
 });
 
 function invalidCursor(): KnowwToolError {
-  return new KnowwToolError(
+  return knowwToolError(
     "VALIDATION_ERROR",
     "cursor is invalid or does not match this request."
   );
@@ -128,7 +132,7 @@ export function decodeStateCursor<T>(
     if (!state.success) throw invalidCursor();
     return state.data;
   } catch (error) {
-    if (error instanceof KnowwToolError) throw error;
+    if (isKnowwToolError(error)) throw error;
     throw invalidCursor();
   }
 }
@@ -167,7 +171,7 @@ export function decodeOffsetCursor(
     }
     return parsed.data.offset;
   } catch (error) {
-    if (error instanceof KnowwToolError) throw error;
+    if (isKnowwToolError(error)) throw error;
     throw invalidCursor();
   }
 }
@@ -181,7 +185,7 @@ export function resolveOffset(input: {
 }): number {
   if (input.cursor === undefined) return input.legacyOffset;
   if (input.legacyOffset !== 0) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Do not combine cursor with a non-zero offset."
     );

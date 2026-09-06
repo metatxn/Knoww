@@ -9,6 +9,7 @@ import {
   type CanonicalTag,
   type CanonicalTrade,
   type EventSort,
+  isPlatformError,
   type ListEventsInput,
   type ListTagsInput,
   type MarketCapabilities,
@@ -16,10 +17,11 @@ import {
   type MarketTradesInput,
   type OrderbookInput,
   type Page,
-  PlatformError,
+  type PlatformError,
   type PlatformOperation,
   type PriceHistoryInput,
   type PriceHistoryInterval,
+  platformError,
   type SearchMarketsInput,
 } from "../../core";
 import type { ServiceFetchOptions } from "../../fetch-options";
@@ -99,7 +101,7 @@ function toPlatformError(
   operation: PlatformOperation,
   options?: ServiceFetchOptions
 ): unknown {
-  if (error instanceof PlatformError) {
+  if (isPlatformError(error)) {
     return error;
   }
   if (options?.signal?.aborted) {
@@ -107,7 +109,7 @@ function toPlatformError(
     return error;
   }
   if (isAbortError(error)) {
-    return new PlatformError(`Polymarket ${operation} timed out`, {
+    return platformError(`Polymarket ${operation} timed out`, {
       platform: PLATFORM,
       operation,
       kind: "timeout",
@@ -115,7 +117,7 @@ function toPlatformError(
     });
   }
   if (isUpstreamError(error)) {
-    return new PlatformError(error.message, {
+    return platformError(error.message, {
       platform: PLATFORM,
       operation,
       kind: "upstream",
@@ -123,7 +125,7 @@ function toPlatformError(
       cause: error,
     });
   }
-  return new PlatformError(
+  return platformError(
     error instanceof Error ? error.message : `Polymarket ${operation} failed`,
     { platform: PLATFORM, operation, kind: "upstream", cause: error }
   );
@@ -145,7 +147,7 @@ function invalidInput(
   operation: PlatformOperation,
   message: string
 ): PlatformError {
-  return new PlatformError(message, {
+  return platformError(message, {
     platform: PLATFORM,
     operation,
     kind: "invalid_input",
@@ -156,7 +158,7 @@ function notFound(
   operation: PlatformOperation,
   message: string
 ): PlatformError {
-  return new PlatformError(message, {
+  return platformError(message, {
     platform: PLATFORM,
     operation,
     kind: "not_found",
@@ -357,10 +359,11 @@ export function createPolymarketMarketDataAdapter(
       }
       const mapped = mapGammaMarket(market, mapContext());
       if (!mapped) {
-        throw new PlatformError(
-          "Gamma returned a market without a condition id",
-          { platform: PLATFORM, operation, kind: "upstream" }
-        );
+        throw platformError("Gamma returned a market without a condition id", {
+          platform: PLATFORM,
+          operation,
+          kind: "upstream",
+        });
       }
       return mapped;
     });

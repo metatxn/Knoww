@@ -28,7 +28,7 @@ import {
 import { PUSD_ADDRESS } from "@knoww/shared-types/contracts";
 import Decimal from "decimal.js";
 import { parseUnits } from "viem";
-import { type FundingGateway, FundingGatewayError } from "../gateway";
+import { type FundingGateway, fundingGatewayError } from "../gateway";
 import type { FundingTokenSource } from "../machine";
 import type {
   FundingAttempt,
@@ -211,7 +211,7 @@ export function createTradingPanelFundingGateway(
   async function loadDepositAddressesCached(): Promise<DepositAddress[]> {
     const proxyAddress = getProxyAddress();
     if (!proxyAddress) {
-      throw new FundingGatewayError({
+      throw fundingGatewayError({
         code: "LOAD_FAILED",
         message: "Connect your wallet to get a deposit address.",
         retryable: false,
@@ -291,7 +291,7 @@ export function createTradingPanelFundingGateway(
           (a) => a.chainId === asset.chainId && a.tokenSymbol === asset.symbol
         ) || addresses.find((a) => a.chainId === asset.chainId);
       if (!matching) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "LOAD_FAILED",
           message: "Failed to get bridge address.",
           retryable: false,
@@ -306,7 +306,7 @@ export function createTradingPanelFundingGateway(
     async fetchQuote(input: FundingQuoteRequest): Promise<FundingQuote> {
       const recipient = await resolveWalletQuoteRecipient(input.tokenAddress);
       if (!recipient) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "QUOTE_FAILED",
           message: "No conversion quote for this token.",
           retryable: false,
@@ -328,7 +328,7 @@ export function createTradingPanelFundingGateway(
 
     async beginAttempt(command: FundingCommand): Promise<FundingAttempt> {
       if (command.flow !== "deposit") {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: "Withdrawals are not supported on this surface.",
           retryable: false,
@@ -348,7 +348,7 @@ export function createTradingPanelFundingGateway(
       if (!response.ok) throw executionError(response.error);
       const attempt = toFundingAttempt(response.data);
       if (!attempt) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: "Could not start the deposit.",
           retryable: true,
@@ -362,7 +362,7 @@ export function createTradingPanelFundingGateway(
       attempt: FundingAttempt
     ): Promise<FundingExecutionResult> {
       if (command.flow !== "deposit") {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: "Withdrawals are not supported on this surface.",
           retryable: false,
@@ -411,7 +411,7 @@ export function createTradingPanelFundingGateway(
     },
 
     async pollWithdrawStatus(): Promise<FundingStatusResult> {
-      throw new FundingGatewayError({
+      throw fundingGatewayError({
         code: "EXECUTION_FAILED",
         message: "Withdrawals are not supported on this surface.",
         retryable: false,
@@ -429,7 +429,7 @@ export function createTradingPanelFundingGateway(
         outcome,
       });
       if (!response.ok) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: response.error || "Could not finalize the attempt.",
           retryable: false,

@@ -9,6 +9,9 @@ import {
 
 setupGammaFetchStub();
 
+const TRUMP_CONDITION_ID = `0x${"ee".repeat(32)}`;
+const TRUMPET_CONDITION_ID = `0x${"ef".repeat(32)}`;
+
 const searchEvent = {
   id: "evt-war",
   slug: "geopolitical-outcomes",
@@ -64,6 +67,8 @@ const searchEvent = {
       question: "Will Warcraft release?",
       active: true,
       closed: false,
+      conditionId:
+        "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       volumeNum: 500,
       outcomes: '["Yes","No"]',
       outcomePrices: '["0.1","0.9"]',
@@ -306,6 +311,7 @@ describe("search_markets ranked market results", () => {
               markets: [
                 {
                   id: "mkt-donald-trump",
+                  conditionId: TRUMP_CONDITION_ID,
                   question: "Will Donald   Trump attend?",
                   active: true,
                   closed: false,
@@ -314,6 +320,7 @@ describe("search_markets ranked market results", () => {
                 },
                 {
                   id: "mkt-donald-trumpet",
+                  conditionId: TRUMPET_CONDITION_ID,
                   question: "Will Donald Trumpet perform?",
                   active: true,
                   closed: false,
@@ -341,7 +348,7 @@ describe("search_markets ranked market results", () => {
       | Array<{ id: string }>
       | undefined;
     expect(markets?.map(({ id }) => id)).toEqual([
-      "polymarket:mkt-donald-trump",
+      `polymarket:${TRUMP_CONDITION_ID}`,
     ]);
   });
 

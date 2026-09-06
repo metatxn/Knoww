@@ -652,6 +652,8 @@ describe("search_markets tool (dev bypass)", () => {
       },
       {
         id: "mkt-2",
+        conditionId:
+          "0x2222222222222222222222222222222222222222222222222222222222222222",
         question: "Alternate outcome market",
         outcomes: '["Maybe"]',
         outcomePrices: '["0.1"]',
@@ -746,9 +748,12 @@ describe("search_markets tool (dev bypass)", () => {
             ],
           },
           {
-            id: "polymarket:mkt-2",
+            id: "polymarket:0x2222222222222222222222222222222222222222222222222222222222222222",
             platform: "polymarket",
-            sourceMarketId: "mkt-2",
+            sourceMarketId:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
+            conditionId:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
             question: "Alternate outcome market",
             totalOutcomes: 1,
             outcomes: [{ name: "Maybe", price: "0.1" }],
@@ -782,6 +787,8 @@ describe("search_markets tool (dev bypass)", () => {
               markets: [
                 {
                   id: "mkt-active",
+                  conditionId:
+                    "0xacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
                   active: true,
                   closed: false,
                   outcomes: '["Yes","No"]',
@@ -813,7 +820,11 @@ describe("search_markets tool (dev bypass)", () => {
       expect.objectContaining({
         id: "polymarket:evt-archived",
         totalMarkets: 1,
-        markets: [expect.objectContaining({ id: "polymarket:mkt-active" })],
+        markets: [
+          expect.objectContaining({
+            id: "polymarket:0xacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
+          }),
+        ],
       }),
     ]);
   });
@@ -875,6 +886,7 @@ describe("search_markets tool (dev bypass)", () => {
     );
     const markets = Array.from({ length: 11 }, (_, index) => ({
       id: `m${index}`,
+      conditionId: `0x${String(index).padStart(64, "0")}`,
       groupItemTitle:
         index === 0 ? "Lower" : index === 1 ? "Higher" : `M${index}`,
       outcomes:

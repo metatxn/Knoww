@@ -5,7 +5,7 @@ import {
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { currentRequestId } from "../context";
-import { KnowwToolError } from "../errors/tool-error";
+import { knowwToolError } from "../errors/tool-error";
 import { requirePolymarketClient } from "../platforms";
 import { registerWithLegacyAlias } from "../tool-catalog";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
@@ -169,7 +169,7 @@ function registerPublicProfile(server: McpServer) {
                 signal: context.mcpReq.signal,
               });
               if (!row) {
-                throw new KnowwToolError(
+                throw knowwToolError(
                   "NOT_FOUND",
                   "No public profile matches that wallet address."
                 );

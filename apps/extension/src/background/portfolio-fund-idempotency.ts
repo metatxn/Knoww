@@ -9,14 +9,32 @@ export type PortfolioFundIdempotencyErrorCode =
   | "INVALID_IDEMPOTENCY_KEY"
   | "PENDING_RECONCILIATION";
 
-export class PortfolioFundIdempotencyError extends Error {
+export interface PortfolioFundIdempotencyError extends Error {
+  readonly name: "PortfolioFundIdempotencyError";
   readonly code: PortfolioFundIdempotencyErrorCode;
+}
 
-  constructor(code: PortfolioFundIdempotencyErrorCode) {
-    super(code);
-    this.name = "PortfolioFundIdempotencyError";
-    this.code = code;
-  }
+export function portfolioFundIdempotencyError(
+  code: PortfolioFundIdempotencyErrorCode
+): PortfolioFundIdempotencyError {
+  const error = new Error(code) as Error & {
+    name: "PortfolioFundIdempotencyError";
+    code: PortfolioFundIdempotencyErrorCode;
+  };
+  error.name = "PortfolioFundIdempotencyError";
+  error.code = code;
+  return error;
+}
+
+export function isPortfolioFundIdempotencyError(
+  value: unknown
+): value is PortfolioFundIdempotencyError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; code?: unknown };
+  return (
+    candidate.name === "PortfolioFundIdempotencyError" &&
+    typeof candidate.code === "string"
+  );
 }
 
 export interface PortfolioFundIdempotencyStorage {
@@ -114,7 +132,7 @@ export function createPortfolioFundIdempotencyCoordinator(
     run<Result>(input: PortfolioFundRunInput<Result>): Promise<Result> {
       if (!isPortfolioFundIdempotencyKey(input.idempotencyKey)) {
         return Promise.reject(
-          new PortfolioFundIdempotencyError("INVALID_IDEMPOTENCY_KEY")
+          portfolioFundIdempotencyError("INVALID_IDEMPOTENCY_KEY")
         );
       }
 
@@ -122,9 +140,7 @@ export function createPortfolioFundIdempotencyCoordinator(
       if (active) {
         if (active.fingerprint !== input.fingerprint) {
           return Promise.reject(
-            new PortfolioFundIdempotencyError(
-              "IDEMPOTENCY_FINGERPRINT_MISMATCH"
-            )
+            portfolioFundIdempotencyError("IDEMPOTENCY_FINGERPRINT_MISMATCH")
           );
         }
         return active.promise as Promise<Result>;
@@ -168,12 +184,10 @@ async function runPersisted<Result>(
 
   if (isPersistedRecord(existing)) {
     if (existing.fingerprint !== input.fingerprint) {
-      throw new PortfolioFundIdempotencyError(
-        "IDEMPOTENCY_FINGERPRINT_MISMATCH"
-      );
+      throw portfolioFundIdempotencyError("IDEMPOTENCY_FINGERPRINT_MISMATCH");
     }
     if (existing.status === "completed") return existing.result as Result;
-    throw new PortfolioFundIdempotencyError("PENDING_RECONCILIATION");
+    throw portfolioFundIdempotencyError("PENDING_RECONCILIATION");
   }
 
   const allRecords = await storage.get(null);
@@ -184,7 +198,7 @@ async function runPersisted<Result>(
       candidate.fingerprint === input.fingerprint
   );
   if (hasMatchingPending) {
-    throw new PortfolioFundIdempotencyError("PENDING_RECONCILIATION");
+    throw portfolioFundIdempotencyError("PENDING_RECONCILIATION");
   }
 
   const timestamp = new Date(nowMs).toISOString();

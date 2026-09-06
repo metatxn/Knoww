@@ -43,11 +43,31 @@ export interface FundingGateway {
 }
 
 /** Gateways throw FundingGatewayError; anything else becomes a generic code. */
-export class FundingGatewayError extends Error {
+export interface FundingGatewayError extends Error {
+  readonly name: "FundingGatewayError";
   readonly funding: FundingError;
-  constructor(funding: FundingError) {
-    super(funding.message);
-    this.name = "FundingGatewayError";
-    this.funding = funding;
-  }
+}
+
+export function fundingGatewayError(
+  funding: FundingError
+): FundingGatewayError {
+  const error = new Error(funding.message) as Error & {
+    name: "FundingGatewayError";
+    funding: FundingError;
+  };
+  error.name = "FundingGatewayError";
+  error.funding = funding;
+  return error;
+}
+
+export function isFundingGatewayError(
+  value: unknown
+): value is FundingGatewayError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; funding?: unknown };
+  return (
+    candidate.name === "FundingGatewayError" &&
+    typeof candidate.funding === "object" &&
+    candidate.funding !== null
+  );
 }

@@ -1,4 +1,8 @@
-import { PLATFORM_IDS, parseCanonicalId } from "@knoww/services/core";
+import {
+  PLATFORM_IDS,
+  type PlatformId,
+  parseCanonicalId,
+} from "@knoww/services/core";
 import {
   type EventIdentifier,
   type GammaEventDetail,
@@ -12,24 +16,30 @@ import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
-import { platformInputSchema, requirePolymarketClient } from "../platforms";
+import {
+  DEFAULT_PLATFORM,
+  platformInputSchema,
+  requirePolymarketClient,
+} from "../platforms";
 import { requireToolQuota } from "../quota";
 import { toDecimalString } from "./decimal";
 import {
   canonicalEventId,
-  canonicalMarketId,
   cleanDescription,
   deriveMarketStatus,
   descriptionIsTruncated,
   isAbortLike,
   knowwEventUrl,
+  type MarketIdentity,
+  marketIdentity,
   marketOutcomeSchema,
-  marketSourceId,
   marketStatusSchema,
   projectMarketOutcomes,
   SLUG_PATTERN,
@@ -164,20 +174,20 @@ function resolveEventIdentifier(args: GetEventInput): EventIdentifier {
     provided.push({ kind: "slug", value: args.slug.trim().toLowerCase() });
   }
   if (provided.length !== 1) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Provide exactly one of id or slug."
     );
   }
   const identifier = provided[0];
   if (identifier.kind === "id" && !ID_PATTERN.test(identifier.value)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "id must be a string of decimal digits."
     );
   }
   if (identifier.kind === "slug" && !SLUG_PATTERN.test(identifier.value)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "slug may contain only lowercase letters, digits, and dashes."
     );
@@ -187,6 +197,7 @@ function resolveEventIdentifier(args: GetEventInput): EventIdentifier {
 
 interface EventLookup {
   client: PolymarketClient;
+  platform: PlatformId;
   identifier: EventIdentifier;
 }
 
@@ -198,11 +209,12 @@ function resolveEventLookup(args: GetEventInput): EventLookup {
   if (args.id === undefined || !args.id.includes(":")) {
     return {
       client: requirePolymarketClient(args.platform),
+      platform: args.platform ?? DEFAULT_PLATFORM,
       identifier: resolveEventIdentifier(args),
     };
   }
   if (args.slug !== undefined) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Provide exactly one of id or slug."
     );
@@ -211,19 +223,23 @@ function resolveEventLookup(args: GetEventInput): EventLookup {
   try {
     parts = parseCanonicalId(args.id.trim());
   } catch {
-    throw new KnowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
   }
   if (args.platform !== undefined && args.platform !== parts.platform) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "platform must match the platform prefix of id."
     );
   }
   const client = requirePolymarketClient(parts.platform);
   if (!ID_PATTERN.test(parts.sourceId)) {
-    throw new KnowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
   }
-  return { client, identifier: { kind: "id", value: parts.sourceId } };
+  return {
+    client,
+    platform: parts.platform,
+    identifier: { kind: "id", value: parts.sourceId },
+  };
 }
 
 /**
@@ -289,15 +305,16 @@ function hasStringId(market: GammaMarketDetail | null | undefined): boolean {
   );
 }
 
-function summarizeEventMarket(
-  market: GammaMarketDetail,
-  groupTitle?: string
-): EventMarketSummary {
+function summarizeEventMarket({
+  market,
+  identity,
+  groupTitle,
+}: MergedMarket): EventMarketSummary {
   const outcomeProjection = projectMarketOutcomes(market);
   return {
-    id: canonicalMarketId(market),
+    id: identity.id,
     platform: POLYMARKET_PLATFORM,
-    sourceMarketId: marketSourceId(market),
+    sourceMarketId: identity.sourceMarketId,
     ...(market.question !== undefined ? { question: market.question } : {}),
     ...(market.slug !== undefined ? { slug: market.slug } : {}),
     ...(market.conditionId !== undefined
@@ -314,12 +331,17 @@ function summarizeEventMarket(
   };
 }
 
-type MergedMarket = { market: GammaMarketDetail; groupTitle?: string };
+type MergedMarket = {
+  market: GammaMarketDetail;
+  identity: MarketIdentity;
+  groupTitle?: string;
+};
 
 /**
  * negRisk parents split their markets across child events, so the embedded
  * list alone silently drops legs. Children merge after the embedded markets,
- * deduplicated by market id with the parent's copy winning.
+ * deduplicated by market id with the parent's copy winning. Markets without
+ * a condition id have no canonical id and are skipped.
  */
 function mergeEventMarkets(
   embedded: GammaMarketDetail[],
@@ -329,15 +351,20 @@ function mergeEventMarkets(
   const merged: MergedMarket[] = [];
   for (const market of embedded) {
     if (seen.has(market.id)) continue;
+    const identity = marketIdentity(market);
+    if (identity === null) continue;
     seen.add(market.id);
-    merged.push({ market });
+    merged.push({ market, identity });
   }
   for (const child of children) {
     for (const market of child.markets ?? []) {
       if (!hasStringId(market) || seen.has(market.id)) continue;
+      const identity = marketIdentity(market);
+      if (identity === null) continue;
       seen.add(market.id);
       merged.push({
         market,
+        identity,
         ...(child.title !== undefined ? { groupTitle: child.title } : {}),
       });
     }
@@ -346,20 +373,20 @@ function mergeEventMarkets(
 }
 
 function mapEventLookupError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) return error;
+  if (isKnowwToolError(error)) return error;
   if (isUpstreamEventError(error)) {
     return error.status === 429
-      ? new KnowwToolError(
+      ? knowwToolError(
           "RATE_LIMITED",
           "The event data source is rate limiting requests."
         )
-      : new KnowwToolError(
+      : knowwToolError(
           "UPSTREAM_UNAVAILABLE",
           "Event data is temporarily unavailable upstream."
         );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The event data source timed out."
     );
@@ -407,8 +434,9 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
   try {
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("get_event");
-    const { client, identifier } = resolveEventLookup(args);
+    const { client, platform, identifier } = resolveEventLookup(args);
     const fingerprint = paginationFingerprint([
+      platform,
       identifier.kind,
       identifier.value,
     ]);
@@ -428,10 +456,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
       throw mapEventLookupError(error);
     }
     if (detail === null) {
-      throw new KnowwToolError(
-        "NOT_FOUND",
-        "No event matches that identifier."
-      );
+      throw knowwToolError("NOT_FOUND", "No event matches that identifier.");
     }
 
     // Both follow-up fetches are best-effort: a degraded market list with a
@@ -472,7 +497,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
     const totalMarkets = merged.length;
     const page = merged
       .slice(offset, offset + args.marketLimit)
-      .map((entry) => summarizeEventMarket(entry.market, entry.groupTitle));
+      .map((entry) => summarizeEventMarket(entry));
     const pagination = buildOffsetPage({
       namespace: "get_event",
       fingerprint,

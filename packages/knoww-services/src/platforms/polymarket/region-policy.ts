@@ -39,7 +39,6 @@ export const POLYMARKET_REGION_POLICY: RegionPolicy = {
     "MM",
     "NZ",
     "NI",
-    "KP",
     "PL",
     "RU",
     "SG",

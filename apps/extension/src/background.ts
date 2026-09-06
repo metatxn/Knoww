@@ -76,9 +76,9 @@ import { canUseProductionReranker } from "./context-promotion";
 import {
   createSearchRequestScheduler,
   isCapacityManagedExtensionRequest,
+  isSearchQueueCapacityError,
+  isSearchQueueDeadlineError,
   runSearchWithRetry,
-  SearchQueueCapacityError,
-  SearchQueueDeadlineError,
 } from "./search-request-policy";
 import {
   getUnsupportedSiteHostname,
@@ -2726,17 +2726,16 @@ chrome.runtime.onMessage.addListener(
           sendResponse(toBackgroundResponse(result));
         } catch (error) {
           const queueWaitMs =
-            error instanceof SearchQueueCapacityError ||
-            error instanceof SearchQueueDeadlineError
+            isSearchQueueCapacityError(error) ||
+            isSearchQueueDeadlineError(error)
               ? error.queueWaitMs
               : undefined;
           logWarn("background.search-request-skipped", {
-            reason:
-              error instanceof SearchQueueCapacityError
-                ? "capacity"
-                : error instanceof SearchQueueDeadlineError
-                  ? "deadline"
-                  : "unexpected",
+            reason: isSearchQueueCapacityError(error)
+              ? "capacity"
+              : isSearchQueueDeadlineError(error)
+                ? "deadline"
+                : "unexpected",
             queueWaitMs,
           });
           sendResponse({

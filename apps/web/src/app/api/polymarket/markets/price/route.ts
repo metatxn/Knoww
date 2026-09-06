@@ -1,5 +1,5 @@
 import { createLogger } from "@knoww/logger";
-import { ClobRequestError } from "@knoww/shared-types/clob";
+import { isClobRequestError } from "@knoww/shared-types/clob";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         error: "Unable to load the price right now.",
       },
       {
-        status: error instanceof ClobRequestError ? error.status : 500,
+        status: isClobRequestError(error) ? error.status : 500,
         headers: { "Cache-Control": "no-store" },
       }
     );

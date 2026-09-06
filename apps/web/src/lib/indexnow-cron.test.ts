@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { IndexNowSubmissionError } from "./indexnow";
+import { indexNowSubmissionError } from "./indexnow";
 import {
   diffIndexNowSitemapSnapshots,
   INDEXNOW_CRON_EXPRESSION,
@@ -261,7 +261,7 @@ describe("runIndexNowSitemapCron", () => {
           { url: "https://knoww.app/guides" },
         ]),
         submit: vi.fn(async () => {
-          throw new IndexNowSubmissionError(503);
+          throw indexNowSubmissionError(503);
         }),
       })
     ).rejects.toThrow("IndexNow submission failed (503)");
@@ -284,7 +284,7 @@ describe("runIndexNowSitemapCron", () => {
         { url: "https://knoww.app/guides" },
       ]),
       submit: vi.fn(async () => {
-        throw new IndexNowSubmissionError(429);
+        throw indexNowSubmissionError(429);
       }),
       now: () => now,
     });

@@ -14,6 +14,8 @@ import {
 } from "./helpers";
 
 const CONDITION_ID = `0x${"ab".repeat(32)}`;
+const LEGACY_CONDITION_ID = `0x${"12".repeat(32)}`;
+const RESOLVED_CONDITION_ID = `0x${"38".repeat(32)}`;
 const TOKEN_ID =
   "53135072462907880191400140706440867753044989936304433583131786753949599718775";
 
@@ -64,6 +66,7 @@ const ACTIVE_MARKET = {
  */
 const LEGACY_CLOSED_MARKET = {
   id: "12",
+  conditionId: LEGACY_CONDITION_ID,
   question: "Will Joe Biden get Coronavirus before the election?",
   slug: "will-joe-biden-get-coronavirus-before-the-election",
   closed: true,
@@ -79,6 +82,7 @@ const LEGACY_CLOSED_MARKET = {
  */
 const RESOLVED_MARKET = {
   id: "3870442",
+  conditionId: RESOLVED_CONDITION_ID,
   question: "Fed rate cut in August 2026?",
   slug: "fed-rate-cut-in-august-2026",
   closed: true,
@@ -345,13 +349,29 @@ describe("get_market tool (dev bypass)", () => {
     expect(result.content?.[0]?.text).toContain("closed");
 
     const market = result.structuredContent?.market as Record<string, unknown>;
-    // Legacy rows without a condition id fall back to the Gamma id.
-    expect(market.id).toBe("polymarket:12");
-    expect(market.sourceMarketId).toBe("12");
+    expect(market.id).toBe(`polymarket:${LEGACY_CONDITION_ID}`);
+    expect(market.sourceMarketId).toBe(LEGACY_CONDITION_ID);
     // active:true on a settled market is noise; closed wins.
     expect(market.status).toBe("closed");
     // Both prices are zero, so no winner may be inferred.
     expect("resolvedOutcome" in market).toBe(false);
+  });
+
+  it("reports NOT_FOUND for a Gamma row without a condition id", async () => {
+    expectGammaFetch(
+      "markets by slug (default filter)",
+      marketsUrlWithoutClosed(`slug=${LEGACY_CLOSED_MARKET.slug}`),
+      () => Response.json([{ ...LEGACY_CLOSED_MARKET, conditionId: undefined }])
+    );
+
+    const { message } = await callTool("get_market", 60, {
+      slug: LEGACY_CLOSED_MARKET.slug,
+    });
+
+    const result = message.result as ToolCallResult;
+    expect(result.isError).toBe(true);
+    expect(result.content?.[0]?.text).toContain("NOT_FOUND");
+    expect(result.content?.[0]?.text).toContain("no condition id");
   });
 
   it("reports resolved with the winning outcome when uma settled it", async () => {

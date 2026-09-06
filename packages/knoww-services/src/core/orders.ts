@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
 import { isBoundedDecimal } from "../validation";
-import { PlatformError } from "./errors";
+import { platformError } from "./errors";
 import { PLATFORM_IDS, type PlatformId, parseCanonicalId } from "./ids";
 import {
   CANONICAL_SCHEMA_VERSION,
@@ -486,13 +486,13 @@ export function assertDraftPlaceable(
   now: Date = new Date()
 ): void {
   if (!draft.eligibility.eligible) {
-    throw new PlatformError(
+    throw platformError(
       `Draft ${draft.draftId} is not eligible: ${draft.eligibility.reasons.join(", ")}`,
       { platform: draft.platform, operation: "placeOrder", kind: "ineligible" }
     );
   }
   if (Date.parse(draft.expiresAt) <= now.getTime()) {
-    throw new PlatformError(
+    throw platformError(
       `Draft ${draft.draftId} expired at ${draft.expiresAt}`,
       {
         platform: draft.platform,

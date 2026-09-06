@@ -4,6 +4,7 @@
 
 ### Added
 
+- Seven trading tools (`get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders`, `preview_order`, `place_order`, `cancel_order`) implemented over `TradingAdapter`, registered only behind `EXPOSE_TRADING_TOOLS` (off) and gated by reserved scopes that nothing grants yet, so the public tool list is unchanged.
 - Five read-only prediction-market tools over stateless Streamable HTTP.
 - OAuth authorization-code flow with S256 PKCE, Google OpenID Connect consent, audience-bound opaque tokens, refresh rotation, and `markets:read` enforcement.
 - Production custom domain with OAuth state isolated from the web application.
@@ -18,9 +19,10 @@
 - Flat `search_markets` results with bounded word or phrase matching, individual lifetime-volume sorting, enriched market fields, and opaque cursor pagination.
 - Machine-readable tool-error metadata with retryability, retry delay, and request ID fields.
 - A shared opaque cursor and page contract across every collection-returning tool, including wrapped Data API offsets and composite sports pagination.
-- `platform`, a canonical `id`, and `sourceMarketId` or `sourceEventId` on every market and event, with `get_market` and `get_event` accepting the canonical id.
+- `platform`, a canonical `id`, and `sourceMarketId` or `sourceEventId` on every market and event, with `get_market` and `get_event` accepting the canonical id. Market ids are condition ids only: a Gamma row without one is omitted from lists and `get_market` reports it as `NOT_FOUND`.
 - An optional `platform` input on the eight cross-platform tools, a `list_platforms` tool, and the `PLATFORM_DISABLED` error code.
 - `polymarket_*` canonical names for the 12 Polymarket-only tools; the original names stay as permanent aliases.
+- Pagination cursors from the cross-platform tools carry the platform they were issued for, so a cursor cannot be replayed against another platform.
 
 ### Fixed
 

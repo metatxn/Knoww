@@ -13,6 +13,33 @@ export const ACTIVE_MCP_SCOPES = [MARKETS_READ_SCOPE] as const;
 
 export type ActiveMcpScope = (typeof ACTIVE_MCP_SCOPES)[number];
 
+/**
+ * Reserved for the trading tools (ADR 2026-08-31, "MCP scopes"). Nothing
+ * grants them yet: the OAuth flow rejects them as unsupported and the
+ * development bypass never carries them, so every trading tool fails closed
+ * with FORBIDDEN even when EXPOSE_TRADING_TOOLS is on. Granting one is a
+ * separate, reviewed change that depends on caller identity (grilling Q1).
+ */
+export const ACCOUNT_READ_SCOPE = "account:read" as const;
+export const ORDERS_READ_SCOPE = "orders:read" as const;
+export const ORDERS_CREATE_SCOPE = "orders:create" as const;
+export const ORDERS_CANCEL_SCOPE = "orders:cancel" as const;
+
+export const RESERVED_TRADING_SCOPES = [
+  ACCOUNT_READ_SCOPE,
+  ORDERS_READ_SCOPE,
+  ORDERS_CREATE_SCOPE,
+  ORDERS_CANCEL_SCOPE,
+] as const;
+
+export type ReservedTradingScope = (typeof RESERVED_TRADING_SCOPES)[number];
+
+/** Every scope a tool may demand: the granted ones plus the reserved ones. */
+export type McpScope =
+  | ActiveMcpScope
+  | ReservedTradingScope
+  | typeof FUTURE_X402_SCOPE;
+
 const activeScopeSet = new Set<string>(ACTIVE_MCP_SCOPES);
 
 export interface McpAuthProps {

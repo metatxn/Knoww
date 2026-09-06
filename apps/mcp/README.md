@@ -31,6 +31,8 @@ For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the
 
 The Worker currently advertises 33 tool names: the 20 original tools, `list_platforms`, and a `polymarket_*` canonical name for each of the 12 Polymarket-only tools. The original names stay registered as permanent aliases:
 
+Seven account and order tools are implemented as well (one per `TradingAdapter` method) but not advertised. They sit behind the `EXPOSE_TRADING_TOOLS` constant in `src/tool-catalog.ts` and require scopes that no grant issues yet; see "Trading tools" under the tool catalog.
+
 - `search_markets`
 - `get_market`
 - `get_event`
@@ -86,7 +88,7 @@ The implementation includes:
 It does not yet include:
 
 - Private authenticated Polymarket or Knoww account data
-- Trading actions or x402-paid tools
+- Publicly exposed trading tools (implemented, not advertised; see "Trading tools" below) or x402-paid tools
 
 ## Architecture
 
@@ -144,9 +146,9 @@ MCP requests remain stateless and need no session affinity. A Durable Object is 
 
 ## Tool catalog
 
-All current tools are read-only and require `markets:read`. Production requests are checked before MCP dispatch, and each tool repeats the scope check at execution time.
+All advertised tools are read-only and require `markets:read`. The seven trading tools under "Trading tools" below are registered only when `EXPOSE_TRADING_TOOLS` is true, and each needs a reserved trading scope. Production requests are checked before MCP dispatch, and each tool repeats the scope check at execution time.
 
-The eight cross-platform tools (`search_markets`, `get_market`, `get_event`, `get_orderbook`, `get_price_history`, `list_events`, `get_market_trades`, `list_tags`) accept an optional `platform` input that defaults to `polymarket`. A platform this server does not enable fails with `PLATFORM_DISABLED`; `list_platforms` reports the enabled set and each platform's capabilities. Every market and event carries `platform`, a canonical `id` (`polymarket:` followed by the condition id or event id), and `sourceMarketId` or `sourceEventId`.
+The eight cross-platform tools (`search_markets`, `get_market`, `get_event`, `get_orderbook`, `get_price_history`, `list_events`, `get_market_trades`, `list_tags`) accept an optional `platform` input that defaults to `polymarket`. A platform this server does not enable fails with `PLATFORM_DISABLED`; `list_platforms` reports the enabled set and each platform's capabilities. Every market and event carries `platform`, a canonical `id` (`polymarket:` followed by the condition id or event id), and `sourceMarketId` or `sourceEventId`. Market ids are condition ids only: a Gamma row without one is omitted from lists, and `get_market` reports it as `NOT_FOUND`.
 
 ### `search_markets`
 
@@ -258,6 +260,26 @@ List inputs are bounded even when Polymarket accepts larger pages. New callers s
 
 `walletAddress` is always an explicit public Polymarket proxy wallet address in `0x` plus 40 hexadecimal-character form. Google sign-in authorizes access to Knoww MCP; it does not provide, infer, or prove ownership of a Polymarket wallet. These tools read public on-chain and Polymarket API data only.
 
+### Trading tools (implemented, not exposed)
+
+Owner decision, 2026-09-06: the account and order tools ship in the codebase so a later platform or the identity work can reuse them, but the public server does not advertise them. `EXPOSE_TRADING_TOOLS` in `src/tool-catalog.ts` is `false`; `createKnowwMcpServer({ exposeTradingTools: true })` registers them for tests. Even when registered, each tool demands a reserved scope (`account:read`, `orders:read`, `orders:create`, `orders:cancel`) that the OAuth flow rejects and the development bypass never carries, so every call fails closed with `FORBIDDEN` until a grant exists. Flipping the constant is therefore only half of exposing them; the other half is caller identity (grilling Q1, on hold) and a scope grant.
+
+The registry builds the Polymarket trading adapter without a signer or API credentials, so today the reads work from the identity in the tool input and the order tools answer `UNAUTHENTICATED`.
+
+Drafts from `preview_order` live in the trading adapter's in-memory map (30-second TTL, 256 entries at most) on the Worker isolate that served the call, because the registry in `src/platforms.ts` is a per-isolate singleton. A `place_order` that lands on another isolate answers `NOT_FOUND` for the draft. Exposing the tools therefore also needs a durable draft store (KV or a Durable Object) or a re-preview inside `place_order`. That belongs to the deferred wallet work, together with caller identity, signer and credential binding, and the scope grant.
+
+| Tool | Adapter method | Scope | Notes |
+| --- | --- | --- | --- |
+| `get_trading_connection` | `connectionStatus` + `regionPolicy` | `account:read` | No upstream call; reports `no_signer` / `no_credentials` today. |
+| `get_account_positions` | `getAccountPositions` | `account:read` | Public Data API by trading address. |
+| `get_account_activity` | `getAccountActivity` | `account:read` | Cursor paging via `meta.nextCursor`. |
+| `get_account_orders` | `getAccountOrders` | `orders:read` | Needs bound credentials. |
+| `preview_order` | `previewOrder` | `orders:create` | Returns a short-lived draft; no funds move. |
+| `place_order` | `placeOrder` | `orders:create` | Idempotent on `idempotencyKey`; re-checks the draft before signing. |
+| `cancel_order` | `cancelOrder` | `orders:cancel` | Idempotent on `idempotencyKey`. |
+
+All seven take `platform` as a required argument (no default) and, except `place_order`, an `identity` object (`{ kind: "wallet", address, accountType, tradingAddress? }` or `{ kind: "broker", accountId }`). `src/trading-identity.ts` is the only module that changes when identity moves from the tool input to the principal.
+
 ## Response conventions
 
 ### Successful results
@@ -291,7 +313,7 @@ interface KnowwPageInfo {
 }
 ```
 
-`search_markets`, `get_event`, `list_events`, `get_market_trades`, `get_trader_leaderboard`, `list_tags`, `list_sports_markets`, `get_wallet_positions`, `get_wallet_activity`, and `get_closed_positions` accept `cursor` and return `page`. When `page.hasMore` is true, pass `meta.nextCursor` unchanged with the same filters and ordering. Cursors are opaque, reject filter reuse, and cannot be combined with a non-zero legacy offset.
+`search_markets`, `get_event`, `list_events`, `get_market_trades`, `get_trader_leaderboard`, `list_tags`, `list_sports_markets`, `get_wallet_positions`, `get_wallet_activity`, and `get_closed_positions` accept `cursor` and return `page`. When `page.hasMore` is true, pass `meta.nextCursor` unchanged with the same filters and ordering. Cursors are opaque, reject reuse with different filters or a different `platform`, and cannot be combined with a non-zero legacy offset.
 
 `list_events` and the market side of `list_sports_markets` carry Polymarket's real Gamma keysets. Data API collections still use documented offsets upstream, so Knoww wraps those offsets in the same cursor contract. A full final page from an offset API can produce one last cursor whose next page is empty because the upstream response does not include a total count. See Polymarket's [event keyset API](https://docs.polymarket.com/api-reference/events/list-events-keyset-pagination), [keyset migration note](https://docs.polymarket.com/changelog), and [offset-based trades API](https://docs.polymarket.com/api-reference/core/get-trades-for-a-user-or-markets).
 
@@ -602,7 +624,7 @@ The MCP host opens `/authorize` in the user's browser. After the user approves t
 
 The MCP client and model never receive the Google client secret, Google authorization code, ID token, access token, email, or password. The MCP grant retains Google's stable subject identifier as the principal. Knoww does not add an application database for this flow: the existing OAuth KV binding stores provider grants and tokens, while the existing Durable Object binding stores only short-lived one-time authorization transactions.
 
-Only `markets:read` is active and advertised. `x402:pay` is reserved for a future paid-tool phase but is currently rejected as `invalid_scope`. When it becomes active, it will mean “this client may attempt an x402-gated tool.” It will not authorize Knoww or the model to spend funds. The agent host must enforce its own budget and ask its wallet component to sign each payment proof.
+Only `markets:read` is active and advertised. The four trading scopes (`account:read`, `orders:read`, `orders:create`, `orders:cancel`) are reserved for the unadvertised trading tools and are rejected as `invalid_scope` in the same way. `x402:pay` is reserved for a future paid-tool phase but is currently rejected as `invalid_scope`. When it becomes active, it will mean “this client may attempt an x402-gated tool.” It will not authorize Knoww or the model to spend funds. The agent host must enforce its own budget and ask its wallet component to sign each payment proof.
 
 `x402:pay` is a Knoww-defined OAuth scope, not part of the x402 protocol. Activation also depends on proving that supported MCP hosts can surface the x402 challenge and retry with the payment proof. The first paid tools should remain read-only and must bind each quote and proof to the principal, client, tool request, amount, asset, network, recipient, expiry, and one-time idempotency identifier.
 
@@ -676,6 +698,7 @@ apps/mcp/
     server.ts                MCP server and tool registration
     config.ts                Environment configuration parser
     context.ts               Request-scoped request ID, analytics, and verified principal
+    trading-identity.ts      Trading identity input; the one module that changes when identity moves to the principal
     platforms.ts             Enabled-platform constant, registry access, and the PLATFORM_DISABLED error
     tool-catalog.ts          Tool names, the polymarket_* alias table, and alias registration
     analytics.ts             Request-scoped PostHog batch capture and bounded metadata
@@ -697,6 +720,7 @@ apps/mcp/
       get-orderbook.ts
       get-price-history.ts
       list-platforms.ts
+      trading.ts             Account and order tools over TradingAdapter, registered behind EXPOSE_TRADING_TOOLS
       public-markets.ts      Event, market-data, leaderboard, tag, and sports getters
       public-wallets.ts      Public profile, position, activity, PnL, and value getters
       public-read.ts         Shared validation, scope, quota, and error mapping
@@ -709,6 +733,7 @@ apps/mcp/
       get-*.test.ts          Tool integration coverage
       platforms.test.ts        Alias, list_platforms, canonical id, and PLATFORM_DISABLED contract coverage
       public-read-tools.test.ts Public getter catalog and execution coverage
+      trading-tools.test.ts    Exposure and scope gates plus the seven trading tools on an in-process exposed server
 
 packages/knoww-services/
   src/

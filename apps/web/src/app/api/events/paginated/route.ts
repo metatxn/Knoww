@@ -30,7 +30,23 @@ const ALLOWED_ORDER_FIELDS = new Set([
   "competitive",
 ]);
 
-class QueryValidationError extends Error {}
+interface QueryValidationError extends Error {
+  readonly name: "QueryValidationError";
+}
+
+function queryValidationError(message: string): QueryValidationError {
+  const error = new Error(message) as Error & { name: "QueryValidationError" };
+  error.name = "QueryValidationError";
+  return error;
+}
+
+function isQueryValidationError(value: unknown): value is QueryValidationError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { name?: unknown }).name === "QueryValidationError"
+  );
+}
 
 /**
  * Gamma keyset cursors are inclusive: the continuation page usually repeats
@@ -63,12 +79,12 @@ function parseLimit(searchParams: URLSearchParams): number {
   const raw = searchParams.get("limit");
   if (raw === null || raw.trim() === "") return DEFAULT_LIMIT;
   if (!/^\d+$/.test(raw)) {
-    throw new QueryValidationError("limit must be a positive integer");
+    throw queryValidationError("limit must be a positive integer");
   }
 
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < MIN_LIMIT) {
-    throw new QueryValidationError("limit must be a positive integer");
+    throw queryValidationError("limit must be a positive integer");
   }
 
   return Math.min(value, MAX_LIMIT);
@@ -83,19 +99,19 @@ function parseBooleanParam(
   if (raw === null || raw.trim() === "") return defaultValue;
   if (raw === "true") return true;
   if (raw === "false") return false;
-  throw new QueryValidationError(`${name} must be true or false`);
+  throw queryValidationError(`${name} must be true or false`);
 }
 
 function parseSeriesId(searchParams: URLSearchParams): string | null {
   const raw = searchParams.get("series_id");
   if (raw === null || raw.trim() === "") return null;
   if (!/^\d+$/.test(raw)) {
-    throw new QueryValidationError("series_id must be a positive integer");
+    throw queryValidationError("series_id must be a positive integer");
   }
 
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new QueryValidationError("series_id must be a positive integer");
+    throw queryValidationError("series_id must be a positive integer");
   }
 
   return String(value);
@@ -107,7 +123,7 @@ function parseTagSlug(searchParams: URLSearchParams): string | null {
 
   const tagSlug = normalizeTagSlug(raw);
   if (!TAG_SLUG_PATTERN.test(tagSlug)) {
-    throw new QueryValidationError("tag_slug is invalid");
+    throw queryValidationError("tag_slug is invalid");
   }
 
   return tagSlug;
@@ -116,7 +132,7 @@ function parseTagSlug(searchParams: URLSearchParams): string | null {
 function parseOrder(searchParams: URLSearchParams): string {
   const order = searchParams.get("order") || "volume24hr";
   if (!ALLOWED_ORDER_FIELDS.has(order)) {
-    throw new QueryValidationError("order is not supported");
+    throw queryValidationError("order is not supported");
   }
   return order;
 }
@@ -125,7 +141,7 @@ function parseCursor(searchParams: URLSearchParams): string | null {
   const cursor = searchParams.get("after_cursor");
   if (!cursor) return null;
   if (cursor.length > MAX_CURSOR_LENGTH) {
-    throw new QueryValidationError("after_cursor is too long");
+    throw queryValidationError("after_cursor is too long");
   }
   return cursor;
 }
@@ -138,10 +154,10 @@ function parseNonNegativeNumberParam(
   if (raw === null || raw.trim() === "") return null;
   const trimmed = raw.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new QueryValidationError(`${name} must be a non-negative number`);
+    throw queryValidationError(`${name} must be a non-negative number`);
   }
   if (!Number.isFinite(Number(trimmed))) {
-    throw new QueryValidationError(`${name} must be a finite number`);
+    throw queryValidationError(`${name} must be a finite number`);
   }
   return trimmed;
 }
@@ -154,7 +170,7 @@ function parseDateParam(
   if (raw === null || raw.trim() === "") return null;
   const value = raw.trim();
   if (!ISO_DATE_PATTERN.test(value) || Number.isNaN(Date.parse(value))) {
-    throw new QueryValidationError(`${name} must be a valid date`);
+    throw queryValidationError(`${name} must be a valid date`);
   }
   return value;
 }
@@ -303,7 +319,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    if (error instanceof QueryValidationError) {
+    if (isQueryValidationError(error)) {
       return badRequest(error.message);
     }
 

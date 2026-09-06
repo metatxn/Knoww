@@ -17,7 +17,7 @@ import {
   buildCanonicalId,
   type CanonicalOrderIntent,
   evaluateRegionTrading,
-  PlatformError,
+  isPlatformError,
   type WalletIdentity,
 } from "../../core";
 import { createPolymarketTradingAdapter } from "./trading-adapter";
@@ -269,7 +269,7 @@ async function platformErrorOf(promise: Promise<unknown>) {
   try {
     await promise;
   } catch (error) {
-    if (error instanceof PlatformError) return error;
+    if (isPlatformError(error)) return error;
     throw error;
   }
   throw new Error("expected a PlatformError");
@@ -668,7 +668,8 @@ describe("createPolymarketTradingAdapter region policy", () => {
     expect(policy.closeOnly).toEqual(
       expect.arrayContaining(["US", "GB", "FR", "CA-ON", "AU", "SG"])
     );
-    // KP sits in both published lists; the blocked list wins on evaluation.
+    // KP is blocked outright, so it must not also sit in the close-only list.
+    expect(policy.closeOnly).not.toContain("KP");
     expect(evaluateRegionTrading(policy, { country: "KP" })).toBe("blocked");
   });
 

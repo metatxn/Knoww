@@ -26,15 +26,18 @@ export {
 } from "./enablement";
 export {
   isPlatformError,
-  PlatformError,
+  type PlatformError,
   type PlatformErrorInit,
   type PlatformErrorKind,
   type PlatformOperation,
+  platformError,
 } from "./errors";
 export {
   buildCanonicalId,
   type CanonicalIdParts,
-  InvalidCanonicalIdError,
+  type InvalidCanonicalIdError,
+  invalidCanonicalIdError,
+  isInvalidCanonicalIdError,
   isPlatformId,
   PLATFORM_IDS,
   type PlatformId,

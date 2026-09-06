@@ -6,14 +6,31 @@ import { checkOriginAndFetchSite } from "@/lib/origin-guard";
 const log = createLogger("agent.api");
 const MAX_AGENT_REQUEST_BODY_BYTES = 16 * 1024;
 
-export class JsonBodyError extends Error {
+export interface JsonBodyError extends Error {
+  readonly name: "JsonBodyError";
   readonly status: 400 | 413;
+}
 
-  constructor(message: string, status: 400 | 413) {
-    super(message);
-    this.name = "JsonBodyError";
-    this.status = status;
-  }
+export function jsonBodyError(
+  message: string,
+  status: 400 | 413
+): JsonBodyError {
+  const error = new Error(message) as Error & {
+    name: "JsonBodyError";
+    status: 400 | 413;
+  };
+  error.name = "JsonBodyError";
+  error.status = status;
+  return error;
+}
+
+export function isJsonBodyError(value: unknown): value is JsonBodyError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; status?: unknown };
+  return (
+    candidate.name === "JsonBodyError" &&
+    (candidate.status === 400 || candidate.status === 413)
+  );
 }
 
 export function jsonError(
@@ -37,7 +54,7 @@ export async function readJson(request: NextRequest): Promise<unknown> {
     MAX_AGENT_REQUEST_BODY_BYTES
   );
   if (!result.ok) {
-    throw new JsonBodyError(result.error, result.status);
+    throw jsonBodyError(result.error, result.status);
   }
   return result.body;
 }

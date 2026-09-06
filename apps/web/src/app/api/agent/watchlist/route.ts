@@ -6,7 +6,7 @@ import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  JsonBodyError,
+  isJsonBodyError,
   jsonError,
   readJson,
   requireAgentAdmin,
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await readJson(request);
     } catch (error) {
-      if (error instanceof JsonBodyError) {
+      if (isJsonBodyError(error)) {
         return jsonError(error.message, error.status);
       }
       return jsonError("Invalid JSON payload", 400);

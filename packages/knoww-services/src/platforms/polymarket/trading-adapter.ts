@@ -41,7 +41,8 @@ import {
   type ConnectionStatusInput,
   cancelOrderInputSchema,
   hashOrderIntent,
-  InvalidCanonicalIdError,
+  isInvalidCanonicalIdError,
+  isPlatformError,
   type MarketStatus,
   type OrderDraft,
   type OrderEligibility,
@@ -50,11 +51,12 @@ import {
   orderIntentSchema,
   orderNotional,
   type PlatformConnectionStatus,
-  PlatformError,
+  type PlatformError,
   type PlatformIdentity,
   type PlatformOperation,
   parseCanonicalId,
   placeDraftInputSchema,
+  platformError,
   type TimeInForce,
   type TradingAdapter,
   type WalletAccountType,
@@ -257,11 +259,11 @@ function isAbortError(error: unknown): boolean {
 }
 
 function toPlatformError(error: unknown, operation: PlatformOperation) {
-  if (error instanceof PlatformError) {
+  if (isPlatformError(error)) {
     return error;
   }
-  if (error instanceof InvalidCanonicalIdError) {
-    return new PlatformError(error.message, {
+  if (isInvalidCanonicalIdError(error)) {
+    return platformError(error.message, {
       platform: PLATFORM,
       operation,
       kind: "invalid_input",
@@ -269,7 +271,7 @@ function toPlatformError(error: unknown, operation: PlatformOperation) {
     });
   }
   if (isAbortError(error)) {
-    return new PlatformError(`Polymarket ${operation} timed out`, {
+    return platformError(`Polymarket ${operation} timed out`, {
       platform: PLATFORM,
       operation,
       kind: "timeout",
@@ -277,7 +279,7 @@ function toPlatformError(error: unknown, operation: PlatformOperation) {
     });
   }
   if (isUpstreamError(error)) {
-    return new PlatformError(error.message, {
+    return platformError(error.message, {
       platform: PLATFORM,
       operation,
       kind: "upstream",
@@ -285,7 +287,7 @@ function toPlatformError(error: unknown, operation: PlatformOperation) {
       cause: error,
     });
   }
-  return new PlatformError(
+  return platformError(
     error instanceof Error ? error.message : `Polymarket ${operation} failed`,
     { platform: PLATFORM, operation, kind: "upstream", cause: error }
   );
@@ -307,7 +309,7 @@ function fail(
   kind: PlatformError["kind"],
   message: string
 ): PlatformError {
-  return new PlatformError(message, { platform: PLATFORM, operation, kind });
+  return platformError(message, { platform: PLATFORM, operation, kind });
 }
 
 function decimalText(value: string | number): string;

@@ -1,5 +1,5 @@
 import { createLogger } from "@knoww/logger";
-import { ClobRequestError } from "@knoww/shared-types/clob";
+import { isClobRequestError } from "@knoww/shared-types/clob";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError } from "@/lib/api-error";
@@ -104,7 +104,7 @@ export async function GET(
   } catch (error) {
     log.error("fetch.failed", { error });
 
-    if (error instanceof ClobRequestError && error.status === 404) {
+    if (isClobRequestError(error) && error.status === 404) {
       return NextResponse.json(
         { success: false, error: "Token not found", history: [] },
         { status: 404 }
@@ -117,7 +117,7 @@ export async function GET(
         error: "Failed to fetch price history",
         history: [],
       },
-      { status: error instanceof ClobRequestError ? error.status : 500 }
+      { status: isClobRequestError(error) ? error.status : 500 }
     );
   }
 }

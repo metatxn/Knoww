@@ -4,6 +4,8 @@ Status: Proposed
 
 Date: 2026-08-31
 
+> Update 2026-09-06: the identity layer proposed here (Google plus Privy, Session Keys) is superseded by the per-platform connections in `2026-09-03-aggregator-platform-adapters.md`. The tool contract shipped in reduced form: `get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders` (this document's `list_open_orders`), `preview_order`, `place_order` and `cancel_order` exist in `apps/mcp/src/tools/trading.ts` behind `EXPOSE_TRADING_TOOLS = false` and the reserved scopes below. Setup, order status, cancel-all, redeem, revocation and Session Keys stay proposed until the owner decides how a wallet reaches the MCP.
+
 ## Summary
 
 Knoww should keep Google OpenID Connect as the identity layer for MCP, then add a separate Polymarket authorization layer for wallet operations.

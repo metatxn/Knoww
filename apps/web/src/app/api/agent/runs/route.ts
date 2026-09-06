@@ -10,15 +10,15 @@ import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  JsonBodyError,
+  isJsonBodyError,
   jsonError,
   readJson,
   requireAgentAdmin,
   requireMutatingAgentAdmin,
 } from "@/lib/agent/api";
 import {
-  DurableAgentRepositoryUnavailableError,
   getAgentRepository,
+  isDurableAgentRepositoryUnavailableError,
 } from "@/lib/agent/repository";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       try {
         body = await readJson(request);
       } catch (error) {
-        if (error instanceof JsonBodyError) {
+        if (isJsonBodyError(error)) {
           return jsonError(error.message, error.status);
         }
         return jsonError("Invalid JSON payload", 400);
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
       await repository.releaseSchedulerLock(AGENT_EXECUTION_LOCK_KEY, ownerId);
     }
   } catch (error) {
-    if (error instanceof DurableAgentRepositoryUnavailableError) {
+    if (isDurableAgentRepositoryUnavailableError(error)) {
       return jsonError("Durable live-run storage is unavailable", 503);
     }
     log.error("run.failed", { error });

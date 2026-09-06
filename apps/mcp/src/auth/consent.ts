@@ -31,20 +31,49 @@ const TRANSACTION_ID_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const MAX_GOOGLE_CODE_LENGTH = 4096;
 const log = createLogger("mcp.oauth.google");
 
-class FormError extends Error {
-  constructor(
-    readonly status: 400 | 413 | 415,
-    message: string
-  ) {
-    super(message);
-  }
+type FormErrorStatus = 400 | 413 | 415;
+
+interface FormError extends Error {
+  readonly name: "FormError";
+  readonly status: FormErrorStatus;
 }
 
-class GoogleConfigurationError extends Error {
-  constructor() {
-    super("Google authentication is not configured for this environment.");
-    this.name = "GoogleConfigurationError";
-  }
+function formError(status: FormErrorStatus, message: string): FormError {
+  const error = new Error(message) as Error & {
+    name: "FormError";
+    status: FormErrorStatus;
+  };
+  error.name = "FormError";
+  error.status = status;
+  return error;
+}
+
+function isFormError(value: unknown): value is FormError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; status?: unknown };
+  return candidate.name === "FormError" && typeof candidate.status === "number";
+}
+
+interface GoogleConfigurationError extends Error {
+  readonly name: "GoogleConfigurationError";
+}
+
+function googleConfigurationError(): GoogleConfigurationError {
+  const error = new Error(
+    "Google authentication is not configured for this environment."
+  ) as Error & { name: "GoogleConfigurationError" };
+  error.name = "GoogleConfigurationError";
+  return error;
+}
+
+function isGoogleConfigurationError(
+  value: unknown
+): value is GoogleConfigurationError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { name?: unknown }).name === "GoogleConfigurationError"
+  );
 }
 
 function htmlEscape(value: string): string {
@@ -113,13 +142,13 @@ async function readForm(request: Request): Promise<URLSearchParams> {
   if (
     !contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")
   ) {
-    throw new FormError(415, "Form content type required.");
+    throw formError(415, "Form content type required.");
   }
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_FORM_BYTES) {
-    throw new FormError(413, "Request body too large.");
+    throw formError(413, "Request body too large.");
   }
-  if (!request.body) throw new FormError(400, "Request body required.");
+  if (!request.body) throw formError(400, "Request body required.");
 
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -130,7 +159,7 @@ async function readForm(request: Request): Promise<URLSearchParams> {
     size += value.byteLength;
     if (size > MAX_FORM_BYTES) {
       await reader.cancel();
-      throw new FormError(413, "Request body too large.");
+      throw formError(413, "Request body too large.");
     }
     chunks.push(value);
   }
@@ -214,7 +243,7 @@ function assertGoogleConfiguration(env: McpOAuthEnv): void {
     env.GOOGLE_CLIENT_SECRET.length < 1 ||
     env.GOOGLE_CLIENT_SECRET.length > 4096
   ) {
-    throw new GoogleConfigurationError();
+    throw googleConfigurationError();
   }
 }
 
@@ -475,10 +504,10 @@ export function createConsentHandler(
         }
         return localError("Not found.", 404);
       } catch (error) {
-        if (error instanceof FormError) {
+        if (isFormError(error)) {
           return localError(error.message, error.status);
         }
-        if (error instanceof GoogleConfigurationError) {
+        if (isGoogleConfigurationError(error)) {
           log.warn("configuration.invalid", {
             requestId: currentRequestId(),
             reason: "google_not_configured",

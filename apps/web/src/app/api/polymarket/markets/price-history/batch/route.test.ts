@@ -10,21 +10,22 @@ vi.mock("@/lib/cache-headers", () => ({
 }));
 
 vi.mock("@knoww/shared-types/clob", () => {
-  class ClobRequestError extends Error {
-    status: number;
-    constructor(message: string, response: { status: number }) {
-      super(message);
-      this.status = response.status;
-    }
+  function clobRequestError(message: string, response: { status: number }) {
+    return Object.assign(new Error(message), {
+      name: "ClobRequestError",
+      status: response.status,
+    });
   }
   return {
-    ClobRequestError,
+    clobRequestError,
+    isClobRequestError: (value: unknown) =>
+      value instanceof Error && value.name === "ClobRequestError",
     fetchClobPriceHistory: vi.fn(),
   };
 });
 
 import {
-  ClobRequestError,
+  clobRequestError,
   fetchClobPriceHistory,
 } from "@knoww/shared-types/clob";
 import { POST } from "./route";
@@ -132,7 +133,7 @@ describe("POST /api/polymarket/markets/price-history/batch", () => {
     const [okId, missingId, brokenId] = makeTokenIds(3);
     vi.mocked(fetchClobPriceHistory).mockImplementation(async (tokenId) => {
       if (tokenId === missingId) {
-        throw new ClobRequestError("not found", {
+        throw clobRequestError("not found", {
           ok: false,
           status: 404,
           json: async () => ({}),
@@ -162,7 +163,7 @@ describe("POST /api/polymarket/markets/price-history/batch", () => {
     const [okId, missingId] = makeTokenIds(2);
     vi.mocked(fetchClobPriceHistory).mockImplementation(async (tokenId) => {
       if (tokenId === missingId) {
-        throw new ClobRequestError("not found", {
+        throw clobRequestError("not found", {
           ok: false,
           status: 404,
           json: async () => ({}),

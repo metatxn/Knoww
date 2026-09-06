@@ -5,13 +5,17 @@ import {
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { currentRequestId } from "../context";
-import { KnowwToolError } from "../errors/tool-error";
-import { platformInputSchema, requirePolymarketClient } from "../platforms";
+import { knowwToolError } from "../errors/tool-error";
+import {
+  DEFAULT_PLATFORM,
+  platformInputSchema,
+  requirePolymarketClient,
+} from "../platforms";
 import { registerWithLegacyAlias } from "../tool-catalog";
 import {
   canonicalEventId,
-  canonicalMarketId,
-  marketSourceId,
+  type MarketIdentity,
+  marketIdentity,
   projectMarketOutcomes,
 } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
@@ -73,12 +77,20 @@ function countText(label: string, count: number): string {
   return `${count} ${label}${count === 1 ? "" : "s"} returned.`;
 }
 
-function projectMarket(market: GammaMarketDetail) {
+/** Markets without a condition id have no canonical id and are omitted. */
+function projectMarkets(markets: readonly GammaMarketDetail[]) {
+  return markets.flatMap((market) => {
+    const identity = marketIdentity(market);
+    return identity === null ? [] : [projectMarket(market, identity)];
+  });
+}
+
+function projectMarket(market: GammaMarketDetail, identity: MarketIdentity) {
   const outcomeProjection = projectMarketOutcomes(market);
   return {
-    id: canonicalMarketId(market),
+    id: identity.id,
     platform: POLYMARKET_PLATFORM,
-    sourceMarketId: marketSourceId(market),
+    sourceMarketId: identity.sourceMarketId,
     ...(market.slug ? { slug: market.slug } : {}),
     ...(cleanQuotedText(market.question, 500)
       ? { question: cleanQuotedText(market.question, 500) }
@@ -128,6 +140,7 @@ function registerListEvents(server: McpServer) {
       executePublicRead("list_events", context, async () => {
         const client = requirePolymarketClient(args.platform);
         const fingerprint = paginationFingerprint([
+          args.platform ?? DEFAULT_PLATFORM,
           args.closed ?? "",
           args.live ?? "",
           args.tagSlug ?? "",
@@ -157,8 +170,9 @@ function registerListEvents(server: McpServer) {
         );
         let nestedTruncated = false;
         const events = eventPage.events.map((event) => {
-          const markets = event.markets.slice(0, 20).map(projectMarket);
-          if (event.markets.length > markets.length) nestedTruncated = true;
+          const shown = event.markets.slice(0, 20);
+          const markets = projectMarkets(shown);
+          if (event.markets.length > shown.length) nestedTruncated = true;
           return {
             id: canonicalEventId(event.id),
             platform: POLYMARKET_PLATFORM,
@@ -266,6 +280,7 @@ function registerMarketTrades(server: McpServer) {
       executePublicRead("get_market_trades", context, async () => {
         const client = requirePolymarketClient(args.platform);
         const fingerprint = paginationFingerprint([
+          args.platform ?? DEFAULT_PLATFORM,
           args.conditionIds ?? [],
           args.eventIds ?? [],
           args.walletAddress ?? "",
@@ -692,7 +707,10 @@ function registerListTags(server: McpServer) {
     (args, context) =>
       executePublicRead("list_tags", context, async () => {
         const client = requirePolymarketClient(args.platform);
-        const fingerprint = paginationFingerprint(["tags"]);
+        const fingerprint = paginationFingerprint([
+          args.platform ?? DEFAULT_PLATFORM,
+          "tags",
+        ]);
         const offset = resolveOffset({
           cursor: args.cursor,
           legacyOffset: args.offset,
@@ -779,7 +797,7 @@ function registerSportsMarkets(server: McpServer) {
                 args.league ?? "",
               ]);
               if (args.cursor !== undefined && args.offset !== 0) {
-                throw new KnowwToolError(
+                throw knowwToolError(
                   "VALIDATION_ERROR",
                   "Do not combine cursor with a non-zero offset."
                 );
@@ -849,7 +867,7 @@ function registerSportsMarkets(server: McpServer) {
                     ? { abbreviation: team.abbreviation }
                     : {}),
                 })),
-                markets: marketPage?.markets.map(projectMarket) ?? [],
+                markets: marketPage ? projectMarkets(marketPage.markets) : [],
               };
               const teamNextOffset =
                 cursorState.teamOffset !== null && teams.length === args.limit

@@ -9,7 +9,9 @@ import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
@@ -82,7 +84,7 @@ interface HistoryArgs {
 function resolveTokenId(args: HistoryArgs): string {
   const tokenId = args.tokenId;
   if (typeof tokenId !== "string" || !TOKEN_ID_PATTERN.test(tokenId)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "tokenId must be a string of up to 80 decimal digits."
     );
@@ -93,7 +95,7 @@ function resolveTokenId(args: HistoryArgs): string {
 function parseIsoMs(value: string, field: string): number {
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       `${field} must be an ISO 8601 timestamp.`
     );
@@ -111,13 +113,13 @@ function resolveWindow(args: HistoryArgs): { startMs: number; endMs: number } {
       ? endMs - DEFAULT_WINDOW_MS
       : parseIsoMs(args.startTime, "startTime");
   if (startMs >= endMs) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "startTime must be before endTime."
     );
   }
   if (endMs - startMs > MAX_WINDOW_MS) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "The requested window must be 31 days or shorter."
     );
@@ -141,23 +143,23 @@ function downsample(points: PriceHistoryPoint[]): {
 }
 
 function mapHistoryError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) {
+  if (isKnowwToolError(error)) {
     return error;
   }
   if (isUpstreamPriceHistoryError(error)) {
     if (error.status === 429) {
-      return new KnowwToolError(
+      return knowwToolError(
         "RATE_LIMITED",
         "The CLOB API rate limited this request."
       );
     }
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_UNAVAILABLE",
       "The CLOB API could not serve price history."
     );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The CLOB API took too long to answer."
     );

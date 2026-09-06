@@ -81,16 +81,39 @@ export interface ClobPriceHistoryParams {
   fidelity?: string | number;
 }
 
-export class ClobRequestError extends Error {
+/**
+ * A CLOB request that came back with a non-OK status. A plain `Error` tagged
+ * with `name: "ClobRequestError"`; narrow with `isClobRequestError`, never
+ * `instanceof`.
+ */
+export interface ClobRequestError extends Error {
+  readonly name: "ClobRequestError";
   readonly status: number;
   readonly statusText: string | undefined;
+}
 
-  constructor(message: string, response: ClobFetchResponse) {
-    super(message);
-    this.name = "ClobRequestError";
-    this.status = response.status;
-    this.statusText = response.statusText;
-  }
+export function clobRequestError(
+  message: string,
+  response: ClobFetchResponse
+): ClobRequestError {
+  const error = new Error(message) as Error & {
+    name: "ClobRequestError";
+    status: number;
+    statusText: string | undefined;
+  };
+  error.name = "ClobRequestError";
+  error.status = response.status;
+  error.statusText = response.statusText;
+  return error;
+}
+
+export function isClobRequestError(value: unknown): value is ClobRequestError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; status?: unknown };
+  return (
+    candidate.name === "ClobRequestError" &&
+    typeof candidate.status === "number"
+  );
 }
 
 type ClobQueryValue = string | number | boolean | bigint | null | undefined;
@@ -274,7 +297,7 @@ export async function fetchClobJson<T = unknown>(
   );
 
   if (!response.ok) {
-    throw new ClobRequestError(
+    throw clobRequestError(
       await readClobError(
         response,
         `CLOB request failed: ${response.statusText || response.status}`

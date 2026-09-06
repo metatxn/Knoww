@@ -317,41 +317,31 @@ async function assertWalletClientChain(
   }
 }
 
-class ViemTransactionHandle implements TransactionHandle {
-  readonly transactionId = null;
+function createViemTransactionHandle(
+  initialTransactionHash: TransactionOutcome["transactionHash"],
+  walletClient: WalletClient
+): TransactionHandle {
+  let transactionHash = initialTransactionHash;
+  return {
+    transactionId: null,
+    get transactionHash() {
+      return transactionHash;
+    },
+    async wait(): Promise<TransactionOutcome> {
+      const receipt = await waitForTransactionReceipt(
+        walletClient as Parameters<typeof waitForTransactionReceipt>[0],
+        { hash: transactionHash as `0x${string}` }
+      );
+      transactionHash =
+        receipt.transactionHash as TransactionOutcome["transactionHash"];
 
-  readonly #walletClient: WalletClient;
-  #transactionHash: TransactionOutcome["transactionHash"];
+      if (receipt.status === "reverted") {
+        throw new Error(`Transaction ${transactionHash} reverted`);
+      }
 
-  constructor(
-    transactionHash: TransactionOutcome["transactionHash"],
-    walletClient: WalletClient
-  ) {
-    this.#transactionHash = transactionHash;
-    this.#walletClient = walletClient;
-  }
-
-  get transactionHash() {
-    return this.#transactionHash;
-  }
-
-  async wait(): Promise<TransactionOutcome> {
-    const receipt = await waitForTransactionReceipt(
-      this.#walletClient as Parameters<typeof waitForTransactionReceipt>[0],
-      { hash: this.#transactionHash as `0x${string}` }
-    );
-    this.#transactionHash =
-      receipt.transactionHash as TransactionOutcome["transactionHash"];
-
-    if (receipt.status === "reverted") {
-      throw new Error(`Transaction ${this.#transactionHash} reverted`);
-    }
-
-    return {
-      transactionHash: this.#transactionHash,
-      transactionId: null,
-    };
-  }
+      return { transactionHash, transactionId: null };
+    },
+  };
 }
 
 export function createUnifiedPolymarketViemSigner(
@@ -395,7 +385,7 @@ export function createUnifiedPolymarketViemSigner(
         data: request.data,
         value: request.value,
       });
-      return new ViemTransactionHandle(
+      return createViemTransactionHandle(
         transactionHash as TransactionOutcome["transactionHash"],
         walletClient
       );

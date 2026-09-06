@@ -17,14 +17,40 @@ export function isPlatformId(value: string): value is PlatformId {
   return (PLATFORM_IDS as readonly string[]).includes(value);
 }
 
-export class InvalidCanonicalIdError extends Error {
-  constructor(
-    readonly id: string,
-    reason: string
-  ) {
-    super(`Invalid canonical id "${id}": ${reason}`);
-    this.name = "InvalidCanonicalIdError";
-  }
+/**
+ * A plain `Error` tagged with `name: "InvalidCanonicalIdError"`; narrow with
+ * `isInvalidCanonicalIdError`, never `instanceof`.
+ */
+export interface InvalidCanonicalIdError extends Error {
+  readonly name: "InvalidCanonicalIdError";
+  /** The id that failed to parse. */
+  readonly id: string;
+}
+
+export function invalidCanonicalIdError(
+  id: string,
+  reason: string
+): InvalidCanonicalIdError {
+  const error = new Error(
+    `Invalid canonical id "${id}": ${reason}`
+  ) as Error & {
+    name: "InvalidCanonicalIdError";
+    id: string;
+  };
+  error.name = "InvalidCanonicalIdError";
+  error.id = id;
+  return error;
+}
+
+export function isInvalidCanonicalIdError(
+  value: unknown
+): value is InvalidCanonicalIdError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; id?: unknown };
+  return (
+    candidate.name === "InvalidCanonicalIdError" &&
+    typeof candidate.id === "string"
+  );
 }
 
 export interface CanonicalIdParts {
@@ -35,15 +61,15 @@ export interface CanonicalIdParts {
 export function parseCanonicalId(id: string): CanonicalIdParts {
   const separator = id.indexOf(":");
   if (separator < 0) {
-    throw new InvalidCanonicalIdError(id, "missing platform separator");
+    throw invalidCanonicalIdError(id, "missing platform separator");
   }
   const platform = id.slice(0, separator);
   const sourceId = id.slice(separator + 1);
   if (!isPlatformId(platform)) {
-    throw new InvalidCanonicalIdError(id, `unknown platform "${platform}"`);
+    throw invalidCanonicalIdError(id, `unknown platform "${platform}"`);
   }
   if (sourceId.length === 0) {
-    throw new InvalidCanonicalIdError(id, "empty source id");
+    throw invalidCanonicalIdError(id, "empty source id");
   }
   return { platform, sourceId };
 }
@@ -53,7 +79,7 @@ export function buildCanonicalId(
   sourceId: string
 ): string {
   if (sourceId.length === 0) {
-    throw new InvalidCanonicalIdError(`${platform}:`, "empty source id");
+    throw invalidCanonicalIdError(`${platform}:`, "empty source id");
   }
   return `${platform}:${sourceId}`;
 }
