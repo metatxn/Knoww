@@ -64,6 +64,7 @@ export {
   decimalAmountSchema,
   hashOrderIntent,
   idempotencyKeySchema,
+  isDraftExpired,
   ORDER_TYPES,
   type OrderDraft,
   type OrderEligibility,

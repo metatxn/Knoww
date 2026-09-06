@@ -476,6 +476,14 @@ export interface OrderResult {
   platformDetails?: PlatformDetails;
 }
 
+/** Invalid expiry timestamps also count as expired. `now` is epoch milliseconds. */
+export function isDraftExpired(
+  draft: OrderDraft,
+  now: number = Date.now()
+): boolean {
+  return !(now < Date.parse(draft.expiresAt));
+}
+
 /**
  * The checks every platform runs before signing a draft: the preview must
  * have found the identity eligible, and the draft's short expiration must
@@ -491,7 +499,7 @@ export function assertDraftPlaceable(
       { platform: draft.platform, operation: "placeOrder", kind: "ineligible" }
     );
   }
-  if (Date.parse(draft.expiresAt) <= now.getTime()) {
+  if (isDraftExpired(draft, now.getTime())) {
     throw platformError(
       `Draft ${draft.draftId} expired at ${draft.expiresAt}`,
       {

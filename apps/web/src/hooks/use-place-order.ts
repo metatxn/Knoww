@@ -1,5 +1,6 @@
 "use client";
 
+import { isDraftExpired } from "@knoww/services/core";
 import { useCallback, useState } from "react";
 import { useConnection } from "wagmi";
 import type { ClobOperationStep } from "@/polymarket/clob/shared";
@@ -62,10 +63,21 @@ export function usePlaceOrder() {
 
       try {
         const adapter = await getAdapter();
-        const draft = await adapter.previewOrder(
-          toCanonicalOrderIntent(params, identity)
-        );
+        const intent = toCanonicalOrderIntent(params, identity);
+        let draft = await adapter.previewOrder(intent);
         prepared = await prepare(params, draft, setStep);
+
+        // Approvals and wrapping can outlast the quote. Refresh once and
+        // recheck funding, carrying forward any confirmed wrap.
+        if (isDraftExpired(draft)) {
+          setStep("checking");
+          draft = await adapter.previewOrder(intent);
+          prepared = await prepare(params, draft, setStep, prepared);
+        }
+
+        if (isDraftExpired(draft)) {
+          throw new Error("Order preparation took too long. Please try again.");
+        }
 
         setStep("placing");
 

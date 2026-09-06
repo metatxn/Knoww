@@ -50,6 +50,7 @@ import {
 import {
   clobAccountRoutes,
   composeRoutes,
+  createChain,
   createFakeProvider,
   harnessErrors,
   PERSONALITIES,
@@ -348,9 +349,157 @@ describe("M3 golden: usePlaceOrder.createOrder", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
+
+  it.each(
+    (["eoa", "safe", "deposit"] as const).flatMap((mode) =>
+      [false, true].map((balancesUpdated) => ({ mode, balancesUpdated }))
+    )
+  )(
+    "$mode wraps once across draft refresh, balances updated: $balancesUpdated",
+    async ({ mode, balancesUpdated }) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const walletLog: WalletRequest[] = [];
+      const chain = createChain(walletLog);
+      harness.walletClient = createWalletClient({
+        account: THROWAWAY_EOA,
+        chain: polygon,
+        transport: custom(
+          createFakeProvider(walletLog, {
+            eth_sendTransaction: chain.sendTransaction,
+          })
+        ),
+      });
+      harness.proxyAddress = WALLETS[mode];
+      harness.walletMode = mode;
+      let wrapConfirmed = false;
+      const staleRpc = rpcRoutes(PERSONALITIES.wrap, chain.rpc);
+      const currentRpc = rpcRoutes(PERSONALITIES.approved, chain.rpc);
+      const baseRoutes = composeRoutes([
+        clobRoutes(markets),
+        clobAccountRoutes(PERSONALITIES.wrap),
+        (request, url) =>
+          (wrapConfirmed && balancesUpdated ? currentRpc : staleRpc)(
+            request,
+            url
+          ),
+        relayerProxyRoutes(),
+      ]);
+      const calls = installFetchCapture((request, url) => {
+        const response = baseRoutes(request, url);
+        if (
+          url.pathname.endsWith("/relayer/transaction") ||
+          (url.pathname === RPC_PATH &&
+            (request.body as { method?: string })?.method ===
+              "eth_getTransactionReceipt")
+        ) {
+          // Confirm after expiry; the balance endpoint may still lag behind.
+          vi.setSystemTime(Date.now() + 60_000);
+          wrapConfirmed = true;
+        }
+        return response;
+      }, window.location.origin);
+      const { result } = renderHook(() => usePlaceOrder());
+
+      if (balancesUpdated) {
+        await act(async () => {
+          await expect(
+            result.current.createOrder(
+              orderCases(markets.plain)["limit-buy-gtc"]
+            )
+          ).resolves.toMatchObject({ success: true });
+        });
+      } else {
+        await expect(
+          act(async () => {
+            await result.current.createOrder(
+              orderCases(markets.plain)["limit-buy-gtc"]
+            );
+          })
+        ).rejects.toThrow(
+          "Collateral balance is still insufficient after wrapping"
+        );
+      }
+
+      expect(harnessErrors).toEqual([]);
+      expect(
+        walletLog.filter((entry) => entry.method === "eth_sendTransaction")
+      ).toHaveLength(mode === "eoa" ? 2 : 0);
+      const transcript = calls.map(
+        toFixtureRequest
+      ) as unknown as FixtureRequest[];
+      expect(
+        transcript.filter((request) => request.url === "/api/relayer/submit")
+      ).toHaveLength(mode === "eoa" ? 0 : 1);
+      expect(transcript.filter(isOrderPost)).toHaveLength(
+        balancesUpdated ? 1 : 0
+      );
+    }
+  );
+
+  it.each(["eoa", "safe", "deposit"] as const)(
+    "switches to Polygon before %s wraps collateral from another chain",
+    async (mode) => {
+      const walletLog: WalletRequest[] = [];
+      const chain = createChain(walletLog);
+      let chainId = "0x1";
+      const provider = createFakeProvider(walletLog, {
+        eth_chainId: () => chainId,
+        wallet_switchEthereumChain: (params) => {
+          chainId = "0x89";
+          walletLog.push({ method: "wallet_switchEthereumChain", params });
+          return null;
+        },
+        eth_sendTransaction: chain.sendTransaction,
+      });
+      harness.walletClient = createWalletClient({
+        account: THROWAWAY_EOA,
+        chain: polygon,
+        transport: custom({
+          async request(args) {
+            if (args.method === "eth_signTypedData_v4" && chainId !== "0x89") {
+              throw Object.assign(
+                new Error("Typed-data chain does not match wallet chain"),
+                { code: 4001 }
+              );
+            }
+            return provider.request(args);
+          },
+        }),
+      });
+      harness.proxyAddress = WALLETS[mode];
+      harness.walletMode = mode;
+      const calls = installFetchCapture(
+        composeRoutes([
+          clobRoutes(markets),
+          clobAccountRoutes(PERSONALITIES.wrap),
+          rpcRoutes(PERSONALITIES.wrap, chain.rpc),
+          relayerProxyRoutes(),
+        ]),
+        window.location.origin
+      );
+      const { result } = renderHook(() => usePlaceOrder());
+
+      await act(async () => {
+        await expect(
+          result.current.createOrder(orderCases(markets.plain)["limit-buy-gtc"])
+        ).resolves.toMatchObject({ success: true });
+      });
+
+      expect(harnessErrors).toEqual([]);
+      const methods = walletLog.map((entry) => entry.method);
+      expect(methods[0]).toBe("wallet_switchEthereumChain");
+      expect(
+        methods.filter((method) => method === "eth_sendTransaction")
+      ).toHaveLength(mode === "eoa" ? 2 : 0);
+      expect(
+        postedOrder(calls.map(toFixtureRequest) as unknown as FixtureRequest[])
+      ).toBeDefined();
+    }
+  );
 
   for (const scenario of SCENARIOS) {
     it(`${scenario.label}: ${scenario.cases.join(", ")}`, async () => {

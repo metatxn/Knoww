@@ -1,6 +1,11 @@
 "use client";
 
 import { createLogger } from "@knoww/logger";
+import type {
+  AccountOrder,
+  AccountReadInput,
+  TradingAdapter,
+} from "@knoww/services/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { qk } from "@/lib/query-keys";
@@ -19,6 +24,29 @@ const log = createLogger("open-orders");
 import { useClobCredentials } from "./use-clob-credentials";
 import { useProxyWallet } from "./use-proxy-wallet";
 import { useTradingAdapter } from "./use-trading-adapter";
+
+async function getAllOpenOrders(
+  adapter: TradingAdapter,
+  input: AccountReadInput
+): Promise<AccountOrder[]> {
+  const orders = new Map<string, AccountOrder>();
+  const seenCursors = new Set<string>();
+  let cursor = input.cursor;
+  do {
+    if (cursor) {
+      if (seenCursors.has(cursor))
+        throw new Error("Order pagination did not advance");
+      seenCursors.add(cursor);
+    }
+    const page = await adapter.getAccountOrders({
+      ...input,
+      ...(cursor ? { cursor } : {}),
+    });
+    for (const order of page.items) orders.set(order.orderId, order);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return [...orders.values()];
+}
 
 /**
  * Open order data structure
@@ -147,8 +175,8 @@ export function useOpenOrders(options: UseOpenOrdersOptions = {}) {
       try {
         if (!identity) throw new Error("Trading wallet not found");
         const adapter = await getAdapter();
-        const page = await adapter.getAccountOrders({ identity });
-        const transformedOrders: OpenOrder[] = page.items.map((order) =>
+        const orders = await getAllOpenOrders(adapter, { identity });
+        const transformedOrders: OpenOrder[] = orders.map((order) =>
           toOpenOrder(order, userAddress)
         );
 
@@ -354,11 +382,11 @@ export function useCancelAllOrders() {
       const adapter = await getAdapter();
 
       // First fetch all open orders
-      const page = await adapter.getAccountOrders({ identity });
+      const orders = await getAllOpenOrders(adapter, { identity });
 
       // Cancel each order
       const results = await Promise.allSettled(
-        page.items.map((order) =>
+        orders.map((order) =>
           adapter.cancelOrder({
             identity,
             orderId: order.orderId,
@@ -371,7 +399,7 @@ export function useCancelAllOrders() {
       const successCount = results.filter(
         (r) => r.status === "fulfilled"
       ).length;
-      return { cancelled: successCount, total: page.items.length };
+      return { cancelled: successCount, total: orders.length };
     },
     onSuccess: () => {
       // Invalidate all open orders queries

@@ -57,6 +57,8 @@ const log = createLogger("clob-client");
 
 /** What the pre-order checks learned that the failure path needs again. */
 export interface PreparedOrder {
+  /** A confirmed wrap must not repeat if another RPC still returns old balances. */
+  collateralWrapped: boolean;
   /** The wallet's share balance before a SELL posts; null for a BUY. */
   sellBalanceBeforePostRaw: bigint | null;
   requiredConditionalRaw: bigint | null;
@@ -138,10 +140,11 @@ export function usePolymarketOrderPreflight() {
     async (
       requiredPusdRaw: bigint,
       reservedPusdRaw: bigint = BigInt(0),
-      estimatedFeeRaw: bigint | null = null
-    ) => {
+      estimatedFeeRaw: bigint | null = null,
+      allowWrap = true
+    ): Promise<boolean> => {
       if (!proxyAddress) throw new Error("Proxy wallet not found");
-      if (requiredPusdRaw <= BigInt(0)) return;
+      if (requiredPusdRaw <= BigInt(0)) return false;
 
       const { createPublicClient, erc20Abi, formatUnits, http } = await import(
         "viem"
@@ -192,6 +195,12 @@ export function usePolymarketOrderPreflight() {
         hasEnoughBaseCollateral: wrapPlan.hasEnoughBaseCollateral,
       });
 
+      if (wrapPlan.needsWrap && !allowWrap) {
+        throw new Error(
+          "Collateral balance is still insufficient after wrapping. Wait for it to update, then try again."
+        );
+      }
+
       if (!wrapPlan.hasEnoughBaseCollateral) {
         const needed = formatUnits(wrapPlan.baseShortfallRaw, PUSD_DECIMALS);
         const haveUsdc = formatUnits(usdcBalance, USDC_E_DECIMALS);
@@ -210,7 +219,7 @@ export function usePolymarketOrderPreflight() {
         );
       }
 
-      if (!wrapPlan.needsWrap) return;
+      if (!wrapPlan.needsWrap) return false;
 
       const txns = buildPusdAutoWrapTransactions(
         proxyAddress as `0x${string}`,
@@ -219,6 +228,7 @@ export function usePolymarketOrderPreflight() {
 
       if (!walletClient) throw new Error("Wallet not connected");
       if (!address) throw new Error("Wallet not connected");
+      const wrapWalletClient = await getViemWalletClient(walletClient, address);
 
       if (isEoaMode) {
         const { polygon } = await import("@/lib/chains");
@@ -226,7 +236,7 @@ export function usePolymarketOrderPreflight() {
         const publicClient = getPublicClient();
 
         for (const tx of txns) {
-          const hash = await walletClient.sendTransaction({
+          const hash = await wrapWalletClient.sendTransaction({
             account: address as `0x${string}`,
             chain: polygon,
             to: tx.to,
@@ -235,20 +245,21 @@ export function usePolymarketOrderPreflight() {
           });
           await publicClient.waitForTransactionReceipt({ hash });
         }
-        return;
+        return true;
       }
 
       if (walletMode === "deposit") {
         await executeViaDepositWallet(
-          walletClient,
+          wrapWalletClient,
           address as `0x${string}`,
           txns,
           proxyAddress as `0x${string}`
         );
-        return;
+        return true;
       }
 
-      await executeViaRelayer(walletClient, address as `0x${string}`, txns);
+      await executeViaRelayer(wrapWalletClient, address as `0x${string}`, txns);
+      return true;
     },
     [proxyAddress, walletClient, address, isEoaMode, walletMode]
   );
@@ -364,11 +375,13 @@ export function usePolymarketOrderPreflight() {
     async (
       params: CreateOrderParams,
       draft: OrderDraft,
-      setStep: (step: ClobOperationStep) => void
+      setStep: (step: ClobOperationStep) => void,
+      previous: PreparedOrder | null = null
     ): Promise<PreparedOrder> => {
       const needs = polymarketDraftRequirements(draft);
       const requiredConditionalRaw = needs.sell?.requiredConditionalRaw ?? null;
       let sellBalanceBeforePostRaw: bigint | null = null;
+      let collateralWrapped = previous?.collateralWrapped ?? false;
 
       if (params.side === Side.SELL && requiredConditionalRaw !== null) {
         if (!proxyAddress) throw new Error("Trading wallet not found");
@@ -415,14 +428,20 @@ export function usePolymarketOrderPreflight() {
           throw new Error("Failed to determine required pUSD amount");
         }
         setStep("preparing");
-        await ensurePusdSufficient(
+        const wrapped = await ensurePusdSufficient(
           needs.buy.requiredNotionalRaw,
           needs.buy.reservedCollateralRaw,
-          needs.buy.estimatedFeeRaw
+          needs.buy.estimatedFeeRaw,
+          !collateralWrapped
         );
+        collateralWrapped ||= wrapped;
       }
 
-      return { sellBalanceBeforePostRaw, requiredConditionalRaw };
+      return {
+        sellBalanceBeforePostRaw,
+        requiredConditionalRaw,
+        collateralWrapped,
+      };
     },
     [
       proxyAddress,

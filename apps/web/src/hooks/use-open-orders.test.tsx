@@ -80,7 +80,11 @@ vi.mock("./use-trading-adapter", () => ({
 
 vi.mock("@/polymarket/read-only-client", () => readOnlyClientMock);
 
-import { useCancelOrder, useOpenOrders } from "./use-open-orders";
+import {
+  useCancelAllOrders,
+  useCancelOrder,
+  useOpenOrders,
+} from "./use-open-orders";
 
 const TOKEN_ID = "12345678901234567890";
 const OTHER_TOKEN_ID = "98765432109876543210";
@@ -139,6 +143,7 @@ function createWrapper() {
 describe("useOpenOrders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tradingAdapterState.getAccountOrders.mockReset();
     wagmiState.address = "0x0000000000000000000000000000000000000001";
     wagmiState.isConnected = true;
     proxyWalletState.proxyAddress =
@@ -209,6 +214,78 @@ describe("useOpenOrders", () => {
     expect(result.current.data?.orders.map((order) => order.id)).toEqual([
       "order-1",
     ]);
+  });
+
+  it("includes orders from every page before filtering by token", async () => {
+    tradingAdapterState.getAccountOrders
+      .mockResolvedValueOnce({
+        items: [
+          accountOrder({
+            outcomeId: buildCanonicalId("polymarket", OTHER_TOKEN_ID),
+          }),
+        ],
+        nextCursor: "page-2",
+      })
+      .mockResolvedValueOnce({ items: [accountOrder({ orderId: "order-2" })] });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useOpenOrders({ market: TOKEN_ID }), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.data?.success).toBe(true));
+
+    expect(result.current.data?.orders.map((order) => order.id)).toEqual([
+      "order-2",
+    ]);
+    expect(result.current.data?.count).toBe(1);
+    expect(tradingAdapterState.getAccountOrders).toHaveBeenLastCalledWith({
+      identity: expect.objectContaining({ platform: "polymarket" }),
+      cursor: "page-2",
+    });
+  });
+
+  it("cancels orders from every page", async () => {
+    tradingAdapterState.getAccountOrders
+      .mockResolvedValueOnce({ items: [accountOrder()], nextCursor: "page-2" })
+      .mockResolvedValueOnce({ items: [accountOrder({ orderId: "order-2" })] });
+    tradingAdapterState.cancelOrder.mockResolvedValue({ status: "cancelled" });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCancelAllOrders(), { wrapper });
+
+    const outcome = await result.current.mutateAsync();
+
+    expect(outcome).toEqual({ cancelled: 2, total: 2 });
+    expect(
+      tradingAdapterState.cancelOrder.mock.calls.map(([input]) => input.orderId)
+    ).toEqual(["order-1", "order-2"]);
+  });
+
+  it("does not start cancelling if a later page fails", async () => {
+    tradingAdapterState.getAccountOrders
+      .mockResolvedValueOnce({ items: [accountOrder()], nextCursor: "page-2" })
+      .mockRejectedValueOnce(new Error("Could not load orders"));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCancelAllOrders(), { wrapper });
+
+    await expect(result.current.mutateAsync()).rejects.toThrow(
+      "Could not load orders"
+    );
+    expect(tradingAdapterState.cancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("stops without cancelling when the adapter repeats a cursor", async () => {
+    tradingAdapterState.getAccountOrders.mockResolvedValue({
+      items: [accountOrder()],
+      nextCursor: "same-page",
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCancelAllOrders(), { wrapper });
+
+    await expect(result.current.mutateAsync()).rejects.toThrow(
+      "Order pagination did not advance"
+    );
+    expect(tradingAdapterState.getAccountOrders).toHaveBeenCalledTimes(2);
+    expect(tradingAdapterState.cancelOrder).not.toHaveBeenCalled();
   });
 
   it("clears the stored credentials when the venue rejects them on a passive read", async () => {

@@ -6,6 +6,7 @@ import {
   cancelOrderInputSchema,
   canonicalIntentJson,
   hashOrderIntent,
+  isDraftExpired,
   type OrderDraft,
   orderIntentSchema,
   orderNotional,
@@ -303,6 +304,23 @@ describe("TradingAdapter contract", () => {
     expiresAt: "2026-09-04T10:00:30Z",
     platformDetails: { platform: "polymarket", negRisk: false },
   };
+
+  it.each([
+    ["2026-09-04T10:00:30Z", "2026-09-04T10:00:29.999Z", false],
+    ["2026-09-04T10:00:30Z", "2026-09-04T10:00:30Z", true],
+    ["2026-09-04T10:00:30Z", "2026-09-04T10:00:31Z", true],
+    ["invalid", "2026-09-04T10:00:29Z", true],
+  ])("expiry %s at %s is expired: %s", (expiresAt, now, expired) => {
+    const candidate = { ...draft, expiresAt };
+    const time = new Date(now);
+    expect(isDraftExpired(candidate, time.getTime())).toBe(expired);
+    const assertPlaceable = () => assertDraftPlaceable(candidate, time);
+    if (expired) {
+      expect(assertPlaceable).toThrow("expired at");
+    } else {
+      expect(assertPlaceable).not.toThrow();
+    }
+  });
 
   it("rejects a draft whose short expiration has passed", () => {
     expect(() =>

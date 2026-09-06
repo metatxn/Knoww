@@ -26,8 +26,8 @@ import {
 } from "@knoww/shared-types/relayer";
 import { type Address, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { polygon } from "viem/chains";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { polygon } from "@/lib/chains";
 import {
   type CapturedRequest,
   clobRoutes,

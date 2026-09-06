@@ -1,6 +1,6 @@
 import type { CanonicalOrderIntent } from "@knoww/services/core";
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const credentials = {
   apiKey: "api-key",
@@ -220,6 +220,7 @@ function draftFor(intent: CanonicalOrderIntent) {
   return {
     schemaVersion: "1",
     draftId: "draft-1",
+    expiresAt: new Date(Date.now() + 30_000).toISOString(),
     platform: "polymarket",
     intent,
     platformDetails,
@@ -291,6 +292,116 @@ describe("usePolymarketOrderPreflight", () => {
 
 describe("usePlaceOrder", () => {
   beforeEach(resetTradingState);
+  afterEach(() => vi.restoreAllMocks());
+
+  it("stops without posting when preparation also outlasts the one refreshed draft", async () => {
+    let now = 1_800_000_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    viemMock.readContract.mockImplementation(async () => {
+      now += 31_000;
+      return BigInt(2_000_000);
+    });
+    const { result } = renderHook(() => usePlaceOrder());
+
+    await expect(
+      act(async () => {
+        await result.current.createOrder({
+          tokenId: "token-1",
+          conditionId: "condition-1",
+          price: 0.5,
+          size: 2,
+          side: "BUY",
+          orderType: "GTC",
+        });
+      })
+    ).rejects.toThrow("Order preparation took too long");
+    expect(tradingAdapterState.placeOrder).not.toHaveBeenCalled();
+    expect(tradingAdapterState.previewOrder).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])(
+    "rechecks a fresh draft after slow approval, increased collateral: %s",
+    async (increasedCollateral) => {
+      let now = 1_800_000_000_000;
+      vi.spyOn(Date, "now").mockImplementation(() => now);
+      const drafts = new Map<string, ReturnType<typeof draftFor>>();
+      tradingAdapterState.previewOrder.mockImplementation(
+        async (intent: CanonicalOrderIntent) => {
+          const draft = {
+            ...draftFor(intent),
+            draftId: `draft-${drafts.size + 1}`,
+          };
+          if (
+            increasedCollateral &&
+            drafts.size > 0 &&
+            draft.platformDetails.requiredNotionalRaw !== undefined
+          ) {
+            draft.platformDetails = {
+              ...draft.platformDetails,
+              requiredNotionalRaw: "3000000",
+              requiredCollateralRaw: "3000000",
+            };
+          }
+          drafts.set(draft.draftId, draft);
+          return draft;
+        }
+      );
+      tradingAdapterState.placeOrder.mockImplementation(
+        async ({ draftId }: { draftId: string }) => {
+          const draft = drafts.get(draftId);
+          if (!draft || Date.parse(draft.expiresAt) <= now)
+            throw new Error("Order draft expired");
+          return placedOrder;
+        }
+      );
+      approvalsMock.readPusdExchangeAllowance.mockResolvedValue(BigInt(0));
+      relayerClientState.approveUsdcForTrading.mockImplementation(async () => {
+        now += 60_000;
+        approvalsMock.readPusdExchangeAllowance.mockResolvedValue(
+          BigInt(100_000_000)
+        );
+        return { success: true, transactionHash: "0xapproval" };
+      });
+      viemMock.readContract
+        .mockResolvedValueOnce(BigInt(2_000_000))
+        .mockResolvedValueOnce(BigInt(0))
+        .mockResolvedValueOnce(BigInt(2_000_000))
+        .mockResolvedValueOnce(BigInt(0));
+      const { result } = renderHook(() => usePlaceOrder());
+      const params = {
+        tokenId: "token-1",
+        conditionId: "condition-1",
+        price: 0.5,
+        size: 2,
+        side: "BUY" as const,
+        orderType: "GTC" as const,
+      };
+
+      if (increasedCollateral) {
+        await expect(
+          act(async () => {
+            await result.current.createOrder(params);
+          })
+        ).rejects.toThrow(/Insufficient collateral/);
+        expect(tradingAdapterState.placeOrder).not.toHaveBeenCalled();
+      } else {
+        await act(async () => {
+          await expect(
+            result.current.createOrder(params)
+          ).resolves.toMatchObject({ success: true });
+        });
+        expect(tradingAdapterState.placeOrder).toHaveBeenCalledExactlyOnceWith({
+          draftId: "draft-2",
+          idempotencyKey: expect.any(String),
+        });
+      }
+      expect(tradingAdapterState.previewOrder).toHaveBeenCalledTimes(2);
+      expect(tradingAdapterState.previewOrder.mock.calls[1][0]).toEqual(
+        tradingAdapterState.previewOrder.mock.calls[0][0]
+      );
+      expect(relayerClientState.approveUsdcForTrading).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("throws a clear insufficient-collateral error before placing when no USDC.e can cover a BUY shortfall", async () => {
     viemMock.readContract
@@ -339,6 +450,7 @@ describe("usePlaceOrder", () => {
     expect(relayerClientState.approveUsdcForTrading).toHaveBeenCalledWith(
       "100"
     );
+    expect(tradingAdapterState.previewOrder).toHaveBeenCalledTimes(1);
     expect(tradingAdapterState.placeOrder).toHaveBeenCalledWith({
       draftId: "draft-1",
       idempotencyKey: expect.any(String),

@@ -4,7 +4,10 @@ import {
   type PlatformRegistryInit,
   type RegistryEnv,
 } from "@knoww/services/registry";
-import { createUnifiedPolymarketViemSigner } from "@knoww/shared-types/polymarket-unified";
+import {
+  createUnifiedPolymarketCredentialsOnlySigner,
+  createUnifiedPolymarketViemSigner,
+} from "@knoww/shared-types/polymarket-unified";
 import type { Address, WalletClient } from "viem";
 import { nextAwareFetch } from "@/lib/platform-registry";
 import { getViemWalletClient } from "@/lib/viem-wallet-client";
@@ -32,19 +35,32 @@ export interface UserTradingRegistryInit {
  * platform's trading credentials, so `useTradingAdapter` stays platform
  * agnostic and the boundary lint keeps the platform name out of `hooks/`.
  *
- * The signer goes through the same Polygon wallet client the legacy hook
- * builds, so chain switching and signing prompts are unchanged.
+ * Reading the account never prompts the wallet. Chain switching is deferred
+ * until the SDK requests a signature or transaction.
  */
 export async function createUserTradingRegistry(
   init: UserTradingRegistryInit
 ): Promise<PlatformRegistry> {
-  const viemClient = await getViemWalletClient(init.walletClient, init.address);
+  const signingClient = async () =>
+    createUnifiedPolymarketViemSigner(
+      await getViemWalletClient(init.walletClient, init.address)
+    );
+  const signer: NonNullable<PolymarketTradingInit["signer"]> = {
+    getAddress: createUnifiedPolymarketCredentialsOnlySigner(init.address)
+      .getAddress,
+    signTypedData: async (payload) =>
+      (await signingClient()).signTypedData(payload),
+    signMessage: async (message) =>
+      (await signingClient()).signMessage(message),
+    sendTransaction: async (request) =>
+      (await signingClient()).sendTransaction(request),
+  };
   return createPlatformRegistry({
     env: init.env,
     fetchImpl: nextAwareFetch,
     polymarket: {
       trading: {
-        signer: createUnifiedPolymarketViemSigner(viemClient),
+        signer,
         credentials: init.credentials,
         builderCode: init.builderCode,
       },

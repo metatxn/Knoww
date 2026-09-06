@@ -341,6 +341,63 @@ describe("useTradingAdapter", () => {
     await expect(result.current.getAdapter()).rejects.toThrow(/credentials/i);
   });
 
+  it.each([false, true])(
+    "keeps reads passive when the wallet would reject a chain switch: %s",
+    async (rejectSwitch) => {
+      mountWallet("eoa");
+      const provider = createFakeProvider([]);
+      const requests: string[] = [];
+      let chainId = "0x1";
+      harness.walletClient = createWalletClient({
+        account: THROWAWAY_EOA,
+        chain: polygon,
+        transport: custom({
+          async request(args) {
+            requests.push(args.method);
+            if (args.method === "eth_chainId") return chainId;
+            if (args.method === "wallet_switchEthereumChain") {
+              if (rejectSwitch) throw new Error("User rejected chain switch");
+              chainId = "0x89";
+              return null;
+            }
+            return provider.request(args);
+          },
+        }),
+      });
+      const calls = installFetchCapture(approvedRoutes, window.location.origin);
+      const { result } = renderHook(() => useTradingAdapter("polymarket"));
+      const adapter = await result.current.getAdapter();
+      const identity = expectedIdentity("eoa");
+
+      await adapter.getAccountOrders({ identity });
+      await adapter.getAccountOrders({ identity });
+      expect(requests).toEqual([]);
+
+      const draft = await adapter.previewOrder(
+        intentFor(markets.plain, ORDER_CASES["limit-buy-gtc"], identity)
+      );
+      expect(requests).toEqual([]);
+      const placement = adapter.placeOrder({
+        draftId: draft.draftId,
+        idempotencyKey: "switch-on-placement",
+      });
+      if (rejectSwitch) {
+        await expect(placement).rejects.toThrow();
+        expect(
+          postedOrder(calls.map(toFixtureRequest) as FixtureRequest[])
+        ).toBeUndefined();
+      } else {
+        await expect(placement).resolves.toMatchObject({
+          orderId: RECORDED_ORDER_ID,
+        });
+        expect(requests.indexOf("wallet_switchEthereumChain")).toBeLessThan(
+          requests.indexOf("eth_signTypedData_v4")
+        );
+      }
+      expect(requests).toContain("wallet_switchEthereumChain");
+    }
+  );
+
   it("is not ready and refuses an adapter without a wallet", async () => {
     harness.eoa = "";
     harness.walletClient = null;
@@ -352,5 +409,24 @@ describe("useTradingAdapter", () => {
     expect(result.current.identity).toBeNull();
     expect(result.current.isReady).toBe(false);
     await expect(result.current.getAdapter()).rejects.toThrow(/wallet/i);
+  });
+
+  it("uses the connected address for passive reads when the client has no account", async () => {
+    mountWallet("eoa");
+    const request = vi.fn(async () => {
+      throw new Error("Passive read requested the wallet");
+    });
+    harness.walletClient = createWalletClient({
+      chain: polygon,
+      transport: custom({ request }),
+    });
+    installFetchCapture(approvedRoutes, window.location.origin);
+    const { result } = renderHook(() => useTradingAdapter("polymarket"));
+
+    const adapter = await result.current.getAdapter();
+    await expect(
+      adapter.getAccountOrders({ identity: expectedIdentity("eoa") })
+    ).resolves.toBeDefined();
+    expect(request).not.toHaveBeenCalled();
   });
 });
