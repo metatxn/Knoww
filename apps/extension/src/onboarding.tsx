@@ -443,15 +443,24 @@ function OnboardingApp() {
   const [notice, setNotice] = React.useState("");
   const [demoCompleted, setDemoCompleted] = React.useState(false);
   const progressRef = React.useRef<OnboardingProgress>({});
+  const progressWriteQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const refreshInFlightRef = React.useRef(false);
   const analyticsStateRef = React.useRef("");
 
   const persistProgress = React.useCallback(
-    async (patch: Partial<OnboardingProgress>) => {
-      const nextProgress = { ...progressRef.current, ...patch };
-      await writeProgress(nextProgress);
-      progressRef.current = nextProgress;
-      return nextProgress;
+    (patch: Partial<OnboardingProgress>) => {
+      const commit = progressWriteQueueRef.current.then(async () => {
+        const nextProgress = { ...progressRef.current, ...patch };
+        await writeProgress(nextProgress);
+        progressRef.current = nextProgress;
+        return nextProgress;
+      });
+      // Return failures to the caller while allowing the next commit to run.
+      progressWriteQueueRef.current = commit.then(
+        () => {},
+        () => {}
+      );
+      return commit;
     },
     []
   );

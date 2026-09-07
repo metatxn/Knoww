@@ -68,6 +68,7 @@ body {
   --pf-line: var(--line);
   --pf-line-2: var(--line-strong);
   --pf-surface-2: var(--panel-soft);
+
   margin-top: 0;
   padding: 16px;
   border: 1px solid var(--line-strong);

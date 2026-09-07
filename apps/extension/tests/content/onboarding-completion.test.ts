@@ -18,9 +18,11 @@ vi.mock("react-dom/client", async (original) => {
 
 let stored: Record<string, unknown>;
 let finishOpen: (response: { ok: boolean }) => void;
+let loggedIn: boolean;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  loggedIn = true;
   stored = {
     [ONBOARDING_STORAGE_KEY]: {
       startedAt: "2026-09-07T06:00:00.000Z",
@@ -41,7 +43,7 @@ beforeEach(() => {
         const response = {
           ok: true,
           data: {
-            loggedIn: true,
+            loggedIn,
             address: "0x0000000000000000000000000000000000000001",
             tradingWalletDeployed: true,
             hasCredentials: true,
@@ -87,6 +89,44 @@ async function clickDemo() {
 }
 
 describe("the final onboarding step", () => {
+  it.each([true, false])(
+    "serializes overlapping progress patches when the first write succeeds: %s",
+    async (firstWriteSucceeds) => {
+      await mount();
+      const writes: Array<(succeed?: boolean) => void> = [];
+      vi.spyOn(chrome.storage.local, "set").mockImplementation(
+        (data, callback) => {
+          writes.push((succeed = true) => {
+            if (succeed) Object.assign(stored, data);
+            Object.defineProperty(chrome.runtime, "lastError", {
+              configurable: true,
+              value: succeed ? undefined : { message: "Storage unavailable" },
+            });
+            callback?.();
+            Object.defineProperty(chrome.runtime, "lastError", {
+              value: undefined,
+            });
+          });
+        }
+      );
+
+      await clickDemo();
+      loggedIn = false;
+      await React.act(async () => window.dispatchEvent(new Event("focus")));
+      expect(writes).toHaveLength(1);
+      await React.act(async () => finishOpen({ ok: true }));
+      expect(writes).toHaveLength(1);
+
+      await React.act(async () => writes[0]?.(firstWriteSucceeds));
+      expect(writes).toHaveLength(2);
+      await React.act(async () => writes[1]?.());
+      expect(stored[ONBOARDING_STORAGE_KEY]).toMatchObject({
+        walletCheckResult: firstWriteSucceeds ? "not_connected" : "connected",
+        demoOpenedAt: expect.any(String),
+      });
+    }
+  );
+
   it("completes after opening X and stays complete after reloading", async () => {
     await mount();
     expect(document.querySelector(".progress-summary")?.textContent).toContain(
