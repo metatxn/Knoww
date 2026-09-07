@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { LandingShell } from "@/components/landing/landing-shell";
 import "../../styles/landing-route.css";
-import { OnboardingLoading, OnboardingSlot } from "./onboarding-slot";
+import {
+  OnboardingLoading,
+  OnboardingSlot,
+  OnboardingThemePicker,
+} from "./onboarding-slot";
 
 export const metadata: Metadata = {
   title: "Connect your wallet to Knoww",
@@ -27,6 +31,7 @@ export default function ExtensionConnectPage() {
         <div className="kw-stage-glow" />
         <div className="kw-grain" />
 
+        <OnboardingThemePicker />
         <OnboardingSlot />
         <OnboardingLoading />
       </main>
