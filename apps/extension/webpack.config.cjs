@@ -409,7 +409,10 @@ module.exports = (_env, argv) => {
                 manifest.web_accessible_resources ??= [];
                 manifest.web_accessible_resources.push({
                   resources: ["onboarding.html"],
-                  matches: ["https://knoww.app/*", ...(devMode ? ["http://localhost/*"] : [])],
+                  matches: [
+                    "https://knoww.app/*",
+                    ...(devMode ? ["http://localhost/*"] : []),
+                  ],
                 });
                 manifest.web_accessible_resources.push(
                   buildUnsupportedSiteSupportWebAccessibleResources(hostsSource)

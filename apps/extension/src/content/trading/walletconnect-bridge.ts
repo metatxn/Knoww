@@ -286,7 +286,11 @@ async function getSessionAccounts(publish = true): Promise<string[]> {
   const generation = shared.connectGeneration;
   if (publish && shared.connectPromise) return [];
   const provider = await getProvider();
-  if (generation !== shared.connectGeneration || (publish && shared.connectPromise)) return [];
+  if (
+    generation !== shared.connectGeneration ||
+    (publish && shared.connectPromise)
+  )
+    return [];
   if (!provider.session) return [];
   const accounts = normalizeAccounts(
     provider.session.namespaces.eip155?.accounts ?? []
@@ -357,7 +361,10 @@ async function polygonRpcRequest<T>(
   }
 }
 
-async function disconnectExistingSession(provider: UniversalProvider, generation: number) {
+async function disconnectExistingSession(
+  provider: UniversalProvider,
+  generation: number
+) {
   try {
     if (provider.session) {
       await provider.disconnect();
@@ -460,7 +467,9 @@ async function abortPendingConnect(): Promise<void> {
 
 const closedRetiredProviders = new WeakSet<UniversalProvider>();
 
-async function closeRetiredProvider(provider: UniversalProvider): Promise<void> {
+async function closeRetiredProvider(
+  provider: UniversalProvider
+): Promise<void> {
   if (closedRetiredProviders.has(provider)) return;
   closedRetiredProviders.add(provider);
   try {
