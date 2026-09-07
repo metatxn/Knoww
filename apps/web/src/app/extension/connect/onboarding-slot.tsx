@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { KwThemeDropdown, useKwTheme } from "@/components/kw-theme";
+
+export function OnboardingThemePicker() {
+  const { theme, setTheme } = useKwTheme();
+  return (
+    <div className="absolute right-3 top-3 z-2 min-[781px]:right-6">
+      <KwThemeDropdown theme={theme} onThemeChange={setTheme} />
+    </div>
+  );
+}
 
 export function OnboardingLoading() {
   const fallback = useRef<HTMLDivElement>(null);
@@ -39,7 +49,7 @@ export function OnboardingSlot() {
     <div
       ref={slot}
       id="knoww-extension-onboarding"
-      className="absolute inset-3 z-1 mx-auto max-w-[1280px] sm:inset-4"
+      className="absolute inset-0 z-1"
     />
   );
 }

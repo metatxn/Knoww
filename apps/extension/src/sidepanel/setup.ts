@@ -70,7 +70,7 @@ export const SETUP_STYLES = `
         border: 1px solid var(--pf-line-2);
         border-radius: 10px;
         background: rgba(255, 255, 255, 0.04);
-        color: rgba(255, 255, 255, 0.9);
+        color: var(--pf-hi);
         cursor: pointer;
         padding: 7px 12px;
         text-align: left;
@@ -185,7 +185,7 @@ export const SETUP_STYLES = `
         text-overflow: ellipsis;
         white-space: nowrap;
         font: 600 12.5px/1.2 var(--pf-sans);
-        color: rgba(255, 255, 255, 0.92);
+        color: var(--pf-hi);
       }
 
       .knoww-pf-wallet-mobile .knoww-pf-wallet-id small {

@@ -13,6 +13,7 @@ import {
   parseOnboardingProgress,
   resolveOnboardingStage,
 } from "./onboarding-state";
+import { applyOnboardingTheme } from "./onboarding-theme";
 
 const REFRESH_INTERVAL_MS = 2500;
 const EMBEDDED =
@@ -442,6 +443,11 @@ function OnboardingApp() {
   const [actionState, setActionState] = React.useState<ActionState>("idle");
   const [notice, setNotice] = React.useState("");
   const [demoCompleted, setDemoCompleted] = React.useState(false);
+  const completionHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => {
+    if (demoCompleted && snapshot.stage === "ready")
+      completionHeadingRef.current?.focus({ preventScroll: true });
+  }, [demoCompleted, snapshot.stage]);
   const progressRef = React.useRef<OnboardingProgress>({});
   const progressWriteQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const refreshInFlightRef = React.useRef(false);
@@ -887,7 +893,77 @@ function OnboardingApp() {
                     <InlineSetup onProgress={refreshStatus} />
                   )}
 
-                {snapshot.stage === "ready" && (
+                {snapshot.stage === "ready" && demoCompleted && (
+                  <>
+                    <div className="stage-intro">
+                      <p className="completion-label">
+                        All four steps complete
+                      </p>
+                      <h1
+                        id="onboarding-stage-title"
+                        ref={completionHeadingRef}
+                        tabIndex={-1}
+                      >
+                        You're all set.
+                      </h1>
+                      <p>
+                        Explore the extension on your favorite sites. Open a
+                        post or market and let Knoww find what relates to it.
+                      </p>
+                    </div>
+                    <nav
+                      className="explore-sites"
+                      aria-label="Explore Knoww on supported sites"
+                    >
+                      {[
+                        {
+                          name: "X",
+                          icon: "x",
+                          url: "https://x.com/",
+                          description: "Find markets in your feed",
+                        },
+                        {
+                          name: "Reddit",
+                          icon: "reddit",
+                          url: "https://www.reddit.com/",
+                          description: "Explore markets in discussions",
+                        },
+                        {
+                          name: "Kalshi",
+                          icon: "kalshi",
+                          url: "https://kalshi.com/",
+                          description: "Explore prediction markets",
+                        },
+                      ].map((site) => (
+                        <a
+                          className="explore-site"
+                          key={site.icon}
+                          href={site.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={`icons/sites/${site.icon}.${site.icon === "kalshi" ? "png" : "svg"}`}
+                            alt=""
+                            width={32}
+                            height={32}
+                          />
+                          <span>
+                            <strong>{site.name}</strong>
+                            <small>{site.description}</small>
+                          </span>
+                          <span aria-hidden="true">↗</span>
+                        </a>
+                      ))}
+                    </nav>
+                    <p className="completion-note">
+                      You can return to extension settings whenever you need
+                      them.
+                    </p>
+                  </>
+                )}
+
+                {snapshot.stage === "ready" && !demoCompleted && (
                   <>
                     <div className="stage-intro">
                       <h1 id="onboarding-stage-title">
@@ -963,15 +1039,20 @@ if (!container) throw new Error("Onboarding root element was not found.");
 createRoot(container).render(<OnboardingApp />);
 if (EMBEDDED) {
   document.documentElement.classList.add("onboarding-embedded");
+  const parentOrigin =
+    __DEV_MODE__ && document.referrer.startsWith("http://localhost:8000/")
+      ? "http://localhost:8000"
+      : "https://knoww.app";
+  window.addEventListener("message", (event) =>
+    applyOnboardingTheme(event, window.parent, parentOrigin)
+  );
   const reportHeight = () =>
     window.parent.postMessage(
       {
         type: "knoww:onboarding-height",
         height: container.scrollHeight,
       },
-      __DEV_MODE__ && document.referrer.startsWith("http://localhost:8000/")
-        ? "http://localhost:8000"
-        : "https://knoww.app"
+      parentOrigin
     );
   new ResizeObserver(reportHeight).observe(container);
   reportHeight();

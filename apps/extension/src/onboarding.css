@@ -48,10 +48,19 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* The first-party host supplies the green aurora behind the packaged UI. */
 .onboarding-embedded,
 .onboarding-embedded body {
-  background: transparent;
+  background: var(--bg);
+}
+
+.onboarding-themed {
+  --text-soft: color-mix(in srgb, var(--text) 85%, var(--bg));
+  --muted: color-mix(in srgb, var(--text) 70%, var(--bg));
+  --dim: color-mix(in srgb, var(--text) 60%, var(--bg));
+  --line: color-mix(in srgb, var(--text) 14%, transparent);
+  --line-strong: color-mix(in srgb, var(--text) 25%, transparent);
+  --green-soft: color-mix(in srgb, var(--green) 9%, transparent);
+  --green-line: color-mix(in srgb, var(--green) 30%, transparent);
 }
 .onboarding-embedded .onboarding-shell {
   min-height: 0;
@@ -107,7 +116,7 @@ body {
 }
 .onboarding-inline-setup .knoww-portfolio-open.primary {
   background: var(--green);
-  color: #101810;
+  color: var(--bg);
 }
 .onboarding-inline-setup .knoww-pf-setup-focused {
   display: grid;
@@ -974,7 +983,7 @@ a:focus-visible {
   height: 30px;
   border-radius: 5px;
   background: #050505;
-  color: var(--text);
+  color: #fafafa;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
@@ -1321,9 +1330,100 @@ footer a {
 .onboarding-embedded .onboarding-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
   height: 100%;
   min-height: 0;
   padding: 16px 24px;
+}
+
+/* The host renders the shared web theme picker over this header space. */
+.onboarding-embedded .build-meta {
+  min-height: 36px;
+  padding-right: 140px;
+}
+
+@media (max-width: 780px) {
+  .onboarding-embedded .build-label {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .onboarding-embedded .build-meta {
+    padding-right: 72px;
+  }
+}
+
+.stage-intro .completion-label {
+  color: var(--green);
+  font: 500 11px / 1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stage-intro h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
+.explore-sites {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.explore-site {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.explore-site:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.explore-site img {
+  flex-shrink: 0;
+  padding: 4px;
+  border-radius: 6px;
+  background: white;
+}
+
+.explore-site strong,
+.explore-site small {
+  display: block;
+}
+
+.explore-site small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.explore-site > span:last-child {
+  margin-left: auto;
+}
+
+.completion-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1100px) {
+  .explore-sites {
+    grid-template-columns: 1fr;
+  }
+  .explore-site {
+    padding: 12px;
+  }
 }
 
 .onboarding-embedded .onboarding-layout {
