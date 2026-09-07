@@ -148,19 +148,26 @@ test("retired transport closes only after the abandoned attempt settles", async 
   void attempt.catch(() => {});
   await vi.waitFor(() => assert.ok(walletConnect.connectReject));
   const client = walletConnect.provider?.client as {
-    core: { relayer: { transportClose: ReturnType<typeof vi.fn> }; heartbeat: { stop: ReturnType<typeof vi.fn> } };
+    core: {
+      relayer: { transportClose: ReturnType<typeof vi.fn> };
+      heartbeat: { stop: ReturnType<typeof vi.fn> };
+    };
   };
   await WalletConnectBridge.cancel();
   assert.equal(client.core.relayer.transportClose.mock.calls.length, 0);
   walletConnect.connectReject?.(new Error("expired"));
   await assert.rejects(attempt, /expired/);
-  await vi.waitFor(() => assert.equal(client.core.relayer.transportClose.mock.calls.length, 1));
+  await vi.waitFor(() =>
+    assert.equal(client.core.relayer.transportClose.mock.calls.length, 1)
+  );
   assert.equal(client.core.heartbeat.stop.mock.calls.length, 1);
 });
 
 test("cancelled initialization does not block a replacement provider", async () => {
   let finishInit!: () => void;
-  walletConnect.initGate = new Promise<void>((resolve) => { finishInit = resolve; });
+  walletConnect.initGate = new Promise<void>((resolve) => {
+    finishInit = resolve;
+  });
   const { WalletConnectBridge } = await import(
     "../../src/content/trading/walletconnect-bridge"
   );
@@ -168,12 +175,16 @@ test("cancelled initialization does not block a replacement provider", async () 
   void oldAttempt.catch(() => {});
   await vi.waitFor(() => assert.equal(walletConnect.storages.length, 1));
   let cancelled = false;
-  void WalletConnectBridge.cancel().then(() => { cancelled = true; });
+  void WalletConnectBridge.cancel().then(() => {
+    cancelled = true;
+  });
   await vi.waitFor(() => assert.equal(cancelled, true), { timeout: 250 });
   walletConnect.initGate = null;
   walletConnect.provider = { ...walletConnect.provider };
   void WalletConnectBridge.connect({ forceNew: true }).catch(() => {});
-  await vi.waitFor(() => assert.equal(providerMock("connect").mock.calls.length, 1));
+  await vi.waitFor(() =>
+    assert.equal(providerMock("connect").mock.calls.length, 1)
+  );
   assert.equal(walletConnect.storages.length, 2);
   finishInit();
   await assert.rejects(oldAttempt, /superseded/);

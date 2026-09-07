@@ -571,6 +571,7 @@ export interface PortfolioSetupSurfaceRender {
 }
 
 export interface PortfolioSetupDependencies {
+  presentation?: "focused";
   onActionStateChange?(label: string | null): void;
   analyticsSurface?: "portfolio_sidepanel" | "extension_onboarding";
   root: HTMLElement;
@@ -598,7 +599,7 @@ export interface PortfolioSetupHandle {
   ): Promise<boolean>;
   renderSurface(data: SetupPortfolioData): PortfolioSetupSurfaceRender;
   renderSignedOut(): string;
-  prepareSignedOut(): Promise<void>;
+  prepareSignedOut(refreshWallets?: boolean): Promise<void>;
   clearConnectionErrors(): void;
   clearTradingError(): void;
   reset(): void;
@@ -1485,10 +1486,9 @@ export function createPortfolioSetup(
     });
     if (mode === "complete") return { html: "", mode };
     if (mode === "banner") return { html: renderSetupBanner(flow), mode };
-    // Returning user — they already have a trading vault, so don't replay the
-    // whole onboarding. Show a focused prompt for what's left (usually generating
-    // CLOB API keys) and keep their portfolio visible behind it.
-    if (data.hasTradingWallet) {
+    // The onboarding page and returning portfolio users need only the next
+    // action. The onboarding page already has its own progress rail.
+    if (data.hasTradingWallet || dependencies.presentation === "focused") {
       return {
         html: renderSetupFocused({
           flow,
@@ -1676,8 +1676,9 @@ export function createPortfolioSetup(
     return committed;
   }
 
-  async function prepareSignedOut(): Promise<void> {
-    if (!portfolioWallets) portfolioWallets = await getPortfolioWallets();
+  async function prepareSignedOut(refreshWallets = false): Promise<void> {
+    if (refreshWallets || !portfolioWallets)
+      portfolioWallets = await getPortfolioWallets();
   }
 
   function reset(): void {

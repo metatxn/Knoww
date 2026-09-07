@@ -5,8 +5,7 @@ import { isOnboardingWalletSetupUrl } from "./onboarding-state";
 if (isOnboardingWalletSetupUrl(location.href)) {
   const mount = () => {
     const slot = document.getElementById("knoww-extension-onboarding");
-    if (slot?.dataset.ready !== "true" || slot.querySelector("iframe"))
-      return;
+    if (slot?.dataset.ready !== "true" || slot.querySelector("iframe")) return;
     const frame = document.createElement("iframe");
     frame.src = chrome.runtime.getURL("onboarding.html?embedded=1");
     frame.title = "Knoww extension setup";

@@ -347,8 +347,15 @@ function notifyRequestedSidePanelView(view?: SidePanelView): void {
 }
 
 function isOnboardingPageSender(sender: chrome.runtime.MessageSender): boolean {
-  return sender.url === chrome.runtime.getURL("onboarding.html") ||
-    isEmbeddedOnboardingSender(sender.url, sender.tab?.url, chrome.runtime.getURL("onboarding.html"), __DEV_MODE__);
+  return (
+    sender.url === chrome.runtime.getURL("onboarding.html") ||
+    isEmbeddedOnboardingSender(
+      sender.url,
+      sender.tab?.url,
+      chrome.runtime.getURL("onboarding.html"),
+      __DEV_MODE__
+    )
+  );
 }
 
 function readOnboardingDemoState(): Promise<OnboardingDemoState | null> {
@@ -1576,17 +1583,21 @@ chrome.runtime.onMessage.addListener(
         return true;
       }
 
-      if (isEmbeddedOnboardingSender(sender.url, sender.tab?.url, chrome.runtime.getURL("onboarding.html"), __DEV_MODE__)) {
+      if (
+        isEmbeddedOnboardingSender(
+          sender.url,
+          sender.tab?.url,
+          chrome.runtime.getURL("onboarding.html"),
+          __DEV_MODE__
+        )
+      ) {
         portfolioSigningTabId = sender.tab?.id;
         sendResponse({ ok: true } as BackgroundResponse);
         return true;
       }
       const setupTabPromise = openOnboardingWalletSetup(windowId);
       const clearDemoStatePromise = clearOnboardingDemoState();
-      void Promise.all([
-        setupTabPromise,
-        clearDemoStatePromise,
-      ])
+      void Promise.all([setupTabPromise, clearDemoStatePromise])
         .then(([setupTab]) => {
           portfolioSigningTabId = setupTab.id;
           sendResponse({
@@ -3257,9 +3268,11 @@ chrome.runtime.onInstalled.addListener((details) => {
         reason: details.reason,
       },
     });
-    void scriptsReady.then(() => chrome.tabs.create({
-      url: `${getKnowwAppUrl()}/extension/connect`,
-    }));
+    void scriptsReady.then(() =>
+      chrome.tabs.create({
+        url: `${getKnowwAppUrl()}/extension/connect`,
+      })
+    );
     return;
   }
 
@@ -3275,8 +3288,10 @@ chrome.runtime.onInstalled.addListener((details) => {
     details.reason === chrome.runtime.OnInstalledReason.UPDATE &&
     __DEV_MODE__
   ) {
-    void scriptsReady.then(() => chrome.tabs.create({
-      url: `${getKnowwAppUrl()}/extension/connect`,
-    }));
+    void scriptsReady.then(() =>
+      chrome.tabs.create({
+        url: `${getKnowwAppUrl()}/extension/connect`,
+      })
+    );
   }
 });

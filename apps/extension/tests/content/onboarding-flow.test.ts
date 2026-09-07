@@ -12,9 +12,7 @@ describe("install-time extension onboarding", () => {
       background.indexOf("chrome.runtime.onInstalled.addListener")
     );
 
-    expect(installHandler).toContain(
-      '`${getKnowwAppUrl()}/extension/connect`'
-    );
+    expect(installHandler).toContain("`${getKnowwAppUrl()}/extension/connect`");
     expect(installHandler).toContain("chrome.tabs.create");
     expect(installHandler).not.toContain("chrome.runtime.openOptionsPage()");
   });
@@ -28,9 +26,7 @@ describe("install-time extension onboarding", () => {
     expect(installHandler).toContain(
       "details.reason === chrome.runtime.OnInstalledReason.UPDATE &&\n    __DEV_MODE__"
     );
-    expect(
-      installHandler.match(/getKnowwAppUrl\(\)/g)
-    ).toHaveLength(2);
+    expect(installHandler.match(/getKnowwAppUrl\(\)/g)).toHaveLength(2);
   });
 
   it("ships the onboarding page in both extension builds", () => {
@@ -84,7 +80,6 @@ describe("install-time extension onboarding", () => {
       "0 of 4 complete",
       "Knoww is installed. Here is what it does.",
       "Browser wallets",
-      "Polygon · 137",
       "Live preview",
       "Open x.com and try it",
     ]) {
