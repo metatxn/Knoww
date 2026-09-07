@@ -145,8 +145,22 @@ describe("the final onboarding step", () => {
     );
     expect(document.querySelector(".progress-fill--4")).not.toBeNull();
     expect(document.querySelector(".stage-progress-fill--4")).not.toBeNull();
+    expect(document.querySelector("h1")?.textContent).toBe("You're all set.");
+    expect(document.activeElement).toBe(document.querySelector("h1"));
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLAnchorElement>(".explore-site"),
+        (link) => link.href
+      )
+    ).toEqual([
+      "https://x.com/",
+      "https://www.reddit.com/",
+      "https://kalshi.com/",
+    ]);
+    expect(document.querySelector(".live-preview")).toBeNull();
     await React.act(async () => mounted.root?.unmount());
     await mount();
+    expect(document.querySelector("h1")?.textContent).toBe("You're all set.");
     expect(document.querySelector(".progress-summary")?.textContent).toContain(
       "4 of 4 complete"
     );
