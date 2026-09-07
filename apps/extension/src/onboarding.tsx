@@ -188,10 +188,18 @@ function StepIcon({ index }: { index: number }) {
   );
 }
 
-function ProgressRail({ stage }: { stage: OnboardingStage }) {
+function ProgressRail({
+  stage,
+  completedSteps,
+}: {
+  stage: OnboardingStage;
+  completedSteps: number;
+}) {
   const activeIndex = STAGE_INDEX[stage];
   const progressLabel =
-    activeIndex === 0 ? "0 of 4 complete" : `${activeIndex} of 4 complete`;
+    completedSteps === 0
+      ? "0 of 4 complete"
+      : `${completedSteps} of 4 complete`;
 
   return (
     <>
@@ -200,12 +208,12 @@ function ProgressRail({ stage }: { stage: OnboardingStage }) {
         <span>{progressLabel}</span>
       </div>
       <div className="progress-track" aria-hidden="true">
-        <span className={`progress-fill progress-fill--${activeIndex}`} />
+        <span className={`progress-fill progress-fill--${completedSteps}`} />
       </div>
       <ol className="progress-rail" aria-label="Setup progress">
         {PROGRESS_STEPS.map((step, index) => {
           const status =
-            index < activeIndex
+            index < completedSteps
               ? "complete"
               : index === activeIndex
                 ? "active"
@@ -365,21 +373,6 @@ function WalletOptions() {
   );
 }
 
-function SetupFacts() {
-  return (
-    <dl className="setup-facts">
-      <div>
-        <dt>Network</dt>
-        <dd>Polygon · 137</dd>
-      </div>
-      <div>
-        <dt>Signature</dt>
-        <dd>Read-only · no gas</dd>
-      </div>
-    </dl>
-  );
-}
-
 function LivePreview() {
   return (
     <div className="live-preview">
@@ -448,6 +441,7 @@ function OnboardingApp() {
   const [loading, setLoading] = React.useState(hasExtensionRuntime());
   const [actionState, setActionState] = React.useState<ActionState>("idle");
   const [notice, setNotice] = React.useState("");
+  const [demoCompleted, setDemoCompleted] = React.useState(false);
   const progressRef = React.useRef<OnboardingProgress>({});
   const refreshInFlightRef = React.useRef(false);
   const analyticsStateRef = React.useRef("");
@@ -455,8 +449,8 @@ function OnboardingApp() {
   const persistProgress = React.useCallback(
     async (patch: Partial<OnboardingProgress>) => {
       const nextProgress = { ...progressRef.current, ...patch };
-      progressRef.current = nextProgress;
       await writeProgress(nextProgress);
+      progressRef.current = nextProgress;
       return nextProgress;
     },
     []
@@ -576,6 +570,7 @@ function OnboardingApp() {
       const storedProgress = await readProgress();
       if (!active) return;
       progressRef.current = storedProgress;
+      setDemoCompleted(Boolean(storedProgress.demoOpenedAt));
       if (!storedProgress.startedAt) {
         await persistProgress({ startedAt: new Date().toISOString() });
         await trackEvent("extension_onboarding_started");
@@ -667,10 +662,15 @@ function OnboardingApp() {
       if (response.ok !== true) {
         setActionState("error");
         setNotice("Knoww couldn't open X. Try again.");
+        return;
       }
-      return;
+    } else {
+      window.open(ONBOARDING_DEMO_URL, "_blank", "noopener,noreferrer");
     }
-    window.open(ONBOARDING_DEMO_URL, "_blank", "noopener,noreferrer");
+    if (!progressRef.current.demoOpenedAt) {
+      await persistProgress({ demoOpenedAt: new Date().toISOString() });
+    }
+    setDemoCompleted(true);
   };
 
   const openSettings = async () => {
@@ -687,6 +687,8 @@ function OnboardingApp() {
   };
 
   const activeIndex = STAGE_INDEX[snapshot.stage];
+  const completedSteps =
+    snapshot.stage === "ready" && demoCompleted ? 4 : activeIndex;
   const activeStep = PROGRESS_STEPS[activeIndex];
   const extensionVersion = hasExtensionRuntime()
     ? chrome.runtime.getManifest().version
@@ -718,7 +720,10 @@ function OnboardingApp() {
             Wire up your wallet and trading account once. After that, Knoww
             surfaces live markets on whatever you are reading.
           </p>
-          <ProgressRail stage={snapshot.stage} />
+          <ProgressRail
+            stage={snapshot.stage}
+            completedSteps={completedSteps}
+          />
           <p className="privacy-note">
             Knoww uses your public wallet address to identify your account and
             tailor your experience. It never receives your private key.
@@ -733,7 +738,7 @@ function OnboardingApp() {
         >
           <div className="stage-progress" aria-hidden="true">
             <span
-              className={`stage-progress-fill stage-progress-fill--${activeIndex}`}
+              className={`stage-progress-fill stage-progress-fill--${completedSteps}`}
             />
           </div>
           <div className="stage-panel-inner">
@@ -816,17 +821,13 @@ function OnboardingApp() {
                         </OnboardingActionButton>
                       </div>
                     )}
-                    <SetupFacts />
-                    <p className="support-note">
-                      Select your wallet below. If you need to install MetaMask,
-                      return to this tab and refresh it after installation.
-                      Setup resumes where you left off.
-                    </p>
-                    <StageNotice
-                      notice={notice}
-                      error={actionState === "error"}
-                      fallback="Choose a wallet to continue setup"
-                    />
+                    {(!EMBEDDED || notice) && (
+                      <StageNotice
+                        notice={notice}
+                        error={actionState === "error"}
+                        fallback="Choose a wallet to continue setup"
+                      />
+                    )}
                   </>
                 )}
 
@@ -837,9 +838,8 @@ function OnboardingApp() {
                         Finish your trading setup.
                       </h1>
                       <p>
-                        Knoww creates your Polymarket trading account and API
-                        keys, then asks you to set a USDC allowance. Complete
-                        each step below and review the prompts in your wallet.
+                        Set up your Polymarket account, generate API keys, and
+                        choose a USDC allowance. Review each wallet prompt.
                       </p>
                     </div>
                     {snapshot.address && (
@@ -849,7 +849,7 @@ function OnboardingApp() {
                         <code>{formatAddress(snapshot.address)}</code>
                       </div>
                     )}
-                    <SetupChecklist snapshot={snapshot} />
+                    {!EMBEDDED && <SetupChecklist snapshot={snapshot} />}
                     {!EMBEDDED && (
                       <div className="actions">
                         <OnboardingActionButton
@@ -862,15 +862,13 @@ function OnboardingApp() {
                         </OnboardingActionButton>
                       </div>
                     )}
-                    <p className="support-note">
-                      Your wallet signs only the account setup and allowance
-                      requests. Knoww never receives your private key.
-                    </p>
-                    <StageNotice
-                      notice={notice}
-                      error={actionState === "error"}
-                      fallback="Complete the remaining setup steps below"
-                    />
+                    {(!EMBEDDED || notice) && (
+                      <StageNotice
+                        notice={notice}
+                        error={actionState === "error"}
+                        fallback="Complete the remaining setup steps below"
+                      />
+                    )}
                   </>
                 )}
 

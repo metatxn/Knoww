@@ -72,7 +72,7 @@ export function InlineSetup({ onProgress }: { onProgress(): Promise<void> }) {
         const address = session?.loggedIn === true ? session.address : null;
         if (!address) {
           data = null;
-          await setup.prepareSignedOut();
+          await setup.prepareSignedOut(true);
         } else if (!__STORE_BUILD__) {
           const wallet = await setup.resolveWallet(address);
           const [status, approval] = await Promise.all([
@@ -110,6 +110,7 @@ export function InlineSetup({ onProgress }: { onProgress(): Promise<void> }) {
     };
     const setup = createPortfolioSetup({
       analyticsSurface: "extension_onboarding",
+      presentation: "focused",
       onActionStateChange: (label) => {
         actionLabel = label;
         updateBusy();
@@ -133,16 +134,13 @@ export function InlineSetup({ onProgress }: { onProgress(): Promise<void> }) {
       setup.handleClick(event);
     };
     root.addEventListener("click", click);
-    const focus = () => {
-      if (!setup.isBusy()) void load();
-    };
-    window.addEventListener("focus", focus);
+    // Focusing the iframe precedes its first click. Loading here would disable
+    // the clicked button before the browser can dispatch that click.
     void load();
     return () => {
       disposed = true;
       setup.reset();
       root.removeEventListener("click", click);
-      window.removeEventListener("focus", focus);
     };
   }, [onProgress]);
 
