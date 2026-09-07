@@ -118,6 +118,9 @@ const requiredClassicAssets = [
   "knoww-inline.css",
   "markets-panel-navbar.css",
   "manifest.json",
+  "onboarding.css",
+  "onboarding.html",
+  "onboarding.js",
   "offscreen.html",
   "offscreen.js",
   "options.html",
@@ -375,11 +378,16 @@ async function main() {
   );
   // The lazy-WAR contract asserts this build's runtime chunk (trading in the
   // full build, wallet-only in the store build) is exposed exactly once by the
-  // same canonical owner as platforms/*.js.
+  // same canonical owner as platforms/*.js. Include the first-party wallet
+  // setup origin, but never the development localhost origin in production.
   for (const failure of validateLazyWarContract(
     builtManifest.web_accessible_resources,
     supportedMatchPatterns,
-    runtimeChunkAsset
+    runtimeChunkAsset,
+    extractStringArray(
+      supportedHostsSource,
+      "ONBOARDING_WALLET_SETUP_PRODUCTION_MATCH_PATTERNS"
+    )
   )) {
     failures.push(`lazy WAR contract: ${failure}`);
   }
@@ -506,6 +514,11 @@ async function main() {
     const contentModules = collectEntryModules(classicStats, "content");
     for (const identifier of contentModules) {
       const normalized = normalizeModulePath(identifier);
+      if (normalized.endsWith("node_modules/process/browser.js")) {
+        failures.push(
+          "classic content graph must not include the process shim for typeof checks"
+        );
+      }
       if (
         /(^|\/)src\/content\/platforms\//.test(normalized) &&
         !normalized.endsWith("src/content/platforms/manifest.json")
@@ -724,6 +737,21 @@ async function main() {
         )})`
       );
     }
+  }
+
+  const walletBundle = await readFile(
+    path.join(
+      distDir,
+      STORE_BUILD ? "content-wallet.js" : "content-trading.js"
+    ),
+    "utf8"
+  );
+  if (
+    !/isGlobalCoreDisabled\(\)\{try\{return(?:!0|true)\}/.test(walletBundle)
+  ) {
+    failures.push(
+      "WalletConnect must compile with global Core sharing disabled"
+    );
   }
 
   for (const filePath of files) {

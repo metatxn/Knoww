@@ -16,7 +16,7 @@ const log = createLogger("sell-position-modal");
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +44,10 @@ export function SellPositionModal({
   onSellSuccess,
 }: SellPositionModalProps) {
   const router = useRouter();
+  const lastOrderAttemptProperties = useRef<Record<
+    string,
+    string | number
+  > | null>(null);
 
   const {
     shares,
@@ -61,22 +65,38 @@ export function SellPositionModal({
     position,
     onSellSuccess: (result) => {
       if (position) {
-        posthog.capture("sell_position_submitted", {
+        const successProperties = {
+          product: "web",
+          surface: "portfolio_quick_sell",
           market_title: position.market.title,
           outcome: position.outcome,
+          outcome_name: position.outcome,
+          side: "SELL",
+          order_type: "MARKET",
+          shares: result.shares,
           shares_sold: result.shares,
+          order_value: result.estimatedProceeds,
           estimated_proceeds: result.estimatedProceeds,
           estimated_price: result.estimatedPrice,
           unrealized_pnl: position.unrealizedPnl,
-        });
+        };
+        posthog.capture("sell_position_submitted", successProperties);
       }
-      toast.success("Sell order filled", {
+      lastOrderAttemptProperties.current = null;
+      toast.success("Sell order submitted", {
         description: `Estimated proceeds: ${formatCurrency(result.estimatedProceeds)}.`,
       });
       onSellSuccess?.();
       onOpenChange(false);
     },
     onSellError: (err) => {
+      if (lastOrderAttemptProperties.current) {
+        posthog.capture("trade_form_submission_failed", {
+          ...lastOrderAttemptProperties.current,
+          failure_stage: "submission",
+        });
+        lastOrderAttemptProperties.current = null;
+      }
       log.error("sell.failed", { error: err });
     },
   });
@@ -117,6 +137,18 @@ export function SellPositionModal({
 
   // Handle quick sell
   const handleQuickSell = async () => {
+    const orderProperties = {
+      product: "web",
+      surface: "portfolio_quick_sell",
+      market_title: position.market.title,
+      outcome_name: position.outcome,
+      side: "SELL",
+      order_type: "MARKET",
+      shares,
+      order_value: sellEstimate.estimatedProceeds,
+    };
+    lastOrderAttemptProperties.current = orderProperties;
+    posthog.capture("trade_button_clicked", orderProperties);
     await executeSell();
   };
 

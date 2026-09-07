@@ -5,6 +5,9 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { qk } from "@/lib/query-keys";
 
+const analyticsMock = vi.hoisted(() => ({ captureTradingEvent: vi.fn() }));
+vi.mock("@/lib/order-analytics", () => analyticsMock);
+
 const wagmiState = vi.hoisted(() => ({
   address: "0x0000000000000000000000000000000000000001",
   isConnected: true,
@@ -323,6 +326,19 @@ describe("useCancelOrder", () => {
     const outcome = await result.current.mutateAsync("order-1");
 
     expect(outcome).toEqual({ success: true, order: cancelled });
+    expect(analyticsMock.captureTradingEvent).toHaveBeenCalledWith(
+      "order_cancel_attempted",
+      wagmiState.address,
+      { order_id: "order-1" }
+    );
+    expect(analyticsMock.captureTradingEvent).toHaveBeenLastCalledWith(
+      "order_cancelled",
+      wagmiState.address,
+      {
+        order_id: "order-1",
+        $insert_id: `cancel:${wagmiState.address}:order-1`,
+      }
+    );
     expect(tradingAdapterState.cancelOrder).toHaveBeenCalledWith({
       identity: expect.objectContaining({ platform: "polymarket" }),
       orderId: "order-1",
@@ -353,5 +369,15 @@ describe("useCancelOrder", () => {
     );
 
     expect(queryClient.getQueryData(listKey)).toEqual(cached);
+    expect(analyticsMock.captureTradingEvent).toHaveBeenLastCalledWith(
+      "order_cancel_failed",
+      wagmiState.address,
+      { order_id: "order-1" }
+    );
+    expect(analyticsMock.captureTradingEvent).not.toHaveBeenCalledWith(
+      "order_cancelled",
+      expect.anything(),
+      expect.anything()
+    );
   });
 });

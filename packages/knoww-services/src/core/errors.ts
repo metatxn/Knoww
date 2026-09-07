@@ -31,6 +31,8 @@ export type PlatformErrorKind =
   | "disabled"
   | "unsupported"
   | "timeout"
+  /** Submission started, but the venue did not return a definite outcome. */
+  | "submission_unknown"
   /** The draft's short expiration passed before `placeOrder`. */
   | "draft_expired"
   /**

@@ -613,17 +613,79 @@ describe("TradingForm", () => {
 
     await waitFor(() => expect(handleSubmit).toHaveBeenCalledTimes(1));
     expect(posthog.capture).toHaveBeenCalledWith(
+      "trade_button_clicked",
+      expect.objectContaining({
+        product: "web",
+        surface: "trading_form",
+        side: "BUY",
+        order_type: "MARKET",
+        order_value: 1.06,
+      })
+    );
+    expect(posthog.capture).toHaveBeenCalledWith(
       "order_submitted",
       expect.objectContaining({
         shares: 6,
         total_cost: 1.06,
       })
     );
-    expect(toast.success).toHaveBeenCalledWith(
-      "Order filled",
+    expect(posthog.capture).not.toHaveBeenCalledWith(
+      "order_succeeded",
       expect.objectContaining({
-        description: "Bought 6 YES at market.",
+        product: "web",
+        side: "BUY",
+        order_type: "MARKET",
+        shares: 6,
+        order_value: 1.06,
+        total_cost: 1.06,
       })
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Order submitted",
+      expect.objectContaining({
+        description: "Check your portfolio for confirmed fills.",
+      })
+    );
+  });
+
+  it("tracks a failed order attempt without recording a success", async () => {
+    const handleSubmit = vi.fn().mockResolvedValue(false);
+    useTradingFormStateMock.mockReturnValue(
+      makeTradingFormState({
+        hasCredentials: true,
+        isConnected: true,
+        handleSubmit,
+      })
+    );
+
+    renderDefaultForm();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /buy 10 shares for \$6/i })
+    );
+
+    await waitFor(() => expect(handleSubmit).toHaveBeenCalledTimes(1));
+    expect(posthog.capture).toHaveBeenCalledWith(
+      "trade_button_clicked",
+      expect.objectContaining({
+        product: "web",
+        surface: "trading_form",
+        side: "BUY",
+        order_type: "MARKET",
+        order_value: 6,
+      })
+    );
+    expect(posthog.capture).toHaveBeenCalledWith(
+      "trade_form_submission_failed",
+      expect.objectContaining({
+        product: "web",
+        surface: "trading_form",
+        failure_stage: "submission",
+      })
+    );
+    expect(posthog.capture).not.toHaveBeenCalledWith(
+      "order_succeeded",
+      expect.anything()
     );
   });
 
@@ -666,6 +728,68 @@ describe("TradingForm", () => {
     expect(
       screen.queryByLabelText("Order amount in dollars")
     ).not.toBeInTheDocument();
+  });
+
+  it("does not report a submitted sell order as a confirmed fill", async () => {
+    const handleSubmit = vi.fn().mockResolvedValue(true);
+    useTradingFormStateMock.mockReturnValue(
+      makeTradingFormState({
+        side: "SELL",
+        orderType: "MARKET",
+        shares: 25,
+        maxSellShares: 40,
+        hasCredentials: true,
+        isConnected: true,
+        handleSubmit,
+      })
+    );
+
+    render(
+      <TradingForm
+        {...canonicalFormProps({
+          title: "Portugal",
+          outcomes: [
+            {
+              name: "Portugal",
+              tokenId: "portugal-token",
+              price: 0.08,
+              probability: 8,
+            },
+            {
+              name: "Field",
+              tokenId: "field-token",
+              price: 0.92,
+              probability: 92,
+            },
+          ],
+          selectedIndex: 0,
+          bestBid: 0.079,
+          bestAsk: 0.08,
+        })}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /sell 10 shares for \$6/i })
+    );
+
+    await waitFor(() => expect(handleSubmit).toHaveBeenCalledTimes(1));
+    expect(posthog.capture).not.toHaveBeenCalledWith(
+      "order_succeeded",
+      expect.objectContaining({
+        product: "web",
+        side: "SELL",
+        order_type: "MARKET",
+      })
+    );
+    expect(posthog.capture).not.toHaveBeenCalledWith(
+      "sell_succeeded",
+      expect.objectContaining({
+        product: "web",
+        side: "SELL",
+        order_type: "MARKET",
+      })
+    );
   });
 
   it("uses the full fractional position size when MARKET SELL Max is clicked", () => {

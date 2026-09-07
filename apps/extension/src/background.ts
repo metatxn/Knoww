@@ -15,9 +15,11 @@ import {
   POLYMARKET_API,
   RELAYER_API_HOST,
 } from "@knoww/shared-types/polymarket";
+import { getAddress } from "viem";
 import {
   flushAnalyticsQueue,
   queueAnalyticsEvent,
+  resetAnalyticsIdentity,
   submitSiteSupportRequest,
 } from "./background/analytics";
 import {
@@ -71,8 +73,17 @@ import {
   extractDerivedCredentials,
   tradingOpNeedsCredentials,
 } from "./background/trading-credential-mediation";
+import {
+  readSetupComplete,
+  readSetupMilestones,
+} from "./content/trading/setup-flow-storage";
 import { TRADING_WARM_ELIGIBLE_STORAGE_KEY } from "./content/trading-warm-flag";
 import { canUseProductionReranker } from "./context-promotion";
+import {
+  isEmbeddedOnboardingSender,
+  ONBOARDING_DEMO_STATE_KEY,
+  ONBOARDING_DEMO_URL,
+} from "./onboarding-state";
 import {
   createSearchRequestScheduler,
   isCapacityManagedExtensionRequest,
@@ -86,6 +97,7 @@ import {
   OPEN_SITE_SUPPORT_PROMPT_MESSAGE,
 } from "./site-support";
 import {
+  getOnboardingWalletSetupMatchPatterns,
   SUPPORTED_MATCH_PATTERNS,
   UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS,
   UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS,
@@ -114,12 +126,14 @@ import {
   type StoredUserSettings,
   type UserSettings,
 } from "./types/settings";
+import { isWebmailUrl, WEBMAIL_HOST_EXCLUDE_PATTERNS } from "./webmail";
 
 // ── Programmatic content script registration ──
 // Instead of declaring content_scripts in manifest.json (which would
 // require <all_urls> and load on every site), we register them only
 // for supported platforms via chrome.scripting.
 const CONTENT_SCRIPT_ID = "knoww-content";
+const ONBOARDING_WALLET_SETUP_SCRIPT_ID = "knoww-onboarding-wallet-setup";
 const UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID = "knoww-unsupported-site-support";
 const MAX_IMAGE_PROXY_BYTES = 512 * 1024;
 const SETTINGS_STORAGE_KEY = "knowwSettings";
@@ -159,6 +173,17 @@ let cachedNotificationPanelSurface:
   | undefined;
 let lastFocusedWindowId: number | undefined;
 const activeTabIdsByWindowId = new Map<number, number>();
+
+interface OnboardingDemoState {
+  tabId: number;
+  windowId?: number;
+  openedAt: string;
+  injectedAt?: string;
+  clickedAt?: string;
+  marketId?: string;
+}
+
+let onboardingDemoStateTask: Promise<unknown> = Promise.resolve();
 
 function getSidePanelApi(): ChromeSidePanelApi | undefined {
   return (chrome as typeof chrome & { sidePanel?: ChromeSidePanelApi })
@@ -321,6 +346,199 @@ function notifyRequestedSidePanelView(view?: SidePanelView): void {
   );
 }
 
+function isOnboardingPageSender(sender: chrome.runtime.MessageSender): boolean {
+  return (
+    sender.url === chrome.runtime.getURL("onboarding.html") ||
+    isEmbeddedOnboardingSender(
+      sender.url,
+      sender.tab?.url,
+      chrome.runtime.getURL("onboarding.html"),
+      __DEV_MODE__
+    )
+  );
+}
+
+function readOnboardingDemoState(): Promise<OnboardingDemoState | null> {
+  return new Promise((resolve) => {
+    chrome.storage.session.get(ONBOARDING_DEMO_STATE_KEY, (result) => {
+      const stored = result[ONBOARDING_DEMO_STATE_KEY] as
+        | Partial<OnboardingDemoState>
+        | undefined;
+      resolve(
+        stored && typeof stored.tabId === "number"
+          ? (stored as OnboardingDemoState)
+          : null
+      );
+    });
+  });
+}
+
+function clearOnboardingDemoState(): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.session.remove(ONBOARDING_DEMO_STATE_KEY, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
+  });
+}
+
+function writeOnboardingDemoState(state: OnboardingDemoState): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.session.set({ [ONBOARDING_DEMO_STATE_KEY]: state }, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
+  });
+}
+
+function runOnboardingDemoStateTask<T>(task: () => Promise<T>): Promise<T> {
+  const nextTask = onboardingDemoStateTask.then(task, task);
+  onboardingDemoStateTask = nextTask.then(
+    () => undefined,
+    () => undefined
+  );
+  return nextTask;
+}
+
+function toOnboardingWalletAddress(address: string | null): string | undefined {
+  if (!address) return undefined;
+  try {
+    return getAddress(address);
+  } catch {
+    return undefined;
+  }
+}
+
+async function getOnboardingWalletAddress(): Promise<string | undefined> {
+  const session = await getExtensionSessionInfo();
+  return toOnboardingWalletAddress(session.address);
+}
+
+async function openOnboardingWalletSetup(
+  windowId: number
+): Promise<chrome.tabs.Tab> {
+  const setupUrl = `${getKnowwAppUrl()}/extension/connect`;
+  const tabs = await chrome.tabs.query({ windowId });
+  const existing = tabs.find((tab) => tab.url === setupUrl);
+  const tab =
+    typeof existing?.id === "number"
+      ? await chrome.tabs.update(existing.id, { active: true })
+      : await chrome.tabs.create({
+          url: setupUrl,
+          active: true,
+          windowId,
+        });
+
+  if (!tab || typeof tab.id !== "number") {
+    throw new Error("Chrome did not return an onboarding wallet setup tab.");
+  }
+  rememberActiveTab(tab.id, tab.windowId);
+  if (typeof tab.windowId === "number") {
+    await chrome.windows
+      .update(tab.windowId, { focused: true })
+      .catch(() => {});
+  }
+  return tab;
+}
+
+async function openOnboardingDemo(windowId?: number): Promise<chrome.tabs.Tab> {
+  const existing = await readOnboardingDemoState();
+  let tab: chrome.tabs.Tab | undefined;
+
+  if (existing) {
+    try {
+      const candidate = await chrome.tabs.get(existing.tabId);
+      if (
+        candidate.url?.startsWith("https://x.com/polymarket") &&
+        (typeof windowId !== "number" || candidate.windowId === windowId)
+      ) {
+        tab = await chrome.tabs.update(existing.tabId, { active: true });
+      }
+    } catch {
+      tab = undefined;
+    }
+  }
+
+  if (!tab) {
+    tab = await chrome.tabs.create({
+      url: ONBOARDING_DEMO_URL,
+      active: true,
+      ...(typeof windowId === "number" ? { windowId } : {}),
+    });
+  }
+
+  if (typeof tab.id !== "number") {
+    throw new Error("Chrome did not return an onboarding demo tab.");
+  }
+  if (typeof tab.windowId === "number") {
+    await chrome.windows
+      .update(tab.windowId, { focused: true })
+      .catch(() => {});
+  }
+
+  await writeOnboardingDemoState({
+    ...(existing ?? {}),
+    tabId: tab.id,
+    ...(typeof tab.windowId === "number" ? { windowId: tab.windowId } : {}),
+    openedAt: new Date().toISOString(),
+  });
+
+  const walletAddress = await getOnboardingWalletAddress();
+  await queueAnalyticsEvent({
+    event: "onboarding_demo_opened",
+    properties: {
+      destination: "x.com/polymarket",
+      ...(walletAddress ? { wallet_address: walletAddress } : {}),
+    },
+  });
+
+  return tab;
+}
+
+async function markOnboardingDemoMilestone(
+  milestone: "injected" | "clicked",
+  tabId: number,
+  marketId?: string
+): Promise<{ accepted: boolean; showGuide: boolean }> {
+  return runOnboardingDemoStateTask(async () => {
+    const state = await readOnboardingDemoState();
+    if (!state || state.tabId !== tabId) {
+      return { accepted: false, showGuide: false };
+    }
+
+    const timestampKey = milestone === "injected" ? "injectedAt" : "clickedAt";
+    const showGuide =
+      milestone === "injected" &&
+      !state.clickedAt &&
+      (!state.marketId || state.marketId === marketId);
+    if (state[timestampKey]) {
+      return { accepted: false, showGuide };
+    }
+
+    const nextState: OnboardingDemoState = {
+      ...state,
+      [timestampKey]: new Date().toISOString(),
+      ...(marketId ? { marketId } : {}),
+    };
+    await writeOnboardingDemoState(nextState);
+
+    const walletAddress = await getOnboardingWalletAddress();
+    await queueAnalyticsEvent({
+      event:
+        milestone === "injected"
+          ? "onboarding_demo_market_injected"
+          : "onboarding_demo_market_clicked",
+      properties: {
+        destination: "x.com/polymarket",
+        ...(marketId ? { market_id: marketId } : {}),
+        ...(walletAddress ? { wallet_address: walletAddress } : {}),
+      },
+    });
+
+    return { accepted: true, showGuide };
+  });
+}
+
 function sendSiteSupportPromptMessage(
   tabId: number,
   reveal: boolean
@@ -356,9 +574,10 @@ async function showUnsupportedSiteSupportPrompt(
   tabId: number,
   options: { reveal: boolean }
 ): Promise<void> {
-  if (await sendSiteSupportPromptMessage(tabId, options.reveal)) return;
-
   try {
+    const tab = await chrome.tabs.get(tabId);
+    if (isWebmailUrl(tab.url)) return;
+    if (await sendSiteSupportPromptMessage(tabId, options.reveal)) return;
     await injectUnsupportedSiteSupportPrompt(tabId);
     if (options.reveal) {
       await sendSiteSupportPromptMessage(tabId, true);
@@ -613,24 +832,46 @@ function forwardToPortfolioSigningTab(
   });
 }
 
-async function registerContentScripts(): Promise<void> {
+let registrationInFlight: Promise<void> | null = null;
+function registerContentScripts(): Promise<void> {
+  registrationInFlight ??= performContentScriptRegistration().finally(() => {
+    registrationInFlight = null;
+  });
+  return registrationInFlight;
+}
+
+async function performContentScriptRegistration(): Promise<void> {
   try {
     const existing = await chrome.scripting.getRegisteredContentScripts({
-      ids: [CONTENT_SCRIPT_ID, UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID],
+      ids: [
+        CONTENT_SCRIPT_ID,
+        ONBOARDING_WALLET_SETUP_SCRIPT_ID,
+        UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID,
+      ],
     });
     const existingIds = new Set(existing.map((script) => script.id));
     const registrations: chrome.scripting.RegisteredContentScript[] = [
       {
         id: CONTENT_SCRIPT_ID,
         matches: SUPPORTED_MATCH_PATTERNS,
+        excludeMatches: WEBMAIL_HOST_EXCLUDE_PATTERNS,
         js: ["content.js"],
         css: ["markets-panel-navbar.css"],
         runAt: "document_end",
       },
       {
+        id: ONBOARDING_WALLET_SETUP_SCRIPT_ID,
+        matches: getOnboardingWalletSetupMatchPatterns(__DEV_MODE__),
+        js: ["content.js", "onboarding-host.js"],
+        runAt: "document_end",
+      },
+      {
         id: UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID,
         matches: UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS,
-        excludeMatches: UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS,
+        excludeMatches: [
+          ...UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS,
+          ...WEBMAIL_HOST_EXCLUDE_PATTERNS,
+        ],
         js: ["unsupported-site.js"],
         css: ["markets-panel-navbar.css", "unsupported-site-prompt.css"],
         runAt: "document_idle",
@@ -1082,13 +1323,23 @@ function broadcastTradingCredentialsUpdated(address: string): void {
   );
 }
 
+// Reconcile recorded orders without loading trading code in the store build.
+if (!__STORE_BUILD__) {
+  const poll = () => {
+    void import(/* webpackMode: "eager" */ "./background/order-analytics")
+      .then((module) => module.pollConfirmedOrders())
+      .catch(() => {});
+  };
+  void chrome.alarms.create("knoww-confirmed-orders", { periodInMinutes: 1 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "knoww-confirmed-orders") poll();
+  });
+  poll();
+}
+
 /**
- * Mediate CLOB credentials between content, the SW store, and the offscreen
- * trading handler. The offscreen document can't reach the TRUSTED_CONTEXTS-only
- * session store, so the SW:
- *   - injects creds into credential-bearing ops before forwarding;
- *   - persists creds from the derive response and relays a method-only result.
- * Content never sends or receives the raw credentials.
+ * Mediate credentials between content, trusted session storage, and offscreen.
+ * Content receives only the derivation result, never raw credentials.
  */
 function forwardToOffscreen(
   message: unknown,
@@ -1120,6 +1371,44 @@ function forwardToOffscreen(
         payload,
         tabId
       );
+
+      if (
+        !__STORE_BUILD__ &&
+        msg.type === "trading:place-order" &&
+        msg.address &&
+        result?.ok &&
+        "data" in result
+      ) {
+        const order = message as {
+          side?: string;
+          orderType?: string;
+          tokenId?: string;
+          size?: number;
+          amount?: number;
+        };
+        try {
+          const observer = await import(
+            /* webpackMode: "eager" */ "./background/order-analytics"
+          );
+          void observer
+            .rememberAcceptedOrder(result.data, msg.address, {
+              surface: "trading_service",
+              side: order.side,
+              token_id: order.tokenId,
+              clob_order_type: order.orderType,
+              order_type:
+                order.orderType === "GTC" || order.orderType === "GTD"
+                  ? "LIMIT"
+                  : "MARKET",
+              requested_shares: order.size,
+              requested_amount: order.amount,
+            })
+            .then(() => observer.pollConfirmedOrders())
+            .catch(() => {});
+        } catch {
+          /* Telemetry cannot change the order response. */
+        }
+      }
 
       if (
         msg.type === "trading:derive-credentials" &&
@@ -1277,6 +1566,159 @@ chrome.runtime.onMessage.addListener(
     if (msg?.type === "trading:signing-response" && sender.tab) {
       chrome.runtime.sendMessage(message).catch(() => {});
       return false;
+    }
+
+    if (msg?.type === "KNOWW_START_ONBOARDING_SETUP") {
+      const senderReject = checkAuthorizedSender(sender.id, chrome.runtime.id);
+      const windowId = sender.tab?.windowId;
+      if (
+        senderReject ||
+        !isOnboardingPageSender(sender) ||
+        typeof windowId !== "number"
+      ) {
+        sendResponse({
+          ok: false,
+          error: "Setup must be started from the Knoww onboarding page.",
+        } as BackgroundResponse);
+        return true;
+      }
+
+      if (
+        isEmbeddedOnboardingSender(
+          sender.url,
+          sender.tab?.url,
+          chrome.runtime.getURL("onboarding.html"),
+          __DEV_MODE__
+        )
+      ) {
+        portfolioSigningTabId = sender.tab?.id;
+        sendResponse({ ok: true } as BackgroundResponse);
+        return true;
+      }
+      const setupTabPromise = openOnboardingWalletSetup(windowId);
+      const clearDemoStatePromise = clearOnboardingDemoState();
+      void Promise.all([setupTabPromise, clearDemoStatePromise])
+        .then(([setupTab]) => {
+          portfolioSigningTabId = setupTab.id;
+          sendResponse({
+            ok: true,
+            data: { setupTabId: setupTab.id },
+          } as BackgroundResponse);
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          } as BackgroundResponse);
+        });
+      return true;
+    }
+
+    if (msg?.type === "KNOWW_OPEN_ONBOARDING_DEMO") {
+      const senderReject = checkAuthorizedSender(sender.id, chrome.runtime.id);
+      if (senderReject || !isOnboardingPageSender(sender)) {
+        sendResponse(
+          (senderReject ?? {
+            ok: false,
+            error: "This action must come from the Knoww onboarding page.",
+          }) as BackgroundResponse
+        );
+        return true;
+      }
+
+      void openOnboardingDemo(sender.tab?.windowId)
+        .then((tab) => {
+          sendResponse({
+            ok: true,
+            data: { demoTabId: tab.id },
+          } as BackgroundResponse);
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          } as BackgroundResponse);
+        });
+      return true;
+    }
+
+    if (msg?.type === "KNOWW_GET_EXTENSION_ONBOARDING_STATUS") {
+      const senderReject = checkAuthorizedSender(sender.id, chrome.runtime.id);
+      if (senderReject || !isOnboardingPageSender(sender)) {
+        sendResponse(
+          (senderReject ?? {
+            ok: false,
+            error: "This request must come from the Knoww onboarding page.",
+          }) as BackgroundResponse
+        );
+        return true;
+      }
+
+      void (async () => {
+        const session = await getExtensionSessionInfo();
+        const walletAddress = toOnboardingWalletAddress(session.address);
+        const [hasCredentials, setupComplete, milestones] =
+          !__STORE_BUILD__ && walletAddress
+            ? await Promise.all([
+                hasClobCredentials(walletAddress),
+                readSetupComplete(walletAddress),
+                readSetupMilestones(walletAddress),
+              ])
+            : [
+                false,
+                false,
+                {
+                  tradingWalletDeployed: false,
+                  hasCredentials: false,
+                  hasApproval: false,
+                },
+              ];
+        const tradingWalletDeployed =
+          setupComplete || milestones.tradingWalletDeployed;
+        const hasApproval = setupComplete || milestones.hasApproval;
+        sendResponse({
+          ok: true,
+          data: {
+            loggedIn: session.loggedIn,
+            address: walletAddress ?? null,
+            hasCredentials,
+            tradingWalletDeployed,
+            hasApproval,
+            tradingReady:
+              hasCredentials && tradingWalletDeployed && hasApproval,
+            storeBuild: __STORE_BUILD__,
+          },
+        } as BackgroundResponse);
+      })().catch(() => {
+        sendResponse({
+          ok: false,
+          error: "Failed to read onboarding status.",
+        } as BackgroundResponse);
+      });
+      return true;
+    }
+
+    if (
+      (msg?.type === "KNOWW_ONBOARDING_DEMO_MARKET_INJECTED" ||
+        msg?.type === "KNOWW_ONBOARDING_DEMO_MARKET_CLICKED") &&
+      typeof sender.tab?.id === "number"
+    ) {
+      const milestone = msg.type.endsWith("INJECTED") ? "injected" : "clicked";
+      void markOnboardingDemoMilestone(
+        milestone,
+        sender.tab.id,
+        typeof msg.marketId === "string" ? msg.marketId : undefined
+      )
+        .then((result) => {
+          sendResponse({ ok: true, data: result } as BackgroundResponse);
+        })
+        .catch(() => {
+          sendResponse({
+            ok: false,
+            error: "Failed to record onboarding demo progress.",
+          } as BackgroundResponse);
+        });
+      return true;
     }
 
     if (msg?.type === "KNOWW_OPEN_EXTENSION_SETTINGS") {
@@ -2335,6 +2777,7 @@ chrome.runtime.onMessage.addListener(
         } finally {
           await clearCachedTradingCredentials();
           await clearExtensionAccessToken();
+          await resetAnalyticsIdentity();
           await chrome.storage.local
             .remove(TRADING_WARM_ELIGIBLE_STORAGE_KEY)
             .catch(() => {});
@@ -2776,6 +3219,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 chrome.action.onClicked.addListener((tab) => {
   if (typeof tab.id !== "number") return;
+  if (isWebmailUrl(tab.url)) return;
 
   const unsupportedHostname = getUnsupportedSiteHostname(tab.url);
   if (unsupportedHostname) {
@@ -2814,7 +3258,8 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
-  void registerContentScripts().then(() => refreshOpenUnsupportedSitePrompts());
+  const scriptsReady = registerContentScripts();
+  void scriptsReady.then(() => refreshOpenUnsupportedSitePrompts());
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     void queueAnalyticsEvent({
       event: "extension_installed",
@@ -2822,7 +3267,11 @@ chrome.runtime.onInstalled.addListener((details) => {
         reason: details.reason,
       },
     });
-    chrome.runtime.openOptionsPage();
+    void scriptsReady.then(() =>
+      chrome.tabs.create({
+        url: `${getKnowwAppUrl()}/extension/connect`,
+      })
+    );
     return;
   }
 
@@ -2833,4 +3282,15 @@ chrome.runtime.onInstalled.addListener((details) => {
       previousVersion: details.previousVersion || null,
     },
   });
+
+  if (
+    details.reason === chrome.runtime.OnInstalledReason.UPDATE &&
+    __DEV_MODE__
+  ) {
+    void scriptsReady.then(() =>
+      chrome.tabs.create({
+        url: `${getKnowwAppUrl()}/extension/connect`,
+      })
+    );
+  }
 });

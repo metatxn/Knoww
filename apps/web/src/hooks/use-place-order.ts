@@ -1,9 +1,11 @@
 "use client";
 
-import { isDraftExpired } from "@knoww/services/core";
+import { isDraftExpired, isPlatformError } from "@knoww/services/core";
 import { useCallback, useState } from "react";
 import { useConnection } from "wagmi";
+import { captureTradingEvent } from "@/lib/order-analytics";
 import type { ClobOperationStep } from "@/polymarket/clob/shared";
+import { usePolymarketOrderAnalytics } from "@/polymarket/order-analytics";
 import {
   type CreateOrderParams,
   OrderType,
@@ -40,6 +42,8 @@ export function usePlaceOrder() {
   const { canTrade, hasCredentials, prepare, resolveFailure } =
     usePolymarketOrderPreflight();
 
+  const trackAccepted = usePolymarketOrderAnalytics(identity, canTrade);
+
   const [isLoading, setIsLoading] = useState(false);
   const [operationStep, setOperationStep] = useState<ClobOperationStep>("idle");
   const [error, setError] = useState<Error | null>(null);
@@ -50,6 +54,22 @@ export function usePlaceOrder() {
       if (!canTrade) throw new Error("Trading setup incomplete");
       if (!identity) throw new Error("Trading wallet not found");
 
+      const clobOrderType = params.orderType ?? "GTC";
+      const analytics = {
+        surface: "trading_service",
+        attempt_id: crypto.randomUUID(),
+        side: params.side,
+        order_type:
+          clobOrderType === "GTC" || clobOrderType === "GTD"
+            ? "LIMIT"
+            : "MARKET",
+        clob_order_type: clobOrderType,
+        token_id: params.tokenId,
+        condition_id: params.conditionId,
+        requested_shares: params.size,
+        requested_amount: params.amount,
+      };
+      captureTradingEvent("order_attempted", address, analytics);
       setIsLoading(true);
       let activeStep: ClobOperationStep = "checking";
       const setStep = (step: ClobOperationStep) => {
@@ -88,8 +108,18 @@ export function usePlaceOrder() {
           draftId: draft.draftId,
           idempotencyKey: crypto.randomUUID(),
         });
+        // Tracking stores the canonical order id. Only later venue trade
+        // confirmations count as fills or successful orders.
+        void trackAccepted(result, analytics);
         return { success: true, order: result };
       } catch (err) {
+        captureTradingEvent(
+          isPlatformError(err) && err.kind === "submission_unknown"
+            ? "order_submission_unknown"
+            : "order_failed",
+          address,
+          { ...analytics, failure_stage: activeStep }
+        );
         const failure = await resolveFailure(err, {
           params,
           prepared,
@@ -107,7 +137,15 @@ export function usePlaceOrder() {
         setOperationStep("idle");
       }
     },
-    [address, canTrade, identity, getAdapter, prepare, resolveFailure]
+    [
+      address,
+      canTrade,
+      identity,
+      getAdapter,
+      prepare,
+      resolveFailure,
+      trackAccepted,
+    ]
   );
 
   return {

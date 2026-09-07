@@ -5,6 +5,7 @@ import { qk } from "@/lib/query-keys";
 import { TradingOnboarding } from "./trading-onboarding";
 
 const wagmiState = vi.hoisted(() => ({
+  address: "0x0000000000000000000000000000000000000001",
   isConnected: true,
 }));
 
@@ -37,6 +38,10 @@ const proxyWalletState = vi.hoisted(() => ({
   usdcBalance: 5,
 }));
 
+const posthogMock = vi.hoisted(() => ({
+  capture: vi.fn(),
+}));
+
 vi.mock("@knoww/logger", () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -48,6 +53,7 @@ vi.mock("@knoww/logger", () => ({
 
 vi.mock("wagmi", () => ({
   useConnection: () => ({
+    address: wagmiState.address,
     isConnected: wagmiState.isConnected,
   }),
 }));
@@ -74,6 +80,10 @@ vi.mock("@/lib/approvals", () => ({
 
 vi.mock("@/lib/wallet-modal", () => ({
   openWalletModalStrict: vi.fn(async () => undefined),
+}));
+
+vi.mock("posthog-js", () => ({
+  default: posthogMock,
 }));
 
 describe("TradingOnboarding", () => {
@@ -125,7 +135,62 @@ describe("TradingOnboarding", () => {
         queryKey: qk.wallet.allUsdcAllowances(),
       });
     });
+    expect(posthogMock.capture).toHaveBeenCalledWith(
+      "trading_token_approval_succeeded",
+      {
+        product: "web",
+        surface: "onboarding",
+        wallet_address: "0x0000000000000000000000000000000000000001",
+        wallet_mode: "deposit",
+      }
+    );
   });
+
+  it.each([false, true])(
+    "distinguishes a newly created wallet from an existing wallet: alreadyDeployed=%s",
+    async (alreadyDeployed) => {
+      relayerState.hasDeployedSafe = false;
+      relayerState.proxyAddress = null;
+      proxyWalletState.isDeployed = false;
+      proxyWalletState.proxyAddress = null;
+      relayerState.deploySafe.mockResolvedValue({
+        success: true,
+        alreadyDeployed,
+      });
+
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <TradingOnboarding />
+        </QueryClientProvider>
+      );
+
+      const deployButton = await screen.findByRole("button", {
+        name: /sign/i,
+      });
+      fireEvent.click(deployButton);
+
+      await waitFor(() => {
+        expect(posthogMock.capture).toHaveBeenCalledWith(
+          alreadyDeployed ? "trading_account_ready" : "trading_account_created",
+          {
+            product: "web",
+            surface: "onboarding",
+            wallet_address: "0x0000000000000000000000000000000000000001",
+            wallet_mode: "deposit",
+            account_kind: "trading_wallet",
+            already_deployed: alreadyDeployed,
+            $insert_id:
+              "trading-wallet:0x0000000000000000000000000000000000000001:deposit",
+          }
+        );
+        if (alreadyDeployed)
+          expect(posthogMock.capture).not.toHaveBeenCalledWith(
+            "trading_account_created",
+            expect.anything()
+          );
+      });
+    }
+  );
 
   it("blocks vault deployment while legacy Safe detection is pending", async () => {
     tradingWalletModeState.isCheckingLegacySafe = true;
@@ -147,5 +212,30 @@ describe("TradingOnboarding", () => {
     expect(deployButton).toBeDisabled();
     fireEvent.click(deployButton);
     expect(relayerState.deploySafe).not.toHaveBeenCalled();
+  });
+
+  it("reports an existing trading wallet as setup readiness, not another acquisition", async () => {
+    credentialsState.hasCredentials = true;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TradingOnboarding />
+      </QueryClientProvider>
+    );
+    await waitFor(() => {
+      expect(posthogMock.capture).toHaveBeenCalledWith(
+        "trading_setup_state",
+        expect.objectContaining({
+          wallet_connected: true,
+          account_ready: true,
+          api_keys_ready: true,
+          approval_ready: false,
+          setup_complete: false,
+        })
+      );
+    });
+    expect(posthogMock.capture).not.toHaveBeenCalledWith(
+      "trading_account_created",
+      expect.anything()
+    );
   });
 });

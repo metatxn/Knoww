@@ -3,11 +3,13 @@
 // ============================================
 
 import { createLogger } from "@knoww/logger";
+import { isOnboardingWalletSetupUrl } from "../onboarding-state";
 import type {
   KalshiCategoriesCache,
   PolymarketTagsCache,
 } from "../types/market";
 import type { UserSettings } from "../types/settings";
+import { isWebmailUrl } from "../webmail";
 import { startDiscoveryWarmup } from "./discovery-warmup";
 import { loadPlatformAdapter } from "./platform-loader";
 import { prefetchTradingRuntime } from "./trading-loader";
@@ -64,6 +66,7 @@ export function observeFirstMountedTradingCard(
 }
 
 (async function main(): Promise<void> {
+  if (isWebmailUrl(window.location.href)) return;
   const { log, safeSendMessage } = window.KNOWW_UTILS;
   const {
     CONFIG,
@@ -77,6 +80,11 @@ export function observeFirstMountedTradingCard(
   const { fetchPolymarketTags } = window.KNOWW_API;
   const { watchFeed } = window.KNOWW_INJECTION;
   const { initNotificationStack } = window.KNOWW_UI;
+
+  if (isOnboardingWalletSetupUrl(window.location.href)) {
+    injectMetamaskBridge();
+    return;
+  }
 
   // Load user settings first (before doing anything else)
   await loadUserSettings();

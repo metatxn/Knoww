@@ -562,6 +562,84 @@ describe("createPolymarketTradingAdapter order lifecycle", () => {
     expect(cancels()).toHaveLength(1);
   });
 
+  it.each([false, true])(
+    "distinguishes rejected submissions from unknown outcomes, transport failure: %s",
+    async (transportFailure) => {
+      const base = clobRoutes(markets);
+      installFetchCapture((request, url) => {
+        if (url.pathname === "/order" && request.method === "POST") {
+          if (transportFailure)
+            throw new Error("Connection closed after submission");
+          return {
+            ...(base(request, url) as Record<string, unknown>),
+            success: false,
+            errorMsg: "Order rejected",
+          };
+        }
+        return base(request, url);
+      });
+      const adapter = openAdapter();
+      const draft = await adapter.previewOrder(
+        intentFor(markets.plain, GTC_BUY)
+      );
+      const error = await platformErrorOf(
+        adapter.placeOrder({
+          draftId: draft.draftId,
+          idempotencyKey: "submission-outcome",
+        })
+      );
+      expect(error.kind).toBe(
+        transportFailure ? "submission_unknown" : "upstream"
+      );
+    }
+  );
+
+  it.each([400, 503])(
+    "classifies HTTP %s during submission",
+    async (status) => {
+      const base = clobRoutes(markets);
+      installFetchCapture((request, url) => {
+        if (url.pathname === "/order" && request.method === "POST")
+          return jsonResponse({ error: "Order request failed" }, status);
+        return base(request, url);
+      });
+      const adapter = openAdapter();
+      const draft = await adapter.previewOrder(
+        intentFor(markets.plain, GTC_BUY)
+      );
+      const error = await platformErrorOf(
+        adapter.placeOrder({
+          draftId: draft.draftId,
+          idempotencyKey: "http-outcome",
+        })
+      );
+      expect(error.kind).toBe(
+        status === 400 ? "upstream" : "submission_unknown"
+      );
+      expect(error.upstreamStatus).toBe(status);
+    }
+  );
+
+  it("rejects a cancellation the exchange refuses", async () => {
+    const base = clobRoutes(markets);
+    installFetchCapture((request, url) => {
+      if (url.pathname === "/order" && request.method === "DELETE") {
+        return {
+          canceled: [],
+          not_canceled: { [RECORDED_ORDER_ID]: "Already matched" },
+        };
+      }
+      return base(request, url);
+    });
+    await expect(
+      openAdapter().cancelOrder({
+        identity: eoaIdentity,
+        orderId: RECORDED_ORDER_ID,
+        idempotencyKey: "refused-cancel",
+      })
+    ).rejects.toThrow("did not cancel");
+  });
+
   it("replays a placement for the same idempotency key without posting twice", async () => {
     const calls = installFetchCapture(clobRoutes(markets));
     const adapter = openAdapter();

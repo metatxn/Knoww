@@ -1,7 +1,9 @@
 import { Decimal } from "decimal.js";
+import { getAddress } from "viem";
 import type { TradingSetupAllowanceReadStatus } from "../content/trading/setup-flow";
 import { hasDeployedTradingWallet } from "../content/trading/setup-gates";
 import { startLoadingMessageSequence } from "../loading-messages";
+import { openTrackedDestination } from "../outbound-analytics";
 import {
   consumeRequestedSidePanelView,
   fetchKnowwJson,
@@ -21,6 +23,14 @@ import {
   type SidePanelView,
   type TradingWalletMode,
 } from "./shared";
+
+function getAnalyticsWalletAddress(address: string): string | undefined {
+  try {
+    return getAddress(address);
+  } catch {
+    return undefined;
+  }
+}
 
 export const PORTFOLIO_STYLES = `
       * {
@@ -1171,7 +1181,11 @@ export function createPortfolioSidepanel(
   let cancelConfirmTimer: ReturnType<typeof setTimeout> | null = null;
 
   function openPortfolioPage(): void {
-    window.open(`${KNOWW_APP_URL}/portfolio`, "_blank", "noopener,noreferrer");
+    openTrackedDestination(
+      `${KNOWW_APP_URL}/portfolio`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   // Disconnect the connected wallet from the portfolio view — mirrors the
@@ -1233,7 +1247,7 @@ export function createPortfolioSidepanel(
 
   function viewPortfolioPosition(position: PortfolioPosition): void {
     const url = portfolioMarketUrl(position.market);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (url) openTrackedDestination(url, "_blank", "noopener,noreferrer");
   }
 
   function getPortfolioSellErrorMessage(error: unknown): string {
@@ -1490,14 +1504,42 @@ export function createPortfolioSidepanel(
     const label = button.querySelector("[data-cancel-label]");
     if (label) label.textContent = "Cancelling your order...";
 
+    const analyticsProperties = {
+      product: "extension",
+      surface: "portfolio_sidepanel",
+      order_id: orderId,
+      wallet_address: getAnalyticsWalletAddress(ownerAddress),
+    };
+    void sendRuntimeMessage({
+      type: "analytics:track",
+      event: "order_cancel_attempted",
+      properties: analyticsProperties,
+    });
     const result = await cancelPortfolioOpenOrder(ownerAddress, orderId);
     if (result.ok) {
+      const walletAddress = getAnalyticsWalletAddress(ownerAddress);
+      void sendRuntimeMessage({
+        type: "analytics:track",
+        event: "order_cancelled",
+        properties: {
+          ...analyticsProperties,
+          $insert_id: `cancel:${analyticsProperties.wallet_address}:${orderId}`,
+          product: "extension",
+          surface: "portfolio_sidepanel",
+          ...(walletAddress ? { wallet_address: walletAddress } : {}),
+        },
+      });
       // Reload so the cancelled order disappears and any BUY collateral it was
       // reserving is reflected back in the cash/positions figures.
       await loadPortfolio(true);
       return;
     }
 
+    void sendRuntimeMessage({
+      type: "analytics:track",
+      event: "order_cancel_failed",
+      properties: analyticsProperties,
+    });
     // Surface the failure on the button and keep the row so the user can retry.
     button.classList.remove("is-busy");
     button.classList.add("is-error");

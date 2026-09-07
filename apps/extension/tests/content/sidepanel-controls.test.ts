@@ -471,14 +471,20 @@ test("side panel exposes a compact portfolio view without charts", () => {
   assert.equal(/renderPortfolioSetupSurface/.test(sidepanelSource), true);
   assert.equal(/resolvePortfolioWallet/.test(sidepanelSource), true);
   assert.equal(/trading:derive-proxy-address/.test(sidepanelSource), true);
-  assert.equal(/\/api\/polymarket\/user\/positions/.test(sidepanelSource), true);
+  assert.equal(
+    /\/api\/polymarket\/user\/positions/.test(sidepanelSource),
+    true
+  );
   assert.equal(/\/api\/polymarket\/user\/trades/.test(sidepanelSource), true);
   assert.equal(/\/api\/polymarket\/user\/details/.test(sidepanelSource), true);
   assert.equal(/trading:get-balance/.test(sidepanelSource), true);
   assert.equal(/cashBalance/.test(sidepanelSource), true);
   assert.equal(/Cash/.test(sidepanelSource), true);
   assert.equal(/KNOWW_GET_PORTFOLIO_OPEN_ORDERS/.test(sidepanelSource), true);
-  assert.equal(/\/api\/polymarket\/markets\/by-token/.test(sidepanelSource), true);
+  assert.equal(
+    /\/api\/polymarket\/markets\/by-token/.test(sidepanelSource),
+    true
+  );
   assert.equal(/renderPortfolioSummary/.test(sidepanelSource), true);
   assert.equal(/renderCompactPositions/.test(sidepanelSource), true);
   assert.equal(/renderCompactOpenOrders/.test(sidepanelSource), true);
@@ -499,10 +505,7 @@ test("side panel exposes a compact portfolio view without charts", () => {
     ),
     true
   );
-  assert.equal(
-    /portfolioWalletConnectError\s*=\s*response\.error/.test(sidepanelSource),
-    true
-  );
+  assert.equal(/data-walletconnect-retry/.test(sidepanelSource), true);
   assert.equal(
     /KNOWW_GET_PORTFOLIO_TRADING_STATUS/.test(backgroundSource),
     true

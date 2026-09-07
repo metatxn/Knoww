@@ -59,9 +59,9 @@ const SECURITY_HEADERS: Record<string, string> = {
     "default-src 'self'",
     // Scripts: self + inline (Next.js hydration requires inline scripts).
     // unsafe-eval is conditionally added only in dev (see below).
-    // PostHog assets are served from us-assets.i.posthog.com.
+    // PostHog assets use Knoww's managed proxy; retain the direct asset origin.
     // Cloudflare Insights beacon is served from static.cloudflareinsights.com.
-    `script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com https://static.cloudflareinsights.com${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline' https://a.knoww.app https://us-assets.i.posthog.com https://static.cloudflareinsights.com${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
     // Block inline event-handler attributes such as onclick= even though Next.js
     // still requires inline script tags for hydration.
     "script-src-attr 'none'",
@@ -115,6 +115,12 @@ function securityHeaderValue(
   value: string,
   pathname: string
 ): string {
+  if (key === "Content-Security-Policy" && pathname === "/extension/connect") {
+    return value.replace(
+      "frame-src 'self'",
+      "frame-src 'self' chrome-extension:"
+    );
+  }
   const isLocalMcpConsole =
     pathname === "/mcp-test" || pathname.startsWith("/mcp-test/");
   if (

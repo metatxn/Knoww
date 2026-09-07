@@ -1043,7 +1043,42 @@ export function createPolymarketTradingAdapter(
     const order = await signOrder(client, intent, tokenId);
     // Resync once more after signing, best-effort like the hook.
     await syncBalanceAllowance(client, tokenId, null);
-    const response = await client.postOrder(order, clobOrderType(intent));
+    let response: unknown;
+    try {
+      response = await client.postOrder(order, clobOrderType(intent));
+    } catch (error) {
+      const status =
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error &&
+        typeof error.status === "number"
+          ? error.status
+          : undefined;
+      // Explicit client-error responses reject the request. Timeouts and
+      // server failures can arrive after acceptance, so leave them unknown.
+      const rejected =
+        status !== undefined && status >= 400 && status < 500 && status !== 408;
+      throw platformError(
+        error instanceof Error
+          ? error.message
+          : "Order submission outcome is unknown",
+        {
+          platform: PLATFORM,
+          operation: "placeOrder",
+          kind: rejected ? "upstream" : "submission_unknown",
+          upstreamStatus: status,
+          cause: error,
+        }
+      );
+    }
+    // The unified SDK normalizes a definite rejection to `ok: false`.
+    // Legacy responses still use success/error/errorMsg below.
+    const rejection = z
+      .object({ ok: z.literal(false), message: z.string() })
+      .safeParse(response);
+    if (rejection.success) {
+      throw fail("placeOrder", "upstream", rejection.data.message);
+    }
     assertClobPostOrderSuccess(response);
     drafts.delete(draftId);
 

@@ -72,10 +72,16 @@ function buildHostPermissions(hostsSource, devMode, storeBuild) {
   return unique;
 }
 
-function buildWarMatches(hostsSource) {
+function buildWarMatches(hostsSource, devMode) {
   const sitePatterns = extractStringArray(
     hostsSource,
     "SUPPORTED_MATCH_PATTERNS"
+  );
+  const onboardingWalletSetupPatterns = extractStringArray(
+    hostsSource,
+    devMode
+      ? "ONBOARDING_WALLET_SETUP_DEVELOPMENT_MATCH_PATTERNS"
+      : "ONBOARDING_WALLET_SETUP_PRODUCTION_MATCH_PATTERNS"
   );
 
   // Chrome is stricter for web_accessible_resources.matches than for
@@ -83,7 +89,10 @@ function buildWarMatches(hostsSource) {
   // `https://www.bbc.com/news/*` are rejected there. Normalize every site
   // pattern to an origin-wide form (`scheme://host/*`) before injecting it
   // into the manifest.
-  const normalizedPatterns = sitePatterns.map((pattern) => {
+  const normalizedPatterns = [
+    ...sitePatterns,
+    ...onboardingWalletSetupPatterns,
+  ].map((pattern) => {
     const match = pattern.match(/^(\*|https?|file|ftp):\/\/([^/]+)(?:\/.*)?$/);
     if (!match) {
       throw new Error(
@@ -272,6 +281,8 @@ module.exports = (_env, argv) => {
       background: "./src/background.ts",
       offscreen: "./src/offscreen/offscreen.ts",
       content: "./src/content/index.ts",
+      onboarding: "./src/onboarding.tsx",
+      "onboarding-host": "./src/onboarding-host.ts",
       options: "./src/options.tsx",
       sidepanel: "./src/sidepanel.ts",
       "unsupported-site": "./src/unsupported-site.ts",
@@ -349,8 +360,12 @@ module.exports = (_env, argv) => {
         },
       },
       new webpack.DefinePlugin({
+        "process.env.DISABLE_GLOBAL_CORE": JSON.stringify("true"),
         __DEV_MODE__: JSON.stringify(devMode),
         __STORE_BUILD__: JSON.stringify(storeBuild),
+        // Match the object ProvidePlugin supplies for direct process uses.
+        // A typeof check alone should not pull in the shim.
+        "typeof process": JSON.stringify("object"),
         "process.env.NODE_DEBUG": JSON.stringify(""),
         "process.env.NODE_ENV": JSON.stringify(
           isProduction ? "production" : "development"
@@ -389,13 +404,23 @@ module.exports = (_env, argv) => {
                 );
                 if (manifest.web_accessible_resources?.[0]?.matches) {
                   manifest.web_accessible_resources[0].matches =
-                    buildWarMatches(hostsSource);
+                    buildWarMatches(hostsSource, devMode);
                 }
                 manifest.web_accessible_resources ??= [];
+                manifest.web_accessible_resources.push({
+                  resources: ["onboarding.html"],
+                  matches: [
+                    "https://knoww.app/*",
+                    ...(devMode ? ["http://localhost/*"] : []),
+                  ],
+                });
                 manifest.web_accessible_resources.push(
                   buildUnsupportedSiteSupportWebAccessibleResources(hostsSource)
                 );
                 if (storeBuild) {
+                  manifest.permissions = manifest.permissions.filter(
+                    (permission) => permission !== "alarms"
+                  );
                   // Drop the "prediction market" framing that flags CWS
                   // review; the store build surfaces relevant markets and
                   // shows read-only portfolio data, it does not trade.
@@ -418,6 +443,8 @@ module.exports = (_env, argv) => {
             },
           },
           { from: "options.html", to: "options.html" },
+          { from: "onboarding.html", to: "onboarding.html" },
+          { from: "src/onboarding.css", to: "onboarding.css" },
           { from: "sidepanel.html", to: "sidepanel.html" },
           { from: "styles.css", to: "styles.css" },
           { from: "icons", to: "icons" },
@@ -523,8 +550,10 @@ module.exports = (_env, argv) => {
         cryptoShimPath
       ),
       new webpack.DefinePlugin({
+        "process.env.DISABLE_GLOBAL_CORE": JSON.stringify("true"),
         __DEV_MODE__: JSON.stringify(devMode),
         __STORE_BUILD__: JSON.stringify(storeBuild),
+        "typeof process": JSON.stringify("object"),
         "process.env.NODE_DEBUG": JSON.stringify(""),
         "process.env.NODE_ENV": JSON.stringify(
           isProduction ? "production" : "development"

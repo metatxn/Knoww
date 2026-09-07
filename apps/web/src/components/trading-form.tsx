@@ -1030,10 +1030,26 @@ function TradingTicket(props: TradingTicketProps) {
                 }`}
                 onClick={async () => {
                   if (needsApproval) {
+                    posthog.capture("trading_token_approval_requested", {
+                      product: "web",
+                      surface: "trading_form",
+                    });
                     const approved = await handleSetAllowance();
                     if (approved) {
+                      posthog.capture("trading_token_approval_succeeded", {
+                        product: "web",
+                        surface: "trading_form",
+                        market_title: marketTitle,
+                        side,
+                        order_type: orderType,
+                      });
                       toast.success("Approval confirmed", {
                         description: "You can place the order now.",
+                      });
+                    } else {
+                      posthog.capture("trading_token_approval_failed", {
+                        product: "web",
+                        surface: "trading_form",
                       });
                     }
                     return;
@@ -1045,31 +1061,42 @@ function TradingTicket(props: TradingTicketProps) {
                   const submittedOutcome = selectedOutcome?.name;
                   const submittedPrice =
                     orderType === "LIMIT" ? limitPrice : calculations.price;
+                  const orderProperties = {
+                    product: "web",
+                    surface: "trading_form",
+                    market_title: marketTitle,
+                    side: submittedSide,
+                    order_type: submittedOrderType,
+                    shares: submittedShares,
+                    outcome_name: submittedOutcome,
+                    order_value: calculations.total,
+                    total_cost: calculations.total,
+                    potential_win: calculations.potentialWin,
+                  };
+
+                  posthog.capture("trade_button_clicked", orderProperties);
 
                   const success = await handleSubmit();
-                  if (success) {
-                    posthog.capture("order_submitted", {
-                      market_title: marketTitle,
-                      side: submittedSide,
-                      order_type: submittedOrderType,
-                      shares: submittedShares,
-                      outcome_name: submittedOutcome,
-                      total_cost: calculations.total,
-                      potential_win: calculations.potentialWin,
+                  if (!success) {
+                    posthog.capture("trade_form_submission_failed", {
+                      ...orderProperties,
+                      failure_stage: "submission",
                     });
+                    return;
+                  }
 
-                    const outcomeLabel = submittedOutcome ?? "shares";
-                    if (submittedOrderType === "LIMIT") {
-                      const intent = submittedSide === "BUY" ? "buy" : "sell";
-                      toast.success("Limit order placed", {
-                        description: `Resting on the book to ${intent} ${submittedShares} ${outcomeLabel} at ${formatCents(submittedPrice)}.`,
-                      });
-                    } else {
-                      const verb = submittedSide === "BUY" ? "Bought" : "Sold";
-                      toast.success("Order filled", {
-                        description: `${verb} ${submittedShares} ${outcomeLabel} at market.`,
-                      });
-                    }
+                  posthog.capture("order_submitted", orderProperties);
+
+                  const outcomeLabel = submittedOutcome ?? "shares";
+                  if (submittedOrderType === "LIMIT") {
+                    const intent = submittedSide === "BUY" ? "buy" : "sell";
+                    toast.success("Limit order placed", {
+                      description: `Resting on the book to ${intent} ${submittedShares} ${outcomeLabel} at ${formatCents(submittedPrice)}.`,
+                    });
+                  } else {
+                    toast.success("Order submitted", {
+                      description: "Check your portfolio for confirmed fills.",
+                    });
                   }
                   // Failures: inline error banner (already friendly-formatted)
                   // surfaces them; the clob `error` state is set asynchronously

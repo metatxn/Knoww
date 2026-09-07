@@ -14,6 +14,7 @@ import {
   resolvePreferredTradingWalletMode,
 } from "@knoww/shared-types/polymarket";
 import type { OrderBook } from "@knoww/shared-types/slippage";
+import { getAddress } from "viem";
 
 const log = createLogger("trading-service");
 const WALLET_MODE_STORAGE_KEY = "knoww_trading_wallet_mode";
@@ -315,7 +316,26 @@ function trackTradingAnalytics(
   properties: Record<string, string | number | boolean | null | undefined> = {}
 ): void {
   if (typeof window.KNOWW_ANALYTICS?.track === "function") {
-    void window.KNOWW_ANALYTICS.track(event, properties);
+    let walletAddress: string | undefined;
+    if (ctx.address) {
+      try {
+        walletAddress = getAddress(ctx.address);
+      } catch {
+        walletAddress = undefined;
+      }
+    }
+    try {
+      void Promise.resolve(
+        window.KNOWW_ANALYTICS.track(event, {
+          ...properties,
+          ...(walletAddress
+            ? { wallet_address: properties.wallet_address ?? walletAddress }
+            : {}),
+        })
+      ).catch(() => {});
+    } catch {
+      /* Analytics cannot interrupt a wallet operation. */
+    }
   }
 }
 
@@ -459,7 +479,7 @@ async function applyConnectedWalletAccounts(
     return;
   }
 
-  const address = accounts[0];
+  const address = getAddress(accounts[0]);
   const storedWalletMode = await readStoredWalletMode(address);
   const initialWalletMode = resolvePreferredTradingWalletMode({
     storedMode: storedWalletMode,
@@ -473,6 +493,7 @@ async function applyConnectedWalletAccounts(
   });
   broadcastWalletConnected(address);
   trackTradingAnalytics(analyticsEvent, {
+    product: "extension",
     hasMultipleWallets: walletUuid !== undefined,
   });
 
@@ -725,7 +746,8 @@ export const TradingService = {
       trackTradingAnalytics(
         result.method === "create"
           ? "trading_api_key_created"
-          : "trading_api_key_derived"
+          : "trading_api_key_derived",
+        { product: "extension" }
       );
       update({
         hasCredentials: true,
@@ -1057,6 +1079,21 @@ export const TradingService = {
 
     update({ state: "placing-order", error: null });
 
+    const analytics = {
+      wallet_address: getAddress(ctx.address),
+      attempt_id: crypto.randomUUID(),
+      side: params.side,
+      order_type:
+        params.orderType === "GTC" || params.orderType === "GTD"
+          ? "LIMIT"
+          : "MARKET",
+      clob_order_type: params.orderType,
+      token_id: params.tokenId,
+      requested_shares: params.size,
+      requested_amount: params.amount,
+    };
+    trackTradingAnalytics("order_attempted", analytics);
+
     try {
       const result = await runWithAuthRetry(ctx.address, () =>
         sendMsg(
@@ -1075,6 +1112,12 @@ export const TradingService = {
       await this.refreshBalance();
       return result;
     } catch (err) {
+      const rejected =
+        err instanceof Error && err.message.startsWith("CLOB rejected order:");
+      trackTradingAnalytics(
+        rejected ? "order_failed" : "order_submission_unknown",
+        analytics
+      );
       update({
         state: "ready",
         error: err instanceof Error ? err.message : String(err),
@@ -1103,6 +1146,11 @@ export const TradingService = {
     }
 
     update({ state: "deploying", error: null });
+    const analytics = {
+      wallet_address: getAddress(ctx.address),
+      wallet_mode: ctx.walletMode,
+    };
+    trackTradingAnalytics("trading_account_creation_attempted", analytics);
 
     try {
       const result = await runWithAuthRetry(ctx.address, () =>
@@ -1127,11 +1175,22 @@ export const TradingService = {
       });
       // Refresh so downstream UI (balances, allowances) reflects the new wallet.
       await this.refreshBalance();
+      if (!result.alreadyDeployed) {
+        trackTradingAnalytics("trading_account_created", {
+          product: "extension",
+          surface: "trading_service",
+          walletMode: ctx.walletMode,
+          account_kind: "trading_wallet",
+          ...analytics,
+          $insert_id: `trading-wallet:${analytics.wallet_address}:${analytics.wallet_mode}`,
+        });
+      }
       return {
         txHash: result.txHash,
         alreadyDeployed: result.alreadyDeployed,
       };
     } catch (err) {
+      trackTradingAnalytics("trading_account_creation_failed", analytics);
       // "error" (not "ready" — the vault isn't deployed) so the wizard's
       // inline error branch and the error toast actually render; the next
       // "Create vault" click resets to "deploying" and clears the error.
@@ -1157,6 +1216,11 @@ export const TradingService = {
     }
 
     update({ state: "approving", error: null });
+    const analytics = {
+      wallet_address: getAddress(ctx.address),
+      wallet_mode: ctx.walletMode,
+    };
+    trackTradingAnalytics("trading_token_approval_requested", analytics);
 
     try {
       const result = await runWithAuthRetry(ctx.address, () =>
@@ -1182,9 +1246,17 @@ export const TradingService = {
       // allowance re-renders a clickable Approve (double-submit window) until
       // the refreshed allowance lands.
       await this.refreshBalance();
+      trackTradingAnalytics("trading_token_approval_succeeded", {
+        ...analytics,
+        product: "extension",
+        surface: "trading_service",
+        walletMode: ctx.walletMode,
+        alreadyApproved: result.alreadyApproved === true,
+      });
       update({ state: "ready" });
       return result.txHash;
     } catch (err) {
+      trackTradingAnalytics("trading_token_approval_failed", analytics);
       update({
         state: "error",
         error: err instanceof Error ? err.message : String(err),

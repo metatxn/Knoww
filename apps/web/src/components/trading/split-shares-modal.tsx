@@ -3,6 +3,7 @@
 import { isWalletRejectionError } from "@knoww/shared-types/trading-errors";
 import { AnimatePresence, m } from "framer-motion";
 import { AlertCircle, ArrowRight, Loader2, X } from "lucide-react";
+import posthog from "posthog-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -31,6 +32,7 @@ export function SplitSharesModal({
   open,
   onOpenChange,
   conditionId,
+  marketTitle,
   negRisk = false,
   onSuccess,
 }: SplitSharesModalProps) {
@@ -144,6 +146,11 @@ export function SplitSharesModal({
     }
 
     setLocalError(null);
+    posthog.capture("position_split_submitted", {
+      product: "web",
+      condition_id: conditionId,
+      amount: numericAmount,
+    });
     const result = await splitPosition(
       conditionId,
       numericAmount,
@@ -152,11 +159,23 @@ export function SplitSharesModal({
     );
 
     if (!result.success) {
+      posthog.capture("position_split_failed", {
+        product: "web",
+        condition_id: conditionId,
+      });
       if (isWalletRejectionError(result.error)) {
         setLocalError("Transaction cancelled");
       } else {
         setLocalError(result.error || "Split failed");
       }
+    } else {
+      posthog.capture("position_split_succeeded", {
+        product: "web",
+        market_title: marketTitle,
+        amount: numericAmount,
+        neg_risk: negRisk,
+        condition_id: conditionId,
+      });
     }
   }, [
     proxyAddress,
@@ -165,6 +184,7 @@ export function SplitSharesModal({
     numericAmount,
     splitPosition,
     negRisk,
+    marketTitle,
   ]);
 
   const displayError = localError || error;

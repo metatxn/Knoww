@@ -61,6 +61,17 @@ const tradingAdapterState = vi.hoisted(() => ({
   placeOrder: vi.fn(),
 }));
 
+const analyticsMock = vi.hoisted(() => ({
+  captureTradingEvent: vi.fn(),
+  trackAccepted: vi.fn(),
+}));
+vi.mock("@/lib/order-analytics", () => ({
+  captureTradingEvent: analyticsMock.captureTradingEvent,
+}));
+vi.mock("@/polymarket/order-analytics", () => ({
+  usePolymarketOrderAnalytics: () => analyticsMock.trackAccepted,
+}));
+
 const placedOrder = {
   platform: "polymarket",
   status: "open",
@@ -294,6 +305,70 @@ describe("usePlaceOrder", () => {
   beforeEach(resetTradingState);
   afterEach(() => vi.restoreAllMocks());
 
+  it("tracks the default order type as a GTC limit order", async () => {
+    viemMock.readContract.mockResolvedValueOnce([BigInt(5_000_000)]);
+    const { result } = renderHook(() => usePlaceOrder());
+    await act(async () => {
+      await result.current.createOrder({
+        tokenId: "123",
+        conditionId: "condition-1",
+        price: 0.5,
+        size: 2,
+        side: "SELL",
+      });
+    });
+    expect(analyticsMock.captureTradingEvent).toHaveBeenCalledWith(
+      "order_attempted",
+      wagmiState.address,
+      expect.objectContaining({ order_type: "LIMIT", clob_order_type: "GTC" })
+    );
+  });
+
+  it.each(["upstream", "submission_unknown"])(
+    "tracks placement failure kind %s",
+    async (kind) => {
+      viemMock.readContract.mockResolvedValueOnce([BigInt(5_000_000)]);
+      tradingAdapterState.placeOrder.mockRejectedValue(
+        Object.assign(new Error("Placement failed"), {
+          name: "PlatformError",
+          platform: "polymarket",
+          operation: "placeOrder",
+          kind,
+        })
+      );
+      const { result } = renderHook(() => usePlaceOrder());
+      await act(async () => {
+        await expect(
+          result.current.createOrder({
+            tokenId: "123",
+            conditionId: "condition-1",
+            price: 0.5,
+            size: 2,
+            side: "SELL",
+            orderType: "GTC",
+          })
+        ).rejects.toThrow("Placement failed");
+      });
+      expect(analyticsMock.captureTradingEvent).toHaveBeenCalledWith(
+        "order_attempted",
+        wagmiState.address,
+        expect.objectContaining({
+          side: "SELL",
+          order_type: "LIMIT",
+          attempt_id: expect.any(String),
+        })
+      );
+      expect(analyticsMock.captureTradingEvent).toHaveBeenLastCalledWith(
+        kind === "submission_unknown"
+          ? "order_submission_unknown"
+          : "order_failed",
+        wagmiState.address,
+        expect.objectContaining({ failure_stage: "placing" })
+      );
+      expect(analyticsMock.trackAccepted).not.toHaveBeenCalled();
+    }
+  );
+
   it("stops without posting when preparation also outlasts the one refreshed draft", async () => {
     let now = 1_800_000_000_000;
     vi.spyOn(Date, "now").mockImplementation(() => now);
@@ -512,6 +587,15 @@ describe("usePlaceOrder", () => {
     expect(relayerClientState.approveUsdcForTrading).not.toHaveBeenCalled();
     expect(tradingAdapterState.placeOrder).toHaveBeenCalled();
     expect(outcome).toEqual({ success: true, order: placedOrder });
+    expect(analyticsMock.trackAccepted).toHaveBeenCalledWith(
+      placedOrder,
+      expect.objectContaining({ side: "SELL", token_id: "123" })
+    );
+    expect(analyticsMock.captureTradingEvent).not.toHaveBeenCalledWith(
+      "order_succeeded",
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   it("repairs a missing exchange operator approval before placing a standard SELL", async () => {

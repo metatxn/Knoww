@@ -8,6 +8,7 @@ import type {
 } from "@knoww/services/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
+import { captureTradingEvent } from "@/lib/order-analytics";
 import { qk } from "@/lib/query-keys";
 import {
   isExpectedClobReadFailure,
@@ -309,15 +310,28 @@ export function useCancelOrder() {
     mutationFn: async (orderId: string) => {
       if (!address) throw new Error("Address not available");
       if (!identity) throw new Error("Trading wallet not found");
-      const adapter = await getAdapter();
-      // The adapter throws when the venue refuses, so a refused cancel
-      // reaches `onError` and the optimistic removal is rolled back.
-      const order = await adapter.cancelOrder({
-        identity,
-        orderId,
-        idempotencyKey: crypto.randomUUID(),
+      captureTradingEvent("order_cancel_attempted", address, {
+        order_id: orderId,
       });
-      return { success: true, order };
+      try {
+        const adapter = await getAdapter();
+        // A refused cancel throws and rolls back the optimistic removal.
+        const order = await adapter.cancelOrder({
+          identity,
+          orderId,
+          idempotencyKey: crypto.randomUUID(),
+        });
+        captureTradingEvent("order_cancelled", address, {
+          order_id: orderId,
+          $insert_id: `cancel:${address}:${orderId}`,
+        });
+        return { success: true, order };
+      } catch (error) {
+        captureTradingEvent("order_cancel_failed", address, {
+          order_id: orderId,
+        });
+        throw error;
+      }
     },
     onMutate: async (orderId: string) => {
       // Cancel any outgoing refetches to prevent overwriting optimistic update
@@ -355,6 +369,7 @@ export function useCancelOrder() {
         }
       }
     },
+    onSuccess: () => {},
     onSettled: () => {
       // Refetch to ensure server state is synced
       queryClient.invalidateQueries({ queryKey: qk.orders.all() });
