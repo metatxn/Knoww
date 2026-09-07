@@ -32,6 +32,7 @@ export interface OnboardingProgress {
   walletInstallClickedAt?: string;
   tradingStartedAt?: string;
   completedAt?: string;
+  demoOpenedAt?: string;
 }
 
 interface ResolveOnboardingStageInput {
@@ -91,6 +92,9 @@ export function parseOnboardingProgress(value: unknown): OnboardingProgress {
       : {}),
     ...(readIsoDate(stored.completedAt)
       ? { completedAt: readIsoDate(stored.completedAt) }
+      : {}),
+    ...(readIsoDate(stored.demoOpenedAt)
+      ? { demoOpenedAt: readIsoDate(stored.demoOpenedAt) }
       : {}),
   };
 }

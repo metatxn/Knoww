@@ -86,11 +86,13 @@ import type {
   TradingSuccessResponse,
   TradingWalletMode,
 } from "../types/chrome-messages";
+import { EXTENSION_AUTH_REQUIRED_ERROR } from "../types/chrome-messages";
 import {
   type BridgeWalletClient,
   createBridgeWalletClient,
 } from "./bridge-signer";
 import { createL2ClobClient } from "./clob-open-orders";
+import { getExtensionSessionInfoViaMessage } from "./extension-auth";
 import {
   deployDepositWallet,
   deployProxyWallet,
@@ -565,17 +567,29 @@ async function handleDeriveProxyAddress(
   if (
     !isDeployed &&
     walletMode !== "eoa" &&
-    msg.skipRelayerDeploymentFallback !== true
+    msg.skipRelayerDeploymentFallback !== true &&
+    // Wallet discovery runs before Knoww sign-in. The public bytecode check
+    // works then, but the optional relayer fallback requires a session.
+    (await getExtensionSessionInfoViaMessage()).loggedIn
   ) {
     const walletType = walletMode === "safe" ? "SAFE" : "WALLET";
     try {
       isDeployed = await isRelayerWalletDeployed(proxyAddress, walletType);
     } catch (error) {
-      logWarn("relayer.deployment-status-fallback.failed", {
-        proxyAddress,
-        walletType,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      // The session can expire after the check above. Keep the bytecode result;
+      // a later status check can use the relayer once sign-in is restored.
+      if (
+        !(
+          error instanceof Error &&
+          error.message === EXTENSION_AUTH_REQUIRED_ERROR
+        )
+      ) {
+        logWarn("relayer.deployment-status-fallback.failed", {
+          proxyAddress,
+          walletType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
   return ok({ proxyAddress, isDeployed });

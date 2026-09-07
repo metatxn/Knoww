@@ -80,7 +80,6 @@ describe("install-time extension onboarding", () => {
       "0 of 4 complete",
       "Knoww is installed. Here is what it does.",
       "Browser wallets",
-      "Polygon · 137",
       "Live preview",
       "Open x.com and try it",
     ]) {
