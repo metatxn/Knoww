@@ -63,6 +63,11 @@ In a second terminal:
 pnpm --filter @knoww/web golden:record
 ```
 
+The runner fetches every entry once and discards the result before it
+records or compares anything. The first render of a route after `next start`
+differs from later ones (`priority` image preloads move into the head and
+flight rows renumber), so both modes take their bytes from a warm server.
+
 Commit `clock.json`, `fixtures/` and `responses/`. When re-recording, delete
 `fixtures/` first: the shim only adds fixtures, so a request key that no
 longer occurs leaves an orphan behind.

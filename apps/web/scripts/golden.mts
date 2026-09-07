@@ -84,6 +84,36 @@ const GOLDEN_VISITOR_COUNTRY = "JP";
  */
 const GOLDEN_USER_AGENT = "knoww-golden/1 (compatible; Chrome-Lighthouse)";
 
+function fetchEntry(entry: ManifestEntry, baseUrl: string): Promise<Response> {
+  return fetch(new URL(entry.path, baseUrl).toString(), {
+    headers: {
+      accept: entry.kind === "html" ? "text/html" : "application/json",
+      "user-agent": GOLDEN_USER_AGENT,
+      "cf-ipcountry": GOLDEN_VISITOR_COUNTRY,
+    },
+    redirect: "manual",
+  });
+}
+
+/**
+ * The first render of a route after `next start` has a different shape from
+ * every later one: React hoists `priority` image preloads into the head and
+ * numbers flight rows in a different order, and neither mask in normalize.ts
+ * covers that. CI starts a fresh server and fetches each page exactly once,
+ * so without this pass it always compares a cold render against a recording
+ * taken from a warm one. Fetching every entry once first, in both modes,
+ * makes the recorded and replayed bytes come from the same server state.
+ */
+async function warmUp(
+  entries: ManifestEntry[],
+  baseUrl: string
+): Promise<void> {
+  for (const entry of entries) {
+    const response = await fetchEntry(entry, baseUrl);
+    await response.arrayBuffer();
+  }
+}
+
 async function main(): Promise<void> {
   const mode = process.argv[2];
   if (mode !== "record" && mode !== "replay") {
@@ -105,17 +135,11 @@ async function main(): Promise<void> {
   await rm(diffDir, { recursive: true, force: true });
   await mkdir(responsesDir, { recursive: true });
 
+  await warmUp(manifest.entries, baseUrl);
+
   const failures: string[] = [];
   for (const entry of manifest.entries) {
-    const url = new URL(entry.path, baseUrl).toString();
-    const response = await fetch(url, {
-      headers: {
-        accept: entry.kind === "html" ? "text/html" : "application/json",
-        "user-agent": GOLDEN_USER_AGENT,
-        "cf-ipcountry": GOLDEN_VISITOR_COUNTRY,
-      },
-      redirect: "manual",
-    });
+    const response = await fetchEntry(entry, baseUrl);
     const text = await response.text();
     const normalized = `status: ${response.status}\n\n${normalizeBody(entry.kind, text)}\n`;
     const goldenFile = path.join(
