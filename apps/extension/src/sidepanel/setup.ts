@@ -483,7 +483,7 @@ export const SETUP_STYLES = `
 
       .knoww-pf-setup-focused-text strong {
         display: block;
-        color: rgba(255, 255, 255, 0.95);
+        color: var(--pf-hi);
         font: 600 13px/1.2 var(--pf-sans);
       }
 

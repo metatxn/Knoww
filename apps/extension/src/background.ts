@@ -58,6 +58,11 @@ import { createPortfolioFundAttemptStore } from "./background/portfolio-fund-att
 import { createPortfolioFundIdempotencyCoordinator } from "./background/portfolio-fund-idempotency";
 import { handleRelevanceAggregateMessage } from "./background/relevance-aggregate-messages";
 import { createRelevanceAggregateStore } from "./background/relevance-aggregate-store";
+import {
+  cancelSessionSignIn,
+  handleSessionSignInMessage,
+  isSessionSignInSender,
+} from "./background/session-sign-in";
 // `./background/portfolio-funds` is the only on-chain money-movement module
 // (it pulls in bridge-signer + relayer-client + viem wallet clients). It is
 // NOT imported statically: the store-compliant build must not ship it. Every
@@ -91,6 +96,7 @@ import {
   isSearchQueueDeadlineError,
   runSearchWithRetry,
 } from "./search-request-policy";
+import { SESSION_SIGN_IN_HASH } from "./session-sign-in";
 import {
   getUnsupportedSiteHostname,
   normalizeSiteSupportHostname,
@@ -1124,7 +1130,9 @@ async function performFetchJson(
       };
     }
     if (response.status === 401 && isKnowwApiUrl(message.url)) {
-      await clearExtensionAccessToken();
+      await clearExtensionAccessToken(
+        headers.Authorization ?? headers.authorization ?? null
+      );
     }
 
     const text = await response.text();
@@ -2737,6 +2745,7 @@ chrome.runtime.onMessage.addListener(
     // Return ONLY derived session facts ({ loggedIn, address }), never the raw
     // bearer token. The token stays in the worker; authed fetches go through the
     // fetch-json proxy, which attaches it internally for knoww.app/api URLs.
+    if (handleSessionSignInMessage(msg, sender, sendResponse)) return true;
     if (msg?.type === "auth:get-session-info") {
       const senderReject = checkAuthorizedSender(sender.id, chrome.runtime.id);
       if (senderReject) {
@@ -2749,6 +2758,13 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
     if (msg?.type === "auth:set-token" && typeof msg.token === "string") {
+      if (
+        sender.url?.includes(SESSION_SIGN_IN_HASH) &&
+        !isSessionSignInSender(sender)
+      ) {
+        sendResponse({ ok: false, error: "This sign-in request has expired." });
+        return true;
+      }
       setExtensionAccessToken(msg.token).then(() => {
         sendResponse({ ok: true, data: null } as BackgroundResponse);
       });
@@ -2761,6 +2777,7 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
     if (msg?.type === "auth:logout") {
+      cancelSessionSignIn();
       (async () => {
         const token = await getExtensionAccessToken();
 

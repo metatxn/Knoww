@@ -518,22 +518,8 @@ function createPanel(opts: PanelOptions): HTMLElement {
     .sendMessage({ type: "trading:prewarm-offscreen" })
     .catch(() => {});
 
-  if (
-    !TradingService.getContext().address &&
-    !panelState.sessionRestoreAttempted
-  ) {
-    panelState.sessionRestoreAttempted = true;
-    TradingService.hasActiveSession()
-      .then((hasSession) => {
-        if (!hasSession) {
-          return [];
-        }
-        return WalletBridge.getAccounts();
-      })
-      .then((accounts) => {
-        if (accounts.length > 0) TradingService.connectWallet();
-      })
-      .catch(() => {});
+  if (!TradingService.getContext().address) {
+    void TradingService.restoreWallet();
   } else if (TradingService.getContext().proxyAddress) {
     TradingService.refreshBalance();
   }
@@ -1012,6 +998,21 @@ function render(
   panel.innerHTML = "";
 
   addHeader(panel, opts, ctx, address);
+
+  if (!address && state === "restoring-session") {
+    addLoading(panel, "Restoring your wallet...");
+    const chooseWallet = el(
+      "button",
+      "knoww-tp-btn-connect secondary",
+      "Choose another wallet"
+    );
+    chooseWallet.onclick = (event) => {
+      event.stopPropagation();
+      TradingService.cancelWalletRestore();
+    };
+    panel.appendChild(chooseWallet);
+    return;
+  }
 
   if (state === "disconnected" || !address) {
     syncCardSetupStorage(null);

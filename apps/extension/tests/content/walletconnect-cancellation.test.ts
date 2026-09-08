@@ -118,6 +118,67 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+test("checking for a saved session without one leaves wallet selection available", async () => {
+  const { WalletConnectBridge } = await import(
+    "../../src/content/trading/walletconnect-bridge"
+  );
+  const states: string[] = [];
+  WalletConnectBridge.onStateChange((state) => states.push(state.status));
+
+  assert.deepEqual(await WalletConnectBridge.getAccounts(), []);
+  assert.equal(WalletConnectBridge.getState().status, "idle");
+  assert.equal(states.includes("initializing"), false);
+  assert.equal(providerMock("connect").mock.calls.length, 0);
+});
+
+test("a stalled or failed saved-session check never shows mobile pairing", async () => {
+  let failInit!: (error: Error) => void;
+  walletConnect.initGate = new Promise<void>((_resolve, reject) => {
+    failInit = reject;
+  });
+  const { WalletConnectBridge } = await import(
+    "../../src/content/trading/walletconnect-bridge"
+  );
+  const accounts = WalletConnectBridge.getAccounts();
+  await vi.waitFor(() => assert.equal(walletConnect.storages.length, 1));
+  assert.equal(WalletConnectBridge.getState().status, "idle");
+
+  failInit(new Error("Relay unavailable"));
+  assert.deepEqual(await accounts, []);
+  assert.equal(WalletConnectBridge.getState().status, "idle");
+});
+
+test("a saved mobile session still restores its connected accounts", async () => {
+  if (walletConnect.provider) {
+    walletConnect.provider.session = {
+      namespaces: { eip155: { accounts: [`eip155:137:${ADDRESS}`] } },
+    };
+  }
+  const { WalletConnectBridge } = await import(
+    "../../src/content/trading/walletconnect-bridge"
+  );
+  assert.deepEqual(await WalletConnectBridge.getAccounts(), [ADDRESS]);
+  assert.equal(WalletConnectBridge.getState().status, "connected");
+});
+
+test("explicit mobile connection shows initialization while the provider loads", async () => {
+  let finishInit!: () => void;
+  walletConnect.initGate = new Promise<void>((resolve) => {
+    finishInit = resolve;
+  });
+  const { WalletConnectBridge } = await import(
+    "../../src/content/trading/walletconnect-bridge"
+  );
+  const connection = WalletConnectBridge.connect({ forceNew: true });
+  void connection.catch(() => {});
+  await vi.waitFor(() => assert.equal(walletConnect.storages.length, 1));
+  assert.equal(WalletConnectBridge.getState().status, "initializing");
+  finishInit();
+  await vi.waitFor(() => assert.ok(walletConnect.connectReject));
+  walletConnect.connectReject?.(new Error("User rejected connection"));
+  await assert.rejects(connection, /User rejected/);
+});
+
 test("cancel and reconnect do not wait for an abandoned approval promise", async () => {
   const { WalletConnectBridge } = await import(
     "../../src/content/trading/walletconnect-bridge"

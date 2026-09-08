@@ -219,7 +219,6 @@ async function getProvider(): Promise<UniversalProvider> {
     );
   }
 
-  emit({ status: "initializing", qrUri: null, error: null });
   const storage = new ChromeWalletConnectStorage();
   shared.providerStorage = storage;
   const providerPromise = UniversalProvider.init({
@@ -601,6 +600,9 @@ export const WalletConnectBridge = {
     const generation = ++shared.connectGeneration;
     const attempt = (async () => {
       try {
+        // Saved-session checks also initialize the provider. Only a connection
+        // attempt should replace wallet selection with the mobile pairing UI.
+        emit({ status: "initializing", qrUri: null, error: null });
         if (forceNew) {
           const provider = await getProvider();
           assertCurrentConnectGeneration(shared, generation);

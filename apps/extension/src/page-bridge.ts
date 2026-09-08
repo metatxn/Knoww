@@ -49,6 +49,7 @@ interface EIP6963Detail {
 const ALLOWED_METHODS = new Set([
   "eth_requestAccounts",
   "wallet_requestPermissions",
+  "wallet_getPermissions",
   "eth_accounts",
   "eth_chainId",
   "eth_signTypedData_v4",
