@@ -43,6 +43,10 @@ import {
   normalizeExtensionTradingWalletMode,
   TRADING_WALLET_SETUP_REQUIRED_MESSAGE,
 } from "./setup-gates";
+import {
+  rememberWalletConnection,
+  restoreOnboardedWallet,
+} from "./wallet-restoration";
 
 export type TradingState =
   | "disconnected"
@@ -139,6 +143,9 @@ function createDisconnectedContext(): TradingContext {
 }
 
 let ctx: TradingContext = createDisconnectedContext();
+let walletRestoreGeneration = 0;
+let walletRestorePromise: Promise<void> | null = null;
+let walletRestoreTimer: ReturnType<typeof setTimeout> | null = null;
 let orderBookRequestSequence = 0;
 let latestContextOrderBookRequest = 0;
 let walletSwitchInProgress = false;
@@ -431,7 +438,8 @@ async function reauthenticate(address: string): Promise<void> {
 
   reAuthPromise = (async () => {
     try {
-      await ExtensionSession.clear();
+      // The failed request already invalidated its own bearer. Another tab may
+      // have signed in since then, so reuse that session instead of clearing it.
       await ExtensionSession.ensureAuthorized(address);
     } finally {
       reAuthPromise = null;
@@ -571,6 +579,7 @@ async function applyConnectedWalletAccounts(
   } else {
     update({ state: "connected" });
   }
+  await rememberWalletConnection(address);
 }
 
 async function clearPreviousWalletSession(address: string): Promise<void> {
@@ -605,6 +614,56 @@ export const TradingService = {
     return ExtensionSession.hasSession();
   },
 
+  restoreWallet(): Promise<void> {
+    if (walletRestorePromise) return walletRestorePromise;
+    if (ctx.address || ctx.state !== "disconnected") return Promise.resolve();
+    const generation = ++walletRestoreGeneration;
+    const isCurrent = () =>
+      generation === walletRestoreGeneration && !ctx.address;
+    walletRestoreTimer = setTimeout(() => {
+      if (generation === walletRestoreGeneration) this.cancelWalletRestore();
+    }, 125_000);
+    const restoration = (async () => {
+      try {
+        const restored = await restoreOnboardedWallet(isCurrent, () => {
+          if (isCurrent()) update({ state: "restoring-session", error: null });
+        });
+        if (!isCurrent()) return;
+        if (restored) {
+          if (walletRestoreTimer) clearTimeout(walletRestoreTimer);
+          walletRestoreTimer = null;
+          await applyConnectedWalletAccounts(
+            [restored.address],
+            restored.walletUuid,
+            "wallet_connected"
+          );
+        } else {
+          update({ state: "disconnected", error: null });
+        }
+      } catch {
+        if (isCurrent()) update({ state: "disconnected", error: null });
+      } finally {
+        if (generation === walletRestoreGeneration) {
+          if (walletRestoreTimer) clearTimeout(walletRestoreTimer);
+          walletRestoreTimer = null;
+          walletRestorePromise = null;
+        }
+      }
+    })();
+    walletRestorePromise = restoration;
+    return restoration;
+  },
+
+  cancelWalletRestore(): void {
+    walletRestoreGeneration += 1;
+    if (walletRestoreTimer) clearTimeout(walletRestoreTimer);
+    walletRestoreTimer = null;
+    walletRestorePromise = null;
+    if (!ctx.address && ctx.state === "restoring-session") {
+      update({ state: "disconnected", error: null });
+    }
+  },
+
   async getConnectedWalletAddress(): Promise<string | null> {
     if (!ctx.address) return null;
     const accounts = await WalletBridge.getSelectedAccounts();
@@ -628,6 +687,16 @@ export const TradingService = {
     if (accountListIncludesAddress(accounts, ctx.address)) return;
 
     const disconnectedAddress = ctx.address;
+    // MetaMask may report only its active account while the trading account
+    // remains authorized. Confirm removal before invalidating the shared login.
+    const stillPermitted =
+      await WalletBridge.hasAccountPermission(disconnectedAddress);
+    if (
+      stillPermitted ||
+      ctx.address !== disconnectedAddress ||
+      walletSwitchInProgress
+    )
+      return;
     WalletBridge.resetAfterDisconnect();
     this.reset();
 
@@ -646,6 +715,7 @@ export const TradingService = {
   },
 
   async connectWallet(walletUuid?: string): Promise<void> {
+    this.cancelWalletRestore();
     update({ state: "connecting", error: null });
 
     try {
@@ -667,6 +737,7 @@ export const TradingService = {
   },
 
   async switchWallet(walletUuid?: string): Promise<void> {
+    this.cancelWalletRestore();
     const previousContext = { ...ctx };
     walletSwitchInProgress = true;
     update({ state: "connecting", error: null });
@@ -1376,6 +1447,7 @@ export const TradingService = {
   },
 
   reset(): void {
+    this.cancelWalletRestore();
     latestContextOrderBookRequest = ++orderBookRequestSequence;
     ctx = createDisconnectedContext();
     consecutiveDegradedApprovalReads = 0;
@@ -1383,6 +1455,7 @@ export const TradingService = {
   },
 
   async disconnect(): Promise<void> {
+    this.cancelWalletRestore();
     await sendMsg<null>({ type: "auth:logout" }, "Failed to disconnect wallet");
     await WalletBridge.disconnect().catch((err) => {
       log.warn("wallet.disconnect_failed", { error: err });

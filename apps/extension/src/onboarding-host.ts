@@ -1,9 +1,32 @@
 import { isOnboardingWalletSetupUrl } from "./onboarding-state";
 import { ONBOARDING_THEME_COLORS } from "./onboarding-theme";
+import { SESSION_SIGN_IN_HASH } from "./session-sign-in";
 
 // This content script only mounts packaged UI. It does not forward page messages
 // into the extension runtime or expose wallet/session data to the website.
-if (isOnboardingWalletSetupUrl(location.href)) {
+if (
+  isOnboardingWalletSetupUrl(location.href) &&
+  location.hash.startsWith(SESSION_SIGN_IN_HASH)
+) {
+  let mounted = false;
+  const mount = () => {
+    const slot = document.getElementById("knoww-extension-onboarding");
+    if (mounted || slot?.dataset.ready !== "true") return;
+    mounted = true;
+    observer.disconnect();
+    void import(
+      /* webpackMode: "eager" */ "./content/trading/session-sign-in"
+    ).then(({ mountSessionSignIn }) => mountSessionSignIn(slot));
+  };
+  const observer = new MutationObserver(mount);
+  observer.observe(document.documentElement, {
+    childList: true,
+    attributes: true,
+    attributeFilter: ["data-ready"],
+    subtree: true,
+  });
+  mount();
+} else if (isOnboardingWalletSetupUrl(location.href)) {
   const mount = () => {
     const slot = document.getElementById("knoww-extension-onboarding");
     if (slot?.dataset.ready !== "true" || slot.querySelector("iframe")) return;

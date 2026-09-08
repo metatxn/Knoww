@@ -161,6 +161,8 @@ export function createTradingRuntime(): TradingRuntime {
       accounts.length > 0 &&
       !accounts.some((account) => sameAddress(account, address))
     ) {
+      const stillPermitted = await WalletBridge.hasAccountPermission(address);
+      if (stillPermitted || cachedAddress !== address) return cachedAddress;
       cachedAddress = null;
       WalletBridge.resetAfterDisconnect();
       await sendAuthLogout();

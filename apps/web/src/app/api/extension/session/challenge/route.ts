@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
     const challenge = createSiwxChallenge({
       address: walletAddress,
       chainId,
+      requestUrl: request.url,
     });
     const signedChallenge = await issueExtensionChallengeToken({
       address: walletAddress,

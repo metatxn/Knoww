@@ -21,6 +21,10 @@ import {
 } from "@knoww/shared-types/trading-errors";
 import { WALLETCONNECT_WALLET_UUID } from "../walletconnect-constants";
 import {
+  ensureWalletAccountAccess,
+  hasWalletAccountPermission,
+} from "./wallet-account-access";
+import {
   WalletConnectBridge,
   type WalletConnectState,
 } from "./walletconnect-bridge";
@@ -359,7 +363,8 @@ export function installSigningListener(): () => void {
 function request(
   method: string,
   params?: unknown[],
-  walletUuid?: string
+  walletUuid?: string,
+  timeoutMs = getWalletRequestTimeoutMs(method)
 ): Promise<unknown> {
   if (isWalletConnectSelected(walletUuid)) {
     switch (method) {
@@ -427,12 +432,68 @@ function request(
         pending.delete(id);
         reject(new Error(`Wallet request timed out: ${method}`));
       }
-    }, getWalletRequestTimeoutMs(method));
+    }, timeoutMs);
   });
 }
 
 export const WalletBridge = {
   init,
+
+  hasAccountPermission(address: string): Promise<boolean> {
+    if (isWalletConnectSelected()) return Promise.resolve(false);
+    const uuid = selectedWalletUuid;
+    return hasWalletAccountPermission(
+      (method) => request(method, undefined, uuid, 3000),
+      address
+    );
+  },
+
+  ensureAccountAccess(
+    walletUuid: string,
+    address: string,
+    isCurrent: () => boolean
+  ): Promise<boolean> {
+    this.selectWallet(walletUuid);
+    return ensureWalletAccountAccess(
+      (method, params) => request(method, params, walletUuid),
+      address,
+      isCurrent
+    );
+  },
+
+  getSelectedWalletUuid(): string | undefined {
+    return selectedWalletUuid;
+  },
+
+  async getWalletAccounts(
+    uuid: string,
+    requestAccess: boolean
+  ): Promise<string[]> {
+    // Reading a specific provider must not silently select the first installed wallet.
+    const timeoutMs = requestAccess ? 120_000 : 3000;
+    if (uuid !== WALLETCONNECT_WALLET_UUID) {
+      return request(
+        requestAccess ? "eth_requestAccounts" : "eth_accounts",
+        undefined,
+        uuid,
+        timeoutMs
+      ) as Promise<string[]>;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        WalletConnectBridge.getAccounts(),
+        new Promise<string[]>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Wallet account lookup timed out.")),
+            timeoutMs
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  },
 
   getDiscoveredWallets(): DiscoveredWallet[] {
     init();

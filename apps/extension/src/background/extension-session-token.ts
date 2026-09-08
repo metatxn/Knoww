@@ -38,3 +38,20 @@ export function decodeExtensionSessionAddress(
     return null;
   }
 }
+
+export function isExtensionSessionExpired(
+  token: string,
+  now = Date.now()
+): boolean {
+  const payload = getExtensionSessionPayloadSegment(token);
+  if (!payload) return true;
+  try {
+    const { exp } = JSON.parse(decodeBase64Url(payload)) as { exp?: unknown };
+    if (typeof exp !== "number" || !Number.isFinite(exp)) return true;
+    // Knoww's two-part tokens use milliseconds; standard JWTs use seconds.
+    const expiresAt = token.split(".").length === 2 ? exp : exp * 1000;
+    return expiresAt <= now;
+  } catch {
+    return true;
+  }
+}

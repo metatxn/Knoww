@@ -91,7 +91,6 @@ interface PanelState {
   selectedOutcome: "yes" | "no";
   yesPrice: number;
   noPriceValue: number;
-  sessionRestoreAttempted: boolean;
   lastRenderedErrorToast: string | null;
   dismissedErrorToast: string | null;
   livePanelRefreshTimer: ReturnType<typeof setTimeout> | null;
@@ -147,7 +146,6 @@ export const panelState: PanelState = {
   selectedOutcome: "yes",
   yesPrice: 0,
   noPriceValue: 0,
-  sessionRestoreAttempted: false,
   lastRenderedErrorToast: null,
   dismissedErrorToast: null,
   livePanelRefreshTimer: null,
