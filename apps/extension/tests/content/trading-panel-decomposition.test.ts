@@ -56,7 +56,6 @@ describe("trading panel decomposition contracts", () => {
       selectedOutcome: "yes",
       yesPrice: 0,
       noPriceValue: 0,
-      sessionRestoreAttempted: false,
       lastRenderedErrorToast: null,
       dismissedErrorToast: null,
       livePanelRefreshTimer: null,

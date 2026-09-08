@@ -1,6 +1,6 @@
 {
   "name": "@knoww/extension",
-  "version": "2.5.54",
+  "version": "2.5.56",
   "private": true,
   "type": "module",
   "scripts": {

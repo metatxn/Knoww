@@ -81,7 +81,9 @@ async function directFetch<T>(
 
   const res = await fetch(url, options);
   if (res.status === 401 && isKnowwApiUrl(url)) {
-    await clearExtensionAccessToken();
+    await clearExtensionAccessToken(
+      finalHeaders.Authorization ?? finalHeaders.authorization ?? null
+    );
     throw new Error(EXTENSION_AUTH_REQUIRED_ERROR);
   }
 

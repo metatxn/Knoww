@@ -4,6 +4,7 @@ import type {
   BackgroundResponse,
   FetchJsonSuccessResponse,
 } from "../../types/chrome-messages";
+import { WALLETCONNECT_WALLET_UUID } from "../walletconnect-constants";
 import { WalletBridge } from "./bridge";
 
 const KNOWW_APP_URL = __DEV_MODE__
@@ -190,6 +191,43 @@ export const ExtensionSession = {
       void window.KNOWW_ANALYTICS?.track("extension_session_started");
 
       try {
+        if (
+          window.location.origin !== KNOWW_APP_URL &&
+          WalletBridge.getSelectedWalletUuid() !== WALLETCONNECT_WALLET_UUID
+        ) {
+          const wallets = WalletBridge.getDiscoveredWallets();
+          const selected =
+            wallets.find(
+              (wallet) => wallet.uuid === WalletBridge.getSelectedWalletUuid()
+            ) ?? (wallets.length === 1 ? wallets[0] : undefined);
+          if (!selected)
+            throw new Error("Choose a wallet before signing in to Knoww.");
+          // Phantom requires the Knoww challenge to be signed on Knoww's origin.
+          // Use the selected provider, so merely installing Phantom does not
+          // redirect users who chose another wallet.
+          const rdns = selected.rdns.trim().toLowerCase();
+          const isPhantom =
+            rdns === "app.phantom" ||
+            (!rdns && selected.name.trim().toLowerCase() === "phantom");
+          if (isPhantom) {
+            const session = await sendAuthMessage<SessionInfo>(
+              {
+                type: "auth:open-sign-in",
+                address,
+                wallet: { rdns: selected.rdns, name: selected.name },
+              },
+              "Knoww sign-in could not be completed."
+            );
+            if (
+              !session?.loggedIn ||
+              !addressesMatch(session.address, address)
+            ) {
+              throw new Error("Sign in with the requested wallet to continue.");
+            }
+            void window.KNOWW_ANALYTICS?.track("extension_session_succeeded");
+            return;
+          }
+        }
         const chainId = normalizeChainId(await WalletBridge.getChainId());
         const nonceResult = await fetchJson<NonceResponse>(
           "/api/extension/session/challenge",
