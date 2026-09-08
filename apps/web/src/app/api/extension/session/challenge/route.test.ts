@@ -29,7 +29,8 @@ it.each([
   "binds the %s challenge to the expected origin",
   async (mode, origin, domain) => {
     vi.stubEnv("NODE_ENV", mode);
-    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://knoww.app");
+    // Reproduce the production response that incorrectly named localhost.
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:8787");
     const walletAddress = "0x1111111111111111111111111111111111111111";
     const request = new NextRequest(
       `${origin}/api/extension/session/challenge`,

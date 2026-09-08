@@ -1,7 +1,11 @@
 const STATEMENT = "Sign in to Knoww";
+const PRODUCTION_SIGN_IN_ORIGIN = "https://knoww.app";
 const LOCAL_ONBOARDING_ORIGIN = "http://localhost:8000";
 
 function getBaseUrl(requestUrl?: string): string {
+  // Released extensions sign on knoww.app. A stale app/CORS URL must not
+  // change the relying party named in a production authentication challenge.
+  if (process.env.NODE_ENV === "production") return PRODUCTION_SIGN_IN_ORIGIN;
   // Local onboarding signs on port 8000, even when the API configuration
   // points to production. Never adopt arbitrary request hosts for sign-in.
   if (process.env.NODE_ENV === "development" && requestUrl) {

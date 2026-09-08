@@ -13,6 +13,28 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("extension sign-in origin", () => {
+  it.each([
+    ["http://localhost:8787", ""],
+    ["", "http://localhost:8787"],
+    ["https://preview.example", "https://another.example"],
+    ["", ""],
+  ])(
+    "uses Knoww's production origin with app URL %s and allowed origin %s",
+    (appUrl, allowedOrigin) => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", appUrl);
+      vi.stubEnv("ALLOWED_ORIGIN", allowedOrigin);
+      const { message } = createSiwxChallenge({
+        address,
+        chainId: 137,
+        requestUrl: "https://knoww.app/api/extension/session/challenge",
+      });
+      expect(parseSiweMessage(message)).toMatchObject({
+        domain: "knoww.app",
+        uri: "https://knoww.app",
+      });
+    }
+  );
   it("uses Phantom's authority-only header and keeps the scheme in the URI", () => {
     expect(
       buildSiwxMessage({
