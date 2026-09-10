@@ -11,6 +11,11 @@ minimumReleaseAgeExclude:
   - "brace-expansion"
   - "fast-uri"
   - "hono"
+  - "next@15.5.24"
+  - "@next/*"
+  - "sharp@0.35.4"
+  - "@img/*"
+  - "js-yaml@4.3.2"
   - "@protobufjs/eventemitter"
   - "@protobufjs/fetch"
   - "@protobufjs/inquire"
@@ -48,6 +53,10 @@ catalog:
   "wagmi": "3.7.6"
 
 packageExtensions:
+  # The installer patch streams selected NuGet files with yauzl.
+  "onnxruntime-node@1.24.3":
+    dependencies:
+      "yauzl": "3.4.0"
   "@metamask/connect-multichain@0.12.1":
     dependencies:
       "debug": "^4.4.3"
@@ -72,13 +81,11 @@ overrides:
   # mitigation; only fixed in >=5.0.9. Release-age gate waived above.
   "brace-expansion": "5.0.9"
   "fast-xml-parser": "5.10.1"
-  "qs": "6.15.3"
+  "qs": "6.16.0"
   "body-parser": "2.3.0"
   "h3": "1.15.11"
-  # GHSA CORS-middleware ReDoS via Access-Control-Request-Headers is only
-  # fixed in >=4.12.34. Staying on the 4.12 line rather than 4.13.0.
-  # Release-age gate waived above.
-  "hono": "4.12.34"
+  # Fix query parsing, parseBody nesting, and toSSG path traversal advisories.
+  "hono": "4.13.5"
   "postcss": "8.5.24"
   # GHSA-2v37-7h3g-55p8: a custom alphabet with size 0 spins forever.
   # Redirect only the vulnerable 3.3.17 release; consumers on NanoID 5 keep
@@ -106,23 +113,21 @@ overrides:
   # posthog-js. Release-age gate waived above; drop the waiver after
   # 2026-08-10, when 3.4.13 ages past the gate on its own.
   "dompurify": "3.4.13"
-  # CVE-2026-59870: quadratic CPU blow-up parsing `!!omap` keys. Fixed on the
-  # v4 line in 4.3.1 (`v4-legacy` tag) — reached via webpack-cli, so a major
-  # bump to 5.x is unnecessary. Past the release-age gate on its own.
-  "js-yaml": "4.3.1"
-  # @huggingface/transformers declares sharp ^0.34.5, which is below the
-  # >=0.35.0 advisory floor. The extension never imports sharp and webpack
-  # does not bundle it, so lifting it also dedupes against the root 0.35.3.
-  "sharp": "0.35.3"
+  # GHSA-2883-xcg3-v3hh: limit CPU use for empty merge sources on the v4 line.
+  "js-yaml": "4.3.2"
+  # GHSA-rgj7-g3m4-5g8c: update libheif, including Transformers' sharp dependency.
+  "sharp": "0.35.4"
   # GHSA-frvp-7c67-39w9 (Windows serve-static path traversal via %5C) is only
   # fixed in >=2.0.5, so the whole 1.x line stays vulnerable. Reached via
   # apps/web > accounts > wata, which declares ^1.13.7 but imports exactly one
   # root symbol (`getRequestListener`) — present and unchanged in 2.x.
   "@hono/node-server": "2.0.12"
-  # Force patched adm-zip (GHSA-xcpc-8h2w-3j85: crafted ZIP → 4GB alloc).
-  # Pulled transitively via @huggingface/transformers > onnxruntime-node,
-  # which still declares ^0.5.16; the override lifts it past the fix.
-  "adm-zip": "0.6.0"
+  # GHSA-vwc7-r8mq-g2x9 has no patched adm-zip release. The version-pinned
+  # ONNX installer patch below replaces its only use with yauzl.
+  "onnxruntime-node@1.24.3>adm-zip": "-"
+
+patchedDependencies:
+  "onnxruntime-node@1.24.3": "patches/onnxruntime-node@1.24.3.patch"
 
 onlyBuiltDependencies:
   - "@reown/appkit"
