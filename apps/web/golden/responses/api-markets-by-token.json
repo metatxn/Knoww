@@ -1,0 +1,14 @@
+status: 200
+
+{
+  "market": {
+    "conditionId": "0x5e464d85eb49f22d876f3ed6168a7db5e2288e9ae1eb91effd2758e994676f86",
+    "endDate": "2026-09-16T00:00:00Z",
+    "eventSlug": "fed-decision-in-september-762",
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/jerome+powell+glasses1.png",
+    "outcome": "Yes",
+    "question": "Will the Fed decrease interest rates by 50+ bps after the September 2026 meeting?",
+    "slug": "will-the-fed-decrease-interest-rates-by-50-bps-after-the-september-2026-meeting-863"
+  },
+  "success": true
+}

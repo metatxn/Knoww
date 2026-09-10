@@ -5,14 +5,17 @@ import {
   currentPrincipal,
   currentRequestId,
 } from "./context";
-import { KnowwToolError } from "./errors/tool-error";
+import { isKnowwToolError } from "./errors/tool-error";
+import { EXPOSE_TRADING_TOOLS } from "./tool-catalog";
 import { registerGetEventTool } from "./tools/get-event";
 import { registerGetMarketTool } from "./tools/get-market";
 import { registerGetOrderbookTool } from "./tools/get-orderbook";
 import { registerGetPriceHistoryTool } from "./tools/get-price-history";
+import { registerListPlatformsTool } from "./tools/list-platforms";
 import { registerPublicMarketTools } from "./tools/public-markets";
 import { registerPublicWalletTools } from "./tools/public-wallets";
 import { registerSearchMarketsTool } from "./tools/search-markets";
+import { registerTradingTools } from "./tools/trading";
 
 export const SERVER_INFO = { name: "knoww-mcp", version: "0.1.0" } as const;
 
@@ -24,7 +27,7 @@ type RegisterTool = (
 ) => unknown;
 
 const TOOL_ERROR_CODE =
-  /^(VALIDATION_ERROR|UNAUTHENTICATED|FORBIDDEN|NOT_FOUND|RATE_LIMITED|CONFLICT|UPSTREAM_TIMEOUT|UPSTREAM_UNAVAILABLE|INTERNAL_ERROR):/u;
+  /^(VALIDATION_ERROR|UNAUTHENTICATED|FORBIDDEN|NOT_FOUND|RATE_LIMITED|CONFLICT|UPSTREAM_TIMEOUT|UPSTREAM_UNAVAILABLE|INTERNAL_ERROR|PLATFORM_DISABLED):/u;
 
 function toolErrorCode(result: unknown): string | undefined {
   if (!result || typeof result !== "object" || !("isError" in result)) {
@@ -73,10 +76,7 @@ export function withToolAnalytics(
       capture(errorCode ? "error" : "success", errorCode);
       return result;
     } catch (error) {
-      capture(
-        "error",
-        error instanceof KnowwToolError ? error.code : "INTERNAL_ERROR"
-      );
+      capture("error", isKnowwToolError(error) ? error.code : "INTERNAL_ERROR");
       throw error;
     }
   };
@@ -98,7 +98,17 @@ function instrumentToolRegistration(server: McpServer): void {
     )) as typeof server.registerTool;
 }
 
-export function createKnowwMcpServer(): McpServer {
+export interface KnowwMcpServerOptions {
+  /**
+   * Registers the account and order tools. Defaults to the
+   * `EXPOSE_TRADING_TOOLS` constant; tests pass `true` to exercise them.
+   */
+  exposeTradingTools?: boolean;
+}
+
+export function createKnowwMcpServer(
+  options: KnowwMcpServerOptions = {}
+): McpServer {
   const server = new McpServer(SERVER_INFO, { capabilities: { tools: {} } });
   instrumentToolRegistration(server);
   registerSearchMarketsTool(server);
@@ -108,5 +118,11 @@ export function createKnowwMcpServer(): McpServer {
   registerGetPriceHistoryTool(server);
   registerPublicMarketTools(server);
   registerPublicWalletTools(server);
+  // After the public tools on purpose: worker tests pin search_markets as the
+  // first listed tool and list_platforms as the last public one.
+  registerListPlatformsTool(server);
+  if (options.exposeTradingTools ?? EXPOSE_TRADING_TOOLS) {
+    registerTradingTools(server);
+  }
   return server;
 }

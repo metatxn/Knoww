@@ -21,7 +21,15 @@
     "isolatedModules": true,
     "paths": {
       "@knoww/logger": ["../../packages/logger/src/index.ts"],
-      "@knoww/services": ["../../packages/knoww-services/src/index.ts"],
+      "@knoww/services/core": [
+        "../../packages/knoww-services/src/core/index.ts"
+      ],
+      "@knoww/services/platforms/polymarket": [
+        "../../packages/knoww-services/src/platforms/polymarket/index.ts"
+      ],
+      "@knoww/services/registry": [
+        "../../packages/knoww-services/src/registry.ts"
+      ],
       "@knoww/shared-types": ["../../packages/shared-types/src/index.ts"],
       "@knoww/shared-types/*": ["../../packages/shared-types/src/*"]
     }

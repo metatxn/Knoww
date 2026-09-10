@@ -1,18 +1,10 @@
+import { isPlatformError } from "@knoww/services/core";
 import { type NextRequest, NextResponse } from "next/server";
-import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { CACHE_DURATION } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 import { logger } from "@/lib/logger";
-import { sanitizeUpstreamBody } from "@/lib/upstream-error";
-
-/**
- * Check if the identifier is a numeric event ID or a slug
- * Event IDs are numeric (e.g., 35908)
- * Slugs contain letters and hyphens (e.g., who-will-trump-nominate-as-fed-chair)
- */
-function isNumericId(str: string): boolean {
-  return /^\d+$/.test(str);
-}
+import { fetchEventDetail } from "@/polymarket/event-reads";
 
 /**
  * GET /api/events/:id
@@ -56,8 +48,8 @@ export async function GET(
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
+  const { id } = await params;
   try {
-    const { id } = await params;
     const fresh = request.nextUrl.searchParams.get("fresh") === "1";
 
     if (!id) {
@@ -70,58 +62,14 @@ export async function GET(
       );
     }
 
-    // Determine the correct API endpoint based on whether it's a numeric ID or slug
-    // - Numeric ID (e.g., 35908): /events/{id}
-    // - Slug (e.g., who-will-trump-win): /events/slug/{slug}
-    const isEventId = isNumericId(id);
-    const eventUrl = isEventId
-      ? `${POLYMARKET_API.GAMMA.EVENTS}/${id}`
-      : `${POLYMARKET_API.GAMMA.EVENTS}/slug/${id}`;
-
-    // Fetch event details from Gamma API
-    const eventResponse = await fetch(eventUrl, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      ...(fresh
-        ? { cache: "no-store" as const }
-        : { next: { revalidate: CACHE_DURATION.EVENTS } }),
+    // A numeric id (e.g. 35908) is looked up by id, anything else by slug.
+    // `fresh=1` bypasses Next's data cache for every read behind the event.
+    const event = await fetchEventDetail(id, {
+      cache: { revalidateSeconds: fresh ? 0 : CACHE_DURATION.EVENTS },
+      marketsCache: { revalidateSeconds: fresh ? 0 : CACHE_DURATION.MARKETS },
     });
 
-    if (!eventResponse.ok) {
-      // Gamma returns 422 (not 404) for a malformed slug. At this public
-      // route it has the same safe, user-facing meaning: no event exists.
-      if (
-        eventResponse.status === 404 ||
-        (!isEventId && eventResponse.status === 422)
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Event not found",
-          },
-          { status: 404 }
-        );
-      }
-      const errorText = await eventResponse.text();
-      logger.warn("events.detail.gamma_failed", {
-        id,
-        status: eventResponse.status,
-        statusText: eventResponse.statusText,
-        body: sanitizeUpstreamBody(errorText),
-      });
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to fetch event details",
-        },
-        { status: 502 }
-      );
-    }
-
-    const event = (await eventResponse.json()) as Record<string, unknown>;
-
-    if (!event) {
+    if (event === null) {
       return NextResponse.json(
         {
           success: false,
@@ -131,111 +79,7 @@ export async function GET(
       );
     }
 
-    // The markets fetch (keyed by event.slug) and the negRisk child-event
-    // fetch (keyed by event.id) are independent of each other — run them
-    // concurrently instead of back-to-back.
-    const fetchMarkets = async (): Promise<Record<string, unknown>[]> => {
-      // If the event already embeds its markets, use them directly.
-      if (event.markets && Array.isArray(event.markets)) {
-        return event.markets as Record<string, unknown>[];
-      }
-      // Otherwise, fetch markets by event slug or ID (always filter closed=false)
-      const marketsUrl = `${POLYMARKET_API.GAMMA.MARKETS}?events_slug=${
-        event.slug || id
-      }&closed=false`;
-      try {
-        const marketsResponse = await fetch(marketsUrl, {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          ...(fresh
-            ? { cache: "no-store" as const }
-            : { next: { revalidate: CACHE_DURATION.MARKETS } }),
-        });
-        if (marketsResponse.ok) {
-          return (await marketsResponse.json()) as Record<string, unknown>[];
-        }
-      } catch (error) {
-        logger.warn("events.detail.markets_fetch_failed", {
-          id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Continue with empty markets array
-      }
-      return [];
-    };
-
-    // Polymarket nests "Most Sixes" / "Top Batter" / "Toss Match Double" etc.
-    // as separate negRisk child events linked back via `parentEventId`. The
-    // standard `/events/slug/{slug}` payload does NOT include them, so the
-    // detail page would silently drop those rows. Fan out to fetch the
-    // children and append their markets to the response so the outcomes
-    // table renders the full set.
-    const eventId = typeof event.id === "string" ? event.id : null;
-    const fetchChildEvents = async (): Promise<Record<string, unknown>[]> => {
-      if (!eventId) return [];
-      try {
-        const childrenUrl = `${POLYMARKET_API.GAMMA.EVENTS}?parent_event_id=${eventId}&limit=50&closed=false`;
-        const childrenResponse = await fetch(childrenUrl, {
-          headers: { "Content-Type": "application/json" },
-          ...(fresh
-            ? { cache: "no-store" as const }
-            : { next: { revalidate: CACHE_DURATION.EVENTS } }),
-        });
-        if (childrenResponse.ok) {
-          const childEvents = (await childrenResponse.json()) as Array<
-            Record<string, unknown>
-          >;
-          if (Array.isArray(childEvents)) return childEvents;
-        }
-      } catch (error) {
-        logger.warn("events.detail.children_fetch_failed", {
-          id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Children fan-out is best-effort; missing children should not fail
-        // the parent event response.
-      }
-      return [];
-    };
-
-    const [markets, childEvents] = await Promise.all([
-      fetchMarkets(),
-      fetchChildEvents(),
-    ]);
-
-    const seenMarketIds = new Set(
-      markets
-        .map((m) => (typeof m.id === "string" ? m.id : null))
-        .filter((v): v is string => v !== null)
-    );
-    for (const child of childEvents) {
-      const childMarkets = Array.isArray(child.markets)
-        ? (child.markets as Record<string, unknown>[])
-        : [];
-      const childEventId =
-        typeof child.id === "string"
-          ? child.id
-          : typeof child.id === "number"
-            ? String(child.id)
-            : null;
-      for (const market of childMarkets) {
-        const mid = typeof market.id === "string" ? market.id : null;
-        if (mid && seenMarketIds.has(mid)) continue;
-        if (mid) seenMarketIds.add(mid);
-        markets.push({
-          ...market,
-          // Tag with the IMMEDIATE child event id (Most Sixes, Top
-          // Batter, …), not the grandparent event id. The UI groups
-          // negRisk siblings by this so each section maps to one
-          // child event — using the grandparent collapsed every
-          // negRisk market into a single nine-button row.
-          parentEventId: childEventId,
-          parentEventTitle: child.title,
-        });
-      }
-    }
-
+    const markets = event.markets ?? [];
     return NextResponse.json(
       {
         success: true,
@@ -252,6 +96,27 @@ export async function GET(
       }
     );
   } catch (error) {
+    // Gamma answered with an error status: the failure is upstream, so the
+    // route reports a bad gateway rather than an error of its own.
+    if (
+      isPlatformError(error) &&
+      error.kind === "upstream" &&
+      error.upstreamStatus !== undefined
+    ) {
+      logger.warn("events.detail.gamma_failed", {
+        id,
+        status: error.upstreamStatus,
+        error: error.message,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to fetch event details",
+        },
+        { status: 502 }
+      );
+    }
+
     logger.error("events.detail.fetch_failed", {
       error: error instanceof Error ? error.message : String(error),
     });

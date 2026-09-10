@@ -84,30 +84,64 @@ export interface GoogleAuthenticationLogFields {
   googleUpstreamStatus?: number;
 }
 
-export class GoogleAuthenticationError extends Error {
+/**
+ * A plain `Error` tagged with `name: "GoogleAuthenticationError"`; narrow
+ * with `isGoogleAuthenticationError`, never `instanceof`.
+ */
+export interface GoogleAuthenticationError extends Error {
+  readonly name: "GoogleAuthenticationError";
   readonly googleFailure: GoogleAuthenticationFailure;
   readonly googleOAuthError?: GoogleOAuthError | "unknown";
   readonly googleStage: GoogleAuthenticationStage;
   readonly googleUpstreamStatus?: number;
+}
 
-  constructor(input: GoogleAuthenticationErrorInput) {
-    super(
-      input.googleStage === "id_token_verification"
-        ? "Google identity could not be verified."
-        : "Google authentication failed."
-    );
-    this.name = "GoogleAuthenticationError";
-    this.googleFailure = input.googleFailure;
-    this.googleOAuthError = input.googleOAuthError;
-    this.googleStage = input.googleStage;
-    this.googleUpstreamStatus = input.googleUpstreamStatus;
+export function googleAuthenticationError(
+  input: GoogleAuthenticationErrorInput
+): GoogleAuthenticationError {
+  const error = new Error(
+    input.googleStage === "id_token_verification"
+      ? "Google identity could not be verified."
+      : "Google authentication failed."
+  ) as Error & {
+    name: "GoogleAuthenticationError";
+    googleFailure: GoogleAuthenticationFailure;
+    googleOAuthError?: GoogleOAuthError | "unknown";
+    googleStage: GoogleAuthenticationStage;
+    googleUpstreamStatus?: number;
+  };
+  error.name = "GoogleAuthenticationError";
+  error.googleFailure = input.googleFailure;
+  error.googleStage = input.googleStage;
+  if (input.googleOAuthError !== undefined) {
+    error.googleOAuthError = input.googleOAuthError;
   }
+  if (input.googleUpstreamStatus !== undefined) {
+    error.googleUpstreamStatus = input.googleUpstreamStatus;
+  }
+  return error;
+}
+
+export function isGoogleAuthenticationError(
+  value: unknown
+): value is GoogleAuthenticationError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as {
+    name?: unknown;
+    googleFailure?: unknown;
+    googleStage?: unknown;
+  };
+  return (
+    candidate.name === "GoogleAuthenticationError" &&
+    typeof candidate.googleFailure === "string" &&
+    typeof candidate.googleStage === "string"
+  );
 }
 
 export function googleAuthenticationLogFields(
   error: unknown
 ): GoogleAuthenticationLogFields {
-  if (!(error instanceof GoogleAuthenticationError)) {
+  if (!isGoogleAuthenticationError(error)) {
     return {
       googleFailure: "unexpected_error",
       googleStage: "unknown",
@@ -257,13 +291,13 @@ export async function exchangeGoogleAuthorizationCode(input: {
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "request_failed",
       googleStage: "token_exchange",
     });
   }
   if (!response.ok) {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "upstream_rejected",
       googleOAuthError: await readGoogleOAuthError(response),
       googleStage: "token_exchange",
@@ -272,7 +306,7 @@ export async function exchangeGoogleAuthorizationCode(input: {
   }
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "invalid_response",
       googleStage: "token_exchange",
     });
@@ -283,14 +317,14 @@ export async function exchangeGoogleAuthorizationCode(input: {
       await readBoundedText(response, TOKEN_RESPONSE_LIMIT_BYTES)
     );
   } catch {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "invalid_response",
       googleStage: "token_exchange",
     });
   }
   const parsed = googleTokenResponseSchema.safeParse(body);
   if (!parsed.success) {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "invalid_response",
       googleStage: "token_exchange",
     });
@@ -328,7 +362,7 @@ export async function verifyGoogleIdToken(input: {
     }
     return { subject: payload.sub as string };
   } catch {
-    throw new GoogleAuthenticationError({
+    throw googleAuthenticationError({
       googleFailure: "verification_failed",
       googleStage: "id_token_verification",
     });

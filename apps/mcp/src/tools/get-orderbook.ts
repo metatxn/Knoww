@@ -1,21 +1,22 @@
 import {
-  CLOB_API_BASE,
-  fetchOrderbookByTokenId,
+  isUpstreamOrderbookError,
   type OrderbookLevel,
   type OrderbookSnapshot,
-  UpstreamOrderbookError,
-} from "@knoww/services";
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
 import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
@@ -56,6 +57,7 @@ const getOrderbookInputSchema = z.object({
     .max(MAX_BOOK_DEPTH)
     .default(DEFAULT_BOOK_DEPTH)
     .describe("Maximum price levels per side, 1 to 50."),
+  platform: platformInputSchema,
 });
 
 type GetOrderbookInput = z.output<typeof getOrderbookInputSchema>;
@@ -101,7 +103,7 @@ type OrderbookResult = z.output<typeof orderbookSnapshotSchema>;
 function resolveTokenId(args: GetOrderbookInput): string {
   const tokenId = args.tokenId?.trim();
   if (tokenId === undefined || !TOKEN_ID_PATTERN.test(tokenId)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "tokenId must be a string of up to 80 decimal digits."
     );
@@ -182,20 +184,20 @@ function readSnapshotClock(timestamp: string | undefined): SnapshotClock {
 }
 
 function mapBookError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) return error;
-  if (error instanceof UpstreamOrderbookError) {
+  if (isKnowwToolError(error)) return error;
+  if (isUpstreamOrderbookError(error)) {
     return error.status === 429
-      ? new KnowwToolError(
+      ? knowwToolError(
           "RATE_LIMITED",
           "The order book source is rate limiting requests."
         )
-      : new KnowwToolError(
+      : knowwToolError(
           "UPSTREAM_UNAVAILABLE",
           "Order book data is temporarily unavailable upstream."
         );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The order book source timed out."
     );
@@ -270,16 +272,17 @@ async function handleGetOrderbook(
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("get_orderbook");
     const tokenId = resolveTokenId(args);
+    const client = requirePolymarketClient(args.platform);
     let snapshot: OrderbookSnapshot | null;
     try {
-      snapshot = await fetchOrderbookByTokenId(tokenId, {
+      snapshot = await client.fetchOrderbookByTokenId(tokenId, {
         signal: context.mcpReq.signal,
       });
     } catch (error) {
       throw mapBookError(error);
     }
     if (snapshot === null) {
-      throw new KnowwToolError(
+      throw knowwToolError(
         "NOT_FOUND",
         "No order book exists for that token id."
       );
@@ -291,7 +294,7 @@ async function handleGetOrderbook(
     );
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-clob", url: CLOB_API_BASE }],
+      sources: [{ name: "polymarket-clob", url: client.baseUrls.clob }],
       ...(clock.iso !== undefined ? { asOf: clock.iso } : {}),
       ...(truncated ? { truncated: true } : {}),
     });

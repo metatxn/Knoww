@@ -7,14 +7,14 @@ import { useCallback, useMemo, useState } from "react";
 import type { Position } from "@/components/portfolio/types";
 import { CLOB_BASE_URL } from "@/constants/polymarket";
 import {
-  OrderType as ClobOrderType,
-  Side,
-  useClobClient,
-} from "@/hooks/use-clob-client";
-import {
   useOrderBook as useOrderBookFromStore,
   useOrderBookStore,
 } from "@/hooks/use-orderbook-store";
+import {
+  OrderType as ClobOrderType,
+  Side,
+  usePlaceOrder,
+} from "@/hooks/use-place-order";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { qk } from "@/lib/query-keys";
@@ -53,7 +53,7 @@ export function useSellPosition({
     isLoading: isClobLoading,
     error: clobError,
     canTrade,
-  } = useClobClient();
+  } = usePlaceOrder();
 
   const [shares, setShares] = useState<number>(position?.size ?? 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -221,7 +221,7 @@ export function useSellPosition({
 
       // Multi-outcome markets use the Neg Risk CTF Exchange contract, so the
       // signed order's verifying contract must match. Pull the flag from the
-      // position (surfaced by /api/user/positions) — hardcoding `false` here
+      // position (surfaced by /api/polymarket/user/positions) — hardcoding `false` here
       // caused neg-risk Quick Sells to be signed against the wrong exchange
       // and rejected server-side. See docs.polymarket.com/trading/orders
       // /overview#negative-risk.
@@ -229,6 +229,8 @@ export function useSellPosition({
 
       const result = await createOrder({
         tokenId,
+        // The adapter drafts against the market, not just the token.
+        conditionId: position?.conditionId,
         price: sellPrice,
         size: shares,
         side: Side.SELL,
@@ -321,6 +323,7 @@ export function useSellPosition({
     tickSize,
     position?.currentPrice,
     position?.negRisk,
+    position?.conditionId,
     createOrder,
     proxyAddress,
     queryClient,

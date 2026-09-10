@@ -1,24 +1,17 @@
 "use client";
 
-import { isClobOrderApproved } from "@knoww/shared-types/approvals";
-import {
-  estimateFallbackFeeRaw,
-  MIN_MARKETABLE_BUY_TICKET_USD,
-  parsePusdUnits,
-} from "@knoww/shared-types/trading";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MIN_MARKETABLE_BUY_TICKET_USD } from "@knoww/shared-types/trading";
+import { useQueryClient } from "@tanstack/react-query";
 import Decimal from "decimal.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { PUSD_DECIMALS } from "@/constants/contracts";
 import {
   OrderType as ClobOrderType,
   Side,
-  useClobClient,
-} from "@/hooks/use-clob-client";
+  usePlaceOrder,
+} from "@/hooks/use-place-order";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { useUserPositions } from "@/hooks/use-user-positions";
-import { checkAllApprovals } from "@/lib/approvals";
 import { calculatePotentialPnL, OrderSide } from "@/lib/polymarket";
 import { qk } from "@/lib/query-keys";
 import { clearBalanceCache } from "@/lib/rpc";
@@ -30,7 +23,11 @@ import {
   roundUpToTick,
 } from "@/lib/slippage";
 import type { OrderTypeSelection, TradingSide } from "@/types/market";
-import type { TradingFormProps } from "../types";
+import type {
+  BuyFeeEstimate,
+  OrderReadiness,
+  TradingTicketProps,
+} from "../types";
 
 const DEFAULT_MAX_SLIPPAGE_PERCENT = 2;
 // Default USD budget for a MARKET BUY. Market buys are denominated in dollars
@@ -38,7 +35,25 @@ const DEFAULT_MAX_SLIPPAGE_PERCENT = 2;
 // count). Opens at $0 — an empty state the user fills via the input or a quick
 // preset; the summary stays hidden until the amount clears the minimum.
 const DEFAULT_MARKET_BUY_AMOUNT_USD = 0;
-const APPROVAL_CHECK_BUCKET_RAW = BigInt(10) ** BigInt(PUSD_DECIMALS);
+
+const NO_ORDER_READINESS: OrderReadiness = {
+  isChecking: false,
+  requiredStep: "none",
+  isPreparing: false,
+  prepare: () => Promise.resolve(true),
+  refresh: () => Promise.resolve(),
+};
+
+/** Platforms without a pre-order step, or a ticket with no platform UI. */
+function useNoOrderReadiness(): OrderReadiness {
+  return NO_ORDER_READINESS;
+}
+
+const NO_BUY_FEE_ESTIMATE: BuyFeeEstimate = { feeUsd: null, isFetching: false };
+
+function useNoBuyFeeEstimate(): BuyFeeEstimate {
+  return NO_BUY_FEE_ESTIMATE;
+}
 
 export function useTradingFormState({
   outcomes,
@@ -57,8 +72,10 @@ export function useTradingFormState({
   initialSide,
   initialShares,
   preparedTradeTicket,
-}: Partial<TradingFormProps> & {
-  outcomes: TradingFormProps["outcomes"];
+  platformUi,
+  slot,
+}: Partial<TradingTicketProps> & {
+  outcomes: TradingTicketProps["outcomes"];
   selectedOutcomeIndex: number;
 }) {
   const { isConnected } = useConnection();
@@ -70,10 +87,7 @@ export function useTradingFormState({
     error: clobError,
     hasCredentials,
     canTrade,
-    updateAllowance,
-    getUsdcAllowance,
-    estimateBuyFee,
-  } = useClobClient();
+  } = usePlaceOrder();
 
   const {
     proxyAddress,
@@ -113,7 +127,6 @@ export function useTradingFormState({
     DEFAULT_MARKET_BUY_AMOUNT_USD
   );
   const [allowPartialFill, setAllowPartialFill] = useState<boolean>(true);
-  const [isUpdatingAllowance, setIsUpdatingAllowance] = useState(false);
   const [hasUserEditedPrice, setHasUserEditedPrice] = useState(false);
   const appliedPreparedTradeRevisionRef = useRef<number | undefined>(undefined);
 
@@ -396,106 +409,35 @@ export function useTradingFormState({
     };
   }, [side, orderType, limitPrice, marketOrderPrice, shares, slippageResult]);
 
-  const { data: onChainAllowance, refetch: refetchAllowance } = useQuery({
-    queryKey: qk.wallet.usdcAllowance(proxyAddress, hasProxyWallet, negRisk),
-    queryFn: () => getUsdcAllowance(proxyAddress || undefined, negRisk),
-    enabled: isConnected && hasProxyWallet && !!proxyAddress,
-    // Allowance only changes when we explicitly update it. Polling every
-    // trading form mount creates steady Polygon RPC pressure for no benefit.
-    staleTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
-  });
-
   // V2 settles in pUSD; legacy USDC.e is auto-wrapped on BUY. The proxy-wallet
   // hook reports the combined spendable balance (pUSD + USDC.e), so the form
   // and the chrome (navbar/portfolio) read the same number.
   const effectiveBalance =
     isConnected && hasProxyWallet ? proxyUsdcBalance : userBalance;
-  const allowance = onChainAllowance?.allowance;
 
   const hasInsufficientBalance =
     effectiveBalance !== undefined && calculations.total > effectiveBalance;
-  const hasInsufficientAllowance =
-    allowance !== undefined && calculations.total > allowance;
-  const hasNoAllowance = allowance !== undefined && allowance === 0;
 
-  const requiredApprovalAmountRaw = useMemo(() => {
-    if (side === "SELL") {
-      return shares > 0 ? BigInt(1) : BigInt(0);
-    }
-    if (!Number.isFinite(calculations.total) || calculations.total <= 0) {
-      return BigInt(0);
-    }
-    const requiredRaw = parsePusdUnits(new Decimal(calculations.total));
-    return requiredRaw + estimateFallbackFeeRaw(requiredRaw);
-  }, [calculations.total, shares, side]);
-
-  const bucketedRequiredApprovalAmountRaw = useMemo(() => {
-    if (requiredApprovalAmountRaw <= BigInt(0)) return BigInt(0);
-    return (
-      ((requiredApprovalAmountRaw + APPROVAL_CHECK_BUCKET_RAW - BigInt(1)) /
-        APPROVAL_CHECK_BUCKET_RAW) *
-      APPROVAL_CHECK_BUCKET_RAW
-    );
-  }, [requiredApprovalAmountRaw]);
-
-  const approvalAmount = useMemo(() => {
-    return new Decimal(bucketedRequiredApprovalAmountRaw.toString())
-      .div(new Decimal(10).pow(PUSD_DECIMALS))
-      .toString();
-  }, [bucketedRequiredApprovalAmountRaw]);
-
-  // The market order notional can move on every order book tick. Keep approval
-  // checks close to the actual required amount, but debounce and bucket them so
-  // cent-level quote movement does not create distinct Polygon multicalls.
-  const [tradingApprovalCheckAmountRaw, setTradingApprovalCheckAmountRaw] =
-    useState(bucketedRequiredApprovalAmountRaw);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setTradingApprovalCheckAmountRaw(bucketedRequiredApprovalAmountRaw);
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [bucketedRequiredApprovalAmountRaw]);
-
-  const shouldCheckTradingApprovals =
-    isConnected &&
-    hasProxyWallet &&
-    !!proxyAddress &&
-    tradingApprovalCheckAmountRaw > BigInt(0);
-
+  // The platform decides whether a step (approvals, a limit) must precede the
+  // order. The slot hook is fixed per platform, so the call is stable across
+  // renders.
+  const useOrderReadiness =
+    platformUi?.useOrderReadiness ?? useNoOrderReadiness;
   const {
-    data: tradingApprovalStatus,
-    refetch: refetchTradingApprovals,
-    isLoading: isCheckingTradingApprovals,
-  } = useQuery({
-    queryKey: qk.wallet.tradingApprovals(
-      proxyAddress,
-      hasProxyWallet,
-      tradingApprovalCheckAmountRaw.toString()
-    ),
-    queryFn: () =>
-      checkAllApprovals(proxyAddress || "", tradingApprovalCheckAmountRaw),
-    enabled: shouldCheckTradingApprovals,
-    // This query is the ticket's approval gate. Keep it fresh enough that the
-    // button matches the order pre-flight, without polling every keystroke.
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData,
+    isChecking: isCheckingTradingApprovals,
+    requiredStep,
+    isPreparing: isUpdatingAllowance,
+    prepare: prepareOrder,
+    refresh: refreshOrderReadiness,
+  } = useOrderReadiness({
+    side,
+    totalUsd: calculations.total,
+    shares,
+    slot,
+    enabled: isConnected,
   });
-  const hasMissingTradingApprovals =
-    shouldCheckTradingApprovals &&
-    tradingApprovalStatus !== undefined &&
-    !isClobOrderApproved(tradingApprovalStatus, {
-      side,
-      negRisk,
-    });
-  const useAllowanceFallbackGate =
-    side === "BUY" && tradingApprovalStatus === undefined;
-  const hasEffectiveInsufficientAllowance =
-    useAllowanceFallbackGate && hasInsufficientAllowance;
-  const hasEffectiveNoAllowance = useAllowanceFallbackGate && hasNoAllowance;
+  const hasMissingTradingApprovals = requiredStep === "setup";
+  const hasInsufficientAllowance = requiredStep === "limit";
 
   const isMarketableBuy = useMemo(() => {
     if (side !== "BUY") return false;
@@ -512,127 +454,30 @@ export function useTradingFormState({
     return calculations.total < MIN_MARKETABLE_BUY_TICKET_USD;
   }, [isMarketableBuy, calculations.total]);
 
-  // Round the fee inputs before they reach the query key. The fee is a smooth
-  // function of size and price, so a cent of movement never changes the
-  // displayed number — but an unrounded key would refetch on every keystroke.
-  const feeEstimateInputs = useMemo(() => {
-    if (side !== "BUY" || !conditionId) return null;
-    if (calculations.size <= 0 || calculations.total <= 0) return null;
-    // A market order the book cannot fill prices at 0 (see `marketOrderPrice`),
-    // and the protocol fee curve is 0 at that endpoint — quoting it would print
-    // a confident "$0.00" for a fee we have no basis to estimate.
-    if (calculations.price <= 0) return null;
-    return {
-      size: calculations.size.toFixed(2),
-      price: calculations.price.toFixed(4),
-      notional: calculations.total.toFixed(2),
-    };
-  }, [
-    side,
-    conditionId,
-    calculations.size,
-    calculations.price,
-    calculations.total,
-  ]);
-
-  const { data: estimatedFeeRaw, isFetching: isFeeEstimateFetching } = useQuery(
-    {
-      queryKey: qk.orders.buyFeeEstimate(
-        conditionId,
-        feeEstimateInputs?.size ?? "",
-        feeEstimateInputs?.price ?? "",
-        feeEstimateInputs?.notional ?? ""
-      ),
-      queryFn: () =>
-        estimateBuyFee({
-          conditionId,
-          size: Number(feeEstimateInputs?.size),
-          price: Number(feeEstimateInputs?.price),
-          notional: Number(feeEstimateInputs?.notional),
-          isMarketableBuy,
-        }),
-      enabled: !!feeEstimateInputs && hasCredentials && !!proxyAddress,
-      // Market fee parameters are effectively static; the ticket inputs are
-      // already in the key, so anything cached for this exact ticket is fresh.
-      staleTime: 5 * 60 * 1000,
-      retry: false,
-      // Hold the last known fee while the next one loads. Without this the row
-      // would blink out of the ticket on every amount change, which reads as
-      // "the fee went away" rather than "the fee is being recomputed".
-      placeholderData: (previous: bigint | null | undefined) => previous,
-    }
-  );
-
-  /**
-   * Estimated fee in USD, or `null` when it could not be determined.
-   *
-   * `null` is deliberately not `0` — the market fee lookup can fail, and
-   * rendering "$0.00" for an unknown fee would be a worse lie than rendering
-   * nothing. Orders sign without `maxSpend`, so this fee is charged *on top of*
-   * the ticket total rather than taken out of it.
-   */
-  const estimatedFeeUsd = useMemo(() => {
-    if (estimatedFeeRaw === null || estimatedFeeRaw === undefined) return null;
-    return new Decimal(estimatedFeeRaw.toString())
-      .div(new Decimal(10).pow(PUSD_DECIMALS))
-      .toNumber();
-  }, [estimatedFeeRaw]);
+  // The taker fee is the platform's to quote; the ticket only shows it.
+  const useBuyFeeEstimate =
+    platformUi?.useBuyFeeEstimate ?? useNoBuyFeeEstimate;
+  const { feeUsd: estimatedFeeUsd, isFetching: isFeeEstimateFetching } =
+    useBuyFeeEstimate({
+      side,
+      slot,
+      shares: calculations.size,
+      price: calculations.price,
+      totalUsd: calculations.total,
+      isMarketableBuy,
+      enabled: isConnected,
+    });
 
   const handleSetAllowance = useCallback(async () => {
-    setIsUpdatingAllowance(true);
     try {
-      await updateAllowance(approvalAmount, {
-        side,
-        negRisk,
-      });
-      await Promise.all([
-        refreshProxyWallet(),
-        refetchAllowance(),
-        refetchTradingApprovals(),
-        queryClient.invalidateQueries({
-          queryKey: qk.wallet.allTradingApprovals(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: qk.wallet.allUsdcAllowances(),
-        }),
-      ]);
-
-      const scheduleApprovalRefetch = (delay: number) => {
-        const timerId = setTimeout(() => {
-          void Promise.all([
-            refreshProxyWallet(),
-            refetchAllowance(),
-            refetchTradingApprovals(),
-          ]);
-          pendingTimersRef.current = pendingTimersRef.current.filter(
-            (id) => id !== timerId
-          );
-        }, delay);
-        pendingTimersRef.current.push(timerId);
-      };
-
-      scheduleApprovalRefetch(1500);
-      scheduleApprovalRefetch(4000);
-      return true;
+      return await prepareOrder();
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error("Failed to set allowance");
       onOrderError?.(error);
       return false;
-    } finally {
-      setIsUpdatingAllowance(false);
     }
-  }, [
-    updateAllowance,
-    approvalAmount,
-    side,
-    negRisk,
-    refreshProxyWallet,
-    refetchAllowance,
-    refetchTradingApprovals,
-    queryClient,
-    onOrderError,
-  ]);
+  }, [prepareOrder, onOrderError]);
 
   const handleSharesChange = useCallback(
     (delta: number) => {
@@ -728,12 +573,7 @@ export function useTradingFormState({
             queryClient.invalidateQueries({
               queryKey: qk.wallet.allUsdcBalances(),
             }),
-            queryClient.invalidateQueries({
-              queryKey: qk.wallet.allUsdcAllowances(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: qk.wallet.allTradingApprovals(),
-            }),
+            refreshOrderReadiness(),
             queryClient.invalidateQueries({ queryKey: qk.positions.all() }),
             queryClient.invalidateQueries({ queryKey: qk.orders.all() }),
           ]);
@@ -746,12 +586,6 @@ export function useTradingFormState({
             }),
             queryClient.refetchQueries({
               queryKey: qk.wallet.allUsdcBalances(),
-            }),
-            queryClient.refetchQueries({
-              queryKey: qk.wallet.allUsdcAllowances(),
-            }),
-            queryClient.refetchQueries({
-              queryKey: qk.wallet.allTradingApprovals(),
             }),
             queryClient.refetchQueries({ queryKey: qk.positions.all() }),
           ]);
@@ -768,12 +602,7 @@ export function useTradingFormState({
               queryClient.refetchQueries({
                 queryKey: qk.wallet.allUsdcBalances(),
               }),
-              queryClient.refetchQueries({
-                queryKey: qk.wallet.allUsdcAllowances(),
-              }),
-              queryClient.refetchQueries({
-                queryKey: qk.wallet.allTradingApprovals(),
-              }),
+              refreshOrderReadiness(),
               queryClient.refetchQueries({ queryKey: qk.positions.all() }),
             ]);
           };
@@ -811,14 +640,7 @@ export function useTradingFormState({
         clearBalanceCache(proxyAddress);
         await Promise.allSettled([
           refreshProxyWallet(),
-          refetchAllowance(),
-          refetchTradingApprovals(),
-          queryClient.invalidateQueries({
-            queryKey: qk.wallet.allTradingApprovals(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: qk.wallet.allUsdcAllowances(),
-          }),
+          refreshOrderReadiness(),
         ]);
       }
       onOrderError?.(error);
@@ -848,8 +670,7 @@ export function useTradingFormState({
     calculations.total,
     calculations.size,
     refreshProxyWallet,
-    refetchAllowance,
-    refetchTradingApprovals,
+    refreshOrderReadiness,
   ]);
 
   return {
@@ -881,11 +702,9 @@ export function useTradingFormState({
     slippageResult,
     effectiveBalance,
     hasInsufficientBalance,
-    hasInsufficientAllowance: hasEffectiveInsufficientAllowance,
-    hasNoAllowance: hasEffectiveNoAllowance,
+    hasInsufficientAllowance,
     hasMissingTradingApprovals,
-    isCheckingTradingApprovals:
-      shouldCheckTradingApprovals && isCheckingTradingApprovals,
+    isCheckingTradingApprovals,
     isBelowMarketableBuyMinNotional,
     minShares,
     maxSellShares,

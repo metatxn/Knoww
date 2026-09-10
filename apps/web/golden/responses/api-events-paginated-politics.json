@@ -1,0 +1,1706 @@
+status: 200
+
+{
+  "data": [
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9957927755234136,
+      "description": "The FED interest rates are defined in this market by the upper bound of the target federal funds range. The decisions on the target federal funds range are made by the Federal Open Market Committee (FOMC) meetings.\n\nThis market will resolve to the amount of basis points the upper bound of the target federal funds rate is changed by versus the level it was prior to the Federal Reserve's September 2026 meeting.\n\nIf the target federal funds rate is changed to a level not expressed in the displayed options, the change will be rounded up to the nearest 25 and will resolve to the relevant bracket. (e.g. if there's a cut/increase of 12.5 bps it will be considered to be 25 bps)\n\nThe resolution source for this market is the FOMC’s statement after its meeting scheduled for September 15-16, 2026 according to the official calendar: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm.\n\nThe level and change of the target federal funds rate is also published at the official website of the Federal Reserve at https://www.federalreserve.gov/monetarypolicy/openmarket.htm.\n\nThis market may resolve as soon as the FOMC’s statement for their September meeting with relevant data is issued. If no statement is released by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+      "endDate": "2026-09-16T00:00:00Z",
+      "id": "481717",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/fed-decision-in-september-762-c4RyWuxRPo1L.jpg",
+      "liquidity": 5172153.42234,
+      "liquidityClob": 5172153.42234,
+      "markets": [
+        {
+          "id": "2252242"
+        },
+        {
+          "id": "2252243"
+        },
+        {
+          "id": "2252244"
+        },
+        {
+          "id": "2252245"
+        },
+        {
+          "id": "2252246"
+        }
+      ],
+      "negRisk": true,
+      "slug": "fed-decision-in-september-762",
+      "startDate": "2026-05-13T21:23:09.737806Z",
+      "tags": [
+        {
+          "id": "100478",
+          "label": "fomc",
+          "slug": "fomc"
+        },
+        {
+          "id": "101800",
+          "label": "Economic Policy",
+          "slug": "economic-policy"
+        },
+        {
+          "id": "100196",
+          "label": "Fed Rates",
+          "slug": "fed-rates"
+        },
+        {
+          "id": "101550",
+          "label": "Jerome Powell",
+          "slug": "jerome-powell"
+        },
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "159",
+          "label": "Fed",
+          "slug": "fed"
+        },
+        {
+          "id": "100328",
+          "label": "Economy",
+          "slug": "economy"
+        },
+        {
+          "id": "105614",
+          "label": "CPI Release",
+          "slug": "cpi-release"
+        }
+      ],
+      "title": "Fed Decision in September?",
+      "volume": 86201211.28938897,
+      "volume1mo": 74155836.13778698,
+      "volume1wk": 30773553.681836,
+      "volume1yr": 86200602.18513097,
+      "volume24hr": 6038488.302619002
+    },
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9171785478357911,
+      "description": "This market will resolve to “Yes” if the named individual wins and accepts the 2028 nomination of the Democratic Party for U.S. president. Otherwise, this market will resolve to “No”.\n\nThe resolution source for this market will be a consensus of official Democratic Party sources.\n\nAny replacement of the democratic nominee before election day will not change the resolution of the market.",
+      "endDate": "2028-11-07T00:00:00Z",
+      "id": "30829",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/democrats+2028+donkey.png",
+      "liquidity": 80471361.13941,
+      "liquidityClob": 80471361.13941,
+      "markets": [
+        {
+          "id": "559652"
+        },
+        {
+          "id": "559653"
+        },
+        {
+          "id": "559654"
+        },
+        {
+          "id": "559655"
+        },
+        {
+          "id": "559656"
+        },
+        {
+          "id": "559657"
+        },
+        {
+          "id": "559658"
+        },
+        {
+          "id": "559659"
+        },
+        {
+          "id": "559660"
+        },
+        {
+          "id": "559661"
+        },
+        {
+          "id": "559662"
+        },
+        {
+          "id": "559663"
+        },
+        {
+          "id": "559664"
+        },
+        {
+          "id": "559665"
+        },
+        {
+          "id": "559666"
+        },
+        {
+          "id": "559667"
+        },
+        {
+          "id": "559668"
+        },
+        {
+          "id": "559669"
+        },
+        {
+          "id": "559670"
+        },
+        {
+          "id": "559671"
+        },
+        {
+          "id": "559672"
+        },
+        {
+          "id": "559673"
+        },
+        {
+          "id": "559674"
+        },
+        {
+          "id": "559675"
+        },
+        {
+          "id": "559676"
+        },
+        {
+          "id": "559677"
+        },
+        {
+          "id": "559678"
+        },
+        {
+          "id": "559679"
+        },
+        {
+          "id": "559680"
+        },
+        {
+          "id": "559681"
+        },
+        {
+          "id": "559682"
+        },
+        {
+          "id": "559683"
+        },
+        {
+          "id": "559684"
+        },
+        {
+          "id": "559685"
+        },
+        {
+          "id": "559686"
+        },
+        {
+          "id": "559687"
+        },
+        {
+          "id": "559688"
+        },
+        {
+          "id": "559689"
+        },
+        {
+          "id": "559690"
+        },
+        {
+          "id": "559691"
+        },
+        {
+          "id": "559692"
+        },
+        {
+          "id": "559693"
+        },
+        {
+          "id": "559694"
+        },
+        {
+          "id": "559695"
+        },
+        {
+          "id": "559696"
+        },
+        {
+          "id": "559697"
+        },
+        {
+          "id": "559698"
+        },
+        {
+          "id": "559699"
+        },
+        {
+          "id": "559700"
+        },
+        {
+          "id": "559701"
+        },
+        {
+          "id": "559702"
+        },
+        {
+          "id": "559703"
+        },
+        {
+          "id": "559704"
+        },
+        {
+          "id": "559705"
+        },
+        {
+          "id": "559706"
+        },
+        {
+          "id": "559707"
+        },
+        {
+          "id": "559708"
+        },
+        {
+          "id": "559709"
+        },
+        {
+          "id": "559710"
+        },
+        {
+          "id": "559711"
+        },
+        {
+          "id": "559712"
+        },
+        {
+          "id": "559713"
+        },
+        {
+          "id": "559714"
+        },
+        {
+          "id": "559715"
+        },
+        {
+          "id": "559716"
+        },
+        {
+          "id": "559717"
+        },
+        {
+          "id": "559718"
+        },
+        {
+          "id": "559719"
+        },
+        {
+          "id": "559720"
+        },
+        {
+          "id": "559721"
+        },
+        {
+          "id": "559722"
+        },
+        {
+          "id": "559723"
+        },
+        {
+          "id": "559724"
+        },
+        {
+          "id": "559725"
+        },
+        {
+          "id": "559726"
+        },
+        {
+          "id": "559727"
+        },
+        {
+          "id": "559728"
+        },
+        {
+          "id": "559729"
+        },
+        {
+          "id": "559730"
+        },
+        {
+          "id": "559731"
+        },
+        {
+          "id": "559732"
+        },
+        {
+          "id": "559733"
+        },
+        {
+          "id": "559734"
+        },
+        {
+          "id": "559735"
+        },
+        {
+          "id": "559736"
+        },
+        {
+          "id": "559737"
+        },
+        {
+          "id": "559738"
+        },
+        {
+          "id": "559739"
+        },
+        {
+          "id": "559740"
+        },
+        {
+          "id": "559741"
+        },
+        {
+          "id": "559742"
+        },
+        {
+          "id": "559743"
+        },
+        {
+          "id": "559744"
+        },
+        {
+          "id": "559745"
+        },
+        {
+          "id": "559746"
+        },
+        {
+          "id": "559747"
+        },
+        {
+          "id": "559748"
+        },
+        {
+          "id": "559749"
+        },
+        {
+          "id": "559750"
+        },
+        {
+          "id": "559751"
+        },
+        {
+          "id": "559752"
+        },
+        {
+          "id": "559753"
+        },
+        {
+          "id": "559754"
+        },
+        {
+          "id": "559755"
+        },
+        {
+          "id": "559756"
+        },
+        {
+          "id": "559757"
+        },
+        {
+          "id": "559758"
+        },
+        {
+          "id": "559759"
+        },
+        {
+          "id": "559760"
+        },
+        {
+          "id": "559761"
+        },
+        {
+          "id": "559762"
+        },
+        {
+          "id": "559763"
+        },
+        {
+          "id": "559764"
+        },
+        {
+          "id": "559765"
+        },
+        {
+          "id": "559766"
+        },
+        {
+          "id": "559767"
+        },
+        {
+          "id": "559768"
+        },
+        {
+          "id": "559769"
+        },
+        {
+          "id": "559770"
+        },
+        {
+          "id": "559771"
+        },
+        {
+          "id": "559772"
+        },
+        {
+          "id": "559773"
+        },
+        {
+          "id": "559774"
+        },
+        {
+          "id": "559775"
+        },
+        {
+          "id": "559776"
+        },
+        {
+          "id": "559777"
+        },
+        {
+          "id": "559778"
+        },
+        {
+          "id": "559779"
+        }
+      ],
+      "negRisk": true,
+      "slug": "democratic-presidential-nominee-2028",
+      "startDate": "<timestamp>",
+      "startTime": "2028-11-07T12:00:00Z",
+      "tags": [
+        {
+          "id": "165",
+          "label": "United States",
+          "slug": "united-states"
+        },
+        {
+          "id": "144",
+          "label": "Elections",
+          "slug": "elections"
+        },
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "1101",
+          "label": "US Election",
+          "slug": "us-presidential-election"
+        },
+        {
+          "id": "101206",
+          "label": "World Elections",
+          "slug": "world-elections"
+        },
+        {
+          "id": "102458",
+          "label": "Earn 4%",
+          "slug": "earn-4"
+        },
+        {
+          "id": "264",
+          "label": "Primaries",
+          "slug": "primaries"
+        }
+      ],
+      "title": "Democratic Presidential Nominee 2028",
+      "volume": 1271892381.414349,
+      "volume1mo": 19742746.302566,
+      "volume1wk": 4159295.510819,
+      "volume1yr": 1247908533.742137,
+      "volume24hr": 912723.642378
+    },
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9979790923380155,
+      "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X from August 28 12:00 PM ET to September 4, 2026 12:00 PM ET.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total.\n\nThe resolution source for this market is the 'Post Counter' figure for posts found at https://xtracker.polymarket.com. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
+      "endDate": "2026-09-04T16:00:00Z",
+      "id": "907934",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/elon-musk-of-tweets-nov-22-29-apMPG21-pzx_.jpg",
+      "liquidity": 583121.91874,
+      "liquidityClob": 583121.91874,
+      "markets": [
+        {
+          "id": "3866045"
+        },
+        {
+          "id": "3866055"
+        },
+        {
+          "id": "3866067"
+        },
+        {
+          "id": "3866076"
+        },
+        {
+          "id": "3866086"
+        },
+        {
+          "id": "3866096"
+        },
+        {
+          "id": "3866107"
+        },
+        {
+          "id": "3866118"
+        },
+        {
+          "id": "3866126"
+        },
+        {
+          "id": "3866131"
+        },
+        {
+          "id": "3866135"
+        },
+        {
+          "id": "3866138"
+        },
+        {
+          "id": "3866141"
+        },
+        {
+          "id": "3866145"
+        },
+        {
+          "id": "3866147"
+        },
+        {
+          "id": "3866148"
+        },
+        {
+          "id": "3866150"
+        },
+        {
+          "id": "3866151"
+        },
+        {
+          "id": "3866152"
+        },
+        {
+          "id": "3866153"
+        },
+        {
+          "id": "3866154"
+        },
+        {
+          "id": "3866155"
+        },
+        {
+          "id": "3866156"
+        },
+        {
+          "id": "3866157"
+        },
+        {
+          "id": "3866158"
+        },
+        {
+          "id": "3866159"
+        }
+      ],
+      "negRisk": true,
+      "slug": "elon-musk-of-tweets-august-28-september-4-2026",
+      "startDate": "2026-08-25T04:00:51Z",
+      "startTime": "2026-08-28T16:00:00Z",
+      "tags": [
+        {
+          "id": "596",
+          "label": "Culture",
+          "slug": "pop-culture"
+        },
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "972",
+          "label": "Tweet Markets",
+          "slug": "tweets-markets"
+        }
+      ],
+      "title": "Elon Musk # tweets August 28 - September 4, 2026?",
+      "volume": 2455499.261972,
+      "volume1mo": 1972818.3163069997,
+      "volume1wk": 1945420.8369029996,
+      "volume1yr": 1972818.3163069997,
+      "volume24hr": 838701.96464
+    },
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9781383630512146,
+      "description": "The next French presidential election is currently expected to be held around April 2027.  This market pertains to the outcome of the next French presidential election, regardless of whether it follows the scheduled end of the current term or is held earlier. \n\nThe President of France is elected via a two-round system; a candidate must secure over 50% of the vote to win outright in the first round. If no candidate achieves this, the top two contenders advance to a runoff.\n\nThis market will resolve according to the candidate who wins this election.\n\nThis market includes any potential second round. If, for any reason, the results of the election are not known by December 31, 2027, 11:59 PM ET, this market will resolve to \"Other\".\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the French Government, specifically the Ministry of the Interior (https://www.interieur.gouv.fr/).",
+      "endDate": "2027-04-30T00:00:00Z",
+      "id": "79987",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/france-presidential-election-2027-U5QY3acvfubZ.png",
+      "liquidity": 15855687.09787,
+      "liquidityClob": 15855687.09787,
+      "markets": [
+        {
+          "id": "679018"
+        },
+        {
+          "id": "679019"
+        },
+        {
+          "id": "679020"
+        },
+        {
+          "id": "679021"
+        },
+        {
+          "id": "679022"
+        },
+        {
+          "id": "679023"
+        },
+        {
+          "id": "679024"
+        },
+        {
+          "id": "679025"
+        },
+        {
+          "id": "679026"
+        },
+        {
+          "id": "679027"
+        },
+        {
+          "id": "679028"
+        },
+        {
+          "id": "679029"
+        },
+        {
+          "id": "679030"
+        },
+        {
+          "id": "679031"
+        },
+        {
+          "id": "679032"
+        },
+        {
+          "id": "679033"
+        },
+        {
+          "id": "679034"
+        },
+        {
+          "id": "679035"
+        },
+        {
+          "id": "679036"
+        },
+        {
+          "id": "679037"
+        },
+        {
+          "id": "679038"
+        },
+        {
+          "id": "679039"
+        },
+        {
+          "id": "679040"
+        },
+        {
+          "id": "679041"
+        },
+        {
+          "id": "679042"
+        },
+        {
+          "id": "679043"
+        },
+        {
+          "id": "679044"
+        },
+        {
+          "id": "679045"
+        },
+        {
+          "id": "679046"
+        },
+        {
+          "id": "679047"
+        },
+        {
+          "id": "679048"
+        },
+        {
+          "id": "679049"
+        },
+        {
+          "id": "679050"
+        },
+        {
+          "id": "679051"
+        },
+        {
+          "id": "679052"
+        },
+        {
+          "id": "679053"
+        },
+        {
+          "id": "679054"
+        },
+        {
+          "id": "679055"
+        },
+        {
+          "id": "679056"
+        },
+        {
+          "id": "679057"
+        },
+        {
+          "id": "679058"
+        },
+        {
+          "id": "679059"
+        },
+        {
+          "id": "679060"
+        },
+        {
+          "id": "679061"
+        },
+        {
+          "id": "679062"
+        },
+        {
+          "id": "679063"
+        },
+        {
+          "id": "679064"
+        },
+        {
+          "id": "679065"
+        },
+        {
+          "id": "679066"
+        },
+        {
+          "id": "679067"
+        },
+        {
+          "id": "679068"
+        },
+        {
+          "id": "679069"
+        },
+        {
+          "id": "679070"
+        },
+        {
+          "id": "679071"
+        },
+        {
+          "id": "679072"
+        },
+        {
+          "id": "679073"
+        },
+        {
+          "id": "679074"
+        },
+        {
+          "id": "679075"
+        },
+        {
+          "id": "679076"
+        },
+        {
+          "id": "679077"
+        },
+        {
+          "id": "679078"
+        },
+        {
+          "id": "679079"
+        },
+        {
+          "id": "679080"
+        },
+        {
+          "id": "679081"
+        },
+        {
+          "id": "679082"
+        },
+        {
+          "id": "679083"
+        },
+        {
+          "id": "679084"
+        },
+        {
+          "id": "679085"
+        },
+        {
+          "id": "679086"
+        },
+        {
+          "id": "679087"
+        },
+        {
+          "id": "679088"
+        },
+        {
+          "id": "679089"
+        },
+        {
+          "id": "679090"
+        },
+        {
+          "id": "679091"
+        },
+        {
+          "id": "679092"
+        },
+        {
+          "id": "679093"
+        },
+        {
+          "id": "679094"
+        },
+        {
+          "id": "679095"
+        },
+        {
+          "id": "679096"
+        },
+        {
+          "id": "679097"
+        },
+        {
+          "id": "679098"
+        },
+        {
+          "id": "679099"
+        },
+        {
+          "id": "679100"
+        },
+        {
+          "id": "679101"
+        },
+        {
+          "id": "679102"
+        },
+        {
+          "id": "679103"
+        },
+        {
+          "id": "679104"
+        },
+        {
+          "id": "679105"
+        },
+        {
+          "id": "679106"
+        },
+        {
+          "id": "679107"
+        },
+        {
+          "id": "679108"
+        },
+        {
+          "id": "679109"
+        },
+        {
+          "id": "679110"
+        },
+        {
+          "id": "679111"
+        },
+        {
+          "id": "679112"
+        },
+        {
+          "id": "679113"
+        },
+        {
+          "id": "679114"
+        },
+        {
+          "id": "679115"
+        },
+        {
+          "id": "679116"
+        },
+        {
+          "id": "679117"
+        },
+        {
+          "id": "679118"
+        },
+        {
+          "id": "679119"
+        },
+        {
+          "id": "679120"
+        },
+        {
+          "id": "679121"
+        },
+        {
+          "id": "679122"
+        },
+        {
+          "id": "679123"
+        },
+        {
+          "id": "679124"
+        },
+        {
+          "id": "679125"
+        },
+        {
+          "id": "679126"
+        },
+        {
+          "id": "679127"
+        },
+        {
+          "id": "679128"
+        },
+        {
+          "id": "679129"
+        },
+        {
+          "id": "679130"
+        },
+        {
+          "id": "679131"
+        },
+        {
+          "id": "679132"
+        },
+        {
+          "id": "679133"
+        },
+        {
+          "id": "679134"
+        },
+        {
+          "id": "679135"
+        },
+        {
+          "id": "679136"
+        },
+        {
+          "id": "679137"
+        },
+        {
+          "id": "679138"
+        },
+        {
+          "id": "679139"
+        },
+        {
+          "id": "679140"
+        },
+        {
+          "id": "679141"
+        },
+        {
+          "id": "679142"
+        },
+        {
+          "id": "679143"
+        },
+        {
+          "id": "679144"
+        },
+        {
+          "id": "679145"
+        }
+      ],
+      "negRisk": true,
+      "slug": "next-french-presidential-election",
+      "startDate": "2025-11-13T23:09:35.8119Z",
+      "startTime": "2027-04-01T17:00:00Z",
+      "tags": [
+        {
+          "id": "100282",
+          "label": "French Election",
+          "slug": "french-election"
+        },
+        {
+          "id": "104743",
+          "label": "Main Election",
+          "slug": "main-election"
+        },
+        {
+          "id": "1378",
+          "label": "France",
+          "slug": "france"
+        },
+        {
+          "id": "101970",
+          "label": "World",
+          "slug": "world"
+        },
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "1597",
+          "label": "Global Elections",
+          "slug": "global-elections"
+        },
+        {
+          "id": "144",
+          "label": "Elections",
+          "slug": "elections"
+        }
+      ],
+      "title": "Next French Presidential Election",
+      "volume": 126089640.575459,
+      "volume1mo": 8685048.74442,
+      "volume1wk": 2969324.884494,
+      "volume1yr": 124622806.314541,
+      "volume24hr": 830510.867336
+    },
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9979790923380155,
+      "description": "A presidential election is scheduled to take place in Brazil on October 4, 2026.\n\nThis market will resolve according to the listed candidate that wins this election.\n\nThis market includes any potential second round. If the result of this election isn't known by June 30, 2027, 11:59 PM ET, the market will resolve to \"Other\".\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Brazilian government, specifically the Superior Electoral Court (Tribunal Superior Eleitoral, TSE) (e.g., https://dadosabertos.tse.jus.br/).",
+      "endDate": "2026-10-04T00:00:00Z",
+      "id": "45915",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/brazil-presidential-election-37lx5Jgvkbr8.png",
+      "liquidity": 15968358.75272,
+      "liquidityClob": 15968358.75272,
+      "markets": [
+        {
+          "id": "601818"
+        },
+        {
+          "id": "601819"
+        },
+        {
+          "id": "601820"
+        },
+        {
+          "id": "601821"
+        },
+        {
+          "id": "601822"
+        },
+        {
+          "id": "601823"
+        },
+        {
+          "id": "601824"
+        },
+        {
+          "id": "601825"
+        },
+        {
+          "id": "601826"
+        },
+        {
+          "id": "601827"
+        },
+        {
+          "id": "601828"
+        },
+        {
+          "id": "601829"
+        },
+        {
+          "id": "601830"
+        },
+        {
+          "id": "601831"
+        },
+        {
+          "id": "601832"
+        },
+        {
+          "id": "601833"
+        },
+        {
+          "id": "601834"
+        },
+        {
+          "id": "601835"
+        },
+        {
+          "id": "601836"
+        },
+        {
+          "id": "601837"
+        },
+        {
+          "id": "601838"
+        },
+        {
+          "id": "601839"
+        },
+        {
+          "id": "601840"
+        },
+        {
+          "id": "601841"
+        },
+        {
+          "id": "601842"
+        },
+        {
+          "id": "601843"
+        },
+        {
+          "id": "601844"
+        },
+        {
+          "id": "601845"
+        },
+        {
+          "id": "601846"
+        },
+        {
+          "id": "601847"
+        },
+        {
+          "id": "601848"
+        },
+        {
+          "id": "601849"
+        }
+      ],
+      "negRisk": true,
+      "slug": "brazil-presidential-election",
+      "startDate": "2025-09-18T20:07:57.76Z",
+      "startTime": "2026-10-04T12:00:00Z",
+      "tags": [
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "101252",
+          "label": "Macro Election 2",
+          "slug": "macro-election-2"
+        },
+        {
+          "id": "104743",
+          "label": "Main Election",
+          "slug": "main-election"
+        },
+        {
+          "id": "100185",
+          "label": "Brazil",
+          "slug": "brazil"
+        },
+        {
+          "id": "1597",
+          "label": "Global Elections",
+          "slug": "global-elections"
+        },
+        {
+          "id": "101206",
+          "label": "World Elections",
+          "slug": "world-elections"
+        },
+        {
+          "id": "101970",
+          "label": "World",
+          "slug": "world"
+        }
+      ],
+      "title": "Brazil Presidential Election",
+      "volume": 142635734.93418202,
+      "volume1mo": 22776137.778835993,
+      "volume1wk": 4843323.5515129985,
+      "volume1yr": 108082979.885448,
+      "volume24hr": 585195.934377
+    },
+    {
+      "active": true,
+      "closed": false,
+      "competitive": 0.9350755973555127,
+      "description": "The 2028 US Presidential Election is scheduled to take place on November 7, 2028.\n\nThis market will resolve to the person who wins the 2028 US Presidential Election. Otherwise, this market will resolve to “No.”\n\nThe resolution source for this market is the Associated Press, Fox News, and NBC. This market will resolve once all three sources call the race for the same candidate. If all three sources haven’t called the race for the same candidate by the inauguration date (January 20, 2029) this market will resolve based on who is inaugurated.",
+      "endDate": "2028-11-07T00:00:00Z",
+      "id": "31552",
+      "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png",
+      "liquidity": 62291317.07734,
+      "liquidityClob": 62291317.07734,
+      "markets": [
+        {
+          "id": "561229"
+        },
+        {
+          "id": "561230"
+        },
+        {
+          "id": "561231"
+        },
+        {
+          "id": "561232"
+        },
+        {
+          "id": "561233"
+        },
+        {
+          "id": "561234"
+        },
+        {
+          "id": "561235"
+        },
+        {
+          "id": "561236"
+        },
+        {
+          "id": "561237"
+        },
+        {
+          "id": "561238"
+        },
+        {
+          "id": "561239"
+        },
+        {
+          "id": "561240"
+        },
+        {
+          "id": "561241"
+        },
+        {
+          "id": "561242"
+        },
+        {
+          "id": "561243"
+        },
+        {
+          "id": "561244"
+        },
+        {
+          "id": "561245"
+        },
+        {
+          "id": "561246"
+        },
+        {
+          "id": "561247"
+        },
+        {
+          "id": "561248"
+        },
+        {
+          "id": "561249"
+        },
+        {
+          "id": "561250"
+        },
+        {
+          "id": "561251"
+        },
+        {
+          "id": "561252"
+        },
+        {
+          "id": "561253"
+        },
+        {
+          "id": "561254"
+        },
+        {
+          "id": "561255"
+        },
+        {
+          "id": "561256"
+        },
+        {
+          "id": "561257"
+        },
+        {
+          "id": "561258"
+        },
+        {
+          "id": "561259"
+        },
+        {
+          "id": "561260"
+        },
+        {
+          "id": "561261"
+        },
+        {
+          "id": "561262"
+        },
+        {
+          "id": "561263"
+        },
+        {
+          "id": "561264"
+        },
+        {
+          "id": "561265"
+        },
+        {
+          "id": "561266"
+        },
+        {
+          "id": "561267"
+        },
+        {
+          "id": "561268"
+        },
+        {
+          "id": "561269"
+        },
+        {
+          "id": "561270"
+        },
+        {
+          "id": "561271"
+        },
+        {
+          "id": "561272"
+        },
+        {
+          "id": "561273"
+        },
+        {
+          "id": "561274"
+        },
+        {
+          "id": "561275"
+        },
+        {
+          "id": "561276"
+        },
+        {
+          "id": "561277"
+        },
+        {
+          "id": "561278"
+        },
+        {
+          "id": "561279"
+        },
+        {
+          "id": "561280"
+        },
+        {
+          "id": "561281"
+        },
+        {
+          "id": "561282"
+        },
+        {
+          "id": "561283"
+        },
+        {
+          "id": "561284"
+        },
+        {
+          "id": "561285"
+        },
+        {
+          "id": "561286"
+        },
+        {
+          "id": "561287"
+        },
+        {
+          "id": "561288"
+        },
+        {
+          "id": "561289"
+        },
+        {
+          "id": "561290"
+        },
+        {
+          "id": "561291"
+        },
+        {
+          "id": "561292"
+        },
+        {
+          "id": "561293"
+        },
+        {
+          "id": "561294"
+        },
+        {
+          "id": "561295"
+        },
+        {
+          "id": "561296"
+        },
+        {
+          "id": "561297"
+        },
+        {
+          "id": "561298"
+        },
+        {
+          "id": "561299"
+        },
+        {
+          "id": "561300"
+        },
+        {
+          "id": "561301"
+        },
+        {
+          "id": "561302"
+        },
+        {
+          "id": "561303"
+        },
+        {
+          "id": "561304"
+        },
+        {
+          "id": "561305"
+        },
+        {
+          "id": "561306"
+        },
+        {
+          "id": "561307"
+        },
+        {
+          "id": "561308"
+        },
+        {
+          "id": "561309"
+        },
+        {
+          "id": "561310"
+        },
+        {
+          "id": "561311"
+        },
+        {
+          "id": "561312"
+        },
+        {
+          "id": "561313"
+        },
+        {
+          "id": "561314"
+        },
+        {
+          "id": "561315"
+        },
+        {
+          "id": "561316"
+        },
+        {
+          "id": "561317"
+        },
+        {
+          "id": "561318"
+        },
+        {
+          "id": "561319"
+        },
+        {
+          "id": "561320"
+        },
+        {
+          "id": "561321"
+        },
+        {
+          "id": "561322"
+        },
+        {
+          "id": "561323"
+        },
+        {
+          "id": "561324"
+        },
+        {
+          "id": "561325"
+        },
+        {
+          "id": "561326"
+        },
+        {
+          "id": "561327"
+        },
+        {
+          "id": "561328"
+        },
+        {
+          "id": "561329"
+        },
+        {
+          "id": "561330"
+        },
+        {
+          "id": "561331"
+        },
+        {
+          "id": "561332"
+        },
+        {
+          "id": "561333"
+        },
+        {
+          "id": "561334"
+        },
+        {
+          "id": "561335"
+        },
+        {
+          "id": "561336"
+        },
+        {
+          "id": "561337"
+        },
+        {
+          "id": "561338"
+        },
+        {
+          "id": "561339"
+        },
+        {
+          "id": "561340"
+        },
+        {
+          "id": "561341"
+        },
+        {
+          "id": "561342"
+        },
+        {
+          "id": "561343"
+        },
+        {
+          "id": "561344"
+        },
+        {
+          "id": "561345"
+        },
+        {
+          "id": "561346"
+        },
+        {
+          "id": "561347"
+        },
+        {
+          "id": "561348"
+        },
+        {
+          "id": "561349"
+        },
+        {
+          "id": "561350"
+        },
+        {
+          "id": "561351"
+        },
+        {
+          "id": "561352"
+        },
+        {
+          "id": "561353"
+        },
+        {
+          "id": "561354"
+        },
+        {
+          "id": "561355"
+        },
+        {
+          "id": "561357"
+        }
+      ],
+      "negRisk": true,
+      "slug": "presidential-election-winner-2028",
+      "startDate": "<timestamp>",
+      "startTime": "2028-11-07T12:00:00Z",
+      "tags": [
+        {
+          "id": "102886",
+          "label": "President",
+          "slug": "president"
+        },
+        {
+          "id": "165",
+          "label": "United States",
+          "slug": "united-states"
+        },
+        {
+          "id": "1101",
+          "label": "US Election",
+          "slug": "us-presidential-election"
+        },
+        {
+          "id": "144",
+          "label": "Elections",
+          "slug": "elections"
+        },
+        {
+          "id": "2",
+          "label": "Politics",
+          "slug": "politics"
+        },
+        {
+          "id": "101206",
+          "label": "World Elections",
+          "slug": "world-elections"
+        },
+        {
+          "id": "1597",
+          "label": "Global Elections",
+          "slug": "global-elections"
+        },
+        {
+          "id": "102458",
+          "label": "Earn 4%",
+          "slug": "earn-4"
+        },
+        {
+          "id": "104743",
+          "label": "Main Election",
+          "slug": "main-election"
+        }
+      ],
+      "title": "Presidential Election Winner 2028",
+      "volume": 701351114.3540592,
+      "volume1mo": 22357764.453344002,
+      "volume1wk": 7514983.369201003,
+      "volume1yr": 679591861.306606,
+      "volume24hr": 484127.08792500006
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "nextCursor": "sksaFUgFHCfzywBNSX4ws9fuaUxzHTVxzUXTcXxHjQl7InYiOjEsImsiOiJldmVudHMiLCJvaCI6IjU2NzMxYTk3ZTVjNjVlOTY3ZGNmMmRlYTgzZGE5YjhmNTVkZGE1OTQ1MmY1MjkwNmVmY2I3YmY0NjY2NzUwMGMiLCJrZXlzIjpbeyJ0IjoiZmxvYXQiLCJ2Ijo0ODQxMjcuMDg3OTI1MDAwMDZ9LHsidCI6InN0cmluZyIsInYiOiIzMTU1MiJ9XX0"
+  },
+  "success": true
+}

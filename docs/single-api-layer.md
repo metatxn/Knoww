@@ -204,14 +204,14 @@ The `get_wallet_*` tools read public Data API records for any address. They are
 not the same as the account tools below, which read the authenticated
 principal's own account.
 
+Status 2026-09-06: `get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders`, `preview_order`, `place_order` and `cancel_order` exist in `apps/mcp/src/tools/trading.ts` but are not advertised. `EXPOSE_TRADING_TOOLS` in `apps/mcp/src/tool-catalog.ts` stays `false`, and their scopes are reserved but never granted, until caller identity (grilling Q1) is settled. Account P&L and portfolio value stay on the public `get_wallet_pnl` and `get_wallet_portfolio_value` tools (owner decision 2026-09-06).
+
 Account and order tools, added in the trading phase, `platform` required:
 
 - `get_account_positions`
 - `get_account_activity`
 - `get_account_orders` (orders placed through this connection only; see
   "Account read visibility")
-- `get_account_pnl`
-- `get_account_portfolio_value`
 - `preview_order`
 - `place_order`
 - `cancel_order`
@@ -357,7 +357,7 @@ know a market is in its dispute window before treating a price as free money.
 
 | Canonical | Kalshi | Polymarket |
 | --- | --- | --- |
-| `unopened` | `initialized` | not yet accepting orders and not closed |
+| `unopened` | `initialized` | not active and not closed, whatever the order book says |
 | `active` | `active` | active and accepting orders |
 | `paused` | `inactive` | active but not accepting orders |
 | `closed` | `closed` | closed, no resolution proposed |
@@ -460,6 +460,11 @@ The registry, not request input, owns provider base URLs. A user-controlled URL
 must never reach a server-side fetch.
 
 ## Repository structure
+
+> Superseded by the package layout in the aggregator ADR. The tree below is the
+> MCP-first plan; the shipped layout is `core/`, `registry.ts` and
+> `platforms/polymarket/` with no root export, and the legacy `markets/` and
+> `profiles/` modules were deleted at M5 on 2026-09-05.
 
 ```text
 apps/mcp/src/
@@ -591,6 +596,13 @@ budget. Polymarket responses may be cached under the existing rules. Kalshi
 responses are not cached until Kalshi authorizes it.
 
 ## Identity and authorization
+
+> Superseded for the web restructure. The aggregator ADR
+> (`decisions/2026-09-03-aggregator-platform-adapters.md`, sections "Identity"
+> and "Supersedes") models a trader as one connection per platform, wallet-backed
+> today, with no Knoww account. The subsections below record the MCP-first
+> design (shared Privy application, Session Keys, trading grants) and stay for
+> the M5 trading phase, open since the read tools moved on 2026-09-05.
 
 ### Two login paths, one authorization server
 
@@ -765,7 +777,7 @@ Consequences:
   the tool description says so.
 - Positions, trade history, activity, and P&L come from the public Data API
   keyed by wallet address, so `get_account_positions`, `get_account_activity`,
-  `get_account_pnl`, and `get_account_portfolio_value` are complete regardless
+  `get_wallet_pnl`, and `get_wallet_portfolio_value` are complete regardless
   of which credential traded.
 - Because Knoww holds the Session Key, the web app can later show agent-placed
   orders through a Knoww endpoint, so the user gets one full picture in the web
@@ -797,7 +809,7 @@ Active today:
 
 Added in the trading phase:
 
-- `accounts:read`
+- `account:read`
 - `orders:read`
 - `orders:create`
 - `orders:cancel`
@@ -994,6 +1006,10 @@ The Polymarket trading adapter also needs:
 - proof that secrets never reach responses or logs.
 
 ## Delivery plan
+
+> Replaced by milestones M1 to M5 in the aggregator ADR. Phase 1 landed for
+> Polymarket at M5 on 2026-09-05, and `list_platforms` plus the `platform`
+> filter from Phase 2 landed with it. The Kalshi items wait for M2.
 
 ### Phase 0: freeze contracts
 

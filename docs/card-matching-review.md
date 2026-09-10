@@ -148,7 +148,7 @@ someone notices a percentage badge on an official Polymarket post.
 - `validateMarketRelevance` has no client cache (contrast `extract-topics`' 10-min cache) — matters only when AI is enabled (`api.ts:2298-2322`).
 - Title dedupe uses char-Levenshtein ≥0.92 on 120-char prefixes, O(n²·L) (`api.ts:1934-1970`) — over-merges shared-prefix series markets, under-merges rewordings.
 - Global 900 ms serialized search queue (`api.ts:1317-1337`) has no backoff on degraded responses — combined with R4, bursts both serialize *and* poison the cache. (Known behavior: the proxy degrades to empty under burst; back off rather than retry.)
-- `ranking-engine.md` and `docs/scoring-flowchart.md` disagree with the code on: AI defaults, embedding model, gate relief valves. Worth a refresh pass once changes land.
+- `ranking-engine.md` disagrees with the code on: AI defaults, embedding model, gate relief valves. Worth a refresh pass once changes land. The old `docs/scoring-flowchart.md` had the same drift and was removed.
 
 ---
 

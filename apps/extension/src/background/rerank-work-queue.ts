@@ -1,49 +1,78 @@
+import {
+  isQueueWaitError,
+  type QueueWaitError,
+  queueWaitError,
+} from "../queue-wait-error";
 export const MAX_PENDING_RERANK_WORK = 8;
 export const MAX_RERANK_QUEUE_WAIT_MS = 5_000;
 
 export type RerankQueueSkipReason = "capacity" | "deadline" | "superseded";
 
-export class RerankQueueCapacityError extends Error {
-  readonly queueWaitMs: number;
+export type RerankQueueCapacityError =
+  QueueWaitError<"RerankQueueCapacityError">;
 
-  constructor(queueWaitMs = 0) {
-    super("Pending rerank work was dropped to keep the queue bounded");
-    this.name = "RerankQueueCapacityError";
-    this.queueWaitMs = queueWaitMs;
-  }
+export function rerankQueueCapacityError(
+  queueWaitMs = 0
+): RerankQueueCapacityError {
+  return queueWaitError(
+    "RerankQueueCapacityError",
+    "Pending rerank work was dropped to keep the queue bounded",
+    queueWaitMs
+  );
 }
 
-export class RerankSupersededError extends Error {
-  readonly queueWaitMs: number;
-
-  constructor(queueWaitMs = 0) {
-    super("Pending rerank work was superseded by a newer request");
-    this.name = "RerankSupersededError";
-    this.queueWaitMs = queueWaitMs;
-  }
+export function isRerankQueueCapacityError(
+  value: unknown
+): value is RerankQueueCapacityError {
+  return isQueueWaitError(value, "RerankQueueCapacityError");
 }
 
-export class RerankQueueDeadlineError extends Error {
-  readonly queueWaitMs: number;
+export type RerankSupersededError = QueueWaitError<"RerankSupersededError">;
 
-  constructor(queueWaitMs = 0) {
-    super("Pending rerank work expired before inference could start");
-    this.name = "RerankQueueDeadlineError";
-    this.queueWaitMs = queueWaitMs;
-  }
+export function rerankSupersededError(queueWaitMs = 0): RerankSupersededError {
+  return queueWaitError(
+    "RerankSupersededError",
+    "Pending rerank work was superseded by a newer request",
+    queueWaitMs
+  );
+}
+
+export function isRerankSupersededError(
+  value: unknown
+): value is RerankSupersededError {
+  return isQueueWaitError(value, "RerankSupersededError");
+}
+
+export type RerankQueueDeadlineError =
+  QueueWaitError<"RerankQueueDeadlineError">;
+
+export function rerankQueueDeadlineError(
+  queueWaitMs = 0
+): RerankQueueDeadlineError {
+  return queueWaitError(
+    "RerankQueueDeadlineError",
+    "Pending rerank work expired before inference could start",
+    queueWaitMs
+  );
+}
+
+export function isRerankQueueDeadlineError(
+  value: unknown
+): value is RerankQueueDeadlineError {
+  return isQueueWaitError(value, "RerankQueueDeadlineError");
 }
 
 export function getRerankQueueSkipDetails(error: unknown): {
   reason: RerankQueueSkipReason;
   queueWaitMs: number;
 } | null {
-  if (error instanceof RerankQueueCapacityError) {
+  if (isRerankQueueCapacityError(error)) {
     return { reason: "capacity", queueWaitMs: error.queueWaitMs };
   }
-  if (error instanceof RerankSupersededError) {
+  if (isRerankSupersededError(error)) {
     return { reason: "superseded", queueWaitMs: error.queueWaitMs };
   }
-  if (error instanceof RerankQueueDeadlineError) {
+  if (isRerankQueueDeadlineError(error)) {
     return { reason: "deadline", queueWaitMs: error.queueWaitMs };
   }
   return null;
@@ -79,7 +108,7 @@ export function createRerankWorkQueue(
     const retained: PendingRerankWork[] = [];
     for (const work of pending) {
       if (work.requestKey === requestKey) {
-        work.reject(new RerankSupersededError(Date.now() - work.queuedAt));
+        work.reject(rerankSupersededError(Date.now() - work.queuedAt));
       } else {
         retained.push(work);
       }
@@ -94,7 +123,7 @@ export function createRerankWorkQueue(
     while (next) {
       const queueWaitMs = Date.now() - next.queuedAt;
       if (queueWaitMs <= maximumQueueWaitMs) break;
-      next.reject(new RerankQueueDeadlineError(queueWaitMs));
+      next.reject(rerankQueueDeadlineError(queueWaitMs));
       next = pending.shift();
     }
     if (!next) return;
@@ -124,7 +153,7 @@ export function createRerankWorkQueue(
           const oldest = pending.shift();
           if (oldest) {
             oldest.reject(
-              new RerankQueueCapacityError(Date.now() - oldest.queuedAt)
+              rerankQueueCapacityError(Date.now() - oldest.queuedAt)
             );
           }
         }

@@ -1,12 +1,12 @@
+import { PLATFORM_IDS } from "@knoww/services/core";
 import {
   DEFAULT_SEARCH_LIMIT,
-  fetchAggregatedSearchData,
-  GAMMA_API_BASE,
   getExactTopOutcome,
   MAX_SEARCH_LIMIT,
   type Market,
+  POLYMARKET_PLATFORM,
   type SearchEvent,
-} from "@knoww/services";
+} from "@knoww/services/platforms/polymarket";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
@@ -14,13 +14,18 @@ import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toolFailureContent,
 } from "../errors/tool-error";
+import {
+  DEFAULT_PLATFORM,
+  platformInputSchema,
+  requirePolymarketClient,
+} from "../platforms";
 import { requireToolQuota } from "../quota";
 import { toDecimalString } from "./decimal";
-import { knowwEventUrl } from "./gamma";
+import { canonicalEventId, knowwEventUrl, marketIdentity } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 import {
   buildOffsetPage,
@@ -46,6 +51,7 @@ const SEARCH_MARKETS_DESCRIPTION = [
 ].join(" ");
 
 const searchMarketsInputSchema = z.object({
+  platform: platformInputSchema,
   query: z
     .string()
     .trim()
@@ -104,7 +110,11 @@ const outcomeSummarySchema = z.object({
 });
 
 const marketSummarySchema = z.object({
-  id: z.string(),
+  id: z
+    .string()
+    .describe("Canonical market id, e.g. polymarket:0x<conditionId>."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceMarketId: z.string().describe("Platform-native market id."),
   slug: z.string().optional(),
   conditionId: z.string().optional(),
   question: z.string().optional(),
@@ -114,19 +124,24 @@ const marketSummarySchema = z.object({
 });
 
 const rankedMarketEventSchema = z.object({
-  id: z.string(),
+  id: z.string().describe("Canonical event id, e.g. polymarket:35908."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceEventId: z.string().describe("Platform-native event id."),
   slug: z.string().optional(),
   title: z.string(),
   url: z.string().optional(),
 });
 
 const rankedMarketSchema = z.object({
-  id: z.string(),
+  id: z
+    .string()
+    .describe("Canonical market id, e.g. polymarket:0x<conditionId>."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceMarketId: z.string().describe("Platform-native market id."),
   slug: z.string().optional(),
   conditionId: z.string().optional(),
   question: z.string().optional(),
   status: z.literal("active"),
-  platform: z.literal("polymarket"),
   url: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -142,7 +157,9 @@ const rankedMarketSchema = z.object({
 });
 
 const eventSummarySchema = z.object({
-  id: z.string(),
+  id: z.string().describe("Canonical event id, e.g. polymarket:35908."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceEventId: z.string().describe("Platform-native event id."),
   slug: z.string().optional(),
   title: z.string(),
   status: z.literal("active"),
@@ -209,16 +226,15 @@ function marketOutcomes(market: Market): {
   };
 }
 
-function summarizeMarket(market: Market): MarketSummary {
-  if (!market.id) {
-    throw new KnowwToolError(
-      "UPSTREAM_UNAVAILABLE",
-      "Search returned a market without a stable identifier."
-    );
-  }
+/** Null for a market without a condition id: it has no canonical id. */
+function summarizeMarket(market: Market): MarketSummary | null {
+  const identity = marketIdentity(market);
+  if (identity === null) return null;
   const { outcomes, totalOutcomes, truncated } = marketOutcomes(market);
   return {
-    id: market.id,
+    id: identity.id,
+    platform: POLYMARKET_PLATFORM,
+    sourceMarketId: identity.sourceMarketId,
     ...(market.slug !== undefined ? { slug: market.slug } : {}),
     ...(market.conditionId !== undefined
       ? { conditionId: market.conditionId }
@@ -240,14 +256,19 @@ function summarizeEvent(event: SearchEvent): {
   const topOutcome = getExactTopOutcome(allMarkets);
   const markets = allMarkets
     .slice(0, MAX_MARKETS_PER_EVENT)
-    .map(summarizeMarket);
+    .flatMap((market) => {
+      const summary = summarizeMarket(market);
+      return summary === null ? [] : [summary];
+    });
   const marketsTruncated = allMarkets.length > MAX_MARKETS_PER_EVENT;
   const outcomesTruncated = markets.some(
     (market) => market.outcomesTruncated === true
   );
   return {
     summary: {
-      id: event.id,
+      id: canonicalEventId(event.id),
+      platform: POLYMARKET_PLATFORM,
+      sourceEventId: event.id,
       ...(event.slug ? { slug: event.slug } : {}),
       title: event.title,
       // This slice requests active events only and the merge drops closed ones.
@@ -292,8 +313,12 @@ function textMatches(
   return boundedQuery.test(normalizedValue);
 }
 
-function rankedMarketFrom(event: SearchEvent, market: Market): RankedMarket {
+function rankedMarketFrom(
+  event: SearchEvent,
+  market: Market
+): RankedMarket | null {
   const summary = summarizeMarket(market);
+  if (summary === null) return null;
   const volume = toDecimalString(market.volume ?? market.volumeNum);
   const liquidity = toDecimalString(market.liquidity ?? market.liquidityNum);
   const startDate = market.startDate ?? event.startDate;
@@ -302,7 +327,6 @@ function rankedMarketFrom(event: SearchEvent, market: Market): RankedMarket {
   return {
     ...summary,
     status: "active",
-    platform: "polymarket",
     ...(market.slug ? { url: knowwEventUrl(market.slug) } : {}),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
@@ -310,7 +334,9 @@ function rankedMarketFrom(event: SearchEvent, market: Market): RankedMarket {
     volumeUnit: "unspecified",
     ...(liquidity !== undefined ? { liquidity } : {}),
     event: {
-      id: event.id,
+      id: canonicalEventId(event.id),
+      platform: POLYMARKET_PLATFORM,
+      sourceEventId: event.id,
       ...(event.slug ? { slug: event.slug } : {}),
       title: event.title,
       ...(eventUrl ? { url: eventUrl } : {}),
@@ -352,6 +378,7 @@ function cursorFingerprint(
   categorySlug: string | undefined
 ): string {
   return paginationFingerprint([
+    args.platform ?? DEFAULT_PLATFORM,
     normalizeSearchText(args.query),
     categorySlug ?? "",
     args.resultType,
@@ -381,7 +408,8 @@ function rankedMarketPage(
       ) {
         continue;
       }
-      matches.push(rankedMarketFrom(event, market));
+      const ranked = rankedMarketFrom(event, market);
+      if (ranked !== null) matches.push(ranked);
     }
   }
   if (args.sortBy === "volume") {
@@ -428,7 +456,7 @@ async function handleSearchMarkets(
     if (args.category !== undefined) {
       const slug = normalizeCategorySlug(args.category);
       if (!slug) {
-        throw new KnowwToolError(
+        throw knowwToolError(
           "VALIDATION_ERROR",
           "category could not be normalized to a slug; use letters, numbers, spaces, or dashes."
         );
@@ -445,14 +473,15 @@ async function handleSearchMarkets(
       maxOffset: 10_000,
     });
 
-    const data = await fetchAggregatedSearchData(
+    const client = requirePolymarketClient(args.platform);
+    const data = await client.fetchAggregatedSearchData(
       args.query,
       MAX_SEARCH_LIMIT,
       tagSlugs,
       { signal: context.mcpReq.signal, fullMarketRecords: true }
     );
     if (data.degraded && data.events.length === 0) {
-      throw new KnowwToolError(
+      throw knowwToolError(
         "UPSTREAM_UNAVAILABLE",
         "Search is temporarily unavailable upstream."
       );
@@ -483,7 +512,7 @@ async function handleSearchMarkets(
     const events = summaries.map((entry) => entry.summary);
     const page = marketPage?.page ?? eventPagination?.page;
     if (!page) {
-      throw new KnowwToolError(
+      throw knowwToolError(
         "INTERNAL_ERROR",
         "Search pagination could not be prepared."
       );
@@ -494,7 +523,7 @@ async function handleSearchMarkets(
       marketPage?.markets.some((market) => market.outcomesTruncated === true);
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-gamma", url: GAMMA_API_BASE }],
+      sources: [{ name: "polymarket-gamma", url: client.baseUrls.gamma }],
       ...(nextCursor ? { nextCursor } : {}),
       truncated:
         data.truncated ||

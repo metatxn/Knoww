@@ -1,31 +1,44 @@
 import {
+  PLATFORM_IDS,
+  type PlatformId,
+  parseCanonicalId,
+} from "@knoww/services/core";
+import {
   type EventIdentifier,
-  fetchChildEvents,
-  fetchEventByIdentifier,
-  fetchOpenMarketsByEventSlug,
-  GAMMA_API_BASE,
   type GammaEventDetail,
   type GammaMarketDetail,
-  UpstreamEventError,
-} from "@knoww/services";
+  isUpstreamEventError,
+  POLYMARKET_PLATFORM,
+  type PolymarketClient,
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
+import {
+  DEFAULT_PLATFORM,
+  platformInputSchema,
+  requirePolymarketClient,
+} from "../platforms";
 import { requireToolQuota } from "../quota";
 import { toDecimalString } from "./decimal";
 import {
+  canonicalEventId,
   cleanDescription,
   deriveMarketStatus,
   descriptionIsTruncated,
   isAbortLike,
   knowwEventUrl,
+  type MarketIdentity,
+  marketIdentity,
   marketOutcomeSchema,
   marketStatusSchema,
   projectMarketOutcomes,
@@ -41,10 +54,12 @@ import {
 } from "./pagination";
 
 const ID_PATTERN = /^[0-9]{1,20}$/;
+const CANONICAL_ID_MESSAGE =
+  "id must be a numeric event id or a canonical id such as polymarket:35908.";
 const MAX_EVENT_TAGS = 10;
 
 const GET_EVENT_DESCRIPTION = [
-  "Fetch one Polymarket event by numeric id or slug.",
+  "Fetch one event by numeric id, canonical id (for example polymarket:35908), or slug.",
   "Provide exactly one identifier per call.",
   "negRisk events merge markets from their open child events; each merged market names its child event in groupTitle.",
   "Markets use opaque cursor pagination; marketOffset remains available for compatibility. totalMarkets reports the full count and prices are decimal strings between 0 and 1.",
@@ -57,7 +72,14 @@ const GET_EVENT_DESCRIPTION = [
  * a KnowwToolError with retry guidance (documented conflict #11).
  */
 const getEventInputSchema = z.object({
-  id: z.string().max(20).optional().describe("Numeric event id, e.g. 35908."),
+  platform: platformInputSchema,
+  id: z
+    .string()
+    .max(140)
+    .optional()
+    .describe(
+      "Numeric event id, e.g. 35908, or the canonical id polymarket:35908."
+    ),
   slug: z
     .string()
     .max(200)
@@ -85,7 +107,9 @@ type GetEventInput = z.output<typeof getEventInputSchema>;
 const eventStatusSchema = z.enum(["active", "closed", "unknown"]);
 
 const eventDetailSchema = z.object({
-  id: z.string(),
+  id: z.string().describe("Canonical event id, e.g. polymarket:35908."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceEventId: z.string().describe("Platform-native event id."),
   title: z.string().optional(),
   slug: z.string().optional(),
   status: eventStatusSchema,
@@ -109,7 +133,11 @@ const eventDetailSchema = z.object({
 });
 
 const eventMarketSummarySchema = z.object({
-  id: z.string(),
+  id: z
+    .string()
+    .describe("Canonical market id, e.g. polymarket:0x<conditionId>."),
+  platform: z.enum(PLATFORM_IDS),
+  sourceMarketId: z.string().describe("Platform-native market id."),
   question: z.string().optional(),
   slug: z.string().optional(),
   conditionId: z.string().optional(),
@@ -146,25 +174,72 @@ function resolveEventIdentifier(args: GetEventInput): EventIdentifier {
     provided.push({ kind: "slug", value: args.slug.trim().toLowerCase() });
   }
   if (provided.length !== 1) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "Provide exactly one of id or slug."
     );
   }
   const identifier = provided[0];
   if (identifier.kind === "id" && !ID_PATTERN.test(identifier.value)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "id must be a string of decimal digits."
     );
   }
   if (identifier.kind === "slug" && !SLUG_PATTERN.test(identifier.value)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "slug may contain only lowercase letters, digits, and dashes."
     );
   }
   return identifier;
+}
+
+interface EventLookup {
+  client: PolymarketClient;
+  platform: PlatformId;
+  identifier: EventIdentifier;
+}
+
+/**
+ * `id` accepts both the bare Gamma id and the canonical form; a colon marks
+ * the canonical form, whose platform prefix must agree with `platform`.
+ */
+function resolveEventLookup(args: GetEventInput): EventLookup {
+  if (args.id === undefined || !args.id.includes(":")) {
+    return {
+      client: requirePolymarketClient(args.platform),
+      platform: args.platform ?? DEFAULT_PLATFORM,
+      identifier: resolveEventIdentifier(args),
+    };
+  }
+  if (args.slug !== undefined) {
+    throw knowwToolError(
+      "VALIDATION_ERROR",
+      "Provide exactly one of id or slug."
+    );
+  }
+  let parts: ReturnType<typeof parseCanonicalId>;
+  try {
+    parts = parseCanonicalId(args.id.trim());
+  } catch {
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+  }
+  if (args.platform !== undefined && args.platform !== parts.platform) {
+    throw knowwToolError(
+      "VALIDATION_ERROR",
+      "platform must match the platform prefix of id."
+    );
+  }
+  const client = requirePolymarketClient(parts.platform);
+  if (!ID_PATTERN.test(parts.sourceId)) {
+    throw knowwToolError("VALIDATION_ERROR", CANONICAL_ID_MESSAGE);
+  }
+  return {
+    client,
+    platform: parts.platform,
+    identifier: { kind: "id", value: parts.sourceId },
+  };
 }
 
 /**
@@ -199,7 +274,9 @@ function buildEventDetail(detail: GammaEventDetail): EventDetail {
   const liquidity = toDecimalString(detail.liquidity);
   const tagProjection = eventTags(detail);
   return {
-    id: detail.id,
+    id: canonicalEventId(detail.id),
+    platform: POLYMARKET_PLATFORM,
+    sourceEventId: detail.id,
     ...(detail.title !== undefined ? { title: detail.title } : {}),
     ...(detail.slug !== undefined ? { slug: detail.slug } : {}),
     status: deriveEventStatus(detail),
@@ -228,13 +305,16 @@ function hasStringId(market: GammaMarketDetail | null | undefined): boolean {
   );
 }
 
-function summarizeEventMarket(
-  market: GammaMarketDetail,
-  groupTitle?: string
-): EventMarketSummary {
+function summarizeEventMarket({
+  market,
+  identity,
+  groupTitle,
+}: MergedMarket): EventMarketSummary {
   const outcomeProjection = projectMarketOutcomes(market);
   return {
-    id: market.id,
+    id: identity.id,
+    platform: POLYMARKET_PLATFORM,
+    sourceMarketId: identity.sourceMarketId,
     ...(market.question !== undefined ? { question: market.question } : {}),
     ...(market.slug !== undefined ? { slug: market.slug } : {}),
     ...(market.conditionId !== undefined
@@ -251,12 +331,17 @@ function summarizeEventMarket(
   };
 }
 
-type MergedMarket = { market: GammaMarketDetail; groupTitle?: string };
+type MergedMarket = {
+  market: GammaMarketDetail;
+  identity: MarketIdentity;
+  groupTitle?: string;
+};
 
 /**
  * negRisk parents split their markets across child events, so the embedded
  * list alone silently drops legs. Children merge after the embedded markets,
- * deduplicated by market id with the parent's copy winning.
+ * deduplicated by market id with the parent's copy winning. Markets without
+ * a condition id have no canonical id and are skipped.
  */
 function mergeEventMarkets(
   embedded: GammaMarketDetail[],
@@ -266,15 +351,20 @@ function mergeEventMarkets(
   const merged: MergedMarket[] = [];
   for (const market of embedded) {
     if (seen.has(market.id)) continue;
+    const identity = marketIdentity(market);
+    if (identity === null) continue;
     seen.add(market.id);
-    merged.push({ market });
+    merged.push({ market, identity });
   }
   for (const child of children) {
     for (const market of child.markets ?? []) {
       if (!hasStringId(market) || seen.has(market.id)) continue;
+      const identity = marketIdentity(market);
+      if (identity === null) continue;
       seen.add(market.id);
       merged.push({
         market,
+        identity,
         ...(child.title !== undefined ? { groupTitle: child.title } : {}),
       });
     }
@@ -283,20 +373,20 @@ function mergeEventMarkets(
 }
 
 function mapEventLookupError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) return error;
-  if (error instanceof UpstreamEventError) {
+  if (isKnowwToolError(error)) return error;
+  if (isUpstreamEventError(error)) {
     return error.status === 429
-      ? new KnowwToolError(
+      ? knowwToolError(
           "RATE_LIMITED",
           "The event data source is rate limiting requests."
         )
-      : new KnowwToolError(
+      : knowwToolError(
           "UPSTREAM_UNAVAILABLE",
           "Event data is temporarily unavailable upstream."
         );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The event data source timed out."
     );
@@ -344,8 +434,9 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
   try {
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("get_event");
-    const identifier = resolveEventIdentifier(args);
+    const { client, platform, identifier } = resolveEventLookup(args);
     const fingerprint = paginationFingerprint([
+      platform,
       identifier.kind,
       identifier.value,
     ]);
@@ -358,17 +449,14 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
     });
     let detail: GammaEventDetail | null;
     try {
-      detail = await fetchEventByIdentifier(identifier, {
+      detail = await client.fetchEventByIdentifier(identifier, {
         signal: context.mcpReq.signal,
       });
     } catch (error) {
       throw mapEventLookupError(error);
     }
     if (detail === null) {
-      throw new KnowwToolError(
-        "NOT_FOUND",
-        "No event matches that identifier."
-      );
+      throw knowwToolError("NOT_FOUND", "No event matches that identifier.");
     }
 
     // Both follow-up fetches are best-effort: a degraded market list with a
@@ -378,7 +466,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
     let childEventsTruncated = false;
     if (detail.negRisk === true) {
       try {
-        const childResult = await fetchChildEvents(detail.id, {
+        const childResult = await client.fetchChildEvents(detail.id, {
           signal: context.mcpReq.signal,
         });
         children = childResult.events;
@@ -396,7 +484,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
       embedded = detail.markets.filter((market) => hasStringId(market));
     } else if (detail.slug) {
       try {
-        embedded = await fetchOpenMarketsByEventSlug(detail.slug, {
+        embedded = await client.fetchOpenMarketsByEventSlug(detail.slug, {
           signal: context.mcpReq.signal,
         });
       } catch (error) {
@@ -409,7 +497,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
     const totalMarkets = merged.length;
     const page = merged
       .slice(offset, offset + args.marketLimit)
-      .map((entry) => summarizeEventMarket(entry.market, entry.groupTitle));
+      .map((entry) => summarizeEventMarket(entry));
     const pagination = buildOffsetPage({
       namespace: "get_event",
       fingerprint,
@@ -429,7 +517,7 @@ async function handleGetEvent(args: GetEventInput, context: ServerContext) {
       page.some((market) => market.outcomesTruncated === true);
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-gamma", url: GAMMA_API_BASE }],
+      sources: [{ name: "polymarket-gamma", url: client.baseUrls.gamma }],
       ...(pagination.nextCursor ? { nextCursor: pagination.nextCursor } : {}),
       truncated:
         pageTruncated || marketsIncomplete || fieldsTruncated

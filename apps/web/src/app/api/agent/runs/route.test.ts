@@ -27,7 +27,7 @@ vi.mock("@/lib/api-rate-limit", () => ({
   checkRateLimit: mocks.checkRateLimit,
 }));
 
-import { DurableAgentRepositoryUnavailableError } from "@/lib/agent/repository";
+import { durableAgentRepositoryUnavailableError } from "@/lib/agent/repository";
 import { POST } from "./route";
 
 const FIRST_IDEMPOTENCY_KEY = "338295e1-bfe2-4f07-91a9-e23bc86379f1";
@@ -131,7 +131,7 @@ describe("POST /api/agent/runs", () => {
 
   it("fails closed when durable storage is unavailable for a live run", async () => {
     mocks.getAgentRepository.mockRejectedValue(
-      new DurableAgentRepositoryUnavailableError()
+      durableAgentRepositoryUnavailableError()
     );
 
     const response = await POST(liveRequest(FIRST_IDEMPOTENCY_KEY));

@@ -49,7 +49,7 @@ describe("wallet provider scope", () => {
     expect(provider).toContain('from "next/headers"');
     expect(provider).toContain("cookieToInitialState(");
     expect(provider).toContain(
-      "<AppRouteProviders initialState={initialState}>"
+      "<AppRouteProviders initialState={initialState} flags={flags}>"
     );
     expect(provider).not.toContain("cookies={");
     expect(appProviders).toContain(

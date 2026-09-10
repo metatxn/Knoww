@@ -1,11 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { CACHE_DURATION, POLYMARKET_API } from "@/constants/polymarket";
+import { CACHE_DURATION } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
-import { fetchGammaKeysetPage, toSlimGammaEvent } from "@/lib/gamma-keyset";
+import { toSlimGammaEvent } from "@/lib/gamma-keyset";
 import { logger } from "@/lib/logger";
 import { normalizeTagSlug } from "@/lib/tag-slugs";
+import { fetchKeysetEventPage } from "@/polymarket/event-reads";
 import type { GammaEvent } from "@/types/gamma-api";
 
 const DEFAULT_LIMIT = 20;
@@ -29,7 +30,23 @@ const ALLOWED_ORDER_FIELDS = new Set([
   "competitive",
 ]);
 
-class QueryValidationError extends Error {}
+interface QueryValidationError extends Error {
+  readonly name: "QueryValidationError";
+}
+
+function queryValidationError(message: string): QueryValidationError {
+  const error = new Error(message) as Error & { name: "QueryValidationError" };
+  error.name = "QueryValidationError";
+  return error;
+}
+
+function isQueryValidationError(value: unknown): value is QueryValidationError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { name?: unknown }).name === "QueryValidationError"
+  );
+}
 
 /**
  * Gamma keyset cursors are inclusive: the continuation page usually repeats
@@ -62,12 +79,12 @@ function parseLimit(searchParams: URLSearchParams): number {
   const raw = searchParams.get("limit");
   if (raw === null || raw.trim() === "") return DEFAULT_LIMIT;
   if (!/^\d+$/.test(raw)) {
-    throw new QueryValidationError("limit must be a positive integer");
+    throw queryValidationError("limit must be a positive integer");
   }
 
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < MIN_LIMIT) {
-    throw new QueryValidationError("limit must be a positive integer");
+    throw queryValidationError("limit must be a positive integer");
   }
 
   return Math.min(value, MAX_LIMIT);
@@ -82,19 +99,19 @@ function parseBooleanParam(
   if (raw === null || raw.trim() === "") return defaultValue;
   if (raw === "true") return true;
   if (raw === "false") return false;
-  throw new QueryValidationError(`${name} must be true or false`);
+  throw queryValidationError(`${name} must be true or false`);
 }
 
 function parseSeriesId(searchParams: URLSearchParams): string | null {
   const raw = searchParams.get("series_id");
   if (raw === null || raw.trim() === "") return null;
   if (!/^\d+$/.test(raw)) {
-    throw new QueryValidationError("series_id must be a positive integer");
+    throw queryValidationError("series_id must be a positive integer");
   }
 
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new QueryValidationError("series_id must be a positive integer");
+    throw queryValidationError("series_id must be a positive integer");
   }
 
   return String(value);
@@ -106,7 +123,7 @@ function parseTagSlug(searchParams: URLSearchParams): string | null {
 
   const tagSlug = normalizeTagSlug(raw);
   if (!TAG_SLUG_PATTERN.test(tagSlug)) {
-    throw new QueryValidationError("tag_slug is invalid");
+    throw queryValidationError("tag_slug is invalid");
   }
 
   return tagSlug;
@@ -115,7 +132,7 @@ function parseTagSlug(searchParams: URLSearchParams): string | null {
 function parseOrder(searchParams: URLSearchParams): string {
   const order = searchParams.get("order") || "volume24hr";
   if (!ALLOWED_ORDER_FIELDS.has(order)) {
-    throw new QueryValidationError("order is not supported");
+    throw queryValidationError("order is not supported");
   }
   return order;
 }
@@ -124,7 +141,7 @@ function parseCursor(searchParams: URLSearchParams): string | null {
   const cursor = searchParams.get("after_cursor");
   if (!cursor) return null;
   if (cursor.length > MAX_CURSOR_LENGTH) {
-    throw new QueryValidationError("after_cursor is too long");
+    throw queryValidationError("after_cursor is too long");
   }
   return cursor;
 }
@@ -137,10 +154,10 @@ function parseNonNegativeNumberParam(
   if (raw === null || raw.trim() === "") return null;
   const trimmed = raw.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    throw new QueryValidationError(`${name} must be a non-negative number`);
+    throw queryValidationError(`${name} must be a non-negative number`);
   }
   if (!Number.isFinite(Number(trimmed))) {
-    throw new QueryValidationError(`${name} must be a finite number`);
+    throw queryValidationError(`${name} must be a finite number`);
   }
   return trimmed;
 }
@@ -153,7 +170,7 @@ function parseDateParam(
   if (raw === null || raw.trim() === "") return null;
   const value = raw.trim();
   if (!ISO_DATE_PATTERN.test(value) || Number.isNaN(Date.parse(value))) {
-    throw new QueryValidationError(`${name} must be a valid date`);
+    throw queryValidationError(`${name} must be a valid date`);
   }
   return value;
 }
@@ -248,56 +265,30 @@ export async function GET(request: NextRequest) {
     // `limit` unique items.
     const gammaLimit = afterCursor ? limit + 1 : limit;
 
-    const params = new URLSearchParams({
-      limit: String(gammaLimit),
-      closed: String(closed),
-      order,
-      ascending: String(ascending),
-    });
-
-    if (afterCursor) {
-      params.set("after_cursor", afterCursor);
-    }
-    if (seriesId) {
-      // series_id is the precise filter Polymarket's UI uses; prefer it
-      // over tag_slug when both are supplied.
-      params.set("series_id", seriesId);
-      params.set("active", "true");
-    } else if (tagSlug) {
-      params.set("tag_slug", tagSlug);
-    }
-    if (volume24hrMin) {
-      params.set("volume_min", volume24hrMin);
-    }
-    if (volume1wkMin) {
-      params.set("volume_min", volume1wkMin);
-    }
-    if (liquidityMin) {
-      params.set("liquidity_min", liquidityMin);
-    }
-    if (live) {
-      params.set("live", "true");
-    }
-    if (startDateMin) {
-      params.set("start_date_min", startDateMin);
-    }
-    if (startDateMax) {
-      params.set("start_date_max", startDateMax);
-    }
-    if (endDateMin) {
-      params.set("end_date_min", endDateMin);
-    }
-    if (endDateMax) {
-      params.set("end_date_max", endDateMax);
-    }
-
-    const page = await fetchGammaKeysetPage<GammaEvent>(
+    const page = await fetchKeysetEventPage(
       {
-        endpoint: POLYMARKET_API.GAMMA.EVENTS_KEYSET,
-        params,
-        revalidate: CACHE_DURATION.EVENTS,
+        limit: gammaLimit,
+        closed,
+        order,
+        ascending,
+        cursor: afterCursor ?? undefined,
+        // series_id is the precise filter Polymarket's UI uses; prefer it
+        // over tag_slug when both are supplied.
+        ...(seriesId
+          ? { seriesIds: [Number(seriesId)], active: true }
+          : tagSlug
+            ? { tagSlug }
+            : {}),
+        // Both floors map to Gamma's single volume_min; the week floor wins.
+        volumeMin: volume1wkMin || volume24hrMin || undefined,
+        liquidityMin: liquidityMin || undefined,
+        live: live || undefined,
+        startDateMin: startDateMin || undefined,
+        startDateMax: startDateMax || undefined,
+        endDateMin: endDateMin || undefined,
+        endDateMax: endDateMax || undefined,
       },
-      ["events", "data"]
+      { revalidateSeconds: CACHE_DURATION.EVENTS }
     );
 
     // Drop ONLY the cursor item (it was the last item of the previous page).
@@ -307,13 +298,17 @@ export async function GET(request: NextRequest) {
     // next page start after a never-shown event.
     const cursorItemId = afterCursor ? decodeCursorItemId(afterCursor) : null;
     const pageItems = cursorItemId
-      ? page.items.filter((e) => String(e.id) !== cursorItemId)
-      : page.items;
+      ? page.rawEvents.filter((e) => String(e.id) !== cursorItemId)
+      : page.rawEvents;
 
     return NextResponse.json(
       {
         success: true,
-        data: pageItems.map((event) => toSlimGammaEvent(event, fullMarkets)),
+        // The records are Gamma events as sent; the slim mapper reads the
+        // legacy type.
+        data: pageItems.map((event) =>
+          toSlimGammaEvent(event as GammaEvent, fullMarkets)
+        ),
         pagination: {
           hasMore: Boolean(page.nextCursor),
           nextCursor: page.nextCursor,
@@ -324,7 +319,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    if (error instanceof QueryValidationError) {
+    if (isQueryValidationError(error)) {
       return badRequest(error.message);
     }
 

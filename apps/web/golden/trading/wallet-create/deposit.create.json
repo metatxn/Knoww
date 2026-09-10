@@ -1,0 +1,67 @@
+{
+  "family": "wallet-create",
+  "mode": "deposit",
+  "wallet": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+  "personality": "undeployed",
+  "relayerDeployed": false,
+  "mount": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/rpc/polygon",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 0,
+          "method": "eth_getCode",
+          "params": [
+            "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+            "latest"
+          ]
+        }
+      }
+    ],
+    "state": {
+      "proxyAddress": null,
+      "hasDeployedSafe": false,
+      "walletMode": "deposit",
+      "error": null
+    }
+  },
+  "action": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/relayer/deployed?address=0x4Fe2CC4925607a473264FA89e7138075695A5F8e&type=WALLET",
+        "headers": {},
+        "body": null
+      },
+      {
+        "method": "POST",
+        "url": "/api/relayer/submit",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "type": "WALLET-CREATE",
+          "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          "to": "0x00000000000Fb5C9ADea0298D729A0CB3823Cc07"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/api/relayer/transaction?id=golden-tx-1",
+        "headers": {},
+        "body": null
+      }
+    ],
+    "wallet": [],
+    "result": {
+      "success": true,
+      "transactionHash": "0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "proxyAddress": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+name: Web CI
+
+on:
+  pull_request:
+    # The ADR routes restructure PRs to the integration branch and one merge
+    # PR to main; nothing else needs this workflow.
+    branches:
+      - agg-restructuring
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # src/config/index.tsx throws at import time without a project id, and
+      # `next build` imports every page to collect its config. CI never opens
+      # a wallet, so a placeholder is enough; set the repository variable to
+      # build with the real (public) id instead.
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '00000000000000000000000000000000' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint web app and shared services
+        run: |
+          pnpm --filter @knoww/services lint
+          pnpm --filter @knoww/web lint
+
+      - name: Typecheck affected packages
+        run: |
+          pnpm --filter @knoww/services typecheck
+          pnpm --filter @knoww/web typecheck
+          pnpm --filter @knoww/extension typecheck
+
+      - name: Run affected tests
+        run: |
+          pnpm --filter @knoww/services test
+          pnpm --filter @knoww/web test
+          pnpm --filter @knoww/extension test
+
+      - name: Build production web app
+        run: pnpm --filter @knoww/web build
+
+      # The golden harness (apps/web/golden/README.md) starts the production
+      # server with every upstream fetch replayed from committed fixtures and
+      # compares each manifest entry byte for byte with the committed response.
+      # A fresh build has no data cache, so nothing answers a fetch before the
+      # harness sees it; the rm keeps that true if a cache step is ever added.
+      - name: Replay golden responses against the production build
+        working-directory: apps/web
+        run: |
+          rm -rf .next/cache/fetch-cache
+          KNOWW_GOLDEN_MODE=replay pnpm exec next start -p 8000 > "$RUNNER_TEMP/golden-server.log" 2>&1 &
+          server_pid=$!
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:8000/robots.txt && break
+            sleep 1
+          done
+          status=0
+          pnpm run golden:replay || status=$?
+          kill "$server_pid" || true
+          if [ -s golden/replay-misses.log ]; then
+            echo "::error::Replay misses: the build fetched upstream requests the recording never made. See golden/replay-misses.log in the golden-diff artifact."
+            status=1
+          fi
+          exit "$status"
+
+      - name: Upload golden diff on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diff
+          path: |
+            apps/web/golden/diff/
+            apps/web/golden/replay-misses.log
+            ${{ runner.temp }}/golden-server.log
+          if-no-files-found: ignore
+
+      - name: Check whitespace
+        run: git diff --check

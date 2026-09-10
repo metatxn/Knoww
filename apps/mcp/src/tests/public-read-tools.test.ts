@@ -175,6 +175,48 @@ describe("public read tools", () => {
     });
   });
 
+  it("accepts a list_events cursor issued without platform when polymarket is passed explicitly", async () => {
+    expectGammaFetch("events", gammaUrl("/events/keyset", "limit=1"), () =>
+      jsonResponse({
+        events: [
+          {
+            id: "7",
+            title: "Fed decision",
+            volume: 1200.5,
+            liquidity: "900.25",
+            markets: [],
+            tags: [],
+          },
+        ],
+        next_cursor: "next-page",
+      })
+    );
+    const first = await callTool("list_events", 217, { limit: 1 });
+    const firstResult = first.message.result as ToolCallResult;
+    expect(firstResult.isError).toBeFalsy();
+    const cursor = (
+      firstResult.structuredContent?.meta as { nextCursor?: string }
+    )?.nextCursor;
+    expect(cursor).toEqual(expect.any(String));
+
+    expectGammaFetch(
+      "events continuation",
+      gammaUrl("/events/keyset", "after_cursor=next-page"),
+      () => jsonResponse({ events: [], next_cursor: null })
+    );
+    const second = await callTool("list_events", 218, {
+      limit: 1,
+      cursor,
+      platform: "polymarket",
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.isError).toBeFalsy();
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+  });
+
   it("combines all CLOB quote sources", async () => {
     expectGammaFetch("prices", clobUrl("/prices"), () =>
       jsonResponse({ [TOKEN_ID]: { BUY: 0.44, SELL: 0.46 } })
@@ -284,6 +326,26 @@ describe("public read tools", () => {
     expect(result.structuredContent?.meta).toMatchObject({
       nextCursor: expect.any(String),
     });
+
+    const cursor = (result.structuredContent?.meta as { nextCursor?: string })
+      ?.nextCursor;
+    expectGammaFetch(
+      "second leaderboard page",
+      dataUrl("/v1/leaderboard", "offset=1"),
+      () => jsonResponse([])
+    );
+    const second = await callTool("get_trader_leaderboard", 2080, {
+      limit: 1,
+      cursor,
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+    expect(secondResult.structuredContent?.meta).not.toHaveProperty(
+      "nextCursor"
+    );
   });
 
   it("returns an opaque continuation cursor for tags", async () => {
@@ -301,6 +363,24 @@ describe("public read tools", () => {
     expect(result.structuredContent?.meta).toMatchObject({
       nextCursor: expect.any(String),
     });
+
+    const cursor = (result.structuredContent?.meta as { nextCursor?: string })
+      ?.nextCursor;
+    expectGammaFetch("second tag page", gammaUrl("/tags", "offset=1"), () =>
+      jsonResponse([])
+    );
+    const second = await callTool("list_tags", 2090, {
+      limit: 1,
+      cursor,
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+    expect(secondResult.structuredContent?.meta).not.toHaveProperty(
+      "nextCursor"
+    );
   });
 
   it("continues sports teams and markets with one composite cursor", async () => {
@@ -435,6 +515,27 @@ describe("public read tools", () => {
     expect(result.structuredContent?.meta).toMatchObject({
       nextCursor: expect.any(String),
     });
+
+    const cursor = (result.structuredContent?.meta as { nextCursor?: string })
+      ?.nextCursor;
+    expectGammaFetch(
+      "second wallet position page",
+      dataUrl("/positions", "offset=1"),
+      () => jsonResponse([])
+    );
+    const second = await callTool("get_wallet_positions", 2110, {
+      walletAddress: WALLET,
+      limit: 1,
+      cursor,
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+    expect(secondResult.structuredContent?.meta).not.toHaveProperty(
+      "nextCursor"
+    );
   });
 
   it("paginates wallet activity with an opaque cursor", async () => {
@@ -468,6 +569,27 @@ describe("public read tools", () => {
     expect(result.structuredContent?.meta).toMatchObject({
       nextCursor: expect.any(String),
     });
+
+    const cursor = (result.structuredContent?.meta as { nextCursor?: string })
+      ?.nextCursor;
+    expectGammaFetch(
+      "second wallet activity page",
+      dataUrl("/activity", "offset=1"),
+      () => jsonResponse([])
+    );
+    const second = await callTool("get_wallet_activity", 2120, {
+      walletAddress: WALLET,
+      limit: 1,
+      cursor,
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+    expect(secondResult.structuredContent?.meta).not.toHaveProperty(
+      "nextCursor"
+    );
   });
 
   it("paginates closed wallet positions with an opaque cursor", async () => {
@@ -502,6 +624,27 @@ describe("public read tools", () => {
     expect(result.structuredContent?.meta).toMatchObject({
       nextCursor: expect.any(String),
     });
+
+    const cursor = (result.structuredContent?.meta as { nextCursor?: string })
+      ?.nextCursor;
+    expectGammaFetch(
+      "second closed position page",
+      dataUrl("/closed-positions", "offset=1"),
+      () => jsonResponse([])
+    );
+    const second = await callTool("get_closed_positions", 2130, {
+      walletAddress: WALLET,
+      limit: 1,
+      cursor,
+    });
+    const secondResult = second.message.result as ToolCallResult;
+    expect(secondResult.structuredContent?.page).toEqual({
+      returnedResults: 0,
+      hasMore: false,
+    });
+    expect(secondResult.structuredContent?.meta).not.toHaveProperty(
+      "nextCursor"
+    );
   });
 
   it("separates all-time PnL from current-position metrics", async () => {

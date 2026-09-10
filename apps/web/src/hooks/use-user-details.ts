@@ -70,7 +70,7 @@ async function fetchUserDetails(
   });
 
   return fetchJson<UserDetailsResponse>(
-    `/api/user/details?${params.toString()}`
+    `/api/polymarket/user/details?${params.toString()}`
   );
 }
 

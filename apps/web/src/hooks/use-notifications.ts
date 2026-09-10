@@ -1,21 +1,24 @@
 "use client";
 
 import { createLogger } from "@knoww/logger";
-import {
-  createUnifiedPolymarketCredentialsOnlySigner,
-  createUnifiedPolymarketSecureClient,
-  isPolymarketFreshAuthenticationRequiredError,
-  type UnifiedPolymarketSecureClient,
-} from "@knoww/shared-types/polymarket-unified";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "wagmi";
+import {
+  isExpectedClobReadFailure,
+  isFreshAuthenticationRequired,
+} from "@/polymarket/errors";
+import {
+  dropPolymarketNotifications,
+  type RawPolymarketNotification,
+  readPolymarketNotifications,
+} from "@/polymarket/notifications";
+import type { ReadOnlyClientInput } from "@/polymarket/read-only-client";
 
 const log = createLogger("notifications");
 
 import { useClobCredentials } from "@/hooks/use-clob-credentials";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import {
-  type DropNotificationParams,
   type Notification,
   type NotificationFilter,
   NotificationType,
@@ -29,49 +32,10 @@ const KNOWN_NOTIFICATION_TYPES = new Set<number>([
 ]);
 
 /**
- * Raw notification from the SDK (may have different shape than docs)
- * The SDK types are incomplete, so we define the actual API response shape
- */
-interface RawNotification {
-  id?: number;
-  type: number;
-  owner: string;
-  payload: unknown;
-  timestamp?: number;
-}
-
-/**
- * Narrow authenticated client surface used by this hook.
- */
-interface UnifiedNotificationClient {
-  fetchNotifications(): Promise<RawNotification[]>;
-  dropNotifications(params?: DropNotificationParams): Promise<void>;
-}
-
-type NotificationClientCache = {
-  key: string;
-  promise: Promise<UnifiedPolymarketSecureClient & UnifiedNotificationClient>;
-};
-
-const authenticatedClientCache = new Map<string, NotificationClientCache>();
-
-function buildNotificationClientCacheKey(
-  signerAddress: string,
-  walletAddress: string,
-  apiKey: string
-): string {
-  return `${signerAddress.toLowerCase()}:${walletAddress.toLowerCase()}:${apiKey}`;
-}
-
-function clearNotificationClientCache(cacheKey: string): void {
-  authenticatedClientCache.delete(cacheKey);
-}
-
-/**
  * Transform raw API notification to our typed Notification
  */
 function transformNotification(
-  raw: RawNotification,
+  raw: RawPolymarketNotification,
   index: number
 ): Notification {
   // Coerce defensively: the API has been observed to send `type` as a string,
@@ -100,19 +64,6 @@ function transformNotification(
 /** Auto-refresh interval in milliseconds (30 seconds) */
 const REFRESH_INTERVAL_MS = 30_000;
 
-function isExpectedClobReadFailure(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err || "");
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("not found") ||
-    lower.includes("unauthorized") ||
-    lower.includes("forbidden") ||
-    lower.includes("401") ||
-    lower.includes("403") ||
-    lower.includes("404")
-  );
-}
-
 /**
  * Hook for managing Polymarket CLOB notifications
  *
@@ -122,6 +73,9 @@ function isExpectedClobReadFailure(err: unknown): boolean {
  * - Unread count for badge display
  * - Auto-refresh on interval
  * - Filtering by notification type
+ *
+ * The CLOB reads and drops live in `src/polymarket/notifications`; this hook
+ * owns the React state around them.
  *
  * Reference: https://docs.polymarket.com/developers/CLOB/clients/methods-l2#notifications
  */
@@ -143,10 +97,11 @@ export function useNotifications() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
-   * Helper to get an authenticated CLOB client with notification methods
-   * Uses the active trading wallet mode for CLOB authentication.
+   * The signer, wallet and credentials every passive read needs. The trading
+   * wallet address is the EOA itself in EOA mode, so one address covers both
+   * modes.
    */
-  const getAuthenticatedClient = useCallback(async () => {
+  const requireReadInput = useCallback((): ReadOnlyClientInput => {
     if (!credentials) {
       throw new Error(
         "API credentials required. Please derive credentials first."
@@ -161,39 +116,11 @@ export function useNotifications() {
       throw new Error("Wallet not connected");
     }
 
-    const cacheKey = buildNotificationClientCacheKey(
-      address,
-      proxyAddress,
-      credentials.apiKey
-    );
-
-    const cachedClient = authenticatedClientCache.get(cacheKey);
-    if (cachedClient) {
-      return cachedClient.promise;
-    }
-
-    let promise: Promise<
-      UnifiedPolymarketSecureClient & UnifiedNotificationClient
-    >;
-    promise = createUnifiedPolymarketSecureClient({
-      signer: createUnifiedPolymarketCredentialsOnlySigner(address),
-      wallet: proxyAddress,
+    return {
+      signerAddress: address,
+      walletAddress: proxyAddress,
       credentials,
-      allowFreshAuthentication: false,
-    })
-      .then(
-        ({ client }) =>
-          client as UnifiedPolymarketSecureClient & UnifiedNotificationClient
-      )
-      .catch((err) => {
-        if (authenticatedClientCache.get(cacheKey)?.promise === promise) {
-          clearNotificationClientCache(cacheKey);
-        }
-        throw err;
-      });
-
-    authenticatedClientCache.set(cacheKey, { key: cacheKey, promise });
-    return promise;
+    };
   }, [address, credentials, proxyAddress]);
 
   /**
@@ -208,12 +135,7 @@ export function useNotifications() {
     setError(null);
 
     try {
-      const client = await getAuthenticatedClient();
-      const rawData = await client.fetchNotifications();
-
-      // SDK types claim Notification[] but the API may return null or an
-      // error envelope; harden the boundary before iterating.
-      const list: RawNotification[] = Array.isArray(rawData) ? rawData : [];
+      const list = await readPolymarketNotifications(requireReadInput());
       const transformed = list.map((raw, index) =>
         transformNotification(raw, index)
       );
@@ -233,16 +155,7 @@ export function useNotifications() {
       const error =
         err instanceof Error ? err : new Error("Failed to fetch notifications");
       setError(error);
-      if (isPolymarketFreshAuthenticationRequiredError(err)) {
-        if (address && proxyAddress && credentials) {
-          clearNotificationClientCache(
-            buildNotificationClientCacheKey(
-              address,
-              proxyAddress,
-              credentials.apiKey
-            )
-          );
-        }
+      if (isFreshAuthenticationRequired(err)) {
         clearCredentials();
         log.debug("fetch.skipped", { reason: "credentials_invalid" });
       } else if (isExpectedClobReadFailure(err)) {
@@ -253,15 +166,7 @@ export function useNotifications() {
     } finally {
       setIsLoading(false);
     }
-  }, [
-    hasCredentials,
-    isConnected,
-    getAuthenticatedClient,
-    clearCredentials,
-    address,
-    proxyAddress,
-    credentials,
-  ]);
+  }, [hasCredentials, isConnected, requireReadInput, clearCredentials]);
 
   /**
    * Dismiss (drop) specific notifications
@@ -282,10 +187,7 @@ export function useNotifications() {
       });
 
       try {
-        const client = await getAuthenticatedClient();
-        await client.dropNotifications({
-          ids: ids.map((id) => String(id)),
-        });
+        await dropPolymarketNotifications(requireReadInput(), ids);
 
         // Remove from local state after successful API call
         setNotifications((prev) => prev.filter((n) => !ids.includes(n.id)));
@@ -303,7 +205,7 @@ export function useNotifications() {
         throw err;
       }
     },
-    [hasCredentials, getAuthenticatedClient]
+    [hasCredentials, requireReadInput]
   );
 
   /**

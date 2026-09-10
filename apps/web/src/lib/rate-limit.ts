@@ -30,13 +30,6 @@ interface RateLimitOptions {
   uniqueTokenPerInterval: number; // Max requests per interval
 }
 
-export class RateLimitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RateLimitError";
-  }
-}
-
 /**
  * Opportunistic cleanup. Module-scope timers are unreliable on Cloudflare
  * Workers (timers set outside a request context may never fire), so expired

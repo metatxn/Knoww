@@ -172,11 +172,14 @@ async function fetchPriceHistoryBatch(
   if (valid.length === 0) return { byToken, partial: false };
 
   try {
-    const response = await fetch("/api/markets/price-history/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tokenIds: valid, startTs, fidelity }),
-    });
+    const response = await fetch(
+      "/api/polymarket/markets/price-history/batch",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenIds: valid, startTs, fidelity }),
+      }
+    );
     if (!response.ok) {
       log.warn("batch_price_history.fetch_failed", { status: response.status });
       return { byToken, partial: true };

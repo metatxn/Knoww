@@ -1,0 +1,40 @@
+{
+  "mode": "deposit",
+  "eoa": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "tradingWallet": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+  "amount": "12.5",
+  "transfer": {
+    "token": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+    "recipient": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+    "amountRaw": "12500000n"
+  },
+  "wallet": [
+    {
+      "method": "eth_sendTransaction",
+      "params": [
+        {
+          "data": "0xa9059cbb0000000000000000000000004fe2cc4925607a473264fa89e7138075695a5f8e0000000000000000000000000000000000000000000000000000000000bebc20",
+          "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          "to": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/rpc/polygon",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "eth_getTransactionReceipt",
+        "params": [
+          "0x0000000000000000000000000000000000000000000000000000000000000001"
+        ]
+      }
+    }
+  ]
+}

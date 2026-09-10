@@ -1,6 +1,7 @@
 "use client";
 
 import { createLogger } from "@knoww/logger";
+import type { CanonicalOutcome } from "@knoww/services/core";
 import {
   getGammaYesNoMarketFields,
   resolveNegRisk,
@@ -24,6 +25,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { LeagueRail, LeagueRailMobile } from "@/components/league-rail";
 import type { TimeRange } from "@/components/market-price-chart";
 import { Navbar } from "@/components/navbar";
+import { findOutcomeIndex } from "@/components/trading/ticket-props";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Event } from "@/hooks/use-event-detail";
@@ -51,6 +53,7 @@ import {
 } from "@/lib/sports-live-game-cache";
 import type { EventCategoryCrumb } from "@/lib/tag-slugs";
 import { applyLiveTradingOutcomeQuotes } from "@/lib/trading-outcome-quotes";
+import { toTradingTarget } from "@/polymarket/trading-target";
 import type {
   OutcomeData,
   PreparedTradeTicket,
@@ -1333,6 +1336,53 @@ export default function EventDetailClient({
     prepareTrade: handleWebMcpPrepareTrade,
   });
 
+  const eventTeams = event?.teams;
+  const matchupTeams = isTeamMatchupEvent(eventTeams) ? eventTeams : null;
+  const isMatchup = !!matchupTeams;
+  const isMatchupMoneylineTradingPanel =
+    isMatchup &&
+    selectedMarket?.sportsMarketType?.toLowerCase() === "moneyline";
+  const tradingFormOutcomes = useMemo(
+    () =>
+      isMatchupMoneylineTradingPanel
+        ? compactMatchupTradingOutcomes(tradingOutcomes, matchupTeams)
+        : tradingOutcomes,
+    [isMatchupMoneylineTradingPanel, tradingOutcomes, matchupTeams]
+  );
+  const tradingFormSelectedOutcomeIndex = selectedOutcomeIndex;
+  const tradingTarget = useMemo(
+    () =>
+      selectedMarket
+        ? toTradingTarget({
+            conditionId: selectedMarket.conditionId,
+            title:
+              selectedMarket.sportsMarketType === "moneyline"
+                ? (event?.title ?? "")
+                : selectedMarket.groupItemTitle || event?.title || "",
+            image: event?.image,
+            outcomes: tradingFormOutcomes,
+            selectedIndex: tradingFormSelectedOutcomeIndex,
+            negRisk: resolveNegRisk(selectedMarket, event ?? undefined),
+          })
+        : null,
+    [
+      selectedMarket,
+      event,
+      tradingFormOutcomes,
+      tradingFormSelectedOutcomeIndex,
+    ]
+  );
+  const handleTradingFormOutcomeChange = useCallback(
+    (outcome: CanonicalOutcome) => {
+      if (tradingTarget) {
+        setSelectedOutcomeIndex(
+          findOutcomeIndex(tradingTarget.market, outcome)
+        );
+      }
+    },
+    [tradingTarget]
+  );
+
   // Loading state - AFTER all hooks
   if (loading) {
     return (
@@ -1424,8 +1474,6 @@ export default function EventDetailClient({
 
   // Sports matchup detection — gated strictly on `event.teams` so non-sports
   // events fall through to the existing single/multi-candidate behavior.
-  const matchupTeams = isTeamMatchupEvent(event.teams) ? event.teams : null;
-  const isMatchup = !!matchupTeams;
   const matchupMoneylineMarkets = isMatchup
     ? sortedMarketData
         .filter((m) => (m.sportsMarketType ?? "").toLowerCase() === "moneyline")
@@ -1550,16 +1598,6 @@ export default function EventDetailClient({
     : isSingleMarketEvent
       ? chartMarket?.yesTokenId
       : chartMarket?.yesTokenId;
-  const isMatchupMoneylineTradingPanel =
-    isMatchup &&
-    selectedMarket?.sportsMarketType?.toLowerCase() === "moneyline";
-  const tradingFormOutcomes = isMatchupMoneylineTradingPanel
-    ? compactMatchupTradingOutcomes(tradingOutcomes, matchupTeams)
-    : tradingOutcomes;
-  const tradingFormSelectedOutcomeIndex = selectedOutcomeIndex;
-  const handleTradingFormOutcomeChange = (nextIndex: number) => {
-    setSelectedOutcomeIndex(nextIndex);
-  };
   const sportsRailActiveSlug = isTeamMatchupEvent(event.teams)
     ? getSportsRailActiveSlug(event)
     : undefined;
@@ -1770,31 +1808,23 @@ export default function EventDetailClient({
                 id="event-trading-ticket"
                 className="lg:col-span-1 lg:row-span-2 lg:sticky lg:top-20 lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto"
               >
-                {selectedMarket && tradingFormOutcomes.length > 0 && (
+                {selectedMarket && tradingTarget && (
                   <ErrorBoundary name="Trading Form">
                     <TradingForm
-                      marketTitle={
-                        selectedMarket.sportsMarketType === "moneyline"
-                          ? event.title
-                          : selectedMarket.groupItemTitle || event.title
-                      }
-                      tokenId={
-                        tradingFormOutcomes[tradingFormSelectedOutcomeIndex]
-                          ?.tokenId || ""
-                      }
-                      outcomes={tradingFormOutcomes}
-                      selectedOutcomeIndex={tradingFormSelectedOutcomeIndex}
+                      market={tradingTarget.market}
+                      outcome={tradingTarget.outcome}
                       onOutcomeChange={handleTradingFormOutcomeChange}
-                      negRisk={resolveNegRisk(selectedMarket, event)}
-                      tickSize={tickSize}
-                      minOrderSize={minOrderSize}
-                      bestBid={bestBid}
-                      bestAsk={bestAsk}
-                      orderBook={orderBook}
+                      quote={{
+                        bestBid,
+                        bestAsk,
+                        orderBook,
+                        tickSize,
+                        minOrderSize,
+                        platformDetails: tradingTarget.platformDetails,
+                      }}
                       maxSlippagePercent={2}
                       onOrderSuccess={handleOrderSuccess}
                       onOrderError={handleOrderError}
-                      marketImage={event?.image}
                       yesProbability={
                         isMatchup ? undefined : selectedMarket.yesProbability
                       }
@@ -1802,7 +1832,6 @@ export default function EventDetailClient({
                       initialSide={initialSide}
                       initialShares={initialShares}
                       preparedTradeTicket={preparedTradeTicket}
-                      conditionId={selectedMarket.conditionId}
                       disableSticky
                     />
                   </ErrorBoundary>

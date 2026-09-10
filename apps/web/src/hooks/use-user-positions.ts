@@ -121,7 +121,7 @@ async function fetchPositions(
   }
 
   return fetchJson<PositionsResponse>(
-    `/api/user/positions?${params.toString()}`
+    `/api/polymarket/user/positions?${params.toString()}`
   );
 }
 

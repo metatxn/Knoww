@@ -491,11 +491,16 @@ function assertCurrentConnectGeneration(
   }
 }
 
-class StaleSessionCleanupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "StaleSessionCleanupError";
-  }
+interface StaleSessionCleanupError extends Error {
+  readonly name: "StaleSessionCleanupError";
+}
+
+function staleSessionCleanupError(message: string): StaleSessionCleanupError {
+  const error = new Error(message) as Error & {
+    name: "StaleSessionCleanupError";
+  };
+  error.name = "StaleSessionCleanupError";
+  return error;
 }
 
 async function retryRetainedStaleSessionCleanup(): Promise<void> {
@@ -506,7 +511,7 @@ async function retryRetainedStaleSessionCleanup(): Promise<void> {
 
   if (!descriptor.topic) {
     log.warn("connect.stale_session_topic_missing", {});
-    throw new StaleSessionCleanupError(
+    throw staleSessionCleanupError(
       "Superseded WalletConnect session has no cleanup topic."
     );
   }
@@ -526,7 +531,7 @@ async function retryRetainedStaleSessionCleanup(): Promise<void> {
       log.warn("connect.stale_session_cleanup_failed", {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new StaleSessionCleanupError(
+      throw staleSessionCleanupError(
         "Superseded WalletConnect session cleanup failed."
       );
     })

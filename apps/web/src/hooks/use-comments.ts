@@ -56,7 +56,7 @@ async function fetchComments(
   }
 
   return fetchJson<CommentsApiResponse>(
-    `/api/comments?${searchParams.toString()}`
+    `/api/polymarket/comments?${searchParams.toString()}`
   );
 }
 

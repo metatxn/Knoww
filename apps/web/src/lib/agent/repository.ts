@@ -14,11 +14,27 @@ interface AgentDbEnv {
 
 let warnedMemoryFallback = false;
 
-export class DurableAgentRepositoryUnavailableError extends Error {
-  constructor() {
-    super("Durable agent repository unavailable");
-    this.name = "DurableAgentRepositoryUnavailableError";
-  }
+export interface DurableAgentRepositoryUnavailableError extends Error {
+  readonly name: "DurableAgentRepositoryUnavailableError";
+}
+
+export function durableAgentRepositoryUnavailableError(): DurableAgentRepositoryUnavailableError {
+  const error = new Error("Durable agent repository unavailable") as Error & {
+    name: "DurableAgentRepositoryUnavailableError";
+  };
+  error.name = "DurableAgentRepositoryUnavailableError";
+  return error;
+}
+
+export function isDurableAgentRepositoryUnavailableError(
+  value: unknown
+): value is DurableAgentRepositoryUnavailableError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { name?: unknown }).name ===
+      "DurableAgentRepositoryUnavailableError"
+  );
 }
 
 export async function getAgentRepository(options?: {
@@ -35,7 +51,7 @@ export async function getAgentRepository(options?: {
     }
   }
   if (options?.requireDurable) {
-    throw new DurableAgentRepositoryUnavailableError();
+    throw durableAgentRepositoryUnavailableError();
   }
   return createAgentRepository();
 }

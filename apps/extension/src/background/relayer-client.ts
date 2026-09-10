@@ -36,7 +36,7 @@ import {
   isKnowwApiUrl,
 } from "./extension-session";
 
-const RELAYER_URL = `${getKnowwAppUrl().replace(/\/$/, "")}/api/relayer`;
+const RELAYER_URL = `${getKnowwAppUrl().replace(/\/$/, "")}/api/polymarket/relayer`;
 
 // This module is shared by two contexts: the offscreen document (trading) and
 // the service worker (portfolio funds). The offscreen relies on the worker for

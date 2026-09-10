@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://gamma-api.polymarket.com/events?parent_event_id=481717&closed=false&limit=51"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "accept-ranges": "bytes",
+      "cache-control": "public, max-age=300",
+      "content-type": "application/json",
+      "deprecation": "true",
+      "server": "cloudflare",
+      "speculation-rules": "\"/cdn-cgi/speculation\"",
+      "strict-transport-security": "max-age=7776000; includeSubDomains",
+      "sunset": "Fri, 01 May 2026 00:00:00 GMT",
+      "vary": "Accept-Encoding,Origin",
+      "warning": "299 - \"use /events/keyset\"",
+      "x-envoy-upstream-service-time": "4"
+    },
+    "body": "[]\n"
+  }
+}

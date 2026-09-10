@@ -1,0 +1,62 @@
+{
+  "enable_order_book": true,
+  "active": true,
+  "closed": false,
+  "archived": false,
+  "accepting_orders": true,
+  "accepting_order_timestamp": "2026-05-13T21:22:03Z",
+  "minimum_order_size": 5,
+  "minimum_tick_size": 0.01,
+  "condition_id": "0xa3b36b2d6104d34af4e6c6215fc818e43352e78a748fbfb0b85e3a35f71dec9a",
+  "question_id": "0x128d7d75905674954c484aa559fd18435376720a91f4614a2a5c2b60aa94c902",
+  "question": "Will there be no change in Fed interest rates after the September 2026 meeting?",
+  "description": "The FED interest rates are defined in this market by the upper bound of the target federal funds range. The decisions on the target federal funds range are made by the Federal Open Market Committee (FOMC) meetings.\n\nThis market will resolve to the amount of basis points the upper bound of the target federal funds rate is changed by versus the level it was prior to the Federal Reserve's September 2026 meeting.\n\nIf the target federal funds rate is changed to a level not expressed in the displayed options, the change will be rounded up to the nearest 25 and will resolve to the relevant bracket. (e.g. if there's a cut/increase of 12.5 bps it will be considered to be 25 bps)\n\nThe resolution source for this market is the FOMC\u2019s statement after its meeting scheduled for September 15-16, 2026 according to the official calendar: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm.\n\nThe level and change of the target federal funds rate is also published at the official website of the Federal Reserve at https://www.federalreserve.gov/monetarypolicy/openmarket.htm.\n\nThis market may resolve as soon as the FOMC\u2019s statement for their September meeting with relevant data is issued. If no statement is released by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+  "market_slug": "will-there-be-no-change-in-fed-interest-rates-after-the-september-2026-meeting-615",
+  "end_date_iso": "2026-09-16T00:00:00Z",
+  "game_start_time": null,
+  "seconds_delay": 0,
+  "fpmm": "",
+  "maker_base_fee": 1000,
+  "taker_base_fee": 1000,
+  "notifications_enabled": true,
+  "neg_risk": true,
+  "neg_risk_market_id": "0x128d7d75905674954c484aa559fd18435376720a91f4614a2a5c2b60aa94c900",
+  "neg_risk_request_id": "0x39c94205a813020092226a77480e8b3eb57eb35c92b7d723b0aeb53868372522",
+  "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/jerome+powell+glasses1.png",
+  "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/jerome+powell+glasses1.png",
+  "rewards": {
+    "rates": [
+      {
+        "asset_address": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+        "rewards_daily_rate": 1000
+      }
+    ],
+    "min_size": 200,
+    "max_spread": 4.5
+  },
+  "is_50_50_outcome": false,
+  "tokens": [
+    {
+      "token_id": "5615282760875985231868508008056959876238536896643315063916840237042205273721",
+      "outcome": "Yes",
+      "price": 0.585,
+      "winner": false
+    },
+    {
+      "token_id": "97050921740416192996389806693742575608111328819185493163189880975611314813724",
+      "outcome": "No",
+      "price": 0.415,
+      "winner": false
+    }
+  ],
+  "tags": [
+    "Politics",
+    "Fed",
+    "Fed Rates",
+    "Economy",
+    "fomc",
+    "Jerome Powell",
+    "Economic Policy",
+    "CPI Release"
+  ]
+}

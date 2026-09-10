@@ -1,6 +1,6 @@
 import {
-  IndexNowSubmissionError,
   type IndexNowSubmissionResult,
+  isIndexNowSubmissionError,
   isValidIndexNowKey,
   normalizeIndexNowUrls,
   submitIndexNow,
@@ -198,7 +198,7 @@ export async function runIndexNowSitemapCron({
       submitted += result.submitted;
       batches += 1;
     } catch (error) {
-      if (!(error instanceof IndexNowSubmissionError) || error.status !== 429) {
+      if (!isIndexNowSubmissionError(error) || error.status !== 429) {
         throw error;
       }
 

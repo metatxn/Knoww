@@ -92,9 +92,9 @@ import {
 import {
   createSearchRequestScheduler,
   isCapacityManagedExtensionRequest,
+  isSearchQueueCapacityError,
+  isSearchQueueDeadlineError,
   runSearchWithRetry,
-  SearchQueueCapacityError,
-  SearchQueueDeadlineError,
 } from "./search-request-policy";
 import { SESSION_SIGN_IN_HASH } from "./session-sign-in";
 import {
@@ -3186,17 +3186,16 @@ chrome.runtime.onMessage.addListener(
           sendResponse(toBackgroundResponse(result));
         } catch (error) {
           const queueWaitMs =
-            error instanceof SearchQueueCapacityError ||
-            error instanceof SearchQueueDeadlineError
+            isSearchQueueCapacityError(error) ||
+            isSearchQueueDeadlineError(error)
               ? error.queueWaitMs
               : undefined;
           logWarn("background.search-request-skipped", {
-            reason:
-              error instanceof SearchQueueCapacityError
-                ? "capacity"
-                : error instanceof SearchQueueDeadlineError
-                  ? "deadline"
-                  : "unexpected",
+            reason: isSearchQueueCapacityError(error)
+              ? "capacity"
+              : isSearchQueueDeadlineError(error)
+                ? "deadline"
+                : "unexpected",
             queueWaitMs,
           });
           sendResponse({

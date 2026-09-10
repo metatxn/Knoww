@@ -4,9 +4,9 @@ import {
   createSearchRequestScheduler,
   isCapacityManagedExtensionRequest,
   isSearchCacheEntryUsable,
+  isSearchQueueCapacityError,
+  isSearchQueueDeadlineError,
   runSearchWithRetry,
-  SearchQueueCapacityError,
-  SearchQueueDeadlineError,
   shouldCacheSearchResult,
 } from "../../src/search-request-policy";
 
@@ -35,7 +35,7 @@ test("search scheduler bounds pending work and keeps the newest requests", async
     order.push("dropped");
     return "dropped";
   });
-  const droppedRejection = assert.rejects(dropped, SearchQueueCapacityError);
+  const droppedRejection = assert.rejects(dropped, isSearchQueueCapacityError);
   const retained = scheduler.enqueue(async () => {
     order.push("retained");
     return "retained";
@@ -70,7 +70,7 @@ test("search scheduler expires queued work before it starts", async () => {
   const stale = scheduler.enqueue(async () => {
     staleStarted = true;
   });
-  const staleRejection = assert.rejects(stale, SearchQueueDeadlineError);
+  const staleRejection = assert.rejects(stale, isSearchQueueDeadlineError);
 
   now = 101;
   blocker.resolve();

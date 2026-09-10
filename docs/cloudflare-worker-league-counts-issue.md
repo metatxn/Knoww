@@ -264,12 +264,12 @@ responses, or perform high-fanout work synchronously:
 | --- | --- | --- |
 | P0 | `GET /api/whales/backtest` | Public synchronous catalog scan with per-market and per-wallet fanout |
 | P1 | `GET /sitemap.xml` | 10.79-second cold generation from up to 13 Gamma pages; sampled first pages were 8–9 MB |
-| P1 | `POST /api/markets/price-history/batch` | 40-way fanout; a 40-token probe did not finish within 90 seconds |
+| P1 | `POST /api/polymarket/markets/price-history/batch` | 40-way fanout; a 40-token probe did not finish within 90 seconds |
 | P1 | `GET /api/events/list` | 2.36 MB default response; 6.17 MB for Soccer at `limit=100` |
 | P1 | Event feed routes | Small client responses built by parsing as much as 9.46 MB upstream |
 | P1 | `GET /api/search` | 1.08 MB for two tag filters with five events each |
 | P1 | `GET /api/whales/activity` | 1.71 MB maximum observed response and up to 102 subrequests |
-| P1 | `GET /api/user/pnl` | 13.19 seconds and 18 upstream pages for a high-activity wallet |
+| P1 | `GET /api/polymarket/user/pnl` | 13.19 seconds and 18 upstream pages for a high-activity wallet |
 | P1 | `GET /api/markets/closed-time` | Approximately 3.2 MB global scan on a keyed miss, followed by lookup fanout |
 | P1 | `POST /api/rpc/polygon` | Unbounded JSON-RPC batch count and caller-controlled large read responses |
 | P1/P2 | `GET /api/whales/suspicious` | Caller-controlled threshold can expand into hundreds of wallet histories |

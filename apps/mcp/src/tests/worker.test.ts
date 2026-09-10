@@ -150,7 +150,7 @@ describe("MCP endpoint (dev bypass)", () => {
     });
   });
 
-  it("lists the search_markets tool with read-only annotations", async () => {
+  it("lists every tool for a request without an Origin header (desktop MCP clients)", async () => {
     const response = await dispatch(
       mcpRequest(
         { jsonrpc: "2.0", id: 2, method: "tools/list" },
@@ -176,17 +176,6 @@ describe("MCP endpoint (dev bypass)", () => {
     });
     expect(tools[0]?.inputSchema?.properties).toHaveProperty("query");
     expect(tools[0]?.inputSchema?.properties).toHaveProperty("limit");
-  });
-
-  it("allows requests without an Origin header (desktop MCP clients)", async () => {
-    const response = await dispatch(
-      mcpRequest(
-        { jsonrpc: "2.0", id: 3, method: "tools/list" },
-        { headers: { "mcp-protocol-version": PROTOCOL_VERSION } }
-      ),
-      devEnv
-    );
-    expect(response.status).toBe(200);
   });
 
   it("allows an allowlisted Origin header", async () => {
@@ -663,6 +652,8 @@ describe("search_markets tool (dev bypass)", () => {
       },
       {
         id: "mkt-2",
+        conditionId:
+          "0x2222222222222222222222222222222222222222222222222222222222222222",
         question: "Alternate outcome market",
         outcomes: '["Maybe"]',
         outcomePrices: '["0.1"]',
@@ -728,7 +719,9 @@ describe("search_markets tool (dev bypass)", () => {
 
     expect(result.structuredContent?.events).toEqual([
       {
-        id: "evt-1",
+        id: "polymarket:evt-1",
+        platform: "polymarket",
+        sourceEventId: "evt-1",
         slug: "bitcoin-above-100k",
         title: "Bitcoin above $100k in 2026?",
         status: "active",
@@ -740,7 +733,10 @@ describe("search_markets tool (dev bypass)", () => {
         totalMarkets: 2,
         markets: [
           {
-            id: "mkt-1",
+            id: "polymarket:0x1111111111111111111111111111111111111111111111111111111111111111",
+            platform: "polymarket",
+            sourceMarketId:
+              "0x1111111111111111111111111111111111111111111111111111111111111111",
             slug: "bitcoin-above-100k-in-2026",
             conditionId:
               "0x1111111111111111111111111111111111111111111111111111111111111111",
@@ -752,7 +748,12 @@ describe("search_markets tool (dev bypass)", () => {
             ],
           },
           {
-            id: "mkt-2",
+            id: "polymarket:0x2222222222222222222222222222222222222222222222222222222222222222",
+            platform: "polymarket",
+            sourceMarketId:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
+            conditionId:
+              "0x2222222222222222222222222222222222222222222222222222222222222222",
             question: "Alternate outcome market",
             totalOutcomes: 1,
             outcomes: [{ name: "Maybe", price: "0.1" }],
@@ -786,6 +787,8 @@ describe("search_markets tool (dev bypass)", () => {
               markets: [
                 {
                   id: "mkt-active",
+                  conditionId:
+                    "0xacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
                   active: true,
                   closed: false,
                   outcomes: '["Yes","No"]',
@@ -815,9 +818,13 @@ describe("search_markets tool (dev bypass)", () => {
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.events).toEqual([
       expect.objectContaining({
-        id: "evt-archived",
+        id: "polymarket:evt-archived",
         totalMarkets: 1,
-        markets: [expect.objectContaining({ id: "mkt-active" })],
+        markets: [
+          expect.objectContaining({
+            id: "polymarket:0xacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
+          }),
+        ],
       }),
     ]);
   });
@@ -866,7 +873,10 @@ describe("search_markets tool (dev bypass)", () => {
     const result = message.result as ToolCallResult;
     expect(result.isError).toBeFalsy();
     const events = result.structuredContent?.events ?? [];
-    expect(events.map((event) => event.id)).toEqual(["evt-2", "evt-3"]);
+    expect(events.map((event) => event.id)).toEqual([
+      "polymarket:evt-2",
+      "polymarket:evt-3",
+    ]);
   });
 
   it("preserves exact top-outcome precision and reports nested truncation", async () => {
@@ -876,6 +886,7 @@ describe("search_markets tool (dev bypass)", () => {
     );
     const markets = Array.from({ length: 11 }, (_, index) => ({
       id: `m${index}`,
+      conditionId: `0x${String(index).padStart(64, "0")}`,
       groupItemTitle:
         index === 0 ? "Lower" : index === 1 ? "Higher" : `M${index}`,
       outcomes:
