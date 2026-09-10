@@ -1,0 +1,110 @@
+--- a/script/install-utils.js
++++ b/script/install-utils.js
+@@ -8,7 +8,10 @@
+ const { execFileSync } = require('child_process');
+ const path = require('path');
+ const os = require('os');
+-const AdmZip = require('adm-zip'); // Use adm-zip instead of spawn
++const yauzl = require('yauzl');
++const { pipeline } = require('stream/promises');
++const { Transform } = require('stream');
++const { crc32 } = require('zlib');
+ 
+ async function downloadFile(url, dest) {
+   return new Promise((resolve, reject) => {
+@@ -140,8 +143,7 @@
+         }
+ 
+         // Create a temporary directory
+-        const tempDir = path.join(os.tmpdir(), `onnxruntime-node-pkgs_${Date.now()}`);
+-        fs.mkdirSync(tempDir, { recursive: true });
++        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'onnxruntime-node-pkgs_'));
+ 
+         try {
+           const packageFilePath = path.join(tempDir, packageFileName);
+@@ -150,40 +152,53 @@
+           console.log(`Downloading ${packageUrl}`);
+           await downloadFile(packageUrl, packageFilePath);
+ 
+-          // Load the NuGet package (which is a ZIP file)
+-          let zip;
++          // Read only manifest-selected entries, without archive-controlled output paths.
++          const zip = await yauzl.openPromise(packageFilePath);
++          const pending = new Set(manifests);
+           try {
+-            zip = new AdmZip(packageFilePath);
+-          } catch (err) {
+-            throw new Error(`Failed to open NuGet package: ${err.message}`);
+-          }
+-
+-          // Extract only the needed files from the package
+-          const extractDir = path.join(tempDir, 'extracted');
+-          fs.mkdirSync(extractDir, { recursive: true });
+-
+-          // Process each manifest and extract/copy files to their destinations
+-          for (const manifest of manifests) {
+-            const { filepath, pathInPackage } = manifest;
+-
+-            // Create directory for the target file
+-            const targetDir = path.dirname(filepath);
+-            fs.mkdirSync(targetDir, { recursive: true });
+-
+-            // Check if the file exists directly in the zip
+-            const zipEntry = zip.getEntry(pathInPackage);
+-            if (!zipEntry) {
+-              throw new Error(`Failed to find ${pathInPackage} in NuGet package`);
++            for await (const entry of zip.eachEntry()) {
++              for (const manifest of pending) {
++                const { filepath, pathInPackage } = manifest;
++                if (entry.fileName !== pathInPackage) continue;
++                if (entry.fileName.endsWith('/') || ((entry.externalFileAttributes >>> 16) & 0xf000) === 0xa000) {
++                  throw new Error(`Expected a regular file for ${pathInPackage}`);
++                }
++                if (fs.lstatSync(filepath, { throwIfNoEntry: false })?.isSymbolicLink()) {
++                  throw new Error(`Refusing to overwrite symbolic link: ${filepath}`);
++                }
++
++                const targetDir = path.dirname(filepath);
++                fs.mkdirSync(targetDir, { recursive: true });
++                const stagingDir = fs.mkdtempSync(path.join(targetDir, '.onnxruntime-'));
++                try {
++                  const stagedFile = path.join(stagingDir, 'binary');
++                  let checksum = 0;
++                  await pipeline(
++                    await zip.openReadStreamPromise(entry),
++                    new Transform({
++                      transform(chunk, encoding, callback) {
++                        checksum = crc32(chunk, checksum);
++                        callback(null, chunk);
++                      },
++                    }),
++                    fs.createWriteStream(stagedFile, { flags: 'wx' }),
++                  );
++                  if (checksum !== entry.crc32) {
++                    throw new Error(`CRC mismatch for ${pathInPackage}`);
++                  }
++                  // Replace the destination atomically, never following a destination symlink.
++                  fs.renameSync(stagedFile, filepath);
++                } finally {
++                  fs.rmSync(stagingDir, { recursive: true, force: true });
++                }
++                pending.delete(manifest);
++              }
+             }
+-
+-            console.log(`Extracting ${pathInPackage} to ${filepath}`);
+-
+-            // Extract just this entry to a temporary location
+-            const extractedFilePath = path.join(extractDir, path.basename(pathInPackage));
+-            zip.extractEntryTo(zipEntry, extractDir, false, true);
+-
+-            // Copy to the final destination
+-            fs.copyFileSync(extractedFilePath, filepath);
++            if (pending.size > 0) {
++              throw new Error(`Failed to find ${[...pending][0].pathInPackage} in NuGet package`);
++            }
++          } finally {
++            zip.close();
+           }
+         } finally {
+           // Clean up the temporary directory - always runs even if an error occurs
