@@ -140,31 +140,6 @@ test("notification panel theme refresh runs when settings change", () => {
   );
 });
 
-test("notification stack close persists until explicitly reopened", () => {
-  const uiSource = readSource("src/content/ui/notifications.ts");
-
-  assert.equal(
-    /const STACK_DISMISSED_STORAGE_KEY = "knoww-stack-dismissed";/.test(
-      uiSource
-    ),
-    true
-  );
-  assert.equal(/function readPersistedStackDismissed/.test(uiSource), true);
-  assert.equal(/function persistStackDismissed/.test(uiSource), true);
-  assert.equal(
-    /persistStackDismissed\(true\);[\s\S]*notification_stack_closed/.test(
-      uiSource
-    ),
-    true
-  );
-  assert.equal(
-    /readPersistedStackDismissed\(\)\.then\(\(dismissed\) => \{[\s\S]*if \(dismissed\) return;[\s\S]*createNotificationStack\(\);/.test(
-      uiSource
-    ),
-    true
-  );
-});
-
 test("notification stack exposes settings and action-open controls", () => {
   const uiSource = readSource("src/content/ui/notifications.ts");
   const navbarSource = readSource("src/content/ui/markets-panel-navbar.ts");

@@ -74,6 +74,7 @@ import {
 // See docs/chrome-prediction-market-ban-assessment.md.
 import { initBridgeWallet } from "./background/signing-state";
 import { handleStorePortfolioRead } from "./background/store-portfolio-reads";
+import { installToolbarBadge } from "./background/toolbar-badge";
 import {
   extractDerivedCredentials,
   tradingOpNeedsCredentials,
@@ -105,8 +106,6 @@ import {
 import {
   getOnboardingWalletSetupMatchPatterns,
   SUPPORTED_MATCH_PATTERNS,
-  UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS,
-  UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS,
 } from "./supported-hosts";
 import type {
   BackgroundResponse,
@@ -596,29 +595,6 @@ async function showUnsupportedSiteSupportPrompt(
   }
 }
 
-async function refreshOpenUnsupportedSitePrompts(): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({
-      url: UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS,
-    });
-    await Promise.all(
-      tabs.map(async (tab) => {
-        if (
-          typeof tab.id !== "number" ||
-          !getUnsupportedSiteHostname(tab.url)
-        ) {
-          return;
-        }
-        await showUnsupportedSiteSupportPrompt(tab.id, { reveal: false });
-      })
-    );
-  } catch (error) {
-    logWarn("site-support.open-tabs-refresh-failed", {
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-}
-
 function sendOpenFloatingPanel(tabId: number): void {
   chrome.tabs.sendMessage(tabId, { type: "KNOWW_OPEN_EXTENSION" }, () => {
     void chrome.runtime.lastError;
@@ -856,6 +832,12 @@ async function performContentScriptRegistration(): Promise<void> {
       ],
     });
     const existingIds = new Set(existing.map((script) => script.id));
+    // Remove the persisted all-site registration from earlier versions.
+    if (existingIds.has(UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID)) {
+      await chrome.scripting.unregisterContentScripts({
+        ids: [UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID],
+      });
+    }
     const registrations: chrome.scripting.RegisteredContentScript[] = [
       {
         id: CONTENT_SCRIPT_ID,
@@ -870,17 +852,6 @@ async function performContentScriptRegistration(): Promise<void> {
         matches: getOnboardingWalletSetupMatchPatterns(__DEV_MODE__),
         js: ["content.js", "onboarding-host.js"],
         runAt: "document_end",
-      },
-      {
-        id: UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID,
-        matches: UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS,
-        excludeMatches: [
-          ...UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS,
-          ...WEBMAIL_HOST_EXCLUDE_PATTERNS,
-        ],
-        js: ["unsupported-site.js"],
-        css: ["markets-panel-navbar.css", "unsupported-site-prompt.css"],
-        runAt: "document_idle",
       },
     ];
     const updates = registrations.filter((script) =>
@@ -903,6 +874,7 @@ async function performContentScriptRegistration(): Promise<void> {
 }
 
 registerContentScripts();
+installToolbarBadge();
 void flushAnalyticsQueue();
 // Resolve signing responses for requests initiated *in the worker* (portfolio
 // deposit/withdraw). Without this the worker's pending-request map is never
@@ -3277,7 +3249,6 @@ chrome.action.onClicked.addListener((tab) => {
 
 chrome.runtime.onInstalled.addListener((details) => {
   const scriptsReady = registerContentScripts();
-  void scriptsReady.then(() => refreshOpenUnsupportedSitePrompts());
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     void queueAnalyticsEvent({
       event: "extension_installed",

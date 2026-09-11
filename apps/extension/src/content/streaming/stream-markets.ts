@@ -29,6 +29,7 @@
 import { createLogger } from "@knoww/logger";
 import type { InjectedMarketEntry, Market } from "../../types/market";
 import type { StreamContext } from "../../types/platform";
+import { replaceToolbarMatches } from "../toolbar-badge";
 import {
   buildMatchQuery,
   buildQuery,
@@ -102,6 +103,7 @@ function schedule(ms: number): void {
 
 /** Run one search for the current game; returns the rendered market count. */
 async function fetchOnce(ctx: StreamContext): Promise<number> {
+  const badgeRunUrl = window.location.href;
   const setMarkets = window.KNOWW_UI?.setStreamMarkets;
   const { searchAllMarkets } = window.KNOWW_API;
   if (!setMarkets || typeof searchAllMarkets !== "function") return 0;
@@ -148,6 +150,8 @@ async function fetchOnce(ctx: StreamContext): Promise<number> {
       shown: ranked.map((market) => market.title).slice(0, 5),
     });
 
+    if (badgeRunUrl !== window.location.href) return 0;
+    replaceToolbarMatches(ranked, badgeRunUrl);
     if (ranked.length > 0) {
       setMarkets(toEntries(ranked));
       return ranked.length;
@@ -194,6 +198,7 @@ async function tick(): Promise<void> {
     // new game's markets are still loading.
     if (switchedGames) {
       window.KNOWW_UI?.setStreamMarkets?.([]);
+      replaceToolbarMatches([], window.location.href);
     }
   }
 
@@ -201,6 +206,7 @@ async function tick(): Promise<void> {
   if (!buildQuery(ctx)) {
     if (renderedKey !== IDLE_KEY) {
       window.KNOWW_UI?.setStreamMarkets?.([]);
+      replaceToolbarMatches([], window.location.href);
       renderedKey = IDLE_KEY;
     }
     schedule(IDLE_CHECK_MS);
