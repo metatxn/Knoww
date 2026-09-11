@@ -54,6 +54,7 @@ import {
   type ScoringMode,
   shouldFailOpen,
 } from "./scoring-policy";
+import { finishToolbarMatchRun, recordToolbarMatches } from "./toolbar-badge";
 import {
   escapeSelectorValue,
   LRUSet,
@@ -2545,6 +2546,7 @@ async function processVisiblePosts(options: {
   totalPostsProcessed += postsReadyForAnalysis.length;
 
   isAnalyzing = true;
+  const badgeRunUrl = window.location.href;
   if (isDebug) {
     log(`\n🔍 [PostAnalyzer] ========== ANALYSIS START ==========`);
     log(
@@ -2560,6 +2562,7 @@ async function processVisiblePosts(options: {
       (selection) => {
         if (injectionsThisBatch >= maxInjections) return;
 
+        if (window.location.href !== badgeRunUrl) return;
         const plan = injectBatchSelection(selection);
         if (!plan) {
           if (isDebug) {
@@ -2570,6 +2573,7 @@ async function processVisiblePosts(options: {
           return;
         }
 
+        recordToolbarMatches([plan.market.market], badgeRunUrl);
         injectionsThisBatch++;
         postsSinceLastInjection = 0;
 
@@ -2599,6 +2603,7 @@ async function processVisiblePosts(options: {
       log(`🔍 [PostAnalyzer] ========== ANALYSIS END (ERROR) ==========\n`);
     }
   } finally {
+    finishToolbarMatchRun(badgeRunUrl);
     isAnalyzing = false;
     schedulePendingDirectLinkDrain(itemSelector);
   }
@@ -2849,14 +2854,17 @@ async function processQueuedPosts(options: {
   totalPostsProcessed += postsReadyForAnalysis.length;
 
   isAnalyzing = true;
+  const badgeRunUrl = window.location.href;
   try {
     let injectionsThisBatch = 0;
     const maxInjections = resolveMaxInjectionsPerBatch();
     await analyzeBatchSelections(postsReadyForAnalysis, (selection) => {
       if (injectionsThisBatch >= maxInjections) return;
 
+      if (window.location.href !== badgeRunUrl) return;
       const plan = injectBatchSelection(selection);
       if (!plan) return;
+      recordToolbarMatches([plan.market.market], badgeRunUrl);
 
       injectionsThisBatch++;
       postsSinceLastInjection = 0;
@@ -2865,6 +2873,7 @@ async function processQueuedPosts(options: {
       );
     });
   } finally {
+    finishToolbarMatchRun(badgeRunUrl);
     isAnalyzing = false;
     schedulePendingDirectLinkDrain(itemSelector);
   }

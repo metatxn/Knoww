@@ -101,9 +101,8 @@ function collectAllModuleIdentifiers(statsJson, identifiers = new Set()) {
   return identifiers;
 }
 
-// Task 10 production baseline measured 2026-07-11: 281,034 bytes.
-// Keep 10% headroom (ceil(281,034 * 1.10)) while preventing core regressions.
-const contentJavaScriptByteBudget = 309_138;
+// Task 10's 309,138-byte budget plus 862 bytes for issue #112's badge reporting.
+const contentJavaScriptByteBudget = 310_000;
 
 const requiredClassicAssets = [
   "background.js",
@@ -303,6 +302,19 @@ async function main() {
     throw new TypeError("Platform routing fixtures must be an array");
   }
 
+  for (const pattern of builtManifest.host_permissions ?? []) {
+    if (pattern === "<all_urls>" || /^[^:]+:\/\/\*\//.test(pattern)) {
+      failures.push(
+        `manifest must not request all-site host permission "${pattern}"`
+      );
+    }
+  }
+  if (!builtManifest.permissions?.includes("activeTab")) {
+    failures.push(
+      "manifest needs activeTab for user-invoked unsupported-site prompts"
+    );
+  }
+
   const relativeFiles = files.map(relativeDistPath);
   const contentJavaScriptPath = path.join(distDir, "content.js");
   // Each build emits exactly one runtime chunk: the full trading panel in the
@@ -343,7 +355,7 @@ async function main() {
     contentJavaScriptBytes = (await stat(contentJavaScriptPath)).size;
     if (contentJavaScriptBytes > contentJavaScriptByteBudget) {
       failures.push(
-        `content.js is ${contentJavaScriptBytes} bytes, exceeding the ${contentJavaScriptByteBudget}-byte Task 10 baseline budget`
+        `content.js is ${contentJavaScriptBytes} bytes, exceeding the ${contentJavaScriptByteBudget}-byte budget`
       );
     }
   } catch (error) {
