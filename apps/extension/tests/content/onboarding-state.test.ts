@@ -84,9 +84,12 @@ describe("extension onboarding state", () => {
         welcomeCompletedAt: 42,
         walletCheckResult: "connected",
         completedAt: null,
+        pinCompletedAt: "2026-09-11T06:30:00.000Z",
+        pinSkippedAt: "invalid",
       })
     ).toEqual({
       startedAt: "2026-09-04T06:30:00.000Z",
+      pinCompletedAt: "2026-09-11T06:30:00.000Z",
       walletCheckResult: "connected",
     });
     expect(parseOnboardingProgress("bad value")).toEqual({});

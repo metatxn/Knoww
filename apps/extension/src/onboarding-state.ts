@@ -33,6 +33,8 @@ export interface OnboardingProgress {
   tradingStartedAt?: string;
   completedAt?: string;
   demoOpenedAt?: string;
+  pinCompletedAt?: string;
+  pinSkippedAt?: string;
 }
 
 interface ResolveOnboardingStageInput {
@@ -92,6 +94,12 @@ export function parseOnboardingProgress(value: unknown): OnboardingProgress {
       : {}),
     ...(readIsoDate(stored.completedAt)
       ? { completedAt: readIsoDate(stored.completedAt) }
+      : {}),
+    ...(readIsoDate(stored.pinCompletedAt)
+      ? { pinCompletedAt: readIsoDate(stored.pinCompletedAt) }
+      : {}),
+    ...(readIsoDate(stored.pinSkippedAt)
+      ? { pinSkippedAt: readIsoDate(stored.pinSkippedAt) }
       : {}),
     ...(readIsoDate(stored.demoOpenedAt)
       ? { demoOpenedAt: readIsoDate(stored.demoOpenedAt) }
