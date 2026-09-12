@@ -135,14 +135,63 @@ describe("buildSitemapEventQueries", () => {
   it("queries closed events separately for durable evergreen results", () => {
     const queries = buildSitemapEventQueries("evergreen");
 
-    expect(queries).toHaveLength(1);
+    expect(queries).toHaveLength(2);
     expect(queries[0].params.get("closed")).toBe("true");
     expect(queries[0].params.get("archived")).toBe("false");
     expect(queries[0].params.get("order")).toBe("volume");
   });
+
+  it("also discovers recently closed events independently of trading volume", () => {
+    const query = buildSitemapEventQueries("evergreen").find(
+      (entry) => entry.params.get("order") === "closedTime"
+    );
+
+    expect(query).toBeDefined();
+    expect(query?.params.get("closed")).toBe("true");
+    expect(query?.params.get("archived")).toBe("false");
+    expect(query?.params.get("ascending")).toBe("false");
+    expect(query?.maxItems).toBe(500);
+  });
 });
 
 describe("fetchSitemapEventRoutes", () => {
+  it("combines recent results with popular history without duplicates or thin pages", async () => {
+    const popular = {
+      slug: "popular-result",
+      title: "Popular result",
+      closed: true,
+      volume: "250000",
+      markets: [
+        {
+          id: "1",
+          closed: true,
+          umaResolutionStatus: "resolved",
+          outcomePrices: '["1", "0"]',
+        },
+      ],
+    };
+    const recent = { ...popular, slug: "small-recent-result", volume: "6840" };
+    const thin = { ...recent, slug: "thin-result", markets: [] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const order = new URL(input).searchParams.get("order");
+        return new Response(
+          JSON.stringify({
+            events:
+              order === "closedTime" ? [recent, popular, thin] : [popular],
+          }),
+          { status: 200 }
+        );
+      })
+    );
+
+    expect(await fetchSitemapEventRoutes("evergreen")).toEqual([
+      { url: "https://knoww.app/events/detail/popular-result" },
+      { url: "https://knoww.app/events/detail/small-recent-result" },
+    ]);
+  });
+
   it("throws when the upstream catalog is unavailable instead of caching an empty sitemap", async () => {
     vi.stubGlobal(
       "fetch",

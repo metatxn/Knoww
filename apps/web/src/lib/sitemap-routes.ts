@@ -42,6 +42,7 @@ const SITEMAP_PAGE_LIMIT = "100";
 const SITEMAP_MAX_EVENTS = 1000;
 const DURABLE_PENDING_SITEMAP_MAX_EVENTS = 500;
 const EVERGREEN_SITEMAP_MAX_EVENTS = 500;
+const RECENT_CLOSED_SITEMAP_MAX_EVENTS = 500;
 
 export type SitemapMarketKind = "active" | "evergreen";
 
@@ -115,13 +116,13 @@ async function fetchAllKeysetItems<T, R>(
 
 export const getCachedSitemapEventRoutes = unstable_cache(
   () => fetchSitemapEventRoutes("active"),
-  ["knoww-sitemap-event-routes-v6"],
+  ["knoww-sitemap-event-routes-v7"],
   { revalidate: SITEMAP_REVALIDATE_SECONDS }
 );
 
 export const getCachedEvergreenSitemapEventRoutes = unstable_cache(
   () => fetchSitemapEventRoutes("evergreen"),
-  ["knoww-sitemap-evergreen-event-routes-v3"],
+  ["knoww-sitemap-evergreen-event-routes-v4"],
   { revalidate: SITEMAP_REVALIDATE_SECONDS }
 );
 
@@ -187,6 +188,18 @@ export function buildSitemapEventQueries(kind: SitemapMarketKind = "active") {
           limit: SITEMAP_PAGE_LIMIT,
         }),
         maxItems: EVERGREEN_SITEMAP_MAX_EVENTS,
+      },
+      {
+        // Give recent results a discovery path even when their total volume
+        // cannot compete with the largest historical events.
+        params: new URLSearchParams({
+          closed: "true",
+          archived: "false",
+          order: "closedTime",
+          ascending: "false",
+          limit: SITEMAP_PAGE_LIMIT,
+        }),
+        maxItems: RECENT_CLOSED_SITEMAP_MAX_EVENTS,
       },
     ];
   }
