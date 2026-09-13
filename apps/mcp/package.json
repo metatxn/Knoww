@@ -26,16 +26,16 @@
     "@modelcontextprotocol/server": "2.0.0",
     "agents": "0.21.0",
     "decimal.js": "catalog:",
-    "jose": "6.2.10",
+    "jose": "6.2.11",
     "zod": "4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@cloudflare/workers-types": "5.20260820.1",
+    "@cloudflare/workers-types": "5.20260904.1",
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@types/node": "24.13.3",
     "typescript": "catalog:",
     "vitest": "^4.1.11",
-    "wrangler": "4.125.0"
+    "wrangler": "4.129.0"
   }
 }

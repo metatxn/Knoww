@@ -39,10 +39,10 @@ minimumReleaseAgeExclude:
   - "wagmi"
 
 catalog:
-  "@biomejs/biome": "2.5.10"
+  "@biomejs/biome": "2.5.12"
   "@polymarket/client": "0.8.1"
   "@types/react": "19.2.18"
-  "@types/react-dom": "19.2.5"
+  "@types/react-dom": "19.2.7"
   "decimal.js": "^10.6.0"
   "react": "19.2.8"
   "react-dom": "19.2.8"
@@ -73,46 +73,46 @@ overrides:
   # which makes Next 16 Turbopack fail even though Knoww does not use x402.
   # Keep the last verified SDK until Coinbase restores optional bundling.
   "@coinbase/cdp-sdk": "1.51.2"
-  "axios": "1.18.1"
+  "axios": "1.20.0"
   # 5.0.1 is the newest published @isaacs/brace-expansion; the previous 5.0.6
   # pin was an unresolvable version carried over from the brace-expansion fork.
   "@isaacs/brace-expansion": "5.0.1"
   # Unbounded-intermediate-array DoS that bypasses the CVE-2026-14257
   # mitigation; only fixed in >=5.0.9. Release-age gate waived above.
   "brace-expansion": "5.0.9"
-  "fast-xml-parser": "5.10.1"
+  "fast-xml-parser": "5.11.1"
   "qs": "6.16.0"
   "body-parser": "2.3.0"
   "h3": "1.15.11"
   # Fix query parsing, parseBody nesting, and toSSG path traversal advisories.
-  "hono": "4.13.5"
-  "postcss": "8.5.24"
+  "hono": "4.13.7"
+  "postcss": "8.5.28"
   # GHSA-2v37-7h3g-55p8: a custom alphabet with size 0 spins forever.
   # Redirect only the vulnerable 3.3.17 release; consumers on NanoID 5 keep
   # their declared major instead of being forced back to 3.x.
   "nanoid@3.3.17": "3.3.18"
   "minimatch": "10.2.6"
   "lodash": "4.18.1"
-  "bn.js": "4.12.3"
-  "undici": "7.29.0"
+  "bn.js": "4.12.5"
+  "undici": "7.29.1"
   "socket.io-parser": "4.2.7"
   "path-to-regexp": "8.4.2"
   "defu": "6.1.7"
-  "protobufjs": "7.6.5"
+  "protobufjs": "7.6.6"
   "uuid": "11.1.1"
-  # 3.1.6 fixes the host-normalization advisories affecting 3.1.5 and stays
-  # within Ajv's supported 3.x range. Release-age gate waived above.
-  "fast-uri": "3.1.6"
-  "ws": "8.21.2"
+  # 3.1.7 also fixes authority injection and IP-literal bracket parsing
+  # while staying within Ajv's supported 3.x range.
+  "fast-uri": "3.1.7"
+  "ws": "8.21.3"
   "shell-quote": "1.10.0"
-  "esbuild": "0.28.1"
+  "esbuild": "0.28.2"
   "form-data": "4.0.6"
-  "vite": "8.2.0"
+  "vite": "8.2.2"
   # GHSA-55q2-fjhq-7xh7: with IN_PLACE, a hook that detaches a node leaves the
   # subtree sanitized-but-executable → XSS. Only fixed in >=3.4.13. Reached via
   # posthog-js. Release-age gate waived above; drop the waiver after
   # 2026-08-10, when 3.4.13 ages past the gate on its own.
-  "dompurify": "3.4.13"
+  "dompurify": "3.4.14"
   # GHSA-2883-xcg3-v3hh: limit CPU use for empty merge sources on the v4 line.
   "js-yaml": "4.3.2"
   # GHSA-rgj7-g3m4-5g8c: update libheif, including Transformers' sharp dependency.
@@ -121,7 +121,7 @@ overrides:
   # fixed in >=2.0.5, so the whole 1.x line stays vulnerable. Reached via
   # apps/web > accounts > wata, which declares ^1.13.7 but imports exactly one
   # root symbol (`getRequestListener`) — present and unchanged in 2.x.
-  "@hono/node-server": "2.0.12"
+  "@hono/node-server": "2.1.1"
   # GHSA-vwc7-r8mq-g2x9 has no patched adm-zip release. The version-pinned
   # ONNX installer patch below replaces its only use with yauzl.
   "onnxruntime-node@1.24.3>adm-zip": "-"
