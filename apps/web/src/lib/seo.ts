@@ -1,4 +1,3 @@
-import Decimal from "decimal.js";
 import type { Metadata } from "next";
 import { cleanMetaText } from "@/lib/meta-text";
 
@@ -20,7 +19,6 @@ export const DEFAULT_SEO_DESCRIPTION =
 const DESCRIPTION_MAX_LENGTH = 155;
 const RESOLVED_MARKET_STATUS_PATTERN = /\b(proposed|resolved)\b/;
 const HISTORICAL_EVENT_MIN_DESCRIPTION_LENGTH = 80;
-const HISTORICAL_EVENT_MIN_VOLUME = new Decimal(10_000);
 
 export type EventSeoStatus = "live" | "closed" | "resolved";
 
@@ -172,8 +170,8 @@ export function buildEventPageDescription({
 
 /**
  * Current events are indexable when they contain an open market. Closed or
- * ended events remain indexable when they have durable context, meaningful
- * trading history, and a market record readers can follow through settlement.
+ * ended events remain indexable when they have durable context and a market
+ * record readers can follow through settlement, regardless of trading volume.
  * Fully resolved pages may use rendered outcome data when their source
  * description is brief. Thin historical pages stay crawlable with noindex.
  */
@@ -239,7 +237,6 @@ function hasIndexableHistoricalEvent(event: SeoEventInput) {
     !event.slug ||
     !isEventClosedForSeo(event) ||
     !hasDurableHistoricalContext(event) ||
-    !hasMinimumHistoricalVolume(event.volume) ||
     !Array.isArray(event.markets)
   ) {
     return false;
@@ -282,22 +279,6 @@ function hasRenderableOutcomePrice(market: SeoMarketInput | null | undefined) {
     const leadingPrice = Number(parsed[0]);
     return (
       Number.isFinite(leadingPrice) && leadingPrice >= 0 && leadingPrice <= 1
-    );
-  } catch {
-    return false;
-  }
-}
-
-function hasMinimumHistoricalVolume(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") {
-    return false;
-  }
-
-  try {
-    const volume = new Decimal(value);
-    return (
-      volume.isFinite() &&
-      volume.greaterThanOrEqualTo(HISTORICAL_EVENT_MIN_VOLUME)
     );
   } catch {
     return false;

@@ -834,9 +834,15 @@ async function performContentScriptRegistration(): Promise<void> {
     const existingIds = new Set(existing.map((script) => script.id));
     // Remove the persisted all-site registration from earlier versions.
     if (existingIds.has(UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID)) {
-      await chrome.scripting.unregisterContentScripts({
-        ids: [UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID],
-      });
+      try {
+        await chrome.scripting.unregisterContentScripts({
+          ids: [UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID],
+        });
+      } catch (error) {
+        logWarn("background.legacy-content-script-cleanup-failed", {
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     }
     const registrations: chrome.scripting.RegisteredContentScript[] = [
       {

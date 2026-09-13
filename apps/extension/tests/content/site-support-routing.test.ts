@@ -34,9 +34,13 @@ describe("unsupported-site toolbar routing", () => {
     }
   );
 
-  it.each([false, true])(
-    "migrates script registrations without adding all-site injection (existing=%s)",
-    async (hasLegacy) => {
+  it.each([
+    { hasLegacy: false, cleanupFails: false },
+    { hasLegacy: true, cleanupFails: false },
+    { hasLegacy: true, cleanupFails: true },
+  ])(
+    "migrates script registrations without adding all-site injection (legacy=$hasLegacy, cleanupFails=$cleanupFails)",
+    async ({ hasLegacy, cleanupFails }) => {
       const background = readSource("src/background.ts");
       const register = background.slice(
         background.indexOf("async function performContentScriptRegistration"),
@@ -52,11 +56,17 @@ describe("unsupported-site toolbar routing", () => {
         updateContentScripts: vi.fn().mockResolvedValue(undefined),
         registerContentScripts: vi.fn().mockResolvedValue(undefined),
       };
+      if (cleanupFails) {
+        scripting.unregisterContentScripts.mockRejectedValue(
+          new Error("Cleanup unavailable")
+        );
+      }
       const logWarn = vi.fn();
       await runInNewContext(
         transpile(`${register}; performContentScriptRegistration()`),
         {
           chrome: { scripting },
+          Error,
           logWarn,
           __DEV_MODE__: false,
           CONTENT_SCRIPT_ID: "supported",
@@ -69,7 +79,6 @@ describe("unsupported-site toolbar routing", () => {
           ],
         }
       );
-      expect(logWarn).not.toHaveBeenCalled();
       if (hasLegacy)
         expect(scripting.unregisterContentScripts).toHaveBeenCalledWith({
           ids: ["legacy"],
@@ -89,6 +98,20 @@ describe("unsupported-site toolbar routing", () => {
           "https://knoww.app/extension/connect",
         ])
       );
+      if (cleanupFails) {
+        expect(scripting.updateContentScripts).toHaveBeenCalledWith([
+          expect.objectContaining({ id: "supported" }),
+        ]);
+        expect(scripting.registerContentScripts).toHaveBeenCalledWith([
+          expect.objectContaining({ id: "onboarding" }),
+        ]);
+        expect(logWarn).toHaveBeenCalledExactlyOnceWith(
+          "background.legacy-content-script-cleanup-failed",
+          { message: "Cleanup unavailable" }
+        );
+      } else {
+        expect(logWarn).not.toHaveBeenCalled();
+      }
     }
   );
 
