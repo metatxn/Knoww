@@ -3,7 +3,7 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import worker from "./index";
 
 const DEV_VARS = {
@@ -41,9 +41,63 @@ describe("MCP analytics lifecycle", () => {
     }) as typeof fetch;
   });
 
+  beforeEach(() => {
+    delivered.length = 0;
+  });
+
   afterAll(() => {
     globalThis.fetch = realFetch;
   });
+
+  it.each([
+    [Array.from({ length: 10_000 }, () => ({ method: "ping" })), 400],
+    [
+      Array.from({ length: 10_000 }, () => ({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ping",
+      })),
+      200,
+    ],
+  ])(
+    "bounds telemetry for batches without changing protocol handling",
+    async (messages, status) => {
+      const body = JSON.stringify(messages);
+      expect(new TextEncoder().encode(body).length).toBeLessThan(1024 * 1024);
+      const ctx = createExecutionContext();
+      const response = await worker.fetch(
+        new Request("http://localhost/mcp", {
+          method: "POST",
+          headers: {
+            host: "localhost",
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            "mcp-protocol-version": "2025-11-25",
+          },
+          body,
+        }),
+        {
+          ...env,
+          ...DEV_VARS,
+          POSTHOG_PROJECT_API_KEY: "test-project-token",
+        } as unknown as Env,
+        ctx
+      );
+      await waitOnExecutionContext(ctx);
+      expect(response.status).toBe(status);
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]?.batch).toHaveLength(2);
+      expect(JSON.stringify(delivered).length).toBeLessThan(2048);
+      expect(delivered[0]?.batch).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: "mcp_http_request_completed",
+            properties: expect.objectContaining({ status }),
+          }),
+        ])
+      );
+    }
+  );
 
   it("captures HTTP, protocol, and tool outcomes without request arguments", async () => {
     const testEnv = {

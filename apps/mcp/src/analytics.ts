@@ -6,6 +6,10 @@ const ALLOWED_POSTHOG_HOSTS = new Set([
   "https://us.i.posthog.com",
   "https://eu.i.posthog.com",
 ]);
+const MAX_EVENTS_PER_REQUEST = 32;
+const MAX_BATCH_BYTES = 64 * 1024;
+const MAX_EVENT_BYTES = 4 * 1024;
+const HASHED_ID_PLACEHOLDER = `mcp_${"0".repeat(64)}`;
 const encoder = new TextEncoder();
 const log = createLogger("mcp.analytics");
 
@@ -129,11 +133,10 @@ function parseProtocolMessage(value: unknown): McpProtocolProperties | null {
 export function parseMcpProtocolMessages(
   value: unknown
 ): McpProtocolProperties[] {
-  const messages = Array.isArray(value) ? value : [value];
-  return messages.flatMap((message) => {
-    const parsed = parseProtocolMessage(message);
-    return parsed ? [parsed] : [];
-  });
+  // Summarize batches without walking attacker-controlled message arrays.
+  if (Array.isArray(value)) return [{ protocol_method: "batch" }];
+  const parsed = parseProtocolMessage(value);
+  return parsed ? [parsed] : [];
 }
 
 export function mcpRoute(pathname: string): string {
@@ -172,27 +175,59 @@ export function createMcpAnalytics(
   const waitUntil = options.waitUntil ?? (() => undefined);
   const queue: QueuedEvent[] = [];
   let flushed = false;
+  let httpCaptured = false;
+  let queuedBytes = encoder.encode(
+    JSON.stringify({ api_key: projectApiKey, batch: [] })
+  ).byteLength;
+
+  function eventProperties(properties: McpAnalyticsProperties, id: string) {
+    return {
+      ...definedProperties(properties),
+      distinct_id: id,
+      product: "mcp",
+      service: "knoww-mcp",
+      $process_person_profile: false,
+    };
+  }
 
   return {
     capture(event, properties, identity) {
       if (!projectApiKey || flushed) return;
-      queue.push({ event, properties, identity });
+      const isHttp = event === MCP_ANALYTICS_EVENTS.httpRequestCompleted;
+      const reserveHttp = !httpCaptured && !isHttp;
+      if (queue.length >= MAX_EVENTS_PER_REQUEST - Number(reserveHttp)) return;
+      const snapshot = definedProperties(properties);
+      const eventBytes = encoder.encode(
+        JSON.stringify({
+          event,
+          properties: eventProperties(snapshot, HASHED_ID_PLACEHOLDER),
+        })
+      ).byteLength;
+      const byteLimit =
+        MAX_BATCH_BYTES - (reserveHttp ? MAX_EVENT_BYTES + 1 : 0);
+      if (
+        eventBytes > MAX_EVENT_BYTES ||
+        queuedBytes + eventBytes + 1 > byteLimit
+      )
+        return;
+      queuedBytes += eventBytes + 1;
+      httpCaptured ||= isHttp;
+      queue.push({ event, properties: snapshot, identity });
     },
     flush() {
       if (!projectApiKey || flushed || queue.length === 0) return;
       flushed = true;
       const events = queue.splice(0);
+      const identities = new Map<string | undefined, Promise<string>>();
       const delivery = Promise.all(
-        events.map(async ({ event, identity, properties }) => ({
-          event,
-          properties: {
-            ...definedProperties(properties),
-            distinct_id: await distinctId(identity),
-            product: "mcp",
-            service: "knoww-mcp",
-            $process_person_profile: false,
-          },
-        }))
+        events.map(async ({ event, identity, properties }) => {
+          let id = identities.get(identity);
+          if (!id) {
+            id = distinctId(identity);
+            identities.set(identity, id);
+          }
+          return { event, properties: eventProperties(properties, await id) };
+        })
       )
         .then((batch) =>
           fetchImpl(`${host}/batch/`, {

@@ -121,7 +121,7 @@ The MCP tools do not call Knoww's public Next.js API routes. Both the website an
 
 The Worker is separate from `apps/web` so it can have its own authentication secrets, quotas, deployment schedule, rollback path, and logs. Hono is not used because the current Worker has one MCP route and the MCP handler already owns the protocol routing.
 
-MCP requests remain stateless and need no session affinity. A Durable Object is used only to create and atomically consume each five-minute Google authorization transaction; it does not hold MCP sessions or Google tokens.
+MCP requests remain stateless and need no session affinity. The existing Durable Object namespace stores five-minute Google authorization transactions and, in separate objects, persistent random OAuth IDs for each Google subject/client pair. It does not hold MCP sessions or Google tokens.
 
 ## Core dependencies
 
@@ -591,7 +591,9 @@ The preferred registration path is a Client ID Metadata Document. Dynamic Client
 
 The MCP host opens `/authorize` in the user's browser. After the user approves the requested scope, Knoww redirects to Google using authorization-code flow, S256 PKCE, a nonce, and five-minute one-time state. The Worker exchanges the Google code on the server and verifies the ID token signature, issuer, audience, expiry, nonce, stable subject, and verified-email claim. It then asks the existing OAuth Provider to issue a one-hour MCP access token and a rotating refresh token with a 30-day lifetime.
 
-The MCP client and model never receive the Google client secret, Google authorization code, ID token, access token, email, or password. The MCP grant retains Google's stable subject identifier as the principal. Knoww does not add an application database for this flow: the existing OAuth KV binding stores provider grants and tokens, while the existing Durable Object binding stores only short-lived one-time authorization transactions.
+The MCP client and model never receive the Google client secret, Google authorization code, ID token, access token, email, or password. The grant keeps Google's subject and the global principal ID in encrypted properties for authorization and per-user quotas. Client-visible authorization codes, access tokens, and refresh tokens use a random 256-bit ID unique to the Google subject/client pair. Separate objects in the existing Durable Object namespace retain these IDs without an expiration alarm, preserving grant replacement when a user authorizes the same client again. These objects store only the random ID; the subject/client tuple selects the object through `idFromName`. No new binding or secret is required. Preserve this namespace across deployments.
+
+When deploying this privacy fix, existing connections must authorize again. Pending codes and refresh tokens with the old Google-subject prefix return `invalid_grant`, since the provider cannot replace an existing grant's identity. Already-issued access tokens remain valid until their original expiry, at most one hour, or until that client reauthorizes. Reauthorization revokes the matching legacy grants without revoking other clients' grants. Previously exposed identifiers cannot be removed from clients or their logs.
 
 Only `markets:read` is active and advertised. `x402:pay` is reserved for a future paid-tool phase but is currently rejected as `invalid_scope`. When it becomes active, it will mean “this client may attempt an x402-gated tool.” It will not authorize Knoww or the model to spend funds. The agent host must enforce its own budget and ask its wallet component to sign each payment proof.
 
@@ -623,6 +625,8 @@ Configure the Google OAuth client as a **Web application** and add the exact `ht
 
 In **Workers & Pages > knoww-mcp > Settings > Variables and Secrets**, add all three names above as encrypted secrets. Reuse the project `585396` PostHog project token for `POSTHOG_PROJECT_API_KEY`; do not use a personal API key. The production Wrangler configuration marks these bindings as required, so a deployment reports missing configuration before traffic changes. Never place their values in Git, build logs, URLs, or browser code.
 
+Analytics caps each request at 32 events and 64 KiB of serialized delivery data, with a 4 KiB limit per event. It reserves room for the HTTP outcome, summarizes message arrays as one `batch` protocol event, and hashes each distinct identity once per request. Excess or oversized events are dropped. Valid MCP batch handling is unchanged.
+
 Analytics uses three bounded events: `mcp_http_request_completed`, `mcp_protocol_request_completed`, and `mcp_tool_called`. Every event includes `product=mcp` and `service=knoww-mcp`. Tool events include the registered tool name, outcome, safe error code, duration, plan, and authentication method. The Worker hashes the OAuth principal before it becomes a PostHog distinct ID and disables person-profile creation. It never sends request bodies, tool arguments, wallet addresses, market queries, response content, authorization headers, Google tokens, or raw errors.
 
 Required Cloudflare bindings:
@@ -630,7 +634,7 @@ Required Cloudflare bindings:
 | Binding | Purpose |
 |---|---|
 | `OAUTH_KV` | Provider-managed clients, grants, authorization codes, and hashed token records |
-| `MCP_AUTH_CHALLENGES` | Legacy-named Durable Object namespace for atomic one-time OIDC transactions |
+| `MCP_AUTH_CHALLENGES` | Legacy-named Durable Object namespace for one-time OIDC transactions and persistent opaque user/client IDs |
 | `MCP_AUTH_RATE_LIMITER` | Distributed limit for authorization, token, and registration routes |
 | `MCP_EDGE_RATE_LIMITER` | Coarse source limit across all Worker paths before routing |
 | `MCP_FREE_PRINCIPAL_RATE_LIMITER` | Free-plan quota across authenticated MCP requests |
