@@ -316,8 +316,12 @@ async function handleConsentPost(
 async function revokeLegacyClientGrants(
   env: McpOAuthEnv,
   principalId: string,
-  clientId: string
+  request: Pick<AuthRequest, "clientId" | "redirectUri">
 ): Promise<void> {
+  const { clientId, redirectUri } = request;
+  // Match the provider's raw-path check for validated IDs, including `/`
+  // and accepted extra-slash forms such as https:///client.example/metadata.
+  const isCimdClient = /^https:\/\/[^/?#]*\//iu.test(clientId);
   let cursor: string | undefined;
   do {
     const page = await env.OAUTH_PROVIDER.listUserGrants(principalId, {
@@ -325,7 +329,10 @@ async function revokeLegacyClientGrants(
       limit: 50,
     });
     for (const grant of page.items) {
-      if (grant.clientId === clientId) {
+      if (
+        grant.clientId === clientId &&
+        (!isCimdClient || grant.redirectUri === redirectUri)
+      ) {
         await env.OAUTH_PROVIDER.revokeGrant(grant.id, principalId);
       }
     }
@@ -429,7 +436,7 @@ async function handleGoogleCallback(
   await revokeLegacyClientGrants(
     env,
     props.principalId,
-    transaction.oauthRequest.clientId
+    transaction.oauthRequest
   );
   return redirectResponse(redirectTo);
 }
