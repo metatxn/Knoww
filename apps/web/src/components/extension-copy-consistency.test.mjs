@@ -24,10 +24,10 @@ test("extension landing permissions match the extension manifest", () => {
   );
 
   assert.deepEqual(landingPermissions.sort(), [...manifest.permissions].sort());
-  assert.equal(manifest.permissions.length, 5);
+  assert.equal(manifest.permissions.length, 6);
   assert.match(
     normalizedSections,
-    /asks for exactly five Chrome API permissions/
+    /asks for exactly six Chrome API permissions/
   );
 });
 
