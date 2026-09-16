@@ -71,6 +71,74 @@ describe("MCP PostHog analytics", () => {
     );
   });
 
+  it.each(["small", "large", "unicode"])(
+    "caps %s events and reserves the HTTP outcome",
+    async (size) => {
+      const tasks: Promise<unknown>[] = [];
+      const fetchImpl = vi.fn<typeof fetch>(async () =>
+        Response.json({ status: "Ok" })
+      );
+      const analytics = createMcpAnalytics({
+        projectApiKey: "test-project-token",
+        fetchImpl,
+        waitUntil: (task) => tasks.push(task),
+      });
+      const value =
+        size === "small"
+          ? "ok"
+          : size === "large"
+            ? "a".repeat(3000)
+            : "界".repeat(1000);
+      for (let i = 0; i < 10_000; i++) {
+        analytics.capture(
+          MCP_ANALYTICS_EVENTS.toolCalled,
+          { value },
+          "same-principal"
+        );
+      }
+      analytics.capture(MCP_ANALYTICS_EVENTS.httpRequestCompleted, {
+        status: 400,
+      });
+      analytics.flush();
+      await Promise.all(tasks);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      const body = String(fetchImpl.mock.calls[0]?.[1]?.body);
+      expect(new TextEncoder().encode(body).length).toBeLessThanOrEqual(
+        64 * 1024
+      );
+      const { batch } = JSON.parse(body);
+      expect(batch.length).toBeLessThanOrEqual(32);
+      expect(batch.length).toBeGreaterThan(1);
+      expect(batch.at(-1)).toMatchObject({
+        event: "mcp_http_request_completed",
+        properties: { status: 400 },
+      });
+    }
+  );
+
+  it("drops oversized events without losing the request outcome", async () => {
+    const tasks: Promise<unknown>[] = [];
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      Response.json({ status: "Ok" })
+    );
+    const analytics = createMcpAnalytics({
+      projectApiKey: "test-project-token",
+      fetchImpl,
+      waitUntil: (task) => tasks.push(task),
+    });
+    analytics.capture(MCP_ANALYTICS_EVENTS.toolCalled, {
+      value: "x".repeat(100_000),
+    });
+    analytics.capture(MCP_ANALYTICS_EVENTS.httpRequestCompleted, {
+      status: 200,
+    });
+    analytics.flush();
+    await Promise.all(tasks);
+    const { batch } = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body));
+    expect(batch).toHaveLength(1);
+    expect(batch[0].event).toBe("mcp_http_request_completed");
+  });
+
   it("does not schedule delivery when the project token is absent", () => {
     const waitUntil = vi.fn();
     const fetchImpl = vi.fn<typeof fetch>();
@@ -142,9 +210,6 @@ describe("MCP PostHog analytics", () => {
           method: "attacker-controlled-method",
         },
       ])
-    ).toEqual([
-      { protocol_method: "tools/call", tool_name: "get_market" },
-      { protocol_method: "other" },
-    ]);
+    ).toEqual([{ protocol_method: "batch" }]);
   });
 });

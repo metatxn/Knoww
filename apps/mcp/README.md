@@ -121,23 +121,23 @@ The MCP tools do not call Knoww's public Next.js API routes. Both the website an
 
 The Worker is separate from `apps/web` so it can have its own authentication secrets, quotas, deployment schedule, rollback path, and logs. Hono is not used because the current Worker has one MCP route and the MCP handler already owns the protocol routing.
 
-MCP requests remain stateless and need no session affinity. A Durable Object is used only to create and atomically consume each five-minute Google authorization transaction; it does not hold MCP sessions or Google tokens.
+MCP requests remain stateless and need no session affinity. The existing Durable Object namespace stores five-minute Google authorization transactions and, in separate objects, persistent random OAuth IDs for each Google subject/client pair. It does not hold MCP sessions or Google tokens.
 
 ## Core dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `agents` | `0.21.0` | Cloudflare's stateless MCP handler adapter |
-| `@modelcontextprotocol/server` | `2.0.0` | Official MCP server implementation |
-| `@cloudflare/workers-oauth-provider` | `0.10.3` | OAuth discovery, registration, grants, tokens, refresh, and revocation |
-| `@knoww/services` | Workspace | Validated Gamma, Data API, and CLOB service calls |
-| `@knoww/logger` | Workspace | Structured logs |
-| `@knoww/shared-types` | Workspace | Shared Polymarket parsers and types |
-| `decimal.js` | Workspace catalog | Exact decimal parsing, comparison, and arithmetic |
-| `jose` | `6.2.3` | Google ID-token signature and claim verification |
-| `zod` | `4.4.3` | Tool and upstream-response schemas |
-| `wrangler` | `4.123.0` | Local Worker runtime, type generation, build, and deploy |
-| `vitest` | `4.1.10` | Workers-native automated tests |
+| Package                              | Version           | Purpose                                                                |
+| ------------------------------------ | ----------------- | ---------------------------------------------------------------------- |
+| `agents`                             | `0.21.0`          | Cloudflare's stateless MCP handler adapter                             |
+| `@modelcontextprotocol/server`       | `2.0.0`           | Official MCP server implementation                                     |
+| `@cloudflare/workers-oauth-provider` | `0.10.3`          | OAuth discovery, registration, grants, tokens, refresh, and revocation |
+| `@knoww/services`                    | Workspace         | Validated Gamma, Data API, and CLOB service calls                      |
+| `@knoww/logger`                      | Workspace         | Structured logs                                                        |
+| `@knoww/shared-types`                | Workspace         | Shared Polymarket parsers and types                                    |
+| `decimal.js`                         | Workspace catalog | Exact decimal parsing, comparison, and arithmetic                      |
+| `jose`                               | `6.2.3`           | Google ID-token signature and claim verification                       |
+| `zod`                                | `4.4.3`           | Tool and upstream-response schemas                                     |
+| `wrangler`                           | `4.123.0`         | Local Worker runtime, type generation, build, and deploy               |
+| `vitest`                             | `4.1.10`          | Workers-native automated tests                                         |
 
 ## Tool catalog
 
@@ -147,17 +147,17 @@ All current tools are read-only and require `markets:read`. Production requests 
 
 Searches active prediction-market events.
 
-| Input | Type | Rules |
-|---|---|---|
-| `query` | string | Required, trimmed, 1 to 200 characters |
-| `status` | `"active"` | Optional, defaults to `active` |
-| `category` | string | Optional, up to 100 characters |
-| `resultType` | `"events"` or `"markets"` | Optional, defaults to `events` |
-| `match` | `"contains"`, `"whole_word"`, or `"exact_phrase"` | Optional, defaults to `contains` |
-| `sortBy` | `"relevance"` or `"volume"` | Optional, defaults to `relevance` |
-| `sortOrder` | `"asc"` or `"desc"` | Optional; applies to volume sorting and defaults to `desc` |
-| `cursor` | string | Optional; continues either result type |
-| `limit` | integer | Optional, 1 to 20, defaults to 10 |
+| Input        | Type                                              | Rules                                                      |
+| ------------ | ------------------------------------------------- | ---------------------------------------------------------- |
+| `query`      | string                                            | Required, trimmed, 1 to 200 characters                     |
+| `status`     | `"active"`                                        | Optional, defaults to `active`                             |
+| `category`   | string                                            | Optional, up to 100 characters                             |
+| `resultType` | `"events"` or `"markets"`                         | Optional, defaults to `events`                             |
+| `match`      | `"contains"`, `"whole_word"`, or `"exact_phrase"` | Optional, defaults to `contains`                           |
+| `sortBy`     | `"relevance"` or `"volume"`                       | Optional, defaults to `relevance`                          |
+| `sortOrder`  | `"asc"` or `"desc"`                               | Optional; applies to volume sorting and defaults to `desc` |
+| `cursor`     | string                                            | Optional; continues either result type                     |
+| `limit`      | integer                                           | Optional, 1 to 20, defaults to 10                          |
 
 The default event records remain unchanged: they contain nested market summaries, reusable identifiers, outcome prices, CLOB token IDs, total counts, and truncation flags.
 
@@ -169,11 +169,11 @@ Both result types include `page.totalResults`, `page.returnedResults`, and `page
 
 Fetches one market using exactly one identifier.
 
-| Input | Type | Rules |
-|---|---|---|
-| `slug` | string | Lowercase letters, digits, and dashes |
+| Input         | Type   | Rules                                      |
+| ------------- | ------ | ------------------------------------------ |
+| `slug`        | string | Lowercase letters, digits, and dashes      |
 | `conditionId` | string | `0x` followed by 64 hexadecimal characters |
-| `tokenId` | string | 1 to 80 decimal digits |
+| `tokenId`     | string | 1 to 80 decimal digits                     |
 
 The response contains lifecycle status, outcomes, prices, token IDs, volume, liquidity, selected price fields, resolution data, and a reference to the parent event when available.
 
@@ -183,13 +183,13 @@ Closed-market lookup retries Gamma with `closed=true` after an empty open-market
 
 Fetches one event using exactly one identifier and returns a page of markets.
 
-| Input | Type | Rules |
-|---|---|---|
-| `id` | string | 1 to 20 decimal digits |
-| `slug` | string | Lowercase letters, digits, and dashes |
-| `cursor` | string | Optional opaque market-page cursor |
-| `marketOffset` | integer | Optional, 0 to 10,000, defaults to 0 |
-| `marketLimit` | integer | Optional, 1 to 50, defaults to 20 |
+| Input          | Type    | Rules                                 |
+| -------------- | ------- | ------------------------------------- |
+| `id`           | string  | 1 to 20 decimal digits                |
+| `slug`         | string  | Lowercase letters, digits, and dashes |
+| `cursor`       | string  | Optional opaque market-page cursor    |
+| `marketOffset` | integer | Optional, 0 to 10,000, defaults to 0  |
+| `marketLimit`  | integer | Optional, 1 to 50, defaults to 20     |
 
 For `negRisk` parents, the tool fetches child events and merges their markets. Ordinary events do not trigger child-event fan-out. If a follow-up request fails, the tool keeps the parent event and marks the market list incomplete. New callers should use `cursor`; `marketOffset` remains available for older clients.
 
@@ -197,10 +197,10 @@ For `negRisk` parents, the tool fetches child events and merges their markets. O
 
 Fetches one live CLOB order-book snapshot.
 
-| Input | Type | Rules |
-|---|---|---|
-| `tokenId` | string | Required, 1 to 80 decimal digits |
-| `depth` | integer | Optional, 1 to 50, defaults to 20 |
+| Input     | Type    | Rules                             |
+| --------- | ------- | --------------------------------- |
+| `tokenId` | string  | Required, 1 to 80 decimal digits  |
+| `depth`   | integer | Optional, 1 to 50, defaults to 20 |
 
 Bids are sorted from highest to lowest price. Asks are sorted from lowest to highest price. Prices, sizes, spread, midpoint, and returned-side depth totals are decimal strings.
 
@@ -210,12 +210,12 @@ A snapshot is marked stale when it is more than 60 seconds old or has no usable 
 
 Fetches CLOB price samples for one outcome token.
 
-| Input | Type | Rules |
-|---|---|---|
-| `tokenId` | string | Required, 1 to 80 decimal digits |
-| `startTime` | ISO 8601 string | Optional |
-| `endTime` | ISO 8601 string | Optional, defaults to now |
-| `fidelityMinutes` | integer | Optional, 1 to 1,440, defaults to 60 |
+| Input             | Type            | Rules                                |
+| ----------------- | --------------- | ------------------------------------ |
+| `tokenId`         | string          | Required, 1 to 80 decimal digits     |
+| `startTime`       | ISO 8601 string | Optional                             |
+| `endTime`         | ISO 8601 string | Optional, defaults to now            |
+| `fidelityMinutes` | integer         | Optional, 1 to 1,440, defaults to 60 |
 
 The default window is the last 24 hours. The maximum window is 31 days. Points are returned in ascending timestamp order. Series longer than 1,000 points are downsampled evenly with both endpoints retained, and the response sets `meta.truncated`.
 
@@ -223,30 +223,30 @@ An empty history is a successful result. Polymarket does not distinguish an unkn
 
 ### Event, market-data, and discovery getters
 
-| Tool | Required input | Optional controls | Result |
-|---|---|---|---|
-| `list_events` | None | Keyset cursor, closed or live state, tag, series, date bounds, order, limit | Events, tags, bounded market summaries, and `meta.nextCursor` |
-| `get_market_trades` | Exactly one of `conditionIds` or `eventIds` | Wallet, side, time bounds, limit, cursor, offset | Public trades with decimal-string size and price |
-| `get_market_quotes` | `tokenIds` | None | BUY/SELL price, midpoint, spread, and last trade |
-| `get_market_holders` | `conditionIds` | Limit and minimum balance | Largest public holders for each market |
-| `get_open_interest` | `conditionIds` | None | Open interest by market |
-| `get_event_live_volume` | Positive integer `eventId` | None | Event total and per-market live volume |
-| `get_trader_leaderboard` | None | Category, period, PnL or volume order, trader filters, limit, cursor, offset | Public trader ranks, volume, and PnL |
-| `list_tags` | None | Limit, cursor, and offset | Category tags for filtering |
-| `list_sports_markets` | None | Sport, league, cursor, team offset, limit | Sports metadata, market types, teams, and tagged markets |
+| Tool                     | Required input                              | Optional controls                                                            | Result                                                        |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `list_events`            | None                                        | Keyset cursor, closed or live state, tag, series, date bounds, order, limit  | Events, tags, bounded market summaries, and `meta.nextCursor` |
+| `get_market_trades`      | Exactly one of `conditionIds` or `eventIds` | Wallet, side, time bounds, limit, cursor, offset                             | Public trades with decimal-string size and price              |
+| `get_market_quotes`      | `tokenIds`                                  | None                                                                         | BUY/SELL price, midpoint, spread, and last trade              |
+| `get_market_holders`     | `conditionIds`                              | Limit and minimum balance                                                    | Largest public holders for each market                        |
+| `get_open_interest`      | `conditionIds`                              | None                                                                         | Open interest by market                                       |
+| `get_event_live_volume`  | Positive integer `eventId`                  | None                                                                         | Event total and per-market live volume                        |
+| `get_trader_leaderboard` | None                                        | Category, period, PnL or volume order, trader filters, limit, cursor, offset | Public trader ranks, volume, and PnL                          |
+| `list_tags`              | None                                        | Limit, cursor, and offset                                                    | Category tags for filtering                                   |
+| `list_sports_markets`    | None                                        | Sport, league, cursor, team offset, limit                                    | Sports metadata, market types, teams, and tagged markets      |
 
 List inputs are bounded even when Polymarket accepts larger pages. New callers should use `meta.nextCursor`; offsets remain available for compatibility. Market titles, event descriptions, profile fields, outcomes, sports rules, and team names are quoted upstream data, not instructions.
 
 ### Public wallet getters
 
-| Tool | Required input | Optional controls | Result |
-|---|---|---|---|
-| `get_public_profile` | `walletAddress` | None | Public profile fields |
-| `get_wallet_positions` | `walletAddress` | Market filters, position state, size threshold, sort, limit, cursor, offset | Current public positions and PnL fields |
-| `get_wallet_activity` | `walletAddress` | Market, activity-type and time filters, sort, limit, cursor, offset | Public wallet activity |
-| `get_closed_positions` | `walletAddress` | Market filters, sort, limit, cursor, offset | Closed positions and realized PnL |
-| `get_wallet_pnl` | `walletAddress` | None | All-time overall PnL and current-position breakdown |
-| `get_wallet_portfolio_value` | `walletAddress` | None | Current total position value |
+| Tool                         | Required input  | Optional controls                                                           | Result                                              |
+| ---------------------------- | --------------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
+| `get_public_profile`         | `walletAddress` | None                                                                        | Public profile fields                               |
+| `get_wallet_positions`       | `walletAddress` | Market filters, position state, size threshold, sort, limit, cursor, offset | Current public positions and PnL fields             |
+| `get_wallet_activity`        | `walletAddress` | Market, activity-type and time filters, sort, limit, cursor, offset         | Public wallet activity                              |
+| `get_closed_positions`       | `walletAddress` | Market filters, sort, limit, cursor, offset                                 | Closed positions and realized PnL                   |
+| `get_wallet_pnl`             | `walletAddress` | None                                                                        | All-time overall PnL and current-position breakdown |
+| `get_wallet_portfolio_value` | `walletAddress` | None                                                                        | Current total position value                        |
 
 `walletAddress` is always an explicit public Polymarket proxy wallet address in `0x` plus 40 hexadecimal-character form. Google sign-in authorizes access to Knoww MCP; it does not provide, infer, or prove ownership of a Polymarket wallet. These tools read public on-chain and Polymarket API data only.
 
@@ -369,21 +369,21 @@ The `dev` script selects the Wrangler `local` environment. That is the only conf
 
 Run these from the repository root.
 
-| Command | Purpose |
-|---|---|
-| `pnpm --filter @knoww/mcp dev` | Start the local Worker with the development auth bypass |
-| `pnpm --filter @knoww/mcp dev:oauth` | Start the local Worker with the complete Google OAuth flow |
-| `pnpm --filter @knoww/mcp test` | Run the MCP Worker test suite |
-| `pnpm --filter @knoww/mcp typecheck` | Run TypeScript without emitting files |
-| `pnpm --filter @knoww/mcp lint` | Run Biome checks for the MCP package |
-| `pnpm --filter @knoww/mcp format` | Format MCP source files |
-| `pnpm --filter @knoww/mcp build` | Produce a dry-run production Worker bundle |
-| `pnpm --filter @knoww/mcp cf-typegen` | Regenerate Cloudflare binding types |
-| `pnpm --filter @knoww/mcp deploy` | Manually upload a production version without assigning traffic while automatic deployment is paused |
-| `pnpm --filter @knoww/mcp deploy:first-production` | Create the first production deployment after local and CI approval |
-| `pnpm --filter @knoww/mcp deploy:promote` | Manually assign production traffic to uploaded versions while automatic deployment is paused |
-| `pnpm --filter @knoww/mcp deploy:status` | Show the active production deployment |
-| `pnpm --filter @knoww/mcp deploy:rollback -- VERSION_ID` | Roll back to a known healthy production version |
+| Command                                                  | Purpose                                                                                             |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @knoww/mcp dev`                           | Start the local Worker with the development auth bypass                                             |
+| `pnpm --filter @knoww/mcp dev:oauth`                     | Start the local Worker with the complete Google OAuth flow                                          |
+| `pnpm --filter @knoww/mcp test`                          | Run the MCP Worker test suite                                                                       |
+| `pnpm --filter @knoww/mcp typecheck`                     | Run TypeScript without emitting files                                                               |
+| `pnpm --filter @knoww/mcp lint`                          | Run Biome checks for the MCP package                                                                |
+| `pnpm --filter @knoww/mcp format`                        | Format MCP source files                                                                             |
+| `pnpm --filter @knoww/mcp build`                         | Produce a dry-run production Worker bundle                                                          |
+| `pnpm --filter @knoww/mcp cf-typegen`                    | Regenerate Cloudflare binding types                                                                 |
+| `pnpm --filter @knoww/mcp deploy`                        | Manually upload a production version without assigning traffic while automatic deployment is paused |
+| `pnpm --filter @knoww/mcp deploy:first-production`       | Create the first production deployment after local and CI approval                                  |
+| `pnpm --filter @knoww/mcp deploy:promote`                | Manually assign production traffic to uploaded versions while automatic deployment is paused        |
+| `pnpm --filter @knoww/mcp deploy:status`                 | Show the active production deployment                                                               |
+| `pnpm --filter @knoww/mcp deploy:rollback -- VERSION_ID` | Roll back to a known healthy production version                                                     |
 
 ## Automated verification
 
@@ -573,11 +573,11 @@ Origin-less requests remain valid because desktop and server-side MCP clients do
 
 Current behavior:
 
-| Environment | `MCP_AUTH_MODE` | Result |
-|---|---|---|
-| Local | `dev-bypass` | Requests reach the MCP handler without OAuth |
-| Production | `oauth-required` | The OAuth Provider validates an audience-bound Bearer token before MCP dispatch |
-| Unknown value | Treated as `oauth-required` | Fails closed through the OAuth path |
+| Environment   | `MCP_AUTH_MODE`             | Result                                                                          |
+| ------------- | --------------------------- | ------------------------------------------------------------------------------- |
+| Local         | `dev-bypass`                | Requests reach the MCP handler without OAuth                                    |
+| Production    | `oauth-required`            | The OAuth Provider validates an audience-bound Bearer token before MCP dispatch |
+| Unknown value | Treated as `oauth-required` | Fails closed through the OAuth path                                             |
 
 An unauthenticated production request receives `401` with a `resource_metadata` link. The provider publishes:
 
@@ -591,7 +591,9 @@ The preferred registration path is a Client ID Metadata Document. Dynamic Client
 
 The MCP host opens `/authorize` in the user's browser. After the user approves the requested scope, Knoww redirects to Google using authorization-code flow, S256 PKCE, a nonce, and five-minute one-time state. The Worker exchanges the Google code on the server and verifies the ID token signature, issuer, audience, expiry, nonce, stable subject, and verified-email claim. It then asks the existing OAuth Provider to issue a one-hour MCP access token and a rotating refresh token with a 30-day lifetime.
 
-The MCP client and model never receive the Google client secret, Google authorization code, ID token, access token, email, or password. The MCP grant retains Google's stable subject identifier as the principal. Knoww does not add an application database for this flow: the existing OAuth KV binding stores provider grants and tokens, while the existing Durable Object binding stores only short-lived one-time authorization transactions.
+The MCP client and model never receive the Google client secret, Google authorization code, ID token, Google access token, email, or password. The grant keeps Google's subject and the global principal ID in encrypted properties for authorization and per-user quotas. Client-visible authorization codes, access tokens, and refresh tokens use a random 256-bit ID unique to the Google subject/client pair. Separate objects in the existing Durable Object namespace retain these IDs without an expiration alarm, preserving grant replacement when a user authorizes the same client again. These objects store only the random ID; the subject/client tuple selects the object through `idFromName`. No new binding or secret is required. Preserve this namespace across deployments.
+
+When deploying this privacy fix, existing connections must authorize again. Pending codes and refresh tokens with the old Google-subject prefix return `invalid_grant`, since the provider cannot replace an existing grant's identity. Already-issued access tokens remain valid until their original expiry, at most one hour, or until that client reauthorizes. Reauthorization revokes the matching legacy grants without revoking other clients' grants. Previously exposed identifiers cannot be removed from clients or their logs.
 
 Only `markets:read` is active and advertised. `x402:pay` is reserved for a future paid-tool phase but is currently rejected as `invalid_scope`. When it becomes active, it will mean “this client may attempt an x402-gated tool.” It will not authorize Knoww or the model to spend funds. The agent host must enforce its own budget and ask its wallet component to sign each payment proof.
 
@@ -603,38 +605,40 @@ Never enable `dev-bypass` in preview or production.
 
 The checked-in Wrangler configuration contains non-secret deployment settings and required secret names only. Secret values belong in Cloudflare Worker secrets.
 
-| Variable | Purpose | Production value |
-|---|---|---|
-| `MCP_AUTH_MODE` | Selects fail-closed production behavior or local bypass | `oauth-required` |
-| `MCP_CANONICAL_RESOURCE` | OAuth resource and token audience | `https://mcp.knoww.app/mcp` |
-| `MCP_ALLOWED_HOSTNAMES` | Comma-separated Host allowlist | `mcp.knoww.app` |
-| `MCP_ALLOWED_ORIGIN_HOSTNAMES` | Comma-separated browser Origin allowlist | `mcp.knoww.app,knoww.app,www.knoww.app` |
-| `POSTHOG_HOST` | Public PostHog event-ingestion host | `https://us.i.posthog.com` |
+| Variable                       | Purpose                                                 | Production value                        |
+| ------------------------------ | ------------------------------------------------------- | --------------------------------------- |
+| `MCP_AUTH_MODE`                | Selects fail-closed production behavior or local bypass | `oauth-required`                        |
+| `MCP_CANONICAL_RESOURCE`       | OAuth resource and token audience                       | `https://mcp.knoww.app/mcp`             |
+| `MCP_ALLOWED_HOSTNAMES`        | Comma-separated Host allowlist                          | `mcp.knoww.app`                         |
+| `MCP_ALLOWED_ORIGIN_HOSTNAMES` | Comma-separated browser Origin allowlist                | `mcp.knoww.app,knoww.app,www.knoww.app` |
+| `POSTHOG_HOST`                 | Public PostHog event-ingestion host                     | `https://us.i.posthog.com`              |
 
 Required production secrets:
 
-| Secret | Purpose |
-|---|---|
-| `GOOGLE_CLIENT_ID` | Identifies the Knoww web OAuth client to Google |
-| `GOOGLE_CLIENT_SECRET` | Authenticates the server-side Google code exchange |
+| Secret                    | Purpose                                            |
+| ------------------------- | -------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`        | Identifies the Knoww web OAuth client to Google    |
+| `GOOGLE_CLIENT_SECRET`    | Authenticates the server-side Google code exchange |
 | `POSTHOG_PROJECT_API_KEY` | Project token used only for public event ingestion |
 
 Configure the Google OAuth client as a **Web application** and add the exact `https://mcp.knoww.app/auth/google/callback` URL under **Authorized redirect URIs**. This server-side flow does not require an Authorized JavaScript origin. If that optional field is populated for another integration, its value is only `https://mcp.knoww.app`; an origin cannot contain a path. The MCP client's own callback URI is separate and remains registered by that MCP client through CIMD or Dynamic Client Registration.
 
 In **Workers & Pages > knoww-mcp > Settings > Variables and Secrets**, add all three names above as encrypted secrets. Reuse the project `585396` PostHog project token for `POSTHOG_PROJECT_API_KEY`; do not use a personal API key. The production Wrangler configuration marks these bindings as required, so a deployment reports missing configuration before traffic changes. Never place their values in Git, build logs, URLs, or browser code.
 
+Analytics caps each request at 32 events and 64 KiB of serialized delivery data, with a 4 KiB limit per event. It reserves room for the HTTP outcome, summarizes message arrays as one `batch` protocol event, and hashes each distinct identity once per request. Excess or oversized events are dropped. Valid MCP batch handling is unchanged.
+
 Analytics uses three bounded events: `mcp_http_request_completed`, `mcp_protocol_request_completed`, and `mcp_tool_called`. Every event includes `product=mcp` and `service=knoww-mcp`. Tool events include the registered tool name, outcome, safe error code, duration, plan, and authentication method. The Worker hashes the OAuth principal before it becomes a PostHog distinct ID and disables person-profile creation. It never sends request bodies, tool arguments, wallet addresses, market queries, response content, authorization headers, Google tokens, or raw errors.
 
 Required Cloudflare bindings:
 
-| Binding | Purpose |
-|---|---|
-| `OAUTH_KV` | Provider-managed clients, grants, authorization codes, and hashed token records |
-| `MCP_AUTH_CHALLENGES` | Legacy-named Durable Object namespace for atomic one-time OIDC transactions |
-| `MCP_AUTH_RATE_LIMITER` | Distributed limit for authorization, token, and registration routes |
-| `MCP_EDGE_RATE_LIMITER` | Coarse source limit across all Worker paths before routing |
-| `MCP_FREE_PRINCIPAL_RATE_LIMITER` | Free-plan quota across authenticated MCP requests |
-| `MCP_FREE_TOOL_RATE_LIMITER` | Free-plan quota keyed by authenticated principal and tool |
+| Binding                           | Purpose                                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `OAUTH_KV`                        | Provider-managed clients, grants, authorization codes, and hashed token records                            |
+| `MCP_AUTH_CHALLENGES`             | Legacy-named Durable Object namespace for one-time OIDC transactions and persistent opaque user/client IDs |
+| `MCP_AUTH_RATE_LIMITER`           | Distributed limit for authorization, token, and registration routes                                        |
+| `MCP_EDGE_RATE_LIMITER`           | Coarse source limit across all Worker paths before routing                                                 |
+| `MCP_FREE_PRINCIPAL_RATE_LIMITER` | Free-plan quota across authenticated MCP requests                                                          |
+| `MCP_FREE_TOOL_RATE_LIMITER`      | Free-plan quota keyed by authenticated principal and tool                                                  |
 
 Local values are defined under `env.local` in `wrangler.jsonc`:
 
@@ -737,10 +741,10 @@ Version 1 is read-only. It must not place, cancel, sign, relay, settle, or pay f
 
 The same stateless handler supports two protocol eras:
 
-| Protocol version | Discovery path | Coverage |
-|---|---|---|
-| 2025-11-25 | Classic `initialize`, then ordinary tool requests | Integration tested |
-| 2026-07-28 | `server/discover` with per-request `_meta` | Integration tested |
+| Protocol version | Discovery path                                    | Coverage           |
+| ---------------- | ------------------------------------------------- | ------------------ |
+| 2025-11-25       | Classic `initialize`, then ordinary tool requests | Integration tested |
+| 2026-07-28       | `server/discover` with per-request `_meta`        | Integration tested |
 
 Do not send a 2026-07-28 protocol header with the classic `initialize` body. The SDK treats that combination as a version mismatch.
 
@@ -771,14 +775,14 @@ Tool failure logs contain only the tool name, request ID, normalized error code,
 
 Google identity failures add only allowlisted diagnostic fields:
 
-| `googleStage` | `googleFailure` | Other field | Meaning |
-|---|---|---|---|
-| `token_exchange` | `request_failed` | None | The Worker could not reach Google's token endpoint or the request timed out. |
-| `token_exchange` | `upstream_rejected` | `googleOAuthError=invalid_client` | Google rejected the client ID and secret pair. |
-| `token_exchange` | `upstream_rejected` | `googleOAuthError=invalid_grant` | The code was expired, reused, or did not match the redirect URI or PKCE verifier. |
-| `token_exchange` | `invalid_response` | None | Google returned a successful but malformed or unsupported token response. |
-| `id_token_verification` | `verification_failed` | None | Signature, JWKS, issuer, audience, age, nonce, subject, or verified-email validation failed. |
-| `unknown` | `unexpected_error` | None | An unexpected error occurred outside the classified Google boundary. |
+| `googleStage`           | `googleFailure`       | Other field                       | Meaning                                                                                      |
+| ----------------------- | --------------------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `token_exchange`        | `request_failed`      | None                              | The Worker could not reach Google's token endpoint or the request timed out.                 |
+| `token_exchange`        | `upstream_rejected`   | `googleOAuthError=invalid_client` | Google rejected the client ID and secret pair.                                               |
+| `token_exchange`        | `upstream_rejected`   | `googleOAuthError=invalid_grant`  | The code was expired, reused, or did not match the redirect URI or PKCE verifier.            |
+| `token_exchange`        | `invalid_response`    | None                              | Google returned a successful but malformed or unsupported token response.                    |
+| `id_token_verification` | `verification_failed` | None                              | Signature, JWKS, issuer, audience, age, nonce, subject, or verified-email validation failed. |
+| `unknown`               | `unexpected_error`    | None                              | An unexpected error occurred outside the classified Google boundary.                         |
 
 `googleUpstreamStatus` is included when Google rejects the token exchange. Logs never include Google's description, the authorization code, PKCE verifier, ID token, access token, email, client secret, or raw exception.
 
@@ -796,18 +800,18 @@ Configure the GitHub repository connection on the existing `knoww-mcp` Worker in
 
 Use the following Cloudflare Workers Builds settings:
 
-| Setting | Value |
-|---|---|
-| Git repository | `metatxn/Knoww` |
-| Production branch | `main` |
-| Root directory | `/apps/mcp` |
-| Build command | `pnpm --dir ../.. install --frozen-lockfile` |
-| Deploy command | `pnpm exec wrangler deploy --env="" --strict` |
-| Non-production branch builds | Disabled |
-| Build caching | Enabled |
-| Build variable | `NODE_VERSION=24` |
-| Build variable | `PNPM_VERSION=10.25.0` |
-| Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
+| Setting                      | Value                                         |
+| ---------------------------- | --------------------------------------------- |
+| Git repository               | `metatxn/Knoww`                               |
+| Production branch            | `main`                                        |
+| Root directory               | `/apps/mcp`                                   |
+| Build command                | `pnpm --dir ../.. install --frozen-lockfile`  |
+| Deploy command               | `pnpm exec wrangler deploy --env="" --strict` |
+| Non-production branch builds | Disabled                                      |
+| Build caching                | Enabled                                       |
+| Build variable               | `NODE_VERSION=24`                             |
+| Build variable               | `PNPM_VERSION=10.25.0`                        |
+| Build variable               | `SKIP_DEPENDENCY_INSTALL=1`                   |
 
 Set the production build watch include paths to:
 

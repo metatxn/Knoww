@@ -1,6 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 
+const OAUTH_USER_ID_KEY = "oauth-user-id";
+export const OPAQUE_OAUTH_USER_ID = /^mcp_[0-9a-f]{64}$/;
+
 const RECORD_KEY = "authorization-transaction";
 const INTERNAL_ORIGIN = "https://authorization-transaction.internal";
 
@@ -21,6 +24,24 @@ function transactionStub(
   transactionId: string
 ): DurableObjectStub {
   return namespace.get(namespace.idFromName(transactionId));
+}
+
+/** Separate objects retain a random ID for each Google subject/client pair. */
+export async function getOAuthUserId(
+  namespace: DurableObjectNamespace,
+  subject: string,
+  clientId: string
+): Promise<string> {
+  const name = `oauth-user:${JSON.stringify([subject, clientId])}`;
+  const response = await transactionStub(namespace, name).fetch(
+    new Request(`${INTERNAL_ORIGIN}/oauth-user`, { method: "POST" })
+  );
+  if (!response.ok) throw new Error("Could not resolve OAuth identity.");
+  const userId = await response.text();
+  if (!OPAQUE_OAUTH_USER_ID.test(userId)) {
+    throw new Error("Invalid OAuth identity.");
+  }
+  return userId;
 }
 
 export async function createAuthorizationTransaction(
@@ -69,11 +90,25 @@ export async function readAuthorizationTransaction(
 
 /**
  * The class name is retained because Durable Object migrations identify the
- * deployed class by name. Its records now hold Google OIDC transactions.
+ * deployed class by name. Separate objects hold expiring OIDC transactions
+ * or persistent opaque OAuth identities.
  */
 export class WalletChallengeStore extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/oauth-user" && request.method === "POST") {
+      const userId = await this.ctx.storage.transaction(async (storage) => {
+        const existing = await storage.get<string>(OAUTH_USER_ID_KEY);
+        if (existing !== undefined) return existing;
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        const created = `mcp_${Array.from(bytes, (byte) =>
+          byte.toString(16).padStart(2, "0")
+        ).join("")}`;
+        await storage.put(OAUTH_USER_ID_KEY, created);
+        return created;
+      });
+      return new Response(userId, { headers: { "cache-control": "no-store" } });
+    }
     if (url.pathname === "/health" && request.method === "GET") {
       return new Response(null, { status: 204 });
     }
