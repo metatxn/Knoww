@@ -10,6 +10,7 @@ import type {
 import { setCspSafeImageSrc } from "../image-proxy";
 import { isMarketWithinDisplayPriceCap } from "../market-price-filter";
 import { installRuntimePortDisconnectHandler } from "../runtime-port-lifecycle";
+import { clearToolbarBadge } from "../toolbar-badge";
 import type { StreamBetHandle, TradingRuntime } from "../trading-runtime-types";
 import { escapeSelectorValue } from "../utils";
 import {
@@ -292,7 +293,8 @@ function ensureNotificationStackLifecyclePort(): void {
 // per-origin so it survives page navigations and reloads.
 
 const STACK_MINIMIZED_STORAGE_KEY = "knoww-stack-minimized";
-const STACK_DISMISSED_STORAGE_KEY = "knoww-stack-dismissed";
+// Closing the panel affects this page; settings control the next page load.
+let stackDismissed = false;
 const STACK_EXPANDED_SESSION_KEY = "knoww-stack-expanded";
 const NOTIFICATION_STACK_VIEWPORT_MARGIN = 12;
 const NOTIFICATION_STACK_PORT_NAME = "knoww-notification-stack";
@@ -323,35 +325,11 @@ function readPersistedStackMinimized(): Promise<boolean> {
   });
 }
 
-function readPersistedStackDismissed(): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage?.local.get(STACK_DISMISSED_STORAGE_KEY, (result) => {
-        if (chrome.runtime.lastError) {
-          resolve(false);
-          return;
-        }
-        resolve(Boolean(result?.[STACK_DISMISSED_STORAGE_KEY]));
-      });
-    } catch {
-      resolve(false);
-    }
-  });
-}
-
 function persistStackMinimized(value: boolean): void {
   try {
     chrome.storage?.local.set({ [STACK_MINIMIZED_STORAGE_KEY]: value });
   } catch {
     // Non-fatal; the UI state stays consistent for the current session.
-  }
-}
-
-function persistStackDismissed(value: boolean): void {
-  try {
-    chrome.storage?.local.set({ [STACK_DISMISSED_STORAGE_KEY]: value });
-  } catch {
-    // Non-fatal; the current page still follows the user's action.
   }
 }
 
@@ -945,7 +923,7 @@ export function createNotificationStack(): HTMLElement {
 
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    persistStackDismissed(true);
+    stackDismissed = true;
     disconnectNotificationStackLifecyclePort();
     container.style.setProperty("display", "none", "important");
     void window.KNOWW_ANALYTICS?.track("notification_stack_closed");
@@ -2248,11 +2226,8 @@ export function updateNotificationStack(markets: InjectedMarketEntry[]): void {
   );
 
   if (!notificationStackContainer) {
-    // Resurrected by the scanner (a persisted dismissed flag skips the init
-    // open path on page load). Route through the full open path so the
-    // trending fetch, theme sync, and listeners run — a bare create leaves
-    // the panel stuck on the empty state forever.
-    openNotificationStack(log);
+    // Matching updates data; only initialization or a user action opens UI.
+    return;
   }
 
   const itemsContainer = document.getElementById("knoww-stack-items");
@@ -2459,6 +2434,7 @@ function openNotificationStack(
   log: (...args: unknown[]) => void,
   created = false
 ): void {
+  clearToolbarBadge();
   ensureNotificationStackLifecyclePort();
 
   if (!notificationStackContainer) {
@@ -2469,6 +2445,7 @@ function openNotificationStack(
   }
 
   if (created) {
+    updateNotificationStack(getStackBaseMarkets());
     void window.KNOWW_ANALYTICS?.track("notification_stack_opened");
     log("Notification stack initialized");
   }
@@ -2544,7 +2521,7 @@ function openNotificationStack(
  */
 export function setNotificationStackVisibility(visible: boolean): void {
   if (visible) {
-    persistStackDismissed(false);
+    stackDismissed = false;
     ensureNotificationStackLifecyclePort();
     openNotificationStack(window.KNOWW_UTILS.log);
     if (notificationStackContainer) {
@@ -2553,7 +2530,7 @@ export function setNotificationStackVisibility(visible: boolean): void {
     return;
   }
 
-  persistStackDismissed(true);
+  stackDismissed = true;
   disconnectNotificationStackLifecyclePort();
   if (notificationStackContainer) {
     notificationStackContainer.style.setProperty(
@@ -2712,11 +2689,9 @@ export function focusNotificationStackMarket(marketId: string): boolean {
 export function initNotificationStack(): void {
   const { log } = window.KNOWW_UTILS;
 
-  void readPersistedStackDismissed().then((dismissed) => {
-    if (dismissed) return;
-    createNotificationStack();
-    openNotificationStack(log, true);
-  });
+  if (stackDismissed || !window.KNOWW_CONFIG.isNotificationStackEnabled())
+    return;
+  if (!notificationStackContainer) openNotificationStack(log);
 }
 
 export interface NotificationUiMessage {

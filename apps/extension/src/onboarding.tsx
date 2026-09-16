@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { getAddress } from "viem";
 import { OnboardingActionButton } from "./onboarding-action-button";
 import { InlineSetup } from "./onboarding-inline-setup";
+import { OnboardingPinStep, PinIcon } from "./onboarding-pin-step";
 import {
   ONBOARDING_DEMO_URL,
   ONBOARDING_METAMASK_INSTALL_URL,
@@ -56,12 +57,14 @@ const PROGRESS_STEPS = __STORE_BUILD__
       { label: "Welcome", detail: "Knoww is installed" },
       { label: "Wallet", detail: "Your Knoww login" },
       { label: "Portfolio", detail: "Read-only positions" },
+      { label: "Pin Knoww", detail: "Keep Knoww in your toolbar" },
       { label: "Try Knoww", detail: "See a market on X" },
     ]
   : [
       { label: "Welcome", detail: "Knoww is installed" },
       { label: "Wallet", detail: "Your Knoww login" },
       { label: "Trading setup", detail: "Account, API keys, approval" },
+      { label: "Pin Knoww", detail: "Keep Knoww in your toolbar" },
       { label: "Try Knoww", detail: "See a market on X" },
     ];
 
@@ -180,6 +183,7 @@ function StepIcon({ index }: { index: number }) {
       </svg>
     );
   }
+  if (index === 3) return <PinIcon />;
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="2.5" />
@@ -190,17 +194,15 @@ function StepIcon({ index }: { index: number }) {
 }
 
 function ProgressRail({
-  stage,
+  activeIndex,
   completedSteps,
+  pinSkipped,
 }: {
-  stage: OnboardingStage;
+  activeIndex: number;
   completedSteps: number;
+  pinSkipped: boolean;
 }) {
-  const activeIndex = STAGE_INDEX[stage];
-  const progressLabel =
-    completedSteps === 0
-      ? "0 of 4 complete"
-      : `${completedSteps} of 4 complete`;
+  const progressLabel = `${completedSteps} of ${PROGRESS_STEPS.length} complete`;
 
   return (
     <>
@@ -235,10 +237,12 @@ function ProgressRail({
                   </span>
                   {step.label}
                 </strong>
-                <small>{step.detail}</small>
+                <small>
+                  {index === 3 && pinSkipped ? "Skipped for now" : step.detail}
+                </small>
               </span>
               <span className="progress-check" aria-hidden="true">
-                ✓
+                {index === 3 && pinSkipped ? "–" : "✓"}
               </span>
             </li>
           );
@@ -443,6 +447,8 @@ function OnboardingApp() {
   const [actionState, setActionState] = React.useState<ActionState>("idle");
   const [notice, setNotice] = React.useState("");
   const [demoCompleted, setDemoCompleted] = React.useState(false);
+  const [pinHandled, setPinHandled] = React.useState(false);
+  const [pinSkipped, setPinSkipped] = React.useState(false);
   const completionHeadingRef = React.useRef<HTMLHeadingElement>(null);
   React.useEffect(() => {
     if (demoCompleted && snapshot.stage === "ready")
@@ -586,6 +592,14 @@ function OnboardingApp() {
       if (!active) return;
       progressRef.current = storedProgress;
       setDemoCompleted(Boolean(storedProgress.demoOpenedAt));
+      setPinHandled(
+        Boolean(
+          storedProgress.pinCompletedAt ||
+            storedProgress.pinSkippedAt ||
+            storedProgress.demoOpenedAt
+        )
+      );
+      setPinSkipped(Boolean(storedProgress.pinSkippedAt));
       if (!storedProgress.startedAt) {
         await persistProgress({ startedAt: new Date().toISOString() });
         await trackEvent("extension_onboarding_started");
@@ -688,6 +702,21 @@ function OnboardingApp() {
     setDemoCompleted(true);
   };
 
+  const finishPinStep = async (skipped: boolean) => {
+    await persistProgress(
+      skipped
+        ? { pinSkippedAt: new Date().toISOString() }
+        : { pinCompletedAt: new Date().toISOString() }
+    );
+    setPinSkipped(skipped);
+    setPinHandled(true);
+    window.requestAnimationFrame(() =>
+      document
+        .getElementById("onboarding-stage-title")
+        ?.focus({ preventScroll: true })
+    );
+  };
+
   const openSettings = async () => {
     if (hasExtensionRuntime()) await chrome.runtime.openOptionsPage();
   };
@@ -701,9 +730,12 @@ function OnboardingApp() {
     if (typeof tab?.id === "number") await chrome.tabs.remove(tab.id);
   };
 
-  const activeIndex = STAGE_INDEX[snapshot.stage];
+  const activeIndex =
+    snapshot.stage === "ready" && pinHandled ? 4 : STAGE_INDEX[snapshot.stage];
   const completedSteps =
-    snapshot.stage === "ready" && demoCompleted ? 4 : activeIndex;
+    snapshot.stage === "ready" && demoCompleted
+      ? PROGRESS_STEPS.length
+      : activeIndex;
   const activeStep = PROGRESS_STEPS[activeIndex];
   const extensionVersion = hasExtensionRuntime()
     ? chrome.runtime.getManifest().version
@@ -730,13 +762,14 @@ function OnboardingApp() {
             <span className="status-pulse" /> Setup
             <span>· from installed to useful</span>
           </p>
-          <h2>Four short steps. No guessing.</h2>
+          <h2>Five short steps. No guessing.</h2>
           <p className="progress-intro">
             Wire up your wallet and trading account once. After that, Knoww
             surfaces live markets on whatever you are reading.
           </p>
           <ProgressRail
-            stage={snapshot.stage}
+            activeIndex={activeIndex}
+            pinSkipped={pinSkipped}
             completedSteps={completedSteps}
           />
           <p className="privacy-note">
@@ -758,7 +791,10 @@ function OnboardingApp() {
           </div>
           <div className="stage-panel-inner">
             <div className="stage-meta">
-              <span>Step {String(activeIndex + 1).padStart(2, "0")} / 04</span>
+              <span>
+                Step {String(activeIndex + 1).padStart(2, "0")} /{" "}
+                {String(PROGRESS_STEPS.length).padStart(2, "0")}
+              </span>
               <span className="stage-phase">
                 <span className="status-pulse" /> {activeStep.label}
               </span>
@@ -893,12 +929,16 @@ function OnboardingApp() {
                     <InlineSetup onProgress={refreshStatus} />
                   )}
 
+                {snapshot.stage === "ready" &&
+                  !pinHandled &&
+                  !demoCompleted && (
+                    <OnboardingPinStep onContinue={finishPinStep} />
+                  )}
+
                 {snapshot.stage === "ready" && demoCompleted && (
                   <>
                     <div className="stage-intro">
-                      <p className="completion-label">
-                        All four steps complete
-                      </p>
+                      <p className="completion-label">Setup complete</p>
                       <h1
                         id="onboarding-stage-title"
                         ref={completionHeadingRef}
@@ -963,10 +1003,10 @@ function OnboardingApp() {
                   </>
                 )}
 
-                {snapshot.stage === "ready" && !demoCompleted && (
+                {snapshot.stage === "ready" && pinHandled && !demoCompleted && (
                   <>
                     <div className="stage-intro">
-                      <h1 id="onboarding-stage-title">
+                      <h1 id="onboarding-stage-title" tabIndex={-1}>
                         Try it on a live post.
                       </h1>
                       <p>

@@ -3,6 +3,7 @@ import { createLogger } from "@knoww/logger";
 import type { WorkerConfig } from "../config";
 import { currentRequestId } from "../context";
 import { mcpOAuthApiHandler } from "./api";
+import { OPAQUE_OAUTH_USER_ID } from "./challenge-store";
 import { createConsentHandler } from "./consent";
 import { authenticateWithGoogle, type GoogleAuthenticator } from "./google";
 import { ACTIVE_MCP_SCOPES, validateMcpAuthProps } from "./scopes";
@@ -59,7 +60,9 @@ export function createOAuthProvider(
     },
     tokenExchangeCallback(options) {
       const props = validateMcpAuthProps(options.props);
-      if (!props) {
+      // Legacy grants embed the Google subject in every newly minted token.
+      // The provider cannot change a grant's userId; require authorization again.
+      if (!props || !OPAQUE_OAUTH_USER_ID.test(options.userId)) {
         throw new OAuthError("invalid_grant", {
           description: "The authorization grant is invalid.",
         });

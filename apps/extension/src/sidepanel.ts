@@ -26,6 +26,7 @@ import {
   renderSiteSupportSurface,
   SITE_SUPPORT_STYLES,
 } from "./sidepanel/site-support";
+import { installSidepanelBadgeLifecycle } from "./sidepanel/toolbar-badge";
 
 interface SidepanelEventHandle {
   handleClick?(event: Event): boolean;
@@ -181,6 +182,7 @@ if (root) {
     },
   });
 
+  const disposeBadgeLifecycle = installSidepanelBadgeLifecycle();
   const uninstallSidepanelMessageListener = installSidepanelMessageListener({
     onSessionDisconnected: portfolio.clearSession,
     onWalletConnected: portfolio.onWalletConnected,
@@ -194,6 +196,7 @@ if (root) {
   window.addEventListener(
     "pagehide",
     () => {
+      disposeBadgeLifecycle();
       uninstallSidepanelMessageListener();
       disposeRootDispatchers();
       markets.dispose();

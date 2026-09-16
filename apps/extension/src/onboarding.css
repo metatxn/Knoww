@@ -413,21 +413,26 @@ a:focus-visible {
 
 .progress-fill--1,
 .stage-progress-fill--1 {
-  width: 25%;
+  width: 20%;
 }
 
 .progress-fill--2,
 .stage-progress-fill--2 {
-  width: 50%;
+  width: 40%;
 }
 
 .progress-fill--3,
 .stage-progress-fill--3 {
-  width: 75%;
+  width: 60%;
 }
 
 .progress-fill--4,
 .stage-progress-fill--4 {
+  width: 80%;
+}
+
+.progress-fill--5,
+.stage-progress-fill--5 {
   width: 100%;
 }
 
@@ -1174,7 +1179,7 @@ footer a {
 
   .progress-rail {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1438,6 +1443,10 @@ footer a {
   min-height: 0;
   overflow-y: auto;
   gap: 12px;
+}
+
+.onboarding-embedded .progress-step {
+  padding: 10px 0;
 }
 
 .onboarding-embedded .stage-panel {
@@ -1719,5 +1728,81 @@ footer a {
   .progress-fill,
   .stage-progress-fill {
     transition: none;
+  }
+}
+
+.pin-guide {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 1fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.pin-menu-preview {
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.pin-menu-heading {
+  margin-bottom: 16px;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.pin-menu-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--text);
+}
+
+.pin-menu-target {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: 1px solid var(--green-line);
+  border-radius: 6px;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.pin-menu-target svg {
+  width: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pin-menu-preview small {
+  display: block;
+  margin-top: 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.pin-instructions {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding-left: 24px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.pin-instructions li::marker {
+  color: var(--green);
+  font-family: var(--mono);
+}
+
+@media (max-width: 1000px) {
+  .pin-guide {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 }

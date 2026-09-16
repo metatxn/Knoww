@@ -4,6 +4,7 @@ import {
   type AuthorizationTransaction,
   consumeAuthorizationTransaction,
   createAuthorizationTransaction,
+  getOAuthUserId,
 } from "./challenge-store";
 
 const transaction: AuthorizationTransaction = {
@@ -51,5 +52,31 @@ describe("OAuth authorization transaction store", () => {
     await expect(
       consumeAuthorizationTransaction(env.MCP_AUTH_CHALLENGES, expired.id)
     ).resolves.toBeNull();
+  });
+});
+
+describe("Opaque OAuth identity store", () => {
+  it("keeps IDs stable across concurrent authorizations and separates users and clients", async () => {
+    const ids = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        getOAuthUserId(env.MCP_AUTH_CHALLENGES, "test-subject", "client-a")
+      )
+    );
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toMatch(/^mcp_[0-9a-f]{64}$/);
+    expect(ids[0]).not.toContain("test-subject");
+    expect(
+      await getOAuthUserId(env.MCP_AUTH_CHALLENGES, "test-subject", "client-a")
+    ).toBe(ids[0]);
+    expect(
+      await getOAuthUserId(env.MCP_AUTH_CHALLENGES, "test-subject", "client-b")
+    ).not.toBe(ids[0]);
+    expect(
+      await getOAuthUserId(
+        env.MCP_AUTH_CHALLENGES,
+        "another-subject",
+        "client-a"
+      )
+    ).not.toBe(ids[0]);
   });
 });

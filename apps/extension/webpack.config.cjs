@@ -52,18 +52,9 @@ function buildHostPermissions(hostsSource, devMode, storeBuild) {
     hostsSource,
     "SUPPORTED_MATCH_PATTERNS"
   );
-  const unsupportedSiteSupportPatterns = extractStringArray(
-    hostsSource,
-    "UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS"
-  );
   const apiPatterns = extractStringArray(hostsSource, "API_HOST_PERMISSIONS");
   const extra = devMode ? ["http://localhost/*"] : [];
-  const merged = [
-    ...sitePatterns,
-    ...unsupportedSiteSupportPatterns,
-    ...apiPatterns,
-    ...extra,
-  ];
+  const merged = [...sitePatterns, ...apiPatterns, ...extra];
   const filtered = storeBuild
     ? merged.filter((pattern) => !TRADING_ONLY_HOST_PERMISSIONS.has(pattern))
     : merged;
@@ -117,7 +108,7 @@ function buildUnsupportedSiteSupportWebAccessibleResources(hostsSource) {
     ],
     matches: extractStringArray(
       hostsSource,
-      "UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS"
+      "UNSUPPORTED_SITE_SUPPORT_RESOURCE_MATCH_PATTERNS"
     ),
   };
 }

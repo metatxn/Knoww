@@ -291,6 +291,7 @@ declare global {
         market?: Market
       ) => void;
       initNotificationStack: () => void;
+      setNotificationStackVisibility: (visible: boolean) => void;
       fetchAndCacheTrending: () => Promise<void>;
       cancelTrendingFetchTimer: () => void;
       SOURCE_CONFIG: Record<

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Knoww — Every opinion is a position",
-  "version": "2.5.56",
+  "name": "Knoww App",
+  "version": "2.5.57",
   "description": "A prediction market layer for the open internet.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -18,7 +18,14 @@
     },
     "default_title": "Knoww"
   },
-  "permissions": ["storage", "offscreen", "scripting", "sidePanel", "alarms"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "offscreen",
+    "scripting",
+    "sidePanel",
+    "alarms"
+  ],
   "host_permissions": ["__GENERATED_BY_WEBPACK_BUILD__"],
   "side_panel": {
     "default_path": "sidepanel.html"

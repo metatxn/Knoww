@@ -1,67 +1,141 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { runInNewContext } from "node:vm";
+import { transpile } from "typescript";
+import { describe, expect, it, vi } from "vitest";
 
 const readSource = (path: string): string =>
   readFileSync(join(process.cwd(), path), "utf8");
 
 describe("unsupported-site toolbar routing", () => {
-  it("registers a lightweight prompt on HTTP(S) pages while keeping full matching allowlisted", () => {
-    const hosts = readSource("src/supported-hosts.ts");
-    const background = readSource("src/background.ts");
-    const webpack = readSource("webpack.config.cjs");
+  it.each([false, true])(
+    "generates only explicit host permissions (store=%s)",
+    (storeBuild) => {
+      const webpack = readSource("webpack.config.cjs");
+      const helpers = webpack.slice(
+        webpack.indexOf("function extractStringArray"),
+        webpack.indexOf("const transformersEntry")
+      );
+      const permissions: string[] = runInNewContext(
+        `${helpers}; buildHostPermissions(hosts, false, storeBuild)`,
+        { hosts: readSource("src/supported-hosts.ts"), storeBuild }
+      );
+      expect(permissions.length).toBeGreaterThan(0);
+      expect(permissions).toContain("https://x.com/*");
+      expect(permissions).toContain("https://knoww.app/*");
+      expect(
+        permissions.some(
+          (pattern) =>
+            pattern === "<all_urls>" ||
+            /^\*?:?\/\/\*/.test(pattern) ||
+            /^[^:]+:\/\/\*\//.test(pattern)
+        )
+      ).toBe(false);
+    }
+  );
 
-    expect(hosts).toContain("UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS");
-    expect(hosts).toContain('"http://*/*"');
-    expect(hosts).toContain('"https://*/*"');
-    expect(hosts).toContain(
-      "ONBOARDING_WALLET_SETUP_PRODUCTION_MATCH_PATTERNS"
+  it.each([
+    { hasLegacy: false, cleanupFails: false },
+    { hasLegacy: true, cleanupFails: false },
+    { hasLegacy: true, cleanupFails: true },
+  ])(
+    "migrates script registrations without adding all-site injection (legacy=$hasLegacy, cleanupFails=$cleanupFails)",
+    async ({ hasLegacy, cleanupFails }) => {
+      const background = readSource("src/background.ts");
+      const register = background.slice(
+        background.indexOf("async function performContentScriptRegistration"),
+        background.indexOf("\nregisterContentScripts();")
+      );
+      const scripting = {
+        getRegisteredContentScripts: vi
+          .fn()
+          .mockResolvedValue(
+            hasLegacy ? [{ id: "legacy" }, { id: "supported" }] : []
+          ),
+        unregisterContentScripts: vi.fn().mockResolvedValue(undefined),
+        updateContentScripts: vi.fn().mockResolvedValue(undefined),
+        registerContentScripts: vi.fn().mockResolvedValue(undefined),
+      };
+      if (cleanupFails) {
+        scripting.unregisterContentScripts.mockRejectedValue(
+          new Error("Cleanup unavailable")
+        );
+      }
+      const logWarn = vi.fn();
+      await runInNewContext(
+        transpile(`${register}; performContentScriptRegistration()`),
+        {
+          chrome: { scripting },
+          Error,
+          logWarn,
+          __DEV_MODE__: false,
+          CONTENT_SCRIPT_ID: "supported",
+          ONBOARDING_WALLET_SETUP_SCRIPT_ID: "onboarding",
+          UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID: "legacy",
+          SUPPORTED_MATCH_PATTERNS: ["https://x.com/*"],
+          WEBMAIL_HOST_EXCLUDE_PATTERNS: [],
+          getOnboardingWalletSetupMatchPatterns: () => [
+            "https://knoww.app/extension/connect",
+          ],
+        }
+      );
+      if (hasLegacy)
+        expect(scripting.unregisterContentScripts).toHaveBeenCalledWith({
+          ids: ["legacy"],
+        });
+      else expect(scripting.unregisterContentScripts).not.toHaveBeenCalled();
+      const registrations = [
+        ...scripting.registerContentScripts.mock.calls,
+        ...scripting.updateContentScripts.mock.calls,
+      ].flatMap(([scripts]) => scripts);
+      expect(registrations.map((script) => script.id).sort()).toEqual([
+        "onboarding",
+        "supported",
+      ]);
+      expect(registrations.flatMap((script) => script.matches)).toEqual(
+        expect.arrayContaining([
+          "https://x.com/*",
+          "https://knoww.app/extension/connect",
+        ])
+      );
+      if (cleanupFails) {
+        expect(scripting.updateContentScripts).toHaveBeenCalledWith([
+          expect.objectContaining({ id: "supported" }),
+        ]);
+        expect(scripting.registerContentScripts).toHaveBeenCalledWith([
+          expect.objectContaining({ id: "onboarding" }),
+        ]);
+        expect(logWarn).toHaveBeenCalledExactlyOnceWith(
+          "background.legacy-content-script-cleanup-failed",
+          { message: "Cleanup unavailable" }
+        );
+      } else {
+        expect(logWarn).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it("uses activeTab without requesting all-site host access", () => {
+    const manifest = JSON.parse(readSource("manifest.json"));
+    const webpack = readSource("webpack.config.cjs");
+    const buildHosts = webpack.slice(
+      webpack.indexOf("function buildHostPermissions"),
+      webpack.indexOf("function buildWarMatches")
     );
-    expect(hosts).toContain(
-      "ONBOARDING_WALLET_SETUP_DEVELOPMENT_MATCH_PATTERNS"
-    );
-    expect(hosts).toContain('"https://knoww.app/extension/connect"');
-    expect(hosts).toContain('"http://localhost/extension/connect"');
-    expect(background).toContain(
-      'const ONBOARDING_WALLET_SETUP_SCRIPT_ID = "knoww-onboarding-wallet-setup"'
-    );
+    expect(manifest.permissions).toContain("activeTab");
+    expect(buildHosts).not.toContain("unsupportedSiteSupportPatterns");
+    expect(buildHosts).not.toContain("UNSUPPORTED_SITE_SUPPORT");
+    expect(buildHosts).toContain('"SUPPORTED_MATCH_PATTERNS"');
+    expect(buildHosts).toContain('"API_HOST_PERMISSIONS"');
+  });
+
+  it("removes the old all-site registration while retaining supported-site scripts", () => {
+    const background = readSource("src/background.ts");
+    expect(background).toContain("chrome.scripting.unregisterContentScripts");
+    expect(background).toContain("ids: [UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID]");
+    expect(background).not.toContain("id: UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID");
+    expect(background).toContain("matches: SUPPORTED_MATCH_PATTERNS");
     expect(background).toContain("id: ONBOARDING_WALLET_SETUP_SCRIPT_ID");
-    expect(background).toContain(
-      'const UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID = "knoww-unsupported-site-support"'
-    );
-    expect(background).toContain("id: UNSUPPORTED_SITE_SUPPORT_SCRIPT_ID");
-    expect(background).toContain('js: ["unsupported-site.js"]');
-    expect(background).toContain(
-      'css: ["markets-panel-navbar.css", "unsupported-site-prompt.css"]'
-    );
-    expect(background).toContain('css: ["markets-panel-navbar.css"]');
-    expect(background).toContain("excludeMatches:");
-    expect(webpack).toContain(
-      "unsupportedSiteSupportPatterns = extractStringArray("
-    );
-    expect(webpack).toContain(
-      '"unsupported-site": "./src/unsupported-site.ts"'
-    );
-    expect(webpack).toContain(
-      "buildUnsupportedSiteSupportWebAccessibleResources(hostsSource)"
-    );
-    expect(webpack).toContain(
-      '"ONBOARDING_WALLET_SETUP_PRODUCTION_MATCH_PATTERNS"'
-    );
-    expect(webpack).toContain(
-      '"ONBOARDING_WALLET_SETUP_DEVELOPMENT_MATCH_PATTERNS"'
-    );
-    expect(webpack).toContain("buildWarMatches(hostsSource, devMode)");
-    const unsupportedResources = webpack.slice(
-      webpack.indexOf(
-        "function buildUnsupportedSiteSupportWebAccessibleResources"
-      ),
-      webpack.indexOf("const transformersEntry")
-    );
-    expect(unsupportedResources).not.toContain('"icons/icon-128.png"');
-    expect(webpack).toMatch(
-      /from:\s*"src\/content\/markets-panel-navbar\.css",\s*to:\s*"markets-panel-navbar\.css"/
-    );
   });
 
   it("routes an unsupported toolbar click to the floating support prompt", () => {
@@ -87,13 +161,10 @@ describe("unsupported-site toolbar routing", () => {
     );
   });
 
-  it("repairs unsupported tabs that were already open when the extension updates", () => {
+  it("does not inject prompts into existing tabs on install or update", () => {
     const background = readSource("src/background.ts");
-
-    expect(background).toContain("refreshOpenUnsupportedSitePrompts()");
-    expect(background).toContain(
-      "showUnsupportedSiteSupportPrompt(tab.id, { reveal: false })"
-    );
+    expect(background).not.toContain("refreshOpenUnsupportedSitePrompts");
+    expect(background).not.toContain("reveal: false");
   });
 
   it("does not attach a full URL or path to default usage events", () => {

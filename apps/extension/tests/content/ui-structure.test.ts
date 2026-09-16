@@ -30,6 +30,7 @@ const EXPECTED_KNOWW_UI_MEMBERS = [
   "createNotificationStack",
   "createNotificationItem",
   "updateNotificationStack",
+  "setNotificationStackVisibility",
   "setStreamMarkets",
   "updateNotificationStackTheme",
   "scrollToMarket",

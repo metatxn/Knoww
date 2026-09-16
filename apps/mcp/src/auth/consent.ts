@@ -9,6 +9,7 @@ import {
   type AuthorizationTransaction,
   consumeAuthorizationTransaction,
   createAuthorizationTransaction,
+  getOAuthUserId,
   readAuthorizationTransaction,
 } from "./challenge-store";
 import {
@@ -341,6 +342,33 @@ async function handleConsentPost(
   );
 }
 
+async function revokeLegacyClientGrants(
+  env: McpOAuthEnv,
+  principalId: string,
+  request: Pick<AuthRequest, "clientId" | "redirectUri">
+): Promise<void> {
+  const { clientId, redirectUri } = request;
+  // Match the provider's raw-path check for validated IDs, including `/`
+  // and accepted extra-slash forms such as https:///client.example/metadata.
+  const isCimdClient = /^https:\/\/[^/?#]*\//iu.test(clientId);
+  let cursor: string | undefined;
+  do {
+    const page = await env.OAUTH_PROVIDER.listUserGrants(principalId, {
+      cursor,
+      limit: 50,
+    });
+    for (const grant of page.items) {
+      if (
+        grant.clientId === clientId &&
+        (!isCimdClient || grant.redirectUri === redirectUri)
+      ) {
+        await env.OAUTH_PROVIDER.revokeGrant(grant.id, principalId);
+      }
+    }
+    cursor = page.cursor;
+  } while (cursor);
+}
+
 async function handleGoogleCallback(
   request: Request,
   env: McpOAuthEnv,
@@ -421,7 +449,11 @@ async function handleGoogleCallback(
   }
   const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
     request: transaction.oauthRequest,
-    userId: props.principalId,
+    userId: await getOAuthUserId(
+      env.MCP_AUTH_CHALLENGES,
+      subject,
+      transaction.oauthRequest.clientId
+    ),
     metadata: {
       authMethod: "google-oidc",
       clientName: transaction.clientName,
@@ -429,6 +461,12 @@ async function handleGoogleCallback(
     scope: transaction.scopes,
     props,
   });
+  // The provider replaces opaque grants itself; legacy grants use a different ID.
+  await revokeLegacyClientGrants(
+    env,
+    props.principalId,
+    transaction.oauthRequest
+  );
   return redirectResponse(redirectTo);
 }
 

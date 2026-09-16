@@ -77,7 +77,7 @@ describe("install-time extension onboarding", () => {
     const styles = readSource("src/onboarding.css");
 
     for (const content of [
-      "0 of 4 complete",
+      "Five short steps.",
       "Knoww is installed. Here is what it does.",
       "Browser wallets",
       "Live preview",

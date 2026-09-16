@@ -11,6 +11,7 @@ import type {
 import type { UserSettings } from "../types/settings";
 import { isWebmailUrl } from "../webmail";
 import { startDiscoveryWarmup } from "./discovery-warmup";
+import { shouldAutoShowNotificationStack } from "./notification-surface";
 import { loadPlatformAdapter } from "./platform-loader";
 import { prefetchTradingRuntime } from "./trading-loader";
 import { startXTraderPnlBadges } from "./x-pnl-badges";
@@ -131,6 +132,34 @@ export function observeFirstMountedTradingCard(
   if (isNotificationStackEnabled()) {
     initNotificationStack();
   }
+
+  // Listen for settings changes to update behavior
+  let autoShowPanel = isNotificationStackEnabled();
+  window.KNOWW_CONFIG.onSettingsChange((newSettings: UserSettings) => {
+    log("Settings changed:", newSettings);
+
+    // If platform was disabled, we could reload the page or stop watching
+    // For now, just log it - changes will take effect on next page load
+    const platformKey = platformName as keyof typeof newSettings.platforms;
+    if (
+      platformKey in newSettings.platforms &&
+      !newSettings.platforms[platformKey]
+    ) {
+      log(
+        `⚠️ ${platformName} disabled - changes will take effect on page reload`
+      );
+    }
+
+    const nextAutoShowPanel = shouldAutoShowNotificationStack(
+      newSettings.showNotificationStack,
+      newSettings.notificationPanelSurface
+    );
+    if (nextAutoShowPanel !== autoShowPanel) {
+      autoShowPanel = nextAutoShowPanel;
+      window.KNOWW_UI.setNotificationStackVisibility(nextAutoShowPanel);
+    }
+    window.KNOWW_UI.updateNotificationStackTheme?.();
+  });
 
   if (platformName === "twitter") {
     startXTraderPnlBadges();
@@ -277,32 +306,6 @@ export function observeFirstMountedTradingCard(
 
   // Start watching the feed
   watchFeed(containerSelector, itemSelector);
-
-  // Listen for settings changes to update behavior
-  window.KNOWW_CONFIG.onSettingsChange((newSettings: UserSettings) => {
-    log("Settings changed:", newSettings);
-
-    // If platform was disabled, we could reload the page or stop watching
-    // For now, just log it - changes will take effect on next page load
-    const platformKey = platformName as keyof typeof newSettings.platforms;
-    if (
-      platformKey in newSettings.platforms &&
-      !newSettings.platforms[platformKey]
-    ) {
-      log(
-        `⚠️ ${platformName} disabled - changes will take effect on page reload`
-      );
-    }
-
-    // Update notification stack visibility
-    const stackElement = document.getElementById("knoww-notification-stack");
-    if (stackElement) {
-      stackElement.style.display = newSettings.showNotificationStack
-        ? "block"
-        : "none";
-    }
-    window.KNOWW_UI.updateNotificationStackTheme?.();
-  });
 
   // ============================================
   // MEMORY OPTIMIZATION: Tab visibility handler

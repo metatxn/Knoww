@@ -227,16 +227,11 @@ export function getOnboardingWalletSetupMatchPatterns(
     : ONBOARDING_WALLET_SETUP_PRODUCTION_MATCH_PATTERNS;
 }
 
-export const UNSUPPORTED_SITE_SUPPORT_MATCH_PATTERNS: string[] = [
+// Expose only prompt fonts to pages opened through activeTab. These patterns
+// must never be included in host permissions or automatic content scripts.
+export const UNSUPPORTED_SITE_SUPPORT_RESOURCE_MATCH_PATTERNS: string[] = [
   "http://*/*",
   "https://*/*",
-];
-
-export const UNSUPPORTED_SITE_SUPPORT_EXCLUDE_PATTERNS: string[] = [
-  ...SUPPORTED_MATCH_PATTERNS,
-  "https://knoww.app/*",
-  "https://www.knoww.app/*",
-  "http://localhost/*",
 ];
 
 /**

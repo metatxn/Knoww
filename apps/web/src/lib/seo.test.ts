@@ -184,6 +184,48 @@ describe("buildNoIndexMetadata", () => {
 });
 
 describe("shouldIndexEventPage", () => {
+  it.each(["8160", "6840", "0", undefined])(
+    "preserves useful historical pages regardless of volume %s",
+    (volume) => {
+      const event = {
+        slug: "historical-result",
+        title: "Historical result",
+        description:
+          "This market retains its resolution rules, source, and trading context so readers can understand the outcome after trading ends.",
+        volume,
+        closed: true,
+        markets: [{ id: "1", closed: true, umaResolutionStatus: "resolved" }],
+      };
+
+      expect(shouldIndexEventPage(event)).toBe(true);
+      expect(shouldListEventInSitemap(event)).toBe(true);
+      expect(shouldIndexEventPage({ ...event, archived: true })).toBe(false);
+      expect(shouldIndexEventPage({ ...event, markets: [] })).toBe(false);
+      expect(shouldIndexEventPage({ ...event, description: "Resolved." })).toBe(
+        false
+      );
+    }
+  );
+
+  it("retains a low-volume result with rendered outcome context", () => {
+    expect(
+      shouldIndexEventPage({
+        slug: "small-result",
+        title: "Small result",
+        volume: "6840",
+        closed: true,
+        markets: [
+          {
+            id: "1",
+            closed: true,
+            umaResolutionStatus: "resolved",
+            outcomePrices: '["1", "0"]',
+          },
+        ],
+      })
+    ).toBe(true);
+  });
+
   it("indexes active events with at least one open market", () => {
     expect(
       shouldIndexEventPage({
