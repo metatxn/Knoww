@@ -19,6 +19,7 @@ export const KNOWW_MCP_TOOL_NAMES = [
   "get_closed_positions",
   "get_wallet_pnl",
   "get_wallet_portfolio_value",
+  "show_markets",
 ] as const;
 
 const toolNameSet = new Set<string>(KNOWW_MCP_TOOL_NAMES);

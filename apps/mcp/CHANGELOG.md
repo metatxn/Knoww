@@ -4,6 +4,8 @@
 
 ### Added
 
+- Conversational discovery guidance and a `show_markets` MCP App with current prices, outcome history, refresh, Knoww links, and text-only fallback. Includes a local fixture preview and bridge regression tests.
+
 - Five read-only prediction-market tools over stateless Streamable HTTP.
 - OAuth authorization-code flow with S256 PKCE, Google OpenID Connect consent, audience-bound opaque tokens, refresh rotation, and `markets:read` enforcement.
 - Production custom domain with OAuth state isolated from the web application.

@@ -75,7 +75,7 @@ const marketEventSchema = z.object({
   url: z.string().optional(),
 });
 
-const marketDetailSchema = z.object({
+export const marketDetailSchema = z.object({
   id: z.string(),
   question: z.string().optional(),
   slug: z.string().optional(),
@@ -217,7 +217,7 @@ function summarizeParentEvent(
   };
 }
 
-function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
+export function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
   const names = parseGammaStringArray(detail.outcomes);
   const prices = parseGammaStringArray(detail.outcomePrices);
   const status = deriveMarketStatus(detail);
@@ -268,7 +268,7 @@ function buildMarketDetail(detail: GammaMarketDetail): MarketDetail {
   };
 }
 
-function mapLookupError(error: unknown): KnowwToolError {
+export function mapLookupError(error: unknown): KnowwToolError {
   if (error instanceof KnowwToolError) return error;
   if (error instanceof UpstreamMarketError) {
     return error.status === 429

@@ -29,9 +29,10 @@ For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the
 
 ## What is implemented
 
-The Worker currently provides 20 tools:
+The Worker currently provides 21 tools:
 
 - `search_markets`
+- `show_markets`
 - `get_market`
 - `get_event`
 - `get_orderbook`
@@ -164,6 +165,16 @@ The default event records remain unchanged: they contain nested market summaries
 Set `resultType` to `markets` for flat market records without the duplicate event-summary payload. This mode can remove substring matches with `whole_word`, match a bounded multi-word phrase with `exact_phrase`, and sort individual markets by lifetime volume. Each record includes the market status, Polymarket platform, Knoww URL, available dates, lifetime volume and liquidity, outcomes, and parent event. Volume is a canonical decimal string, but `volumeUnit` is `unspecified` because the upstream API does not document its currency.
 
 Both result types include `page.totalResults`, `page.returnedResults`, and `page.hasMore`. Pass `meta.nextCursor` unchanged to continue the same query, filters, and ordering. Search is live rather than snapshot-isolated, so results can move between pages. `page.totalResults` covers the upstream candidates inspected for that call; when `meta.truncated` is true, narrow the query or category because more upstream candidates or nested event summaries may exist.
+
+### `show_markets`
+
+Displays up to three selected active markets in a self-contained MCP App. Pass `{ "slugs": ["market-slug"] }` using identifiers returned by `search_markets` or `get_market`. The tool fetches current prices, omits inactive, archived, expired, and missing markets, and preserves usable cards when another lookup fails. An empty array produces an empty state.
+
+Cards show outcome prices, resolution details, available end dates, provenance, and Knoww links. Users can refresh prices or select an outcome for its last 24 hours of price history. Decimal.js formats prices, including boundary labels for very small or near-certain probabilities. Clients without MCP Apps support receive a text summary with the same prices and links.
+
+For conversational discovery, the host model calls `search_markets` with `resultType: "markets"` and `sortBy: "relevance"`, compares the event and time horizon, then calls `show_markets` for close matches. Tool descriptions encourage this for relevant future-event questions and discourage unrelated or personal-advice queries. This is guidance to the host model, not a guarantee that it will invoke the app. Knoww receives tool arguments, not passive access to the user's conversation history. No lifecycle hook is required.
+
+The display tool declares `ui.resourceUri` for `ui://knoww/markets/v1.html` and the OpenAI output-template compatibility alias. The resource uses the MCP Apps 2026-01-26 bridge, negotiates host capabilities, and sends tool calls through the host. It needs no direct network access, external scripts, or new dependencies. Existing OAuth scope and quota checks apply to the display and history tools.
 
 ### `get_market`
 
@@ -426,6 +437,22 @@ The current baseline is 97 service tests and 138 MCP tests. The build command pe
 Tests stub upstream fetches with a one-shot route table. They fail when an expected route is unused or code makes an unexpected outbound request.
 
 ## Manual testing
+
+### Conversational market cards
+
+Run `pnpm --filter @knoww/mcp preview:markets` with Node 24 or newer, then open `http://127.0.0.1:8799`. This local fixture host uses sample data and needs no credentials. It exercises refresh, charts, empty results, partial failures, tool errors, untrusted text, and light/dark themes. It does not test live market search or a real ChatGPT connection.
+
+After deploying the updated Worker, reconnect or refresh the tools in an MCP Apps-capable host. Verify the following prompts using current markets; never substitute a loosely related event when no close match exists.
+
+| Prompt | Expected behavior |
+| --- | --- |
+| “Show me prediction markets about the next Fed rate decision.” | Search, check dates, then display up to three close matches. |
+| “How likely is a rate cut at the next Fed meeting?” | The host may discover Knoww from tool descriptions, search, and show relevant cards. Check this without explicitly naming the app. |
+| “Explain what the federal funds rate means.” | Explain the concept without adding unrelated market cards. |
+| “Should I put my savings into this bet?” | Do not use the discovery tool as a personal investment recommendation. |
+| A future event with no matching active market | Explain that no close match was found; do not invent a slug. |
+
+In the real host, also verify refresh and chart permissions, external Knoww links, text-only fallback, and mobile layout. Local protocol tests cannot establish model selection quality or host rendering compatibility.
 
 ### Full Google OAuth on localhost
 
