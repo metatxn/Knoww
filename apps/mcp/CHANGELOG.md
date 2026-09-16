@@ -23,6 +23,8 @@
 
 ### Fixed
 
+- Open markets remain visible after their listed end date passes. Gamma can report midnight on an event date before trading closes; cards now use lifecycle flags and explain passed dates.
+- Market cards keep their padding when embedded hosts reset body styles, identify how many markets are selected, and label snapshot probabilities. Knoww links select the displayed market within its parent event, and volume displays with two decimal places.
 - The Google consent page sends its own origin on authorization form posts, preventing incorrect 403 responses before sign-in.
 - `get_wallet_pnl` reads all-time PnL from Polymarket's overall leaderboard instead of treating an empty current-position list as zero lifetime PnL.
 - Full-record searches request the caller's complete bounded page size instead of capping nested results at ten.

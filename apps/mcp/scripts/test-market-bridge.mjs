@@ -2,6 +2,33 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createContext, runInContext } from "node:vm";
 import { BRIDGE_SCRIPT } from "../src/ui/bridge.ts";
+import { MARKETS_HTML } from "../src/ui/markets.ts";
+
+test("market links allow only Knoww events and a single valid market selection", () => {
+  const context = createContext({ URL });
+  const start = MARKETS_HTML.indexOf("function safeUrl(");
+  const end = MARKETS_HTML.indexOf("function updateControls(", start);
+  runInContext(MARKETS_HTML.slice(start, end), context);
+  const safeUrl = (url) => context.safeUrl(url);
+  const event = "https://knoww.app/events/detail/bitcoin-above";
+  const condition = `0x${"a".repeat(64)}`;
+  assert.equal(safeUrl(event), event);
+  assert.equal(
+    safeUrl(`${event}?conditionId=${condition}`),
+    `${event}?conditionId=${condition}`
+  );
+  for (const url of [
+    "javascript:alert(1)",
+    "https://other.example/events/detail/bitcoin-above",
+    "https://user@knoww.app/events/detail/bitcoin-above",
+    `${event}?conditionId=invalid`,
+    `${event}?conditionId=${condition}&conditionId=${condition}`,
+    `${event}?conditionId=${condition}&side=BUY`,
+    `${event}?redirect=https://other.example`,
+    `${event}#fragment`,
+  ])
+    assert.equal(safeUrl(url), null);
+});
 
 function bridge() {
   const sent = [];

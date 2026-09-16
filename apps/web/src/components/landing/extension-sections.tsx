@@ -142,6 +142,11 @@ export function MatchingSection() {
 
 const PERMISSIONS = [
   {
+    icon: Eye,
+    name: "activeTab",
+    why: "Temporarily accesses the current tab when you click Knoww to show a site-support request prompt on unsupported sites.",
+  },
+  {
     icon: Layers,
     name: "storage",
     why: "Keeps your settings and cached matches in your browser.",
@@ -179,9 +184,10 @@ export function PermissionsSection() {
               Permissions, and why we ask.
             </h2>
             <p className="mt-6 max-w-[52ch] text-base leading-[1.6] text-(--kw-fg)/80">
-              The extension asks for exactly five Chrome API permissions. Host
-              access lets matching run on supported sites and lets a lightweight
-              request prompt appear elsewhere.
+              The extension asks for exactly six Chrome API permissions. Host
+              access lets matching run on supported sites. Clicking Knoww on an
+              unsupported site grants temporary tab access to show a
+              site-support request prompt.
             </p>
             <p className="mt-4 max-w-[52ch] text-base leading-[1.6] text-(--kw-fg)/80">
               What stays in your browser: page text and matching (by default),
