@@ -1,7 +1,7 @@
 import { BRIDGE_SCRIPT } from "./bridge.ts";
 
 // Change this URI when the component contract or bundled UI changes.
-export const MARKETS_RESOURCE_URI = "ui://knoww/markets/v1.html";
+export const MARKETS_RESOURCE_URI = "ui://knoww/markets/v2.html";
 
 export const MARKETS_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -9,7 +9,9 @@ export const MARKETS_HTML = String.raw`<!doctype html>
 :root { color-scheme: light dark; --surface: #fff; --ink: #25231e; --muted: #69645b; --line: #e7e4dc; --tint: #f7f5ef; --accent: #37663d; }
 @media(prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --surface: #191a18; --ink: #f1f0e9; --muted: #b8b7ad; --line: #3c3e37; --tint: #262821; --accent: #a5d699; } }
 :root[data-theme="dark"] { --surface: #191a18; --ink: #f1f0e9; --muted: #b8b7ad; --line: #3c3e37; --tint: #262821; --accent: #a5d699; }
-* { box-sizing: border-box; } body { margin: 0; padding: 16px; background: var(--surface); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; }
+* { box-sizing: border-box; } body { margin: 0; padding: 0; background: var(--surface); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; }
+.app-shell { padding: 20px; min-width: 0; overflow-wrap: anywhere; }
+@media(max-width: 420px) { .app-shell { padding: 16px; } }
 header, .row, .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 h1 { margin: 0; font: 600 22px/1.2 Georgia, serif; } h2 { margin: 8px 0 16px; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
 p { margin: 8px 0; } .muted, small { color: var(--muted); } #status { margin-top: 12px; } #markets { display: grid; gap: 16px; margin: 16px 0; }
@@ -22,11 +24,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .chart { margin-top: 16px; } .chart svg { display: block; width: 100%; height: 100px; color: var(--accent); }
 .chart-caption { font-size: 12px; color: var(--muted); } .actions { margin-top: 16px; } details { margin-top: 12px; } summary { cursor: pointer; } .description { white-space: pre-wrap; overflow-wrap: anywhere; }
 footer { border-top: 1px solid var(--line); padding-top: 12px; font-size: 12px; color: var(--muted); } [hidden] { display: none !important; }
-</style></head><body>
-<header><div><h1>Knoww</h1><div class="muted">Markets related to your conversation</div></div><button id="refresh" type="button" disabled>Refresh prices</button></header>
+</style></head><body><div class="app-shell">
+<header><div><h1>Knoww</h1><div id="selection" class="muted">Markets related to your conversation</div></div><button id="refresh" type="button" disabled>Refresh prices</button></header>
 <p id="status" role="status" aria-live="polite">Loading relevant markets...</p>
 <main id="markets" aria-label="Relevant prediction markets"></main>
-<footer>Source: Polymarket. Prices reflect market expectations, not guaranteed outcomes. <span id="fetched"></span></footer>
+<footer>Source: Polymarket Gamma. Snapshot probabilities, not live buy/sell quotes. <span id="fetched"></span> Prices may change; refresh for the latest snapshot.</footer>
+</div>
 <script>
 const list = document.getElementById("markets");
 const status = document.getElementById("status");
@@ -48,7 +51,9 @@ function dateText(value) {
 function safeUrl(raw) {
   try {
     const url = new URL(raw);
-    return url.origin === "https://knoww.app" && /^\/events\/detail\/[a-z0-9-]+$/.test(url.pathname) && !url.username && !url.password && !url.search && !url.hash ? url.href : null;
+    const query = Array.from(url.searchParams);
+    const validQuery = !query.length || (query.length === 1 && query[0][0] === "conditionId" && /^0x[0-9a-f]{64}$/.test(query[0][1]));
+    return url.origin === "https://knoww.app" && /^\/events\/detail\/[a-z0-9-]+$/.test(url.pathname) && !url.username && !url.password && validQuery && !url.hash ? url.href : null;
   } catch { return null; }
 }
 function updateControls() {
@@ -77,6 +82,7 @@ function renderChart(container, history, name) {
 function card(market) {
   const article = element("article");
   article.append(element("div", "POLYMARKET · ACTIVE", "eyebrow"), element("h2", market.question ?? market.slug));
+  if (market.event?.title && market.event.title !== market.question) article.append(element("p", "Event: " + market.event.title, "chart-caption"));
   const outcomes = element("div", undefined, "outcomes");
   const chart = element("div", undefined, "chart");
   chart.setAttribute("aria-live", "polite");
@@ -102,7 +108,7 @@ function card(market) {
     outcomes.append(button);
   }
   article.append(outcomes);
-  if (market.volume !== undefined) article.append(element("p", "Volume " + market.volume + " · Unit unspecified by source", "chart-caption"));
+  if (market.volumeLabel !== undefined) article.append(element("p", "Volume " + market.volumeLabel + " · Unit unspecified by source", "chart-caption"));
   if (!outcomes.children.length) article.append(element("p", "Outcome prices unavailable.", "muted"));
   if (market.outcomesTruncated) article.append(element("small", "Some outcomes are omitted. Open Knoww for the complete market."));
   article.append(element("p", "Select an outcome to view its price history.", "chart-caption"), chart);
@@ -113,7 +119,7 @@ function card(market) {
     article.append(details);
   }
   const actions = element("div", undefined, "actions");
-  actions.append(element("small", market.endDate ? "Ends " + dateText(market.endDate) : "End date unavailable"));
+  actions.append(element("small", market.endDate ? "Listed end date: " + dateText(market.endDate) : "End date unavailable"));
   const url = safeUrl(market.url);
   if (url) {
     const link = element("a", "Open on Knoww ↗");
@@ -127,6 +133,7 @@ function card(market) {
     actions.append(link);
   }
   article.append(actions);
+  if (market.endDate && Date.parse(market.endDate) <= Date.now()) article.append(element("p", "The listed end date has passed. Polymarket still marks this market open.", "chart-caption"));
   return article;
 }
 function receiveResult(result) {
@@ -137,6 +144,8 @@ function receiveResult(result) {
   latest = data;
   revision++;
   list.replaceChildren(...data.markets.slice(0, 3).map(card));
+  const count = Math.min(data.markets.length, 3);
+  document.getElementById("selection").textContent = count ? count + " selected market" + (count === 1 ? "" : "s") + " · Up to 3 per view" : "Markets related to your conversation";
   const notices = [];
   if (!data.markets.length) notices.push("No matching active markets to show.");
   if (data.omittedCount) notices.push("Inactive or missing markets were omitted.");

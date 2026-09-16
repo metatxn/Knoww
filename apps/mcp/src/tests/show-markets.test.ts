@@ -18,6 +18,7 @@ import {
 const market = {
   id: "42",
   slug: "fed-cut-next-month",
+  conditionId: `0x${"a".repeat(64)}`,
   question: "Will the Fed cut rates next month?",
   active: true,
   closed: false,
@@ -101,7 +102,7 @@ describe("show_markets MCP App", () => {
       markets: [
         {
           id: "42",
-          url: "https://knoww.app/events/detail/fed-meeting",
+          url: `https://knoww.app/events/detail/fed-meeting?conditionId=${market.conditionId}`,
           outcomes: [
             {
               name: "Yes",
@@ -121,6 +122,52 @@ describe("show_markets MCP App", () => {
       "https://knoww.app/events/detail/fed-meeting"
     );
   });
+
+  it("keeps all three selected markets and their own outcome prices and links", async () => {
+    const slugs = [
+      "bitcoin-above-74k",
+      "bitcoin-above-76k",
+      "bitcoin-above-78k",
+    ];
+    for (const [index, slug] of slugs.entries()) {
+      mockMarket(slug, {
+        ...market,
+        slug,
+        conditionId: `0x${String(index + 1).repeat(64)}`,
+        outcomes: '["No","Yes"]',
+        outcomePrices: '["0.66","0.34"]',
+        volume: "135415.74727400002",
+      });
+    }
+    const { message } = await callTool("show_markets", 21, { slugs });
+    expect(message.result?.structuredContent).toMatchObject({
+      markets: slugs.map((slug, index) => ({
+        slug,
+        url: `https://knoww.app/events/detail/fed-meeting?conditionId=0x${String(index + 1).repeat(64)}`,
+        volumeLabel: "135,415.75",
+        outcomes: [
+          { name: "No", priceLabel: "66.0%", tokenId: "111" },
+          { name: "Yes", priceLabel: "34.0%", tokenId: "222" },
+        ],
+      })),
+      selectionSlugs: slugs,
+      omittedCount: 0,
+      unavailableCount: 0,
+    });
+  });
+
+  it.each([undefined, "invalid&side=BUY"])(
+    "keeps an event-only link without a valid condition id: %s",
+    async (conditionId) => {
+      mockMarket(market.slug, { ...market, conditionId });
+      const { message } = await callTool("show_markets", 22, {
+        slugs: [market.slug],
+      });
+      expect(message.result?.structuredContent).toMatchObject({
+        markets: [{ url: "https://knoww.app/events/detail/fed-meeting" }],
+      });
+    }
+  );
 
   it("preserves nonzero and noncertain probabilities at the display boundaries", async () => {
     mockMarket(market.slug, {
@@ -144,7 +191,7 @@ describe("show_markets MCP App", () => {
     { closed: true, umaResolutionStatus: "resolved" },
     { active: false },
     { archived: true },
-    { endDate: "2000-01-01T00:00:00Z" },
+    { closed: true, endDate: "2000-01-01T00:00:00Z" },
   ])("omits an ineligible market: %j", async (overrides) => {
     mockMarket(market.slug, { ...market, ...overrides });
     const { message } = await callTool("show_markets", 2, {
@@ -153,6 +200,29 @@ describe("show_markets MCP App", () => {
     expect(message.result?.structuredContent).toMatchObject({
       markets: [],
       omittedCount: 1,
+    });
+  });
+
+  it("shows open Fed contracts even after their date-only end timestamp has passed", async () => {
+    const slugs = [
+      "will-the-fed-decrease-interest-rates-by-25-bps-after-the-september-2026-meeting-586",
+      "will-the-fed-decrease-interest-rates-by-50-bps-after-the-september-2026-meeting-863",
+      "will-the-fed-increase-interest-rates-by-25-bps-after-the-september-2026-meeting-649",
+    ];
+    for (const slug of slugs) {
+      mockMarket(slug, {
+        ...market,
+        slug,
+        // Gamma can keep a market open after its listed end date.
+        endDate: "2000-01-01T00:00:00Z",
+        acceptingOrders: true,
+      });
+    }
+    const { message } = await callTool("show_markets", 23, { slugs });
+    expect(message.result?.structuredContent).toMatchObject({
+      markets: slugs.map((slug) => ({ slug, status: "active" })),
+      omittedCount: 0,
+      unavailableCount: 0,
     });
   });
 
