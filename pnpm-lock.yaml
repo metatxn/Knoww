@@ -67,7 +67,7 @@ overrides:
   '@hono/node-server': 2.0.12
   onnxruntime-node@1.24.3>adm-zip: '-'
 
-packageExtensionsChecksum: sha256-ZfVJNnLFQcRwwlZuGoQri/KAm4RocJm7I5/xFTVduF8=
+packageExtensionsChecksum: sha256-ckqXUdBxzAknj0orvocI7mE7fk6jqkSrtrc3cFPX2Uc=
 
 patchedDependencies:
   onnxruntime-node@1.24.3:
@@ -9198,6 +9198,8 @@ snapshots:
 
   '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.79(zod@4.4.3))(zod@4.4.3)':
     dependencies:
+      '@ai-sdk/provider': 4.0.8
+      '@ai-sdk/provider-utils': 5.0.30(zod@4.4.3)
       ai: 7.0.79(zod@4.4.3)
       zod: 4.4.3
 
