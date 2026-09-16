@@ -22,6 +22,14 @@ fewer than 1,000 URLs. Membership in this bounded sitemap is separate from page
 eligibility; a useful page can remain indexable after leaving the recent set.
 Both affected sitemap data-cache keys change with this policy.
 
+Sitemap filters and cursor paging live in
+`apps/web/src/polymarket/sitemap-reads.ts`. They use the registry's Polymarket
+client through `fetchKeysetEventPage`, including the `archived=false` filter.
+Raw pages use `no-store`; the assembled sitemap retains its one-hour cache.
+Disabling Polymarket in the registry returns no event URLs and makes no catalog
+requests. The shared sitemap module handles eligibility, deduplication, and XML
+without calling Gamma directly.
+
 The closure-time query uses the documented `order` and `after_cursor` parameters
 of the [Polymarket events keyset API](https://docs.polymarket.com/api-reference/events/list-events-keyset-pagination).
 A read-only request with `closed=true&order=closedTime&ascending=false` returned

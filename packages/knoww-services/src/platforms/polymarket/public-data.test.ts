@@ -106,6 +106,16 @@ describe("fetchTagBySlug", () => {
 });
 
 describe("fetchEventPage", () => {
+  it("preserves the archived filter used by sitemap queries", async () => {
+    const { client, calls } = createClient(() =>
+      jsonResponse({ events: [], next_cursor: null })
+    );
+
+    await client.fetchEventPage({ limit: 100, archived: false });
+
+    expect(calls[0].searchParams.get("archived")).toBe("false");
+  });
+
   it("forwards the volume and liquidity floors as Gamma's volume_min and liquidity_min", async () => {
     const { client, calls } = createClient(() =>
       jsonResponse({ events: [], next_cursor: null })

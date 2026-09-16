@@ -28,6 +28,14 @@ const DISALLOWED_PLATFORM_NAMING = [
   "getMarketDataAdapter('polymarket')",
 ];
 
+test("sitemap orchestration delegates platform reads instead of calling Gamma", () => {
+  const source = readFileSync(join(SRC_DIR, "lib/sitemap-routes.ts"), "utf8");
+  assert.doesNotMatch(
+    source,
+    /POLYMARKET_API|fetchGammaKeysetPage|\/events\/keyset/
+  );
+});
+
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);

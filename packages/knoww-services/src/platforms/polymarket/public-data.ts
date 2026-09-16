@@ -205,6 +205,7 @@ export interface EventPageParams {
   limit: number;
   cursor?: string;
   closed?: boolean;
+  archived?: boolean;
   live?: boolean;
   tagSlug?: string;
   seriesIds?: number[];
@@ -308,6 +309,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
     addIfDefined(url.searchParams, "limit", input.limit);
     addIfDefined(url.searchParams, "after_cursor", input.cursor);
     addIfDefined(url.searchParams, "closed", input.closed);
+    addIfDefined(url.searchParams, "archived", input.archived);
     addIfDefined(url.searchParams, "live", input.live);
     addIfDefined(url.searchParams, "tag_slug", input.tagSlug);
     addIfDefined(url.searchParams, "series_id", input.seriesIds?.join(","));

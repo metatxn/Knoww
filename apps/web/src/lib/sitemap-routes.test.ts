@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildSitemapEventQueries } from "@/polymarket/sitemap-reads";
 import { GUIDES } from "./guides";
 import {
   buildCategorySitemapRoutes,
   buildEventSitemapRoute,
   buildEventSitemapRoutes,
   buildGuideSitemapRoutes,
-  buildSitemapEventQueries,
   buildSitemapIndexUrls,
   buildStaticSitemapRoutes,
   escapeXml,
@@ -117,39 +117,39 @@ describe("buildSitemapEventQueries", () => {
     const queries = buildSitemapEventQueries("active");
 
     expect(queries).toHaveLength(2);
-    expect(queries[0].params.get("active")).toBe("true");
-    expect(queries[0].params.get("closed")).toBe("false");
-    expect(queries[0].params.get("archived")).toBe("false");
-    expect(queries[0].params.get("order")).toBe("volume24hr");
+    expect(queries[0].params.active).toBe(true);
+    expect(queries[0].params.closed).toBe(false);
+    expect(queries[0].params.archived).toBe(false);
+    expect(queries[0].params.order).toBe("volume24hr");
   });
 
   it("also queries durable closed-false events after their daily volume drops", () => {
     const queries = buildSitemapEventQueries("active");
 
-    expect(queries[1].params.get("active")).toBeNull();
-    expect(queries[1].params.get("closed")).toBe("false");
-    expect(queries[1].params.get("archived")).toBe("false");
-    expect(queries[1].params.get("order")).toBe("volume");
+    expect(queries[1].params.active).toBeUndefined();
+    expect(queries[1].params.closed).toBe(false);
+    expect(queries[1].params.archived).toBe(false);
+    expect(queries[1].params.order).toBe("volume");
   });
 
   it("queries closed events separately for durable evergreen results", () => {
     const queries = buildSitemapEventQueries("evergreen");
 
     expect(queries).toHaveLength(2);
-    expect(queries[0].params.get("closed")).toBe("true");
-    expect(queries[0].params.get("archived")).toBe("false");
-    expect(queries[0].params.get("order")).toBe("volume");
+    expect(queries[0].params.closed).toBe(true);
+    expect(queries[0].params.archived).toBe(false);
+    expect(queries[0].params.order).toBe("volume");
   });
 
   it("also discovers recently closed events independently of trading volume", () => {
     const query = buildSitemapEventQueries("evergreen").find(
-      (entry) => entry.params.get("order") === "closedTime"
+      (entry) => entry.params.order === "closedTime"
     );
 
     expect(query).toBeDefined();
-    expect(query?.params.get("closed")).toBe("true");
-    expect(query?.params.get("archived")).toBe("false");
-    expect(query?.params.get("ascending")).toBe("false");
+    expect(query?.params.closed).toBe(true);
+    expect(query?.params.archived).toBe(false);
+    expect(query?.params.ascending).toBe(false);
     expect(query?.maxItems).toBe(500);
   });
 });
@@ -157,6 +157,7 @@ describe("buildSitemapEventQueries", () => {
 describe("fetchSitemapEventRoutes", () => {
   it("combines recent results with popular history without duplicates or thin pages", async () => {
     const popular = {
+      id: "1",
       slug: "popular-result",
       title: "Popular result",
       closed: true,
