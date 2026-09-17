@@ -2,15 +2,12 @@ import { createLogger } from "@knoww/logger";
 import Decimal from "decimal.js";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { jsonError } from "@/lib/api-error";
 import { clampedInt, firstIssueMessage, orAbsent } from "@/lib/api-query";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
-import {
-  createRequestDeadline,
-  fetchWithTimeout,
-} from "@/lib/fetch-with-timeout";
+import { createRequestDeadline } from "@/lib/fetch-with-timeout";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.whales.activity");
 const REQUEST_DEADLINE_MS = 25_000;
@@ -129,13 +126,12 @@ async function fetchTopTraders(
   signal?: AbortSignal
 ): Promise<LeaderboardTrader[]> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?category=OVERALL&timePeriod=${timePeriod}&orderBy=VOL&limit=${limit}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 300 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "leaderboard",
+      new URLSearchParams(
+        `category=OVERALL&timePeriod=${timePeriod}&orderBy=VOL&limit=${limit}`
+      ),
+      { cache: { revalidateSeconds: 300 }, signal }
     );
     if (!response.ok) return [];
     return await response.json();
@@ -151,13 +147,12 @@ async function fetchTraderActivity(
   signal?: AbortSignal
 ): Promise<TradeActivity[]> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/activity?user=${address.toLowerCase()}&limit=${Math.min(limit, 100)}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "activity",
+      new URLSearchParams(
+        `user=${address.toLowerCase()}&limit=${Math.min(limit, 100)}`
+      ),
+      { cache: { revalidateSeconds: 60 }, signal }
     );
     if (!response.ok) return [];
     return await response.json();
@@ -172,13 +167,10 @@ async function fetchGlobalLargeTrades(
   signal?: AbortSignal
 ): Promise<GlobalTradeData[]> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/trades?limit=${limit}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "trades",
+      new URLSearchParams(`limit=${limit}`),
+      { cache: { revalidateSeconds: 60 }, signal }
     );
     if (!response.ok) return [];
     return await response.json();

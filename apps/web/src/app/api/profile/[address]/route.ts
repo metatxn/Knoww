@@ -1,10 +1,10 @@
 import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { jsonError } from "@/lib/api-error";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.profile");
 
@@ -40,6 +40,7 @@ export interface TraderProfile {
 
   // Stats
   totalVolume: number;
+  totalVolumeUnit?: "shares" | "USD";
   totalPnl: number;
   positionsCount: number;
   tradesCount: number;
@@ -84,9 +85,10 @@ async function fetchPublicProfile(
   address: string
 ): Promise<UpstreamResult<PublicProfile | null>> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/profile/${address}`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+    const response = await fetchWalletDataResponse(
+      "profile",
+      new URLSearchParams({ user: address }),
+      { cache: { revalidateSeconds: 300 } }
     );
     if (!response.ok) return upstreamFailure(null);
     return upstreamSuccess((await response.json()) as PublicProfile);
@@ -121,9 +123,10 @@ async function fetchLeaderboardRank(
   timePeriod: string
 ): Promise<UpstreamResult<LeaderboardEntry | null>> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?user=${address}&timePeriod=${timePeriod}`,
-      { next: { revalidate: 60 } }
+    const response = await fetchWalletDataResponse(
+      "leaderboard",
+      new URLSearchParams(`user=${address}&timePeriod=${timePeriod}`),
+      { cache: { revalidateSeconds: 60 } }
     );
     if (!response.ok) return upstreamFailure(null);
     const data = (await response.json()) as LeaderboardEntry[];
@@ -144,9 +147,10 @@ async function fetchPositions(
   address: string
 ): Promise<UpstreamResult<unknown>> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/positions?user=${address}`,
-      { next: { revalidate: 60 } }
+    const response = await fetchWalletDataResponse(
+      "positions",
+      new URLSearchParams(`user=${address}`),
+      { cache: { revalidateSeconds: 60 } }
     );
     if (!response.ok) return upstreamFailure([]);
     return upstreamSuccess(await response.json());
@@ -157,9 +161,10 @@ async function fetchPositions(
 
 async function fetchTrades(address: string): Promise<UpstreamResult<unknown>> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/trades?user=${address}&limit=100`,
-      { next: { revalidate: 60 } }
+    const response = await fetchWalletDataResponse(
+      "trades",
+      new URLSearchParams(`user=${address}&limit=100`),
+      { cache: { revalidateSeconds: 60 } }
     );
     if (!response.ok) return upstreamFailure([]);
     return upstreamSuccess(await response.json());
@@ -248,7 +253,7 @@ export async function GET(
     const rankMonth = rankMonthResult.data;
 
     // Calculate total volume from P&L data or rankings
-    const totalVolume = rankAll?.vol || pnlData?.volume?.total || 0;
+    const totalVolume = rankAll?.vol ?? pnlData?.volume?.total ?? 0;
     const totalPnl = pnlData?.pnl?.total || rankAll?.pnl || 0;
 
     const profile: TraderProfile = {
@@ -260,6 +265,7 @@ export async function GET(
       verifiedBadge: publicProfile?.verifiedBadge || false,
 
       totalVolume,
+      totalVolumeUnit: rankAll?.vol !== undefined ? "shares" : "USD",
       totalPnl,
       positionsCount: Array.isArray(positions) ? positions.length : 0,
       tradesCount: Array.isArray(trades) ? trades.length : 0,

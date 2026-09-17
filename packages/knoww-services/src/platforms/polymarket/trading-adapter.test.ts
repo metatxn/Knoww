@@ -652,6 +652,81 @@ describe("createPolymarketTradingAdapter order lifecycle", () => {
     expect(posts()).toHaveLength(1);
   });
 
+  it.each([
+    { transactionHashes: [], label: "without inline hashes" },
+    {
+      transactionHashes: [`0x${"ab".repeat(32)}`],
+      label: "with inline hashes",
+    },
+  ])(
+    "preserves trade IDs on an accepted FAK order $label",
+    async ({ transactionHashes }) => {
+      const tradeIds = ["trade-1", "trade-2"];
+      const base = clobRoutes(markets);
+      const calls = installFetchCapture((request, url) => {
+        if (url.pathname === "/order" && request.method === "POST") {
+          return {
+            success: true,
+            errorMsg: "",
+            orderID: RECORDED_ORDER_ID,
+            status: "matched",
+            takingAmount: "50",
+            makingAmount: "25",
+            tradeIDs: tradeIds,
+            ...(transactionHashes.length > 0
+              ? { transactionsHashes: transactionHashes }
+              : {}),
+          };
+        }
+        return base(request, url);
+      });
+      const adapter = openAdapter();
+      const draft = await adapter.previewOrder(
+        intentFor(markets.plain, ORDER_CASES["market-buy-fak-book-walk"])
+      );
+      const input = {
+        draftId: draft.draftId,
+        idempotencyKey: "accepted-fak-settlement",
+      };
+      const result = await adapter.placeOrder(input);
+
+      expect(result.orderId).toBe(RECORDED_ORDER_ID);
+      expect(result.platformDetails).toMatchObject({
+        platform: "polymarket",
+        tradeIds,
+      });
+      if (transactionHashes.length > 0) {
+        expect(result.platformDetails).toMatchObject({ transactionHashes });
+      }
+      await expect(adapter.placeOrder(input)).resolves.toBe(result);
+      expect(calls.filter((call) => postedOrderRequest([call]))).toHaveLength(
+        1
+      );
+    }
+  );
+
+  it.each([
+    { price: "0.5025", eligible: true, reasons: [] },
+    { price: "0.503", eligible: false, reasons: ["off_tick"] },
+  ])("validates price $price against a 0.0025 tick", async (expected) => {
+    const base = clobRoutes(markets);
+    installFetchCapture((request, url) => {
+      if (url.pathname === `/markets/${markets.plain.conditionId}`) {
+        return { ...markets.plain.market, minimum_tick_size: "0.0025" };
+      }
+      return base(request, url);
+    });
+    const draft = await openAdapter().previewOrder(
+      intentFor(markets.plain, { ...GTC_BUY, price: expected.price })
+    );
+
+    expect(draft.tickSize).toBe("0.0025");
+    expect(draft.eligibility).toEqual({
+      eligible: expected.eligible,
+      reasons: expected.reasons,
+    });
+  });
+
   it("previews without a signer and refuses to place", async () => {
     installFetchCapture(clobRoutes(markets));
     const adapter = createPolymarketTradingAdapter();
@@ -733,6 +808,174 @@ describe("createPolymarketTradingAdapter order lifecycle", () => {
       })
     );
     expect(error.kind).toBe("ineligible");
+  });
+});
+
+describe("createPolymarketTradingAdapter settlement reads", () => {
+  beforeEach(() => {
+    pinEntropy();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function trade(id: string, status: string, transactionHash = "") {
+    return {
+      id,
+      status,
+      transaction_hash: transactionHash,
+      asset_id: markets.plain.tokenId,
+      market: markets.plain.conditionId,
+      owner: FAKE_CLOB_CREDENTIALS.apiKey,
+      maker_address: THROWAWAY_EOA,
+      taker_order_id: RECORDED_ORDER_ID,
+      side: "BUY",
+      trader_side: "TAKER",
+      price: "0.5",
+      size: "10",
+      outcome: "Yes",
+      fee_rate_bps: "0",
+      bucket_index: 0,
+      maker_orders: [],
+      match_time: String(FIXED_NOW_SECONDS),
+      last_update: String(FIXED_NOW_SECONDS),
+    };
+  }
+
+  function installTrades(records: ReturnType<typeof trade>[]) {
+    const base = clobRoutes(markets);
+    return installFetchCapture((request, url) => {
+      if (url.pathname === "/data/trades") {
+        const data = records.filter(
+          (record) => record.id === url.searchParams.get("id")
+        );
+        return { data, count: data.length, limit: 100, next_cursor: "LTE=" };
+      }
+      return base(request, url);
+    });
+  }
+
+  it("keeps an accepted order pending when no settlement references exist yet", async () => {
+    const calls = installTrades([]);
+    const result = await openAdapter().getOrderSettlement({
+      identity: eoaIdentity,
+      tradeIds: [],
+    });
+
+    expect(result).toEqual({
+      status: "pending",
+      transactionHashes: [],
+      failedTradeIds: [],
+      pendingTradeIds: [],
+    });
+    expect(calls.filter((call) => postedOrderRequest([call]))).toHaveLength(0);
+  });
+
+  it("collects confirmed hashes without posting or requesting a signature", async () => {
+    const firstHash = `0x${"ab".repeat(32)}`;
+    const secondHash = `0x${"cd".repeat(32)}`;
+    const calls = installTrades([
+      trade("trade-1", "CONFIRMED", firstHash),
+      trade("trade-2", "CONFIRMED", secondHash),
+    ]);
+    const signer = openSigner();
+    const sign = vi.spyOn(signer, "signTypedData");
+    const result = await openAdapter({ signer }).getOrderSettlement({
+      identity: eoaIdentity,
+      tradeIds: ["trade-1", "trade-2", "trade-1"],
+      transactionHashes: [firstHash],
+    });
+
+    expect(
+      calls
+        .filter((call) => new URL(call.url).pathname === "/data/trades")
+        .map((call) => new URL(call.url).searchParams.get("id"))
+    ).toEqual(["trade-1", "trade-2"]);
+    expect(result).toEqual({
+      status: "settled",
+      transactionHashes: [firstHash, secondHash],
+      failedTradeIds: [],
+      pendingTradeIds: [],
+    });
+    expect(sign).not.toHaveBeenCalled();
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  });
+
+  it("reports a failed fill alongside the hashes of confirmed fills", async () => {
+    const transactionHash = `0x${"ab".repeat(32)}`;
+    const calls = installTrades([
+      trade("confirmed", "CONFIRMED", transactionHash),
+      trade("failed", "FAILED"),
+    ]);
+    const result = await openAdapter().getOrderSettlement({
+      identity: eoaIdentity,
+      tradeIds: ["confirmed", "failed"],
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      transactionHashes: [transactionHash],
+      failedTradeIds: ["failed"],
+      pendingTradeIds: [],
+    });
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  });
+
+  it.each(["MATCHED", "MINED", "RETRYING", "CONFIRMED", "missing"])(
+    "keeps %s fills pending until a confirmed hash is available",
+    async (status) => {
+      const calls = installTrades(
+        status === "missing"
+          ? []
+          : [
+              trade(
+                "pending",
+                status,
+                status === "CONFIRMED" ? "" : `0x${"ab".repeat(32)}`
+              ),
+            ]
+      );
+      const result = await openAdapter().getOrderSettlement({
+        identity: eoaIdentity,
+        tradeIds: ["pending"],
+      });
+
+      expect(result).toEqual({
+        status: "pending",
+        transactionHashes: [],
+        failedTradeIds: [],
+        pendingTradeIds: ["pending"],
+      });
+      expect(calls.every((call) => call.method === "GET")).toBe(true);
+    }
+  );
+
+  it("does not request a signature when settlement credentials are rejected", async () => {
+    const base = clobRoutes(markets);
+    const calls = installFetchCapture((request, url) => {
+      if (
+        url.pathname === "/auth/api-keys" ||
+        url.pathname === "/data/trades"
+      ) {
+        return jsonResponse({ error: "Invalid API key" }, 401);
+      }
+      return base(request, url);
+    });
+    const signer = openSigner();
+    const sign = vi
+      .spyOn(signer, "signTypedData")
+      .mockRejectedValue(new Error("Unexpected wallet signature request"));
+
+    await expect(
+      openAdapter({ signer }).getOrderSettlement({
+        identity: eoaIdentity,
+        tradeIds: ["pending"],
+      })
+    ).rejects.toThrow();
+    expect(sign).not.toHaveBeenCalled();
+    expect(calls.filter((call) => postedOrderRequest([call]))).toHaveLength(0);
   });
 });
 

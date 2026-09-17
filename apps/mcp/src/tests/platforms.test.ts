@@ -100,15 +100,15 @@ describe("aggregator tool surface (dev bypass)", () => {
 
   it("answers an alias call with the same payload as the canonical tool", async () => {
     const openInterest = () =>
-      Response.json([{ market: CONDITION_ID, value: "1234.5" }]);
+      Response.json({ data: [{ condition_id: CONDITION_ID, value: 1234.5 }] });
     expectGammaFetch(
       "open interest via canonical name",
-      dataUrl("/oi", `market=${CONDITION_ID}`),
+      dataUrl("/v2/oi", `condition=${CONDITION_ID}`),
       openInterest
     );
     expectGammaFetch(
       "open interest via alias",
-      dataUrl("/oi", `market=${CONDITION_ID}`),
+      dataUrl("/v2/oi", `condition=${CONDITION_ID}`),
       openInterest
     );
 

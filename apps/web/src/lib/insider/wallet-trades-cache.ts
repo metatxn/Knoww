@@ -1,3 +1,4 @@
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 /**
  * Transient per-wallet trade loader. Full trade histories are intentionally
  * never retained at module scope: the live route caches the much smaller
@@ -5,8 +6,6 @@
  */
 
 import { createLogger } from "@knoww/logger";
-import { POLYMARKET_API } from "@/constants/polymarket";
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 const log = createLogger("insider.wallet-trades-cache");
 
@@ -52,12 +51,13 @@ async function fetchWalletTradesPage(
   signal?: AbortSignal
 ): Promise<WalletTradesPage> {
   try {
-    const url = `${POLYMARKET_API.DATA.BASE}/activity?user=${address.toLowerCase()}&limit=${PAGE_SIZE}&offset=${offset}`;
-    const response = await fetchWithTimeout(url, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 300 },
-      signal,
-    });
+    const response = await fetchWalletDataResponse(
+      "activity",
+      new URLSearchParams(
+        `user=${address.toLowerCase()}&limit=${PAGE_SIZE}&offset=${offset}`
+      ),
+      { cache: { revalidateSeconds: 300 }, signal }
+    );
     if (!response.ok) {
       log.warn("page.response.failed", {
         address,

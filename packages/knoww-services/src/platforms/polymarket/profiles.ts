@@ -6,13 +6,13 @@ import {
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { camelCaseDataRow, createDataApi } from "./data-api";
 import { upstreamPublicDataError } from "./errors";
 import type { PolymarketPublicData } from "./public-data";
 
 /**
- * Gamma profile and Data API wallet reads. Behaviour is the legacy
- * `src/profiles/public-data.ts` verbatim; only the base URLs and the fetch
- * binding come from the context, and the leaderboard dependency is injected.
+ * Gamma profiles and Data API v2 wallet reads, normalized for existing callers.
+ * The context supplies fetch and base URLs; leaderboard reads are injected.
  */
 
 const PUBLIC_DATA_TIMEOUT_MS = 8500;
@@ -46,6 +46,12 @@ const positionSchema = z
     size: nonNegativeDecimalStringSchema,
     avgPrice: probabilityStringSchema,
     initialValue: nonNegativeDecimalStringSchema,
+    grossInitialValue: nonNegativeDecimalStringSchema
+      .nullish()
+      .transform((v) => v ?? undefined),
+    entryFeesUsdc: nonNegativeDecimalStringSchema
+      .nullish()
+      .transform((v) => v ?? undefined),
     currentValue: nonNegativeDecimalStringSchema,
     cashPnl: decimalStringSchema,
     percentPnl: decimalStringSchema,
@@ -105,28 +111,12 @@ const closedPositionSchema = z
   })
   .passthrough();
 
-const portfolioValueSchema = z.array(
-  z
-    .object({
-      user: z.string(),
-      value: nonNegativeDecimalStringSchema,
-    })
-    .passthrough()
-);
-
-function addIfDefined(
-  params: URLSearchParams,
-  name: string,
-  value: string | number | boolean | undefined
-) {
-  if (value !== undefined) params.set(name, String(value));
-}
-
 export interface WalletPositionsParams {
   walletAddress: string;
   conditionIds?: string[];
   eventIds?: number[];
   sizeThreshold?: string;
+  includeArchived?: boolean;
   redeemable?: boolean;
   mergeable?: boolean;
   title?: string;
@@ -213,7 +203,8 @@ export function createProfiles(
   ctx: PolymarketClientContext,
   deps: ProfilesDependencies
 ) {
-  const { gamma: GAMMA_API_BASE, dataApi: DATA_API_BASE } = ctx.baseUrls;
+  const { gamma: GAMMA_API_BASE } = ctx.baseUrls;
+  const dataApi = createDataApi(ctx);
 
   async function fetchJson<T>(
     url: URL,
@@ -266,66 +257,131 @@ export function createProfiles(
     return fetchJson(url, profileSchema, options, true);
   }
 
+  const mapPosition = (raw: unknown) => {
+    const row = camelCaseDataRow(raw);
+    return {
+      ...row,
+      asset: row.tokenId,
+      size: row.currentSize,
+      initialValue: row.entryCostUsdc,
+      grossInitialValue: row.totalCostUsdc,
+      curPrice: row.currentPrice,
+      totalBought: row.totalSize,
+      cashPnl: row.unrealizedPnl,
+      oppositeAsset: row.oppositeTokenId,
+      timestamp: row.lastEventAt,
+    };
+  };
+  const v2Position = z.preprocess(mapPosition, positionSchema);
+  const v2ClosedPosition = z.preprocess(mapPosition, closedPositionSchema);
+  const v2Activity = z.preprocess((raw) => {
+    const row = camelCaseDataRow(raw);
+    return {
+      ...row,
+      asset: row.tokenId,
+      side: row.side === "" ? undefined : row.side,
+    };
+  }, activitySchema);
+  const positionSort = (sort?: string) => {
+    const value =
+      {
+        CURRENT: "CURRENT_VALUE",
+        SIZE: "TOKENS",
+        CASHPNL: "UNREALIZED_PNL",
+        REALIZEDPNL: "REALIZED_PNL",
+      }[sort ?? ""] ?? sort;
+    if (
+      value !== undefined &&
+      ![
+        "CURRENT_VALUE",
+        "TOKENS",
+        "UNREALIZED_PNL",
+        "REALIZED_PNL",
+        "TOTAL_PNL",
+        "TIMESTAMP",
+      ].includes(value)
+    )
+      throw upstreamPublicDataError("Unsupported position sort", 400);
+    return value;
+  };
   async function fetchWalletPositions(
     input: WalletPositionsParams,
     options?: ServiceFetchOptions
   ) {
-    const url = new URL("/positions", DATA_API_BASE);
-    url.searchParams.set("user", input.walletAddress);
-    addIfDefined(url.searchParams, "market", input.conditionIds?.join(","));
-    addIfDefined(url.searchParams, "eventId", input.eventIds?.join(","));
-    addIfDefined(url.searchParams, "sizeThreshold", input.sizeThreshold);
-    addIfDefined(url.searchParams, "redeemable", input.redeemable);
-    addIfDefined(url.searchParams, "mergeable", input.mergeable);
-    addIfDefined(url.searchParams, "title", input.title);
-    url.searchParams.set("limit", String(input.limit));
-    url.searchParams.set("offset", String(input.offset));
-    addIfDefined(url.searchParams, "sortBy", input.sortBy);
-    addIfDefined(url.searchParams, "sortDirection", input.sortDirection);
-    return (await fetchJson(url, z.array(positionSchema), options)) ?? [];
+    return dataApi.rows(
+      "positions",
+      {
+        user: input.walletAddress,
+        condition: input.conditionIds?.join(","),
+        event_id: input.eventIds?.join(","),
+        filter_type: "TOKENS",
+        filter_amount: input.sizeThreshold,
+        include_archived: input.includeArchived,
+        status: input.redeemable === true ? "REDEEMABLE" : "OPEN",
+        title: input.title,
+        sort_by: positionSort(input.sortBy),
+        sort_direction: input.sortDirection,
+      },
+      v2Position,
+      {
+        limit: input.limit,
+        offset: input.offset,
+        filter: (row) =>
+          (input.redeemable === undefined ||
+            row.redeemable === input.redeemable) &&
+          (input.mergeable === undefined || row.mergeable === input.mergeable),
+      },
+      options
+    );
   }
-
   async function fetchWalletActivity(
     input: WalletActivityParams,
     options?: ServiceFetchOptions
   ) {
-    const url = new URL("/activity", DATA_API_BASE);
-    url.searchParams.set("user", input.walletAddress);
-    addIfDefined(url.searchParams, "market", input.conditionIds?.join(","));
-    addIfDefined(url.searchParams, "eventId", input.eventIds?.join(","));
-    addIfDefined(url.searchParams, "type", input.types?.join(","));
-    addIfDefined(url.searchParams, "start", input.startTimestamp);
-    addIfDefined(url.searchParams, "end", input.endTimestamp);
-    url.searchParams.set("limit", String(input.limit));
-    url.searchParams.set("offset", String(input.offset));
-    addIfDefined(url.searchParams, "sortDirection", input.sortDirection);
-    return (await fetchJson(url, z.array(activitySchema), options)) ?? [];
+    return dataApi.rows(
+      "activity",
+      {
+        user: input.walletAddress,
+        condition: input.conditionIds?.join(","),
+        event_id: input.eventIds?.join(","),
+        type: input.types?.join(","),
+        start: input.startTimestamp,
+        end: input.endTimestamp,
+        sort_direction: input.sortDirection,
+      },
+      v2Activity,
+      input,
+      options
+    );
   }
-
   async function fetchClosedPositions(
     input: ClosedPositionsParams,
     options?: ServiceFetchOptions
   ) {
-    const url = new URL("/closed-positions", DATA_API_BASE);
-    url.searchParams.set("user", input.walletAddress);
-    addIfDefined(url.searchParams, "market", input.conditionIds?.join(","));
-    addIfDefined(url.searchParams, "eventId", input.eventIds?.join(","));
-    url.searchParams.set("limit", String(input.limit));
-    url.searchParams.set("offset", String(input.offset));
-    addIfDefined(url.searchParams, "sortBy", input.sortBy);
-    addIfDefined(url.searchParams, "sortDirection", input.sortDirection);
-    return (await fetchJson(url, z.array(closedPositionSchema), options)) ?? [];
+    return dataApi.rows(
+      "positions",
+      {
+        user: input.walletAddress,
+        condition: input.conditionIds?.join(","),
+        event_id: input.eventIds?.join(","),
+        status: "CLOSED",
+        sort_by: positionSort(input.sortBy),
+        sort_direction: input.sortDirection,
+      },
+      v2ClosedPosition,
+      input,
+      options
+    );
   }
-
   async function fetchWalletPortfolioValue(
     walletAddress: string,
     options?: ServiceFetchOptions
   ) {
-    const url = new URL("/value", DATA_API_BASE);
-    url.searchParams.set("user", walletAddress);
-    const rows = (await fetchJson(url, portfolioValueSchema, options)) ?? [];
-    const row = rows.find(
-      (entry) => entry.user.toLowerCase() === walletAddress.toLowerCase()
+    const row = await dataApi.value(
+      "value",
+      { user: walletAddress },
+      z.object({ value: nonNegativeDecimalStringSchema }).nullable(),
+      options
     );
     return { walletAddress, value: row?.value ?? "0" };
   }

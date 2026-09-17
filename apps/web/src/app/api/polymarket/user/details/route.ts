@@ -6,13 +6,9 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
 import { sanitizeUpstreamBody } from "@/lib/upstream-error";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.user.details");
-
-/**
- * Polymarket Data API base URL
- */
-const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
  * User details from Polymarket leaderboard API
@@ -132,15 +128,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch user details from Polymarket leaderboard API
-    const response = await fetch(
-      `${DATA_API_BASE}/v1/leaderboard?${queryParams.toString()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-        next: { revalidate: 60 }, // Cache for 1 minute
-      }
-    );
+    const response = await fetchWalletDataResponse("leaderboard", queryParams, {
+      cache: { revalidateSeconds: 60 },
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -181,12 +171,13 @@ export async function GET(request: NextRequest) {
         timePeriod,
         category,
         details: {
-          rank: parseInt(userDetails.rank, 10),
+          rank: userDetails.rank ? Number.parseInt(userDetails.rank, 10) : null,
           proxyWallet: userDetails.proxyWallet,
           userName: userDetails.userName,
           xUsername: userDetails.xUsername || null,
           verifiedBadge: userDetails.verifiedBadge,
           volume: userDetails.vol,
+          volumeUnit: "shares",
           pnl: userDetails.pnl,
           profileImage: userDetails.profileImage || null,
         },

@@ -212,18 +212,19 @@ test("builds market evidence from the order book without side-less price fetches
   globalThis.fetch = async (input) => {
     const url = String(input);
     requestedUrls.push(url);
-    if (url.includes("/prices-history?")) {
+    if (url.includes("/v2/prices-history?")) {
       const nowSec = Math.floor(Date.now() / 1000);
       return {
         ok: true,
         status: 200,
         json: async () => ({
-          history: [
-            { t: nowSec - 86_400, p: 0.45 },
-            { t: nowSec - 3_600, p: 0.46 },
-            { t: nowSec - 300, p: 0.48 },
-            { t: nowSec, p: 0.5 },
+          data: [
+            { timestamp: nowSec - 86_400, price: 0.45 },
+            { timestamp: nowSec - 3_600, price: 0.46 },
+            { timestamp: nowSec - 300, price: 0.48 },
+            { timestamp: nowSec, price: 0.5 },
           ],
+          pagination: { next_cursor: null },
         }),
       };
     }
@@ -341,8 +342,12 @@ test("adds top related markets from grouped Gamma events", async () => {
         }),
       };
     }
-    if (url.includes("/prices-history?")) {
-      return { ok: true, status: 200, json: async () => ({ history: [] }) };
+    if (url.includes("/v2/prices-history?")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [], pagination: { next_cursor: null } }),
+      };
     }
     return {
       ok: true,

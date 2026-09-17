@@ -18,6 +18,8 @@ import { KNOWW_MCP_TOOL_NAMES, TRADING_TOOL_NAMES } from "../tool-catalog";
 import {
   clobUrl,
   dataUrl,
+  dataV2Page,
+  dataV2PositionFixture,
   devEnv,
   dispatch,
   expectGammaFetch,
@@ -254,8 +256,8 @@ describe("trading tools", () => {
   });
 
   it("read positions for an identity through the public Data API", async () => {
-    expectGammaFetch("positions", dataUrl("/positions"), () =>
-      jsonResponse([POSITION])
+    expectGammaFetch("positions", dataUrl("/v2/positions"), () =>
+      jsonResponse(dataV2Page([dataV2PositionFixture(POSITION)]))
     );
     const result = await callExposed("get_account_positions", {
       platform: "polymarket",
@@ -274,7 +276,9 @@ describe("trading tools", () => {
   });
 
   it("page activity for an identity", async () => {
-    expectGammaFetch("activity", dataUrl("/activity"), () => jsonResponse([]));
+    expectGammaFetch("activity", dataUrl("/v2/activity"), () =>
+      jsonResponse(dataV2Page([]))
+    );
     const result = await callExposed("get_account_activity", {
       platform: "polymarket",
       identity: IDENTITY,

@@ -20,6 +20,7 @@ export type PlatformOperation =
   | "getAccountPositions"
   | "getAccountActivity"
   | "getAccountOrders"
+  | "getOrderSettlement"
   | "previewOrder"
   | "placeOrder"
   | "cancelOrder";

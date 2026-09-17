@@ -5,11 +5,11 @@ import { ERROR_MESSAGES } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import {
   createRequestDeadline,
-  fetchWithTimeout,
   isAbortLikeError,
 } from "@/lib/fetch-with-timeout";
 import { summarizeUserPositions } from "@/lib/user-position-summary";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.user.positions");
 const UPSTREAM_TIMEOUT_MS = 10_000;
@@ -24,11 +24,6 @@ const POSITIONS_UPSTREAM_MAX_PAGE_SIZE = 100;
 const POSITIONS_UPSTREAM_ABSOLUTE_MAX_PAGES = 10;
 
 /**
- * Polymarket Data API base URL
- */
-const DATA_API_BASE = "https://data-api.polymarket.com";
-
-/**
  * Position data from Polymarket Data API
  * Based on actual response from: /positions?user={address}&sizeThreshold=.1&redeemable=true
  */
@@ -39,6 +34,8 @@ interface PolymarketPosition {
   size: number;
   avgPrice: number;
   initialValue: number;
+  grossInitialValue?: number;
+  entryFeesUsdc?: number;
   currentValue: number;
   cashPnl: number;
   percentPnl: number;
@@ -107,19 +104,13 @@ async function fetchPolymarketPositionsPage(
 > {
   const pageQueryParams = new URLSearchParams(queryParams);
   pageQueryParams.set("offset", upstreamOffset.toString());
-  const fullUrl = `${DATA_API_BASE}/positions?${pageQueryParams.toString()}`;
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(
-      fullUrl,
-      {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal,
-      },
-      UPSTREAM_TIMEOUT_MS
-    );
+    response = await fetchWalletDataResponse("positions", pageQueryParams, {
+      signal,
+      timeoutMs: UPSTREAM_TIMEOUT_MS,
+    });
   } catch (error) {
     if (isAbortLikeError(error)) {
       return {
@@ -452,6 +443,12 @@ export async function GET(request: NextRequest) {
       currentPrice: p.curPrice,
       currentValue: p.currentValue,
       initialValue: p.initialValue,
+      ...(p.grossInitialValue === undefined
+        ? {}
+        : { grossInitialValue: p.grossInitialValue }),
+      ...(p.entryFeesUsdc === undefined
+        ? {}
+        : { entryFeesUsdc: p.entryFeesUsdc }),
       unrealizedPnl: p.cashPnl,
       unrealizedPnlPercent: p.percentPnl,
       realizedPnl: p.realizedPnl,
@@ -483,6 +480,12 @@ export async function GET(request: NextRequest) {
       size: p.size,
       avgPrice: p.avgPrice,
       initialValue: p.initialValue,
+      ...(p.grossInitialValue === undefined
+        ? {}
+        : { grossInitialValue: p.grossInitialValue }),
+      ...(p.entryFeesUsdc === undefined
+        ? {}
+        : { entryFeesUsdc: p.entryFeesUsdc }),
       endDate: p.endDate,
       negRisk: p.negativeRisk,
       market: {

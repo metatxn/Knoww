@@ -2,17 +2,13 @@ import { createLogger } from "@knoww/logger";
 import Decimal from "decimal.js";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { clampedInt, nonNegativeFloatParam, orAbsent } from "@/lib/api-query";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
-import {
-  createRequestDeadline,
-  fetchWithTimeout,
-  waitForAbort,
-} from "@/lib/fetch-with-timeout";
+import { createRequestDeadline, waitForAbort } from "@/lib/fetch-with-timeout";
 import { scoreFundingCluster } from "@/lib/insider/archetypes/funding-cluster";
 import { scoreOwnerCluster } from "@/lib/insider/archetypes/owner-cluster";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.whales.suspicious");
 
@@ -256,13 +252,10 @@ async function fetchRecentTrades(
   signal?: AbortSignal
 ): Promise<TradeData[]> {
   try {
-    const response = await fetchWithTimeout(
-      `${POLYMARKET_API.DATA.BASE}/trades?limit=${limit}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "trades",
+      new URLSearchParams(`limit=${limit}`),
+      { cache: { revalidateSeconds: 60 }, signal }
     );
     if (!response.ok) return [];
     return response.json();

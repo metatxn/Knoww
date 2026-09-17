@@ -5,13 +5,9 @@ import { ERROR_MESSAGES } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { sanitizeUpstreamBody } from "@/lib/upstream-error";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.user.portfolio-value");
-
-/**
- * Polymarket Data API base URL
- */
-const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
  * Portfolio Value API Response
@@ -113,15 +109,10 @@ export async function GET(request: NextRequest) {
 
     let response: Response;
     try {
-      response = await fetch(
-        `${DATA_API_BASE}/value?user=${user.toLowerCase()}`,
-        {
-          headers: {
-            Accept: "application/json",
-          },
-          next: { revalidate: 30 }, // Cache for 30 seconds
-          signal: controller.signal,
-        }
+      response = await fetchWalletDataResponse(
+        "value",
+        new URLSearchParams({ user: user.toLowerCase() }),
+        { signal: controller.signal, cache: { revalidateSeconds: 30 } }
       );
     } catch (err) {
       clearTimeout(timeoutId);

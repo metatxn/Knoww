@@ -10,13 +10,9 @@ import {
   isAbortLikeError,
 } from "@/lib/fetch-with-timeout";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.user.pnl");
-
-/**
- * Polymarket Data API base URL
- */
-const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
  * Polymarket User P&L API base URL
@@ -216,15 +212,15 @@ async function fetchActivity(
 
   for (let page = 0; page < MAX_ACTIVITY_PAGES; page++) {
     const offset = page * ACTIVITY_PAGE_SIZE;
-    const response = await fetchWithTimeout(
-      `${DATA_API_BASE}/activity?user=${user.toLowerCase()}&limit=${ACTIVITY_PAGE_SIZE}&offset=${offset}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "activity",
+      new URLSearchParams({
+        user: user.toLowerCase(),
+        limit: String(ACTIVITY_PAGE_SIZE),
+        offset: String(offset),
+      }),
+      { signal, cache: { revalidateSeconds: 60 } }
     );
-
     if (!response.ok) throw new Error("Failed to fetch trades");
 
     const pageData: unknown = await response.json();
@@ -269,13 +265,15 @@ async function fetchPositions(
   const seen = new Set<string>();
 
   for (let page = 0; page < MAX_POSITIONS_PAGES; page++) {
-    const response = await fetchWithTimeout(
-      `${DATA_API_BASE}/positions?user=${user.toLowerCase()}&sizeThreshold=.1&limit=${POSITIONS_PAGE_SIZE}&offset=${page * POSITIONS_PAGE_SIZE}`,
-      {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 60 },
-        signal,
-      }
+    const response = await fetchWalletDataResponse(
+      "positions",
+      new URLSearchParams({
+        user: user.toLowerCase(),
+        sizeThreshold: ".1",
+        limit: String(POSITIONS_PAGE_SIZE),
+        offset: String(page * POSITIONS_PAGE_SIZE),
+      }),
+      { signal, cache: { revalidateSeconds: 60 } }
     );
     if (!response.ok) throw new Error("Failed to fetch positions");
 

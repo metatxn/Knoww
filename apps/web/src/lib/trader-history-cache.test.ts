@@ -1,5 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// These tests exercise consumer behavior; wallet-reads.test.ts checks the v2 wire contract.
+vi.mock("@/polymarket/wallet-reads", () => ({
+  fetchWalletDataResponse: (
+    resource: string,
+    params: URLSearchParams,
+    options?: { signal?: AbortSignal }
+  ) => {
+    const path =
+      resource === "leaderboard"
+        ? "v1/leaderboard"
+        : resource === "profile"
+          ? `profile/${params.get("user")}`
+          : resource;
+    return fetch(`https://data-api.polymarket.com/${path}?${params}`, {
+      signal: options?.signal,
+    });
+  },
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();

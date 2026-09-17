@@ -41,7 +41,23 @@ describe("fetchTraderLeaderboardPage", () => {
       xUsername: "alice",
       verifiedBadge: true,
     };
-    const { client, calls } = createClient(() => jsonResponse([row]));
+    const { client, calls } = createClient(() =>
+      jsonResponse({
+        data: [
+          {
+            rank: row.rank,
+            user_id: row.proxyWallet,
+            user_name: row.userName,
+            volume: row.vol,
+            pnl: row.pnl,
+            profile_image: row.profileImage,
+            x_username: row.xUsername,
+            verified: row.verifiedBadge,
+          },
+        ],
+        pagination: { next_cursor: null },
+      })
+    );
 
     const page = await client.fetchTraderLeaderboardPage({
       category: "OVERALL",
@@ -51,15 +67,14 @@ describe("fetchTraderLeaderboardPage", () => {
       offset: 0,
     });
 
-    expect(calls[0].pathname).toBe("/v1/leaderboard");
+    expect(calls[0].pathname).toBe("/v2/leaderboard");
     expect(Object.fromEntries(calls[0].searchParams)).toEqual({
       category: "OVERALL",
-      timePeriod: "DAY",
-      orderBy: "PNL",
+      time_period: "DAY",
+      sort_by: "PNL",
       limit: "25",
-      offset: "0",
     });
-    expect(page.rawEntries).toEqual([row]);
+    expect(page.rawEntries[0]).toMatchObject(row);
     expect(page.entries).toMatchObject([
       { rank: "1", volume: "1000.5", pnl: "-12.25", xUsername: "alice" },
     ]);

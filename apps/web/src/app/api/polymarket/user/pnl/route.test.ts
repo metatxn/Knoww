@@ -5,6 +5,17 @@ vi.mock("@/lib/api-rate-limit", () => ({
   checkRateLimit: vi.fn(() => null),
 }));
 
+vi.mock("@/polymarket/wallet-reads", () => ({
+  fetchWalletDataResponse: (
+    resource: string,
+    params: URLSearchParams,
+    options?: { signal?: AbortSignal }
+  ) =>
+    fetch(`https://data-api.polymarket.com/${resource}?${params}`, {
+      signal: options?.signal,
+    }),
+}));
+
 import { GET } from "./route";
 
 interface UserPnlResponse {

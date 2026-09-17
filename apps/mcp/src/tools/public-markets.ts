@@ -524,7 +524,7 @@ function registerEventLiveVolume(server: McpServer) {
   const inputSchema = z.object({ eventId: z.number().int().positive() });
   registerWithLegacyAlias(
     "polymarket_get_event_live_volume",
-    "Get live aggregate volume and per-market volume for one event.",
+    "Get live taker volume for one event and its markets, measured in shares.",
     (name, description) =>
       server.registerTool(
         name,
@@ -595,7 +595,7 @@ function registerTraderLeaderboard(server: McpServer) {
   });
   registerWithLegacyAlias(
     "polymarket_get_trader_leaderboard",
-    "Get ranked public Polymarket trader volume and PnL statistics with opaque cursor pagination.",
+    "Get ranked public Polymarket traders with volume in shares and PnL in USD, using opaque cursor pagination.",
     (name, description) =>
       server.registerTool(
         name,

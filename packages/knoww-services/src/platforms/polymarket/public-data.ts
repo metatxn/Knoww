@@ -5,15 +5,15 @@ import {
 } from "../../fetch-options";
 import { decimalValueSchema } from "../../validation";
 import type { PolymarketClientContext } from "./context";
+import { camelCaseDataRow, createDataApi } from "./data-api";
 import { upstreamPublicDataError } from "./errors";
 import { gammaMarketDetailSchema } from "./gamma-detail";
 // Type only: the shape of a Gamma event record the mappers accept.
 import type { GammaEventLike } from "./mappers";
 
 /**
- * Gamma, CLOB and Data API public reads. Behaviour is the legacy
- * `src/markets/public-data.ts` verbatim; only the base URLs and the fetch
- * binding come from the context.
+ * Gamma, CLOB and Data API v2 public reads with validated platform payloads.
+ * The context supplies base URLs, fetch, cache hints, and cancellation.
  */
 
 const PUBLIC_DATA_TIMEOUT_MS = 8500;
@@ -98,29 +98,6 @@ const holderGroupSchema = z
   .object({
     token: z.string(),
     holders: z.array(holderSchema),
-  })
-  .passthrough();
-
-const openInterestSchema = z
-  .object({
-    market: z.string(),
-    value: nonNegativeDecimalStringSchema,
-  })
-  .passthrough()
-  .transform(({ market, value }) => ({ conditionId: market, value }));
-
-const liveVolumeSchema = z
-  .object({
-    total: nonNegativeDecimalStringSchema,
-    markets: z.array(
-      z
-        .object({
-          market: z.string(),
-          value: nonNegativeDecimalStringSchema,
-        })
-        .passthrough()
-        .transform(({ market, value }) => ({ conditionId: market, value }))
-    ),
   })
   .passthrough();
 
@@ -235,11 +212,9 @@ export interface MarketTradesParams {
 }
 
 export function createPublicData(ctx: PolymarketClientContext) {
-  const {
-    gamma: GAMMA_API_BASE,
-    clob: CLOB_API_BASE,
-    dataApi: DATA_API_BASE,
-  } = ctx.baseUrls;
+  const { gamma: GAMMA_API_BASE, clob: CLOB_API_BASE } = ctx.baseUrls;
+
+  const dataApi = createDataApi(ctx);
 
   /**
    * Fetches and validates a JSON payload. Returns the parsed data next to the
@@ -343,18 +318,23 @@ export function createPublicData(ctx: PolymarketClientContext) {
     input: MarketTradesParams,
     options?: PublicFetchOptions
   ) {
-    const url = new URL("/trades", DATA_API_BASE);
-    addIfDefined(url.searchParams, "market", input.conditionIds?.join(","));
-    addIfDefined(url.searchParams, "eventId", input.eventIds?.join(","));
-    addIfDefined(url.searchParams, "user", input.walletAddress);
-    addIfDefined(url.searchParams, "side", input.side);
-    addIfDefined(url.searchParams, "start", input.startTimestamp);
-    addIfDefined(url.searchParams, "end", input.endTimestamp);
-    addIfDefined(url.searchParams, "limit", input.limit);
-    addIfDefined(url.searchParams, "offset", input.offset);
-    return (await fetchJson(url, z.array(tradeSchema), options)) as z.infer<
-      typeof tradeSchema
-    >[];
+    return dataApi.rows(
+      "trades",
+      {
+        condition: input.conditionIds?.join(","),
+        event_id: input.eventIds?.join(","),
+        user: input.walletAddress,
+        side: input.side,
+        start: input.startTimestamp,
+        end: input.endTimestamp,
+      },
+      z.preprocess((raw) => {
+        const row = camelCaseDataRow(raw);
+        return { ...row, asset: row.tokenId };
+      }, tradeSchema),
+      input,
+      options
+    );
   }
 
   const quoteMapSchema = z.record(
@@ -441,87 +421,150 @@ export function createPublicData(ctx: PolymarketClientContext) {
     input: { conditionIds: string[]; limit: number; minBalance?: number },
     options?: PublicFetchOptions
   ) {
-    const url = new URL("/holders", DATA_API_BASE);
-    url.searchParams.set("market", input.conditionIds.join(","));
-    addIfDefined(url.searchParams, "limit", input.limit);
-    addIfDefined(url.searchParams, "minBalance", input.minBalance);
-    return (await fetchJson(
-      url,
-      z.array(holderGroupSchema),
+    const schema = z.preprocess((raw) => {
+      const row = camelCaseDataRow(raw);
+      return {
+        token: row.tokenId,
+        holders: Array.isArray(row.holders)
+          ? row.holders.map((entry) => {
+              const holder = camelCaseDataRow(entry);
+              return { ...holder, asset: holder.tokenId };
+            })
+          : row.holders,
+      };
+    }, holderGroupSchema);
+    // v2 sizes each page per outcome token, so one page already holds top N.
+    const page = await dataApi.page(
+      "holders",
+      {
+        condition: input.conditionIds.join(","),
+        limit: input.limit,
+        min_balance: input.minBalance,
+      },
+      schema,
       options
-    )) as z.infer<typeof holderGroupSchema>[];
+    );
+    return page.items;
   }
 
   async function fetchOpenInterest(
     conditionIds: string[],
     options?: PublicFetchOptions
   ) {
-    const url = new URL("/oi", DATA_API_BASE);
-    url.searchParams.set("market", conditionIds.join(","));
-    return (await fetchJson(
-      url,
-      z.array(openInterestSchema),
+    return dataApi.value(
+      "oi",
+      { condition: conditionIds.join(",") },
+      z.array(
+        z
+          .object({
+            condition_id: z.string(),
+            value: nonNegativeDecimalStringSchema,
+          })
+          .transform(({ condition_id, value }) => ({
+            conditionId: condition_id,
+            value,
+          }))
+      ),
       options
-    )) as z.infer<typeof openInterestSchema>[];
+    );
   }
-
   async function fetchEventLiveVolume(
     eventId: number,
     options?: PublicFetchOptions
   ) {
-    const url = new URL("/live-volume", DATA_API_BASE);
-    url.searchParams.set("id", String(eventId));
-    const rows = (await fetchJson(
-      url,
-      z.array(liveVolumeSchema),
+    const row = await dataApi.value(
+      "live-volume",
+      { event_id: eventId },
+      z.object({
+        taker_volume_total: nonNegativeDecimalStringSchema,
+        conditions: z.array(
+          z.object({
+            condition_id: z.string(),
+            taker_volume: nonNegativeDecimalStringSchema,
+          })
+        ),
+      }),
       options
-    )) as z.infer<typeof liveVolumeSchema>[];
-    const row = rows[0] ?? { total: "0", markets: [] };
-    return { eventId, total: row.total, markets: row.markets };
+    );
+    return {
+      eventId,
+      total: row.taker_volume_total,
+      markets: row.conditions.map((market) => ({
+        conditionId: market.condition_id,
+        value: market.taker_volume,
+      })),
+    };
   }
-
-  function leaderboardUrl(input: TraderLeaderboardParams): URL {
-    const url = new URL("/v1/leaderboard", DATA_API_BASE);
-    url.searchParams.set("category", input.category);
-    url.searchParams.set("timePeriod", input.timePeriod);
-    url.searchParams.set("orderBy", input.orderBy);
-    url.searchParams.set("limit", String(input.limit));
-    url.searchParams.set("offset", String(input.offset));
-    addIfDefined(url.searchParams, "user", input.walletAddress);
-    addIfDefined(url.searchParams, "userName", input.userName);
-    return url;
-  }
-
-  async function fetchTraderLeaderboard(
-    input: TraderLeaderboardParams,
-    options?: PublicFetchOptions
-  ) {
-    return (await fetchJson(
-      leaderboardUrl(input),
-      z.array(leaderboardEntrySchema),
-      options
-    )) as z.infer<typeof leaderboardEntrySchema>[];
-  }
-
-  /**
-   * The leaderboard with the rows as the Data API sent them alongside the
-   * validated ones. apps/web serves the untouched rows to its leaderboard
-   * page, so that payload stays byte-identical to a direct Data API read.
-   */
   async function fetchTraderLeaderboardPage(
     input: TraderLeaderboardParams,
     options?: PublicFetchOptions
   ) {
-    const { payload, data } = await fetchValidated(
-      leaderboardUrl(input),
-      z.array(leaderboardEntrySchema),
-      options
-    );
-    return {
-      entries: data,
-      /** The same rows as the Data API sent them, index-aligned with `entries`. */
-      rawEntries: payload as DataApiLeaderboardRecord[],
+    const params = {
+      category: input.category,
+      time_period: input.timePeriod,
+      sort_by: input.orderBy === "VOL" ? "VOLUME" : input.orderBy,
     };
+    const mapRow = (raw: unknown) => {
+      const { userId, volume, verified, ...row } = camelCaseDataRow(raw);
+      return {
+        ...row,
+        proxyWallet: userId,
+        vol: volume,
+        verifiedBadge: verified,
+      };
+    };
+    let rawEntries: DataApiLeaderboardRecord[];
+    if (input.walletAddress) {
+      const standing = await dataApi.value(
+        "leaderboard",
+        {
+          category: input.category,
+          time_period: input.timePeriod,
+          user: input.walletAddress,
+        },
+        z.record(z.string(), z.unknown()).nullable(),
+        options
+      );
+      if (!standing || input.offset > 0 || input.limit === 0) rawEntries = [];
+      else {
+        const row = mapRow(standing);
+        const rank =
+          input.orderBy === "VOL" ? standing.rank_volume : standing.rank_pnl;
+        // Empty rank means unranked; do not invent rank zero.
+        rawEntries = [{ ...row, rank: rank ?? "" } as DataApiLeaderboardRecord];
+      }
+    } else {
+      rawEntries = await dataApi.rows(
+        "leaderboard",
+        params,
+        z.unknown().transform((raw) => {
+          const row = mapRow(raw);
+          leaderboardEntrySchema.parse(row);
+          return row as DataApiLeaderboardRecord;
+        }),
+        {
+          limit: input.limit,
+          offset: input.offset,
+          ...(input.userName
+            ? {
+                filter: (row: DataApiLeaderboardRecord) =>
+                  String(row.userName ?? "")
+                    .toLowerCase()
+                    .includes((input.userName ?? "").toLowerCase()),
+              }
+            : {}),
+        },
+        options
+      );
+    }
+    const entries = z.array(leaderboardEntrySchema).parse(rawEntries);
+    return { entries, rawEntries };
+  }
+  async function fetchTraderLeaderboard(
+    input: TraderLeaderboardParams,
+    options?: PublicFetchOptions
+  ) {
+    return (await fetchTraderLeaderboardPage(input, options)).entries;
   }
 
   /**
@@ -596,7 +639,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
     )) as z.infer<typeof tagSchema>;
     const url = new URL("/markets/keyset", GAMMA_API_BASE);
     url.searchParams.set("tag_id", tag.id);
-    url.searchParams.set("limit", String(input.limit));
+    url.searchParams.set("limit", String(Math.min(input.limit, 100)));
     addIfDefined(url.searchParams, "after_cursor", input.cursor);
     const page = (await fetchJson(url, marketPageSchema, options)) as z.infer<
       typeof marketPageSchema

@@ -120,6 +120,16 @@ export interface PolymarketTradingAdapterInit extends PolymarketClientInit {
 
 export interface PolymarketTradingAdapter extends TradingAdapter {
   readonly platform: typeof PLATFORM;
+  getOrderSettlement(input: {
+    identity: PlatformIdentity;
+    tradeIds: string[];
+    transactionHashes?: string[];
+  }): Promise<{
+    status: "pending" | "settled" | "failed";
+    transactionHashes: string[];
+    failedTradeIds: string[];
+    pendingTradeIds: string[];
+  }>;
 }
 
 type EvmAddress = `0x${string}`;
@@ -241,6 +251,9 @@ const postOrderResponseSchema = z
     orderID: z.string().optional(),
     status: z.string().optional(),
     transactionsHashes: z.array(z.string()).optional(),
+    transactionHashes: z.array(z.string()).optional(),
+    tradeIds: z.array(z.string()).optional(),
+    tradeIDs: z.array(z.string()).optional(),
   })
   .passthrough();
 
@@ -1086,14 +1099,25 @@ export function createPolymarketTradingAdapter(
     const orderId = posted.success
       ? (posted.data.orderId ?? posted.data.orderID)
       : undefined;
-    const hashes = posted.success ? (posted.data.transactionsHashes ?? []) : [];
+    const hashes = posted.success
+      ? (posted.data.transactionHashes ?? posted.data.transactionsHashes ?? [])
+      : [];
+    const tradeIds = posted.success
+      ? (posted.data.tradeIds ?? posted.data.tradeIDs ?? [])
+      : [];
     return {
       platform: PLATFORM,
       status: orderStatusOf(posted.success ? posted.data.status : undefined),
       ...(orderId !== undefined ? { orderId } : {}),
       idempotencyKey,
-      ...(hashes.length > 0
-        ? { platformDetails: { platform: PLATFORM, transactionHashes: hashes } }
+      ...(hashes.length > 0 || tradeIds.length > 0
+        ? {
+            platformDetails: {
+              platform: PLATFORM,
+              ...(hashes.length ? { transactionHashes: hashes } : {}),
+              ...(tradeIds.length ? { tradeIds } : {}),
+            },
+          }
         : {}),
     };
   }
@@ -1314,6 +1338,77 @@ export function createPolymarketTradingAdapter(
     return pending;
   }
 
+  async function getOrderSettlement(input: {
+    identity: PlatformIdentity;
+    tradeIds: string[];
+    transactionHashes?: string[];
+  }) {
+    return run("getOrderSettlement", async () => {
+      const ids = z
+        .array(z.string().trim().min(1).max(256))
+        .max(100)
+        .safeParse(input.tradeIds);
+      if (!ids.success)
+        throw fail(
+          "getOrderSettlement",
+          "invalid_input",
+          "Invalid settlement trade IDs"
+        );
+      const account = resolveTradingAccount(
+        input.identity,
+        "getOrderSettlement"
+      );
+      const client = adaptUnifiedSecureClientForLegacyClob(
+        (await readOnlyOrdersClient(
+          account,
+          "getOrderSettlement"
+        )) as unknown as UnifiedSdkTradingClient
+      );
+      const hashes = new Set(input.transactionHashes ?? []);
+      const pendingTradeIds: string[] = [];
+      const failedTradeIds: string[] = [];
+      for (const id of new Set(ids.data)) {
+        const raw = await client.fetchTrade({ id });
+        if (raw === null) {
+          pendingTradeIds.push(id);
+          continue;
+        }
+        const trade = z
+          .object({
+            status: z.string(),
+            transactionHash: z.string().nullish(),
+            transaction_hash: z.string().nullish(),
+          })
+          .safeParse(raw);
+        if (!trade.success)
+          throw fail(
+            "getOrderSettlement",
+            "upstream",
+            "Invalid trade settlement response"
+          );
+        if (trade.data.status.toUpperCase() === "FAILED") {
+          failedTradeIds.push(id);
+          continue;
+        }
+        const hash = trade.data.transactionHash ?? trade.data.transaction_hash;
+        if (trade.data.status.toUpperCase() === "CONFIRMED" && hash)
+          hashes.add(hash);
+        else pendingTradeIds.push(id);
+      }
+      return {
+        status:
+          pendingTradeIds.length || (ids.data.length === 0 && hashes.size === 0)
+            ? ("pending" as const)
+            : failedTradeIds.length
+              ? ("failed" as const)
+              : ("settled" as const),
+        transactionHashes: [...hashes],
+        pendingTradeIds,
+        failedTradeIds,
+      };
+    });
+  }
+
   return {
     platform: PLATFORM,
     regionPolicy: () => POLYMARKET_REGION_POLICY,
@@ -1321,6 +1416,7 @@ export function createPolymarketTradingAdapter(
     getAccountPositions,
     getAccountActivity,
     getAccountOrders,
+    getOrderSettlement,
     previewOrder,
     placeOrder,
     cancelOrder,

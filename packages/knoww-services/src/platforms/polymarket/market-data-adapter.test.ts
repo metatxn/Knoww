@@ -380,7 +380,13 @@ describe("createPolymarketMarketDataAdapter", () => {
   describe("getPriceHistory", () => {
     it("requests a one-day window ending now and maps the points to ISO times", async () => {
       const recorded = recordingFetch(() =>
-        jsonResponse(clobPricesHistoryFixture)
+        jsonResponse({
+          data: clobPricesHistoryFixture.history.map(({ t, p }) => ({
+            timestamp: t,
+            price: p,
+          })),
+          pagination: { next_cursor: null },
+        })
       );
       const adapter = createPolymarketMarketDataAdapter({
         fetchImpl: recorded.fetchImpl,
@@ -392,7 +398,7 @@ describe("createPolymarketMarketDataAdapter", () => {
         interval: "1d",
       });
       expect(recorded.calls.map((call) => call.url)).toEqual([
-        `https://clob.polymarket.com/prices-history?market=${CUT_50_YES_TOKEN}&startTs=1788358200&endTs=1788444600&fidelity=15`,
+        `https://data-api.polymarket.com/v2/prices-history?token_id=${CUT_50_YES_TOKEN}&start=1788358200&end=1788444600&bucket_seconds=900&limit=10000`,
       ]);
       expect(history).toMatchObject({
         marketId: `polymarket:${CUT_50_CONDITION_ID}`,
@@ -410,7 +416,9 @@ describe("createPolymarketMarketDataAdapter", () => {
     });
 
     it("honours an explicit fidelity on a one-hour window", async () => {
-      const recorded = recordingFetch(() => jsonResponse({ history: [] }));
+      const recorded = recordingFetch(() =>
+        jsonResponse({ data: [], pagination: { next_cursor: null } })
+      );
       const adapter = createPolymarketMarketDataAdapter({
         fetchImpl: recorded.fetchImpl,
         now: () => new Date(1788444600 * 1000),
@@ -422,7 +430,7 @@ describe("createPolymarketMarketDataAdapter", () => {
         fidelityMinutes: 5,
       });
       expect(recorded.calls.map((call) => call.url)).toEqual([
-        `https://clob.polymarket.com/prices-history?market=${CUT_50_YES_TOKEN}&startTs=1788441000&endTs=1788444600&fidelity=5`,
+        `https://data-api.polymarket.com/v2/prices-history?token_id=${CUT_50_YES_TOKEN}&start=1788441000&end=1788444600&bucket_seconds=300&limit=10000`,
       ]);
       expect(history.points).toEqual([]);
     });
@@ -431,14 +439,26 @@ describe("createPolymarketMarketDataAdapter", () => {
   describe("getMarketTrades", () => {
     it("lists public trades for the market from the Data API", async () => {
       const { adapter, calls } = createAdapter(() =>
-        jsonResponse(dataTradesFixture)
+        jsonResponse({
+          data: dataTradesFixture.map((row) =>
+            Object.fromEntries(
+              Object.entries(row).map(([k, v]) => [
+                k === "asset"
+                  ? "token_id"
+                  : k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+                v,
+              ])
+            )
+          ),
+          pagination: { next_cursor: null },
+        })
       );
       const page = await adapter.getMarketTrades({
         sourceMarketId: CUT_50_CONDITION_ID,
         limit: 2,
       });
       expect(calls.map((call) => call.url)).toEqual([
-        `https://data-api.polymarket.com/trades?market=${CUT_50_CONDITION_ID}&limit=2&offset=0`,
+        `https://data-api.polymarket.com/v2/trades?condition=${CUT_50_CONDITION_ID}&limit=2`,
       ]);
       expect(page.items).toEqual([
         {

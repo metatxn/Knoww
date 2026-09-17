@@ -293,25 +293,25 @@ export function recordedPosition(
   proxyWallet: string
 ): Record<string, unknown> {
   return {
-    proxyWallet,
-    asset: market.tokenId,
-    conditionId: market.conditionId,
-    size: "10",
-    avgPrice: "0.5",
-    initialValue: "5",
-    currentValue: "6",
-    cashPnl: "1",
-    percentPnl: "20",
-    totalBought: "10",
-    realizedPnl: "0",
-    percentRealizedPnl: "0",
-    curPrice: "0.6",
+    proxy_wallet: proxyWallet,
+    token_id: market.tokenId,
+    condition_id: market.conditionId,
+    current_size: "10",
+    avg_price: "0.5",
+    entry_cost_usdc: "5",
+    current_value: "6",
+    unrealized_pnl: "1",
+    percent_pnl: "20",
+    total_size: "10",
+    realized_pnl: "0",
+    percent_realized_pnl: "0",
+    current_price: "0.6",
     redeemable: false,
     mergeable: false,
     title: "Recorded plain market",
     outcome: "Yes",
-    outcomeIndex: 0,
-    negativeRisk: false,
+    outcome_index: 0,
+    negative_risk: false,
   };
 }
 
@@ -320,17 +320,17 @@ export function recordedActivity(
   proxyWallet: string
 ): Record<string, unknown> {
   return {
-    proxyWallet,
+    proxy_wallet: proxyWallet,
     timestamp: FIXED_NOW_SECONDS,
-    conditionId: market.conditionId,
+    condition_id: market.conditionId,
     type: "TRADE",
     size: "10",
-    usdcSize: "5",
-    transactionHash: `0x${"cd".repeat(32)}`,
+    usdc_size: "5",
+    transaction_hash: `0x${"cd".repeat(32)}`,
     price: "0.5",
-    asset: market.tokenId,
+    token_id: market.tokenId,
     side: "BUY",
-    outcomeIndex: 0,
+    outcome_index: 0,
     title: "Recorded plain market",
     outcome: "Yes",
   };
@@ -364,8 +364,16 @@ export function clobRoutes(
     }
     if (url.origin === DATA_API_ORIGIN) {
       const user = url.searchParams.get("user") ?? "";
-      if (path === "/positions") return [recordedPosition(markets.plain, user)];
-      if (path === "/activity") return [recordedActivity(markets.plain, user)];
+      if (path === "/v2/positions")
+        return {
+          data: [recordedPosition(markets.plain, user)],
+          pagination: { next_cursor: null },
+        };
+      if (path === "/v2/activity")
+        return {
+          data: [recordedActivity(markets.plain, user)],
+          pagination: { next_cursor: null },
+        };
       return undefined;
     }
     if (url.origin !== CLOB_ORIGIN) return undefined;

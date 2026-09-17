@@ -162,6 +162,7 @@ export function clobUrl(pathname: string, queryContains?: string) {
 export function dataUrl(pathname: string, queryContains?: string) {
   return (url: URL): boolean =>
     url.origin === DATA_ORIGIN &&
+    !url.searchParams.has("offset") &&
     url.pathname === pathname &&
     (queryContains === undefined || url.search.includes(queryContains));
 }
@@ -207,4 +208,30 @@ export function setupGammaFetchStub(): void {
     gammaRoutes.length = 0;
     expect(pending).toEqual([]);
   });
+}
+
+/** Build v2 wire fixtures from the legacy position examples used by tool assertions. */
+export function dataV2PositionFixture(row: Record<string, unknown>) {
+  const names: Record<string, string> = {
+    asset: "token_id",
+    size: "current_size",
+    initialValue: "entry_cost_usdc",
+    grossInitialValue: "total_cost_usdc",
+    curPrice: "current_price",
+    totalBought: "total_size",
+    cashPnl: "unrealized_pnl",
+    oppositeAsset: "opposite_token_id",
+    timestamp: "last_event_at",
+  };
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      names[key] ??
+        key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`),
+      value,
+    ])
+  );
+}
+
+export function dataV2Page(data: unknown[], nextCursor: string | null = null) {
+  return { data, pagination: { next_cursor: nextCursor } };
 }

@@ -1,3 +1,15 @@
+import {
+  normalizePriceHistoryPoint,
+  type PriceHistoryClient,
+  priceHistoryRequests,
+  readSdkPriceHistory,
+} from "./price-history.ts";
+
+export {
+  normalizePriceHistoryPoint,
+  priceHistoryRequests,
+} from "./price-history.ts";
+
 import { POLYMARKET_API, type TradingSide } from "./polymarket.ts";
 
 export type ClobHeaders = Record<string, string>;
@@ -21,7 +33,7 @@ export type ClobFetch = (
   init?: ClobFetchInit
 ) => Promise<ClobFetchResponse>;
 
-export interface UnifiedClobOrderBookClient {
+export interface UnifiedClobOrderBookClient extends PriceHistoryClient {
   fetchOrderBook(request: { tokenId: string }): Promise<unknown>;
   fetchOrderBooks?(request: Array<{ tokenId: string }>): Promise<unknown>;
   fetchMarketInfo?(request: { conditionId: string }): Promise<unknown>;
@@ -29,17 +41,12 @@ export interface UnifiedClobOrderBookClient {
     tokenId: string;
     side: TradingSide;
   }): Promise<unknown>;
-  fetchPriceHistory?(request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
-  }): Promise<unknown>;
   fetchBuilderFeeRates?(request: { builderCode: string }): Promise<unknown>;
 }
 
 export interface ClobRequestOptions {
   host?: string;
+  dataApiHost?: string;
   fetchImpl?: ClobFetch;
   headers?: ClobHeaders;
   requestInit?: ClobFetchInit;
@@ -228,30 +235,6 @@ function optionalNumber(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
-}
-
-function buildUnifiedPriceHistoryRequest(
-  tokenId: string,
-  params: ClobPriceHistoryParams
-): {
-  tokenId: string;
-  startTs?: number;
-  endTs?: number;
-  fidelity?: number;
-} {
-  const request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
-  } = { tokenId };
-  const startTs = optionalNumber(params.startTs);
-  const endTs = optionalNumber(params.endTs);
-  const fidelity = optionalNumber(params.fidelity);
-  if (startTs !== undefined) request.startTs = startTs;
-  if (endTs !== undefined) request.endTs = endTs;
-  if (fidelity !== undefined) request.fidelity = fidelity;
-  return request;
 }
 
 export function buildClobPublicUrl(
@@ -443,36 +426,79 @@ export function fetchClobPrice<T = unknown>(
   return fetchClobJson<T>("price", { token_id: tokenId }, options);
 }
 
-export function fetchClobPriceHistory<T = ClobPriceHistoryResponse>(
+export async function fetchClobPriceHistory<T = ClobPriceHistoryResponse>(
   tokenId: string,
   params: ClobPriceHistoryParams = {},
   options?: ClobRequestOptions
 ): Promise<T> {
   if (canUseUnifiedSdkForPublicRead(options)) {
-    if (options?.unifiedClient?.fetchPriceHistory) {
-      return options.unifiedClient
-        .fetchPriceHistory(buildUnifiedPriceHistoryRequest(tokenId, params))
-        .then((data) => ({
-          history: Array.isArray(data) ? data : [],
-        })) as Promise<T>;
+    if (options?.unifiedClient) {
+      const history = await readSdkPriceHistory(
+        options.unifiedClient,
+        tokenId,
+        params
+      );
+      return { history: history.map(({ t, p }) => ({ t, p: Number(p) })) } as T;
     }
-
-    return import("./polymarket-unified.ts").then(
-      ({ fetchUnifiedClobPriceHistory }) =>
-        fetchUnifiedClobPriceHistory<T>(tokenId, params)
+    const { fetchUnifiedClobPriceHistory } = await import(
+      "./polymarket-unified.ts"
     );
+    return fetchUnifiedClobPriceHistory<T>(tokenId, params);
   }
-
-  return fetchClobJson<T>(
-    "prices-history",
-    {
-      market: tokenId,
-      startTs: params.startTs,
-      endTs: params.endTs,
-      fidelity: params.fidelity,
-    },
-    options
-  );
+  const history = new Map<number, { t: number; p: number }>();
+  for (const request of priceHistoryRequests(tokenId, params)) {
+    const query: Record<string, string | number | undefined> = {
+      token_id: tokenId,
+      start: request.start,
+      end: request.end,
+      interval: request.interval,
+      bucket_seconds: request.bucketSeconds,
+    };
+    const seen = new Set<string>();
+    for (let pages = 0; ; pages++) {
+      if (pages >= 1000)
+        throw new Error("Price history pagination exceeded limit");
+      const result = await fetchClobJson<{
+        data: unknown[];
+        pagination: { next_cursor: string | null };
+      }>("v2/prices-history", query, {
+        ...options,
+        host: options?.dataApiHost ?? POLYMARKET_API.DATA.BASE,
+      });
+      if (
+        !Array.isArray(result.data) ||
+        !result.pagination ||
+        !(
+          result.pagination.next_cursor === null ||
+          typeof result.pagination.next_cursor === "string"
+        )
+      )
+        throw new Error("Malformed price history page");
+      for (const raw of result.data) {
+        const point = normalizePriceHistoryPoint(raw);
+        if (
+          request.start !== undefined &&
+          (point.t < request.start ||
+            (request.end !== undefined && point.t > request.end))
+        )
+          throw new Error("Price history point outside requested window");
+        history.set(point.t, { t: point.t, p: Number(point.p) });
+      }
+      const cursor = result.pagination.next_cursor;
+      if (cursor === null) break;
+      if (!cursor || seen.has(cursor))
+        throw new Error("Price history repeated pagination cursor");
+      seen.add(cursor);
+      query.cursor = cursor;
+    }
+  }
+  return {
+    history: [...history.values()]
+      .filter(
+        (point) => params.endTs === undefined || point.t <= Number(params.endTs)
+      )
+      .sort((a, b) => a.t - b.t),
+  } as T;
 }
 
 /**

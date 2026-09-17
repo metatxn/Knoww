@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  CLOB_ORIGIN,
   callTool,
-  clobUrl,
+  DATA_ORIGIN,
+  dataUrl,
+  dataV2Page,
   devEnv,
   dispatch,
   expectGammaFetch,
@@ -13,14 +14,8 @@ import {
   type ToolCallResult,
 } from "./helpers";
 
-/**
- * get_price_history tests. The CLOB /prices-history contract these encode
- * (probed 2026-08-25): the query key is `market` but carries the TOKEN id,
- * `t` is a seconds epoch number, `p` a float, points arrive ascending, and
- * an unknown token answers HTTP 200 with an empty history, so an empty
- * window is a success, never NOT_FOUND. The tool validates the time range
- * itself, converts points to ISO timestamps and decimal-string prices, and
- * downsamples past 1000 points instead of returning unbounded arrays.
+/** Data API v2 uses token IDs, seconds-based windows and cursor pages.
+ * Tool results retain ISO timestamps and decimal-string prices.
  */
 
 const TOKEN_ID =
@@ -118,19 +113,19 @@ describe("get_price_history tool", () => {
 
   it("converts ISO inputs to epoch seconds and points to ISO plus decimal strings", async () => {
     expectGammaFetch(
-      "clob-history",
-      clobUrl(
-        "/prices-history",
-        `market=${TOKEN_ID}&startTs=${START_TS}&endTs=${END_TS}&fidelity=120`
+      "data-history",
+      dataUrl(
+        "/v2/prices-history",
+        `token_id=${TOKEN_ID}&start=${START_TS}&end=${END_TS}&bucket_seconds=7200`
       ),
       () =>
-        jsonResponse({
-          history: [
-            { t: START_TS + 425, p: 0.006 },
-            { t: START_TS + 4025, p: 0.007 },
-            { t: START_TS + 7625, p: 0.0065 },
-          ],
-        })
+        jsonResponse(
+          dataV2Page([
+            { timestamp: START_TS + 425, price: 0.006 },
+            { timestamp: START_TS + 4025, price: 0.007 },
+            { timestamp: START_TS + 7625, price: 0.0065 },
+          ])
+        )
     );
 
     const { response, message } = await callTool("get_price_history", 83, {
@@ -174,16 +169,16 @@ describe("get_price_history tool", () => {
       new Date((START_TS + 7625) * 1000).toISOString()
     );
     expect(structured.meta.sources).toEqual([
-      { name: "polymarket-clob", url: CLOB_ORIGIN },
+      { name: "polymarket-data", url: DATA_ORIGIN },
     ]);
     expect(structured.meta.truncated).toBeUndefined();
   });
 
   it("defaults to a 24 hour window ending now", async () => {
     expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
-      () => jsonResponse({ history: [] })
+      "data-history",
+      dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`),
+      () => jsonResponse(dataV2Page([]))
     );
 
     const { message } = await callTool("get_price_history", 84, {
@@ -247,13 +242,20 @@ describe("get_price_history tool", () => {
 
   it("downsamples past 1000 points, keeps the endpoints, and flags truncation", async () => {
     const dense = Array.from({ length: 1500 }, (_, index) => ({
-      t: START_TS + index * 30,
-      p: 0.4 + (index % 10) / 1000,
+      timestamp: START_TS + index * 30,
+      price: 0.4 + (index % 10) / 1000,
     }));
     expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
-      () => jsonResponse({ history: dense })
+      "first history page",
+      (url) =>
+        dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`)(url) &&
+        !url.searchParams.has("cursor"),
+      () => jsonResponse(dataV2Page(dense.slice(0, 750), "history-next"))
+    );
+    expectGammaFetch(
+      "second history page",
+      dataUrl("/v2/prices-history", "cursor=history-next"),
+      () => jsonResponse(dataV2Page(dense.slice(750)))
     );
 
     const { message } = await callTool("get_price_history", 88, {
@@ -280,9 +282,9 @@ describe("get_price_history tool", () => {
 
   it("treats an empty history as success, not NOT_FOUND", async () => {
     expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
-      () => jsonResponse({ history: [] })
+      "data-history",
+      dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`),
+      () => jsonResponse(dataV2Page([]))
     );
 
     const { message } = await callTool("get_price_history", 89, {
@@ -301,12 +303,15 @@ describe("get_price_history tool", () => {
     expect(structured.history).not.toHaveProperty("downsampled");
   });
 
-  it("maps CLOB 429 responses to RATE_LIMITED", async () => {
-    expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
-      () => jsonResponse({}, 429)
-    );
+  it("maps Data API 429 responses to RATE_LIMITED", async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expectGammaFetch(
+        `rate-limited history attempt ${attempt}`,
+        dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`),
+        () =>
+          new Response("{}", { status: 429, headers: { "Retry-After": "0" } })
+      );
+    }
 
     const { message } = await callTool("get_price_history", 90, {
       tokenId: TOKEN_ID,
@@ -319,10 +324,10 @@ describe("get_price_history tool", () => {
     expect(text).toContain("Safe to retry.");
   });
 
-  it("maps CLOB server failures to UPSTREAM_UNAVAILABLE", async () => {
+  it("maps Data API server failures to UPSTREAM_UNAVAILABLE", async () => {
     expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
+      "data-history",
+      dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`),
       () => jsonResponse({ error: "boom" }, 500)
     );
 
@@ -339,8 +344,8 @@ describe("get_price_history tool", () => {
 
   it("maps aborted upstream fetches to UPSTREAM_TIMEOUT", async () => {
     expectGammaFetch(
-      "clob-history",
-      clobUrl("/prices-history", `market=${TOKEN_ID}`),
+      "data-history",
+      dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`),
       () => {
         throw new DOMException("The operation was aborted", "AbortError");
       }

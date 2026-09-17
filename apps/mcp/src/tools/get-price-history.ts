@@ -21,14 +21,7 @@ import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 
-/**
- * Upstream /prices-history quirks this tool absorbs (probed 2026-08-25):
- * the query key is `market` but carries the token id, `t` is a seconds
- * epoch while /book uses a milliseconds string, and an unknown token
- * answers HTTP 200 with an empty history. An empty window is therefore a
- * success, never NOT_FOUND. The time range is validated here, so an
- * upstream 400 is unexpected and maps to UPSTREAM_UNAVAILABLE.
- */
+/** The adapter normalizes v2 pages to seconds and decimal-string prices. */
 
 const TOKEN_ID_PATTERN = /^[0-9]{1,80}$/;
 const DEFAULT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -38,14 +31,14 @@ const DEFAULT_FIDELITY_MINUTES = 60;
 const MAX_POINTS = 1000;
 
 const description = [
-  "Fetches price history for one outcome token from the Polymarket CLOB.",
+  "Fetches price history for one outcome token from the Polymarket Data API.",
   "Points are upstream price samples derived from trade activity, returned",
   "in ascending time order with ISO 8601 timestamps and decimal-string",
   "prices in USDC (0 to 1). The window defaults to the last 24 hours, is",
   "capped at 31 days, and fidelityMinutes controls the sample spacing.",
   "Series longer than 1000 points are downsampled evenly with the",
   "endpoints kept. An empty result means no trades in the window or an",
-  "unknown token; upstream does not distinguish the two.",
+  "unknown token or unavailable retained history.",
 ].join(" ");
 
 const inputSchema = {
@@ -225,7 +218,7 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
 
         const meta = buildToolMeta({
           requestId: currentRequestId(),
-          sources: [{ name: "polymarket-clob", url: client.baseUrls.clob }],
+          sources: [{ name: "polymarket-data", url: client.baseUrls.dataApi }],
           ...(lastPoint === undefined ? {} : { asOf: lastPoint.timestamp }),
           ...(downsampled ? { truncated: true } : {}),
         });

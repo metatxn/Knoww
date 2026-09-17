@@ -1,16 +1,13 @@
 import { createLogger } from "@knoww/logger";
+import Decimal from "decimal.js";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.user.trades");
-
-/**
- * Polymarket Data API base URL
- */
-const DATA_API_BASE = "https://data-api.polymarket.com";
 
 /**
  * Trade/Activity data from Polymarket Data API
@@ -171,19 +168,13 @@ export async function GET(request: NextRequest) {
       queryParams.set("market", market);
     }
 
-    const fullUrl = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
-
     // Fetch activity from Polymarket Data API (with 10s timeout)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
     let response: Response;
     try {
-      response = await fetch(fullUrl, {
-        headers: {
-          Accept: "application/json",
-        },
-        cache: "no-store",
+      response = await fetchWalletDataResponse("activity", queryParams, {
         signal: controller.signal,
       });
     } catch (err) {
@@ -221,15 +212,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate totals using actual number fields
-    const totalVolume = data.reduce((sum, t) => sum + (t.usdcSize || 0), 0);
+    const totalVolume = data
+      .reduce((sum, t) => sum.plus(t.usdcSize ?? 0), new Decimal(0))
+      .toNumber();
 
     const buyVolume = data
       .filter((t) => t.side === "BUY")
-      .reduce((sum, t) => sum + (t.usdcSize || 0), 0);
+      .reduce((sum, t) => sum.plus(t.usdcSize ?? 0), new Decimal(0))
+      .toNumber();
 
     const sellVolume = data
       .filter((t) => t.side === "SELL")
-      .reduce((sum, t) => sum + (t.usdcSize || 0), 0);
+      .reduce((sum, t) => sum.plus(t.usdcSize ?? 0), new Decimal(0))
+      .toNumber();
 
     // Transform trades for frontend.
     // A single tx hash can produce multiple activity rows (e.g., a REDEEM

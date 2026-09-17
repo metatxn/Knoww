@@ -114,6 +114,12 @@ function projectPosition(
     size: row.size,
     avgPrice: row.avgPrice,
     initialValue: row.initialValue,
+    ...(row.grossInitialValue === undefined
+      ? {}
+      : { grossInitialValue: row.grossInitialValue }),
+    ...(row.entryFeesUsdc === undefined
+      ? {}
+      : { entryFeesUsdc: row.entryFeesUsdc }),
     currentValue: row.currentValue,
     cashPnl: row.cashPnl,
     percentPnl: row.percentPnl,
@@ -237,14 +243,13 @@ function registerWalletPositions(server: McpServer) {
       sortBy: z
         .enum([
           "CURRENT",
-          "INITIAL",
           "TOKENS",
           "CASHPNL",
-          "PERCENTPNL",
-          "TITLE",
-          "RESOLVING",
-          "PRICE",
-          "AVGPRICE",
+          "CURRENT_VALUE",
+          "UNREALIZED_PNL",
+          "REALIZED_PNL",
+          "TOTAL_PNL",
+          "TIMESTAMP",
         ])
         .default("CURRENT"),
       sortDirection: z.enum(["ASC", "DESC"]).default("DESC"),
@@ -477,10 +482,10 @@ function registerClosedPositions(server: McpServer) {
     .object({
       ...walletFilters,
       limit: z.number().int().min(1).max(50).default(25),
-      offset: z.number().int().min(0).max(100_000).default(0),
+      offset: z.number().int().min(0).max(10_000).default(0),
       cursor: cursorInputSchema,
       sortBy: z
-        .enum(["REALIZEDPNL", "TITLE", "PRICE", "AVGPRICE", "TIMESTAMP"])
+        .enum(["REALIZEDPNL", "REALIZED_PNL", "TOTAL_PNL", "TIMESTAMP"])
         .default("REALIZEDPNL"),
       sortDirection: z.enum(["ASC", "DESC"]).default("DESC"),
     })
@@ -520,7 +525,7 @@ function registerClosedPositions(server: McpServer) {
                 legacyOffset: args.offset,
                 namespace: "get_closed_positions",
                 fingerprint,
-                maxOffset: 100_000,
+                maxOffset: 10_000,
               });
               const rows = await client.fetchClosedPositions(
                 { ...args, offset },
@@ -552,7 +557,7 @@ function registerClosedPositions(server: McpServer) {
                 offset,
                 limit: args.limit,
                 returnedResults: positions.length,
-                maxOffset: 100_000,
+                maxOffset: 10_000,
               });
               return {
                 content: [

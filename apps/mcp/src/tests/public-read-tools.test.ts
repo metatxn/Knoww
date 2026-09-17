@@ -3,6 +3,8 @@ import {
   callTool,
   clobUrl,
   dataUrl,
+  dataV2Page,
+  dataV2PositionFixture,
   devEnv,
   dispatch,
   expectGammaFetch,
@@ -32,6 +34,8 @@ const POSITION = {
   size: 10,
   avgPrice: 0.4,
   initialValue: 4,
+  grossInitialValue: 4.1,
+  entryFeesUsdc: 0.1,
   currentValue: 6,
   cashPnl: 2,
   percentPnl: 50,
@@ -250,18 +254,20 @@ describe("public read tools", () => {
   });
 
   it("returns an opaque continuation cursor for public market trades", async () => {
-    expectGammaFetch("first trade page", dataUrl("/trades", "offset=0"), () =>
-      jsonResponse([
-        {
-          proxyWallet: WALLET,
-          side: "BUY",
-          asset: TOKEN_ID,
-          conditionId: CONDITION_ID,
-          size: 10,
-          price: 0.42,
-          timestamp: 1_800_000_000,
-        },
-      ])
+    expectGammaFetch("first trade page", dataUrl("/v2/trades"), () =>
+      jsonResponse(
+        dataV2Page([
+          {
+            proxy_wallet: WALLET,
+            side: "BUY",
+            token_id: TOKEN_ID,
+            condition_id: CONDITION_ID,
+            size: 10,
+            price: 0.42,
+            timestamp: 1_800_000_000,
+          },
+        ])
+      )
     );
 
     const { message } = await callTool("get_market_trades", 207, {
@@ -280,8 +286,31 @@ describe("public read tools", () => {
 
     const cursor = (result.structuredContent?.meta as { nextCursor?: string })
       ?.nextCursor;
-    expectGammaFetch("second trade page", dataUrl("/trades", "offset=1"), () =>
-      jsonResponse([])
+    expectGammaFetch(
+      "second trade page replay",
+      (url) => dataUrl("/v2/trades")(url) && !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              {
+                proxy_wallet: WALLET,
+                side: "BUY",
+                token_id: TOKEN_ID,
+                condition_id: CONDITION_ID,
+                size: 10,
+                price: 0.42,
+                timestamp: 1_800_000_000,
+              },
+            ],
+            "upstream-next"
+          )
+        )
+    );
+    expectGammaFetch(
+      "second trade page continuation",
+      dataUrl("/v2/trades", "cursor=upstream-next"),
+      () => jsonResponse(dataV2Page([]))
     );
     const second = await callTool("get_market_trades", 210, {
       conditionIds: [CONDITION_ID],
@@ -299,19 +328,18 @@ describe("public read tools", () => {
   });
 
   it("returns an opaque continuation cursor for the trader leaderboard", async () => {
-    expectGammaFetch(
-      "first leaderboard page",
-      dataUrl("/v1/leaderboard", "offset=0"),
-      () =>
-        jsonResponse([
+    expectGammaFetch("first leaderboard page", dataUrl("/v2/leaderboard"), () =>
+      jsonResponse(
+        dataV2Page([
           {
             rank: "1",
-            proxyWallet: WALLET,
-            userName: "alice",
-            vol: 1000.5,
+            user_id: WALLET,
+            user_name: "alice",
+            volume: 1000.5,
             pnl: 12.25,
           },
         ])
+      )
     );
 
     const { message } = await callTool("get_trader_leaderboard", 208, {
@@ -330,9 +358,29 @@ describe("public read tools", () => {
     const cursor = (result.structuredContent?.meta as { nextCursor?: string })
       ?.nextCursor;
     expectGammaFetch(
-      "second leaderboard page",
-      dataUrl("/v1/leaderboard", "offset=1"),
-      () => jsonResponse([])
+      "second leaderboard page replay",
+      (url) =>
+        dataUrl("/v2/leaderboard")(url) && !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              {
+                rank: "1",
+                user_id: WALLET,
+                user_name: "alice",
+                volume: 1000.5,
+                pnl: 12.25,
+              },
+            ],
+            "upstream-next"
+          )
+        )
+    );
+    expectGammaFetch(
+      "second leaderboard page continuation",
+      dataUrl("/v2/leaderboard", "cursor=upstream-next"),
+      () => jsonResponse(dataV2Page([]))
     );
     const second = await callTool("get_trader_leaderboard", 2080, {
       limit: 1,
@@ -476,8 +524,10 @@ describe("public read tools", () => {
   });
 
   it("returns projected positions with decimal strings", async () => {
-    expectGammaFetch("positions", dataUrl("/positions", `user=${WALLET}`), () =>
-      jsonResponse([POSITION])
+    expectGammaFetch(
+      "positions",
+      dataUrl("/v2/positions", `user=${WALLET}`),
+      () => jsonResponse(dataV2Page([dataV2PositionFixture(POSITION)]))
     );
 
     const { message } = await callTool("get_wallet_positions", 204, {
@@ -491,6 +541,8 @@ describe("public read tools", () => {
         avgPrice: "0.4",
         currentValue: "6",
         cashPnl: "2",
+        grossInitialValue: "4.1",
+        entryFeesUsdc: "0.1",
       },
     ]);
   });
@@ -498,8 +550,8 @@ describe("public read tools", () => {
   it("paginates wallet positions with an opaque cursor", async () => {
     expectGammaFetch(
       "first wallet position page",
-      dataUrl("/positions", "offset=0"),
-      () => jsonResponse([POSITION])
+      dataUrl("/v2/positions", "status=OPEN"),
+      () => jsonResponse(dataV2Page([dataV2PositionFixture(POSITION)]))
     );
 
     const { message } = await callTool("get_wallet_positions", 211, {
@@ -519,9 +571,19 @@ describe("public read tools", () => {
     const cursor = (result.structuredContent?.meta as { nextCursor?: string })
       ?.nextCursor;
     expectGammaFetch(
-      "second wallet position page",
-      dataUrl("/positions", "offset=1"),
-      () => jsonResponse([])
+      "second wallet position page replay",
+      (url) =>
+        dataUrl("/v2/positions", "status=OPEN")(url) &&
+        !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page([dataV2PositionFixture(POSITION)], "upstream-next")
+        )
+    );
+    expectGammaFetch(
+      "second wallet position page continuation",
+      dataUrl("/v2/positions", "cursor=upstream-next"),
+      () => jsonResponse(dataV2Page([]))
     );
     const second = await callTool("get_wallet_positions", 2110, {
       walletAddress: WALLET,
@@ -541,19 +603,21 @@ describe("public read tools", () => {
   it("paginates wallet activity with an opaque cursor", async () => {
     expectGammaFetch(
       "first wallet activity page",
-      dataUrl("/activity", "offset=0"),
+      dataUrl("/v2/activity"),
       () =>
-        jsonResponse([
-          {
-            proxyWallet: WALLET,
-            timestamp: 1_800_000_000,
-            type: "TRADE",
-            conditionId: CONDITION_ID,
-            asset: TOKEN_ID,
-            size: 2,
-            price: 0.5,
-          },
-        ])
+        jsonResponse(
+          dataV2Page([
+            {
+              proxy_wallet: WALLET,
+              timestamp: 1_800_000_000,
+              type: "TRADE",
+              condition_id: CONDITION_ID,
+              token_id: TOKEN_ID,
+              size: 2,
+              price: 0.5,
+            },
+          ])
+        )
     );
 
     const { message } = await callTool("get_wallet_activity", 212, {
@@ -573,9 +637,30 @@ describe("public read tools", () => {
     const cursor = (result.structuredContent?.meta as { nextCursor?: string })
       ?.nextCursor;
     expectGammaFetch(
-      "second wallet activity page",
-      dataUrl("/activity", "offset=1"),
-      () => jsonResponse([])
+      "second wallet activity page replay",
+      (url) => dataUrl("/v2/activity")(url) && !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              {
+                proxy_wallet: WALLET,
+                timestamp: 1_800_000_000,
+                type: "TRADE",
+                condition_id: CONDITION_ID,
+                token_id: TOKEN_ID,
+                size: 2,
+                price: 0.5,
+              },
+            ],
+            "upstream-next"
+          )
+        )
+    );
+    expectGammaFetch(
+      "second wallet activity page continuation",
+      dataUrl("/v2/activity", "cursor=upstream-next"),
+      () => jsonResponse(dataV2Page([]))
     );
     const second = await callTool("get_wallet_activity", 2120, {
       walletAddress: WALLET,
@@ -595,20 +680,22 @@ describe("public read tools", () => {
   it("paginates closed wallet positions with an opaque cursor", async () => {
     expectGammaFetch(
       "first closed position page",
-      dataUrl("/closed-positions", "offset=0"),
+      dataUrl("/v2/positions", "status=CLOSED"),
       () =>
-        jsonResponse([
-          {
-            proxyWallet: WALLET,
-            asset: TOKEN_ID,
-            conditionId: CONDITION_ID,
-            avgPrice: 0.4,
-            totalBought: 10,
-            realizedPnl: 2,
-            curPrice: 1,
-            timestamp: 1_800_000_000,
-          },
-        ])
+        jsonResponse(
+          dataV2Page([
+            {
+              proxy_wallet: WALLET,
+              token_id: TOKEN_ID,
+              condition_id: CONDITION_ID,
+              avg_price: 0.4,
+              total_size: 10,
+              realized_pnl: 2,
+              current_price: 1,
+              last_event_at: 1_800_000_000,
+            },
+          ])
+        )
     );
 
     const { message } = await callTool("get_closed_positions", 213, {
@@ -628,9 +715,33 @@ describe("public read tools", () => {
     const cursor = (result.structuredContent?.meta as { nextCursor?: string })
       ?.nextCursor;
     expectGammaFetch(
-      "second closed position page",
-      dataUrl("/closed-positions", "offset=1"),
-      () => jsonResponse([])
+      "second closed position page replay",
+      (url) =>
+        dataUrl("/v2/positions", "status=CLOSED")(url) &&
+        !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              {
+                proxy_wallet: WALLET,
+                token_id: TOKEN_ID,
+                condition_id: CONDITION_ID,
+                avg_price: 0.4,
+                total_size: 10,
+                realized_pnl: 2,
+                current_price: 1,
+                last_event_at: 1_800_000_000,
+              },
+            ],
+            "upstream-next"
+          )
+        )
+    );
+    expectGammaFetch(
+      "second closed position page continuation",
+      dataUrl("/v2/positions", "cursor=upstream-next"),
+      () => jsonResponse(dataV2Page([]))
     );
     const second = await callTool("get_closed_positions", 2130, {
       walletAddress: WALLET,
@@ -648,31 +759,39 @@ describe("public read tools", () => {
   });
 
   it("separates all-time PnL from current-position metrics", async () => {
-    expectGammaFetch("pnl positions", dataUrl("/positions", `limit=500`), () =>
-      jsonResponse([
-        POSITION,
-        {
-          ...POSITION,
-          asset: "987654321",
-          initialValue: 3,
-          currentValue: 2,
-          cashPnl: -1,
-          realizedPnl: 0.25,
-        },
-      ])
+    expectGammaFetch(
+      "pnl positions",
+      dataUrl("/v2/positions", "limit=500"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              POSITION,
+              {
+                ...POSITION,
+                asset: "987654321",
+                initialValue: 3,
+                currentValue: 2,
+                cashPnl: -1,
+                realizedPnl: 0.25,
+              },
+            ].map(dataV2PositionFixture)
+          )
+        )
     );
     expectGammaFetch(
       "all-time PnL",
-      dataUrl("/v1/leaderboard", "timePeriod=ALL"),
+      dataUrl("/v2/leaderboard", "time_period=ALL"),
       () =>
-        jsonResponse([
-          {
-            rank: "7",
-            proxyWallet: WALLET,
-            vol: 100.5,
+        jsonResponse({
+          data: {
+            rank_pnl: 7,
+            rank_volume: 9,
+            user_id: WALLET,
+            volume: 100.5,
             pnl: 9.25,
           },
-        ])
+        })
     );
 
     const { message } = await callTool("get_wallet_pnl", 205, {
@@ -707,25 +826,26 @@ describe("public read tools", () => {
   it("reports all-time PnL when a wallet has no current positions", async () => {
     expectGammaFetch(
       "empty current positions",
-      dataUrl("/positions", "limit=500"),
-      () => jsonResponse([])
+      dataUrl("/v2/positions", "limit=500"),
+      () => jsonResponse(dataV2Page([]))
     );
     expectGammaFetch(
       "all-time leaderboard PnL",
-      dataUrl("/v1/leaderboard", "timePeriod=ALL"),
+      dataUrl("/v2/leaderboard", "time_period=ALL"),
       () =>
-        jsonResponse([
-          {
-            rank: "2303533",
-            proxyWallet: WALLET,
-            userName: "tagme",
-            vol: 1083.804636,
+        jsonResponse({
+          data: {
+            rank_pnl: 2303533,
+            rank_volume: 2000000,
+            user_id: WALLET,
+            user_name: "tagme",
+            volume: 1083.804636,
             pnl: -37.906702304018,
-            profileImage: "",
-            xUsername: "",
-            verifiedBadge: false,
+            profile_image: "",
+            x_username: "",
+            verified: false,
           },
-        ])
+        })
     );
 
     const { message } = await callTool("get_wallet_pnl", 206, {

@@ -30,7 +30,21 @@ describe("fetchLeaderboardRows", () => {
       xUsername: null,
       verifiedBadge: false,
     };
-    const fetchMock = stubFetch([row]);
+    const fetchMock = stubFetch({
+      data: [
+        {
+          rank: row.rank,
+          user_id: row.proxyWallet,
+          user_name: row.userName,
+          volume: row.vol,
+          pnl: row.pnl,
+          profile_image: row.profileImage,
+          x_username: row.xUsername,
+          verified: row.verifiedBadge,
+        },
+      ],
+      pagination: { next_cursor: null },
+    });
 
     const rows = await fetchLeaderboardRows(
       {
@@ -45,13 +59,12 @@ describe("fetchLeaderboardRows", () => {
 
     expect(rows).toEqual([row]);
     const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
-    expect(url.pathname).toBe("/v1/leaderboard");
+    expect(url.pathname).toBe("/v2/leaderboard");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       category: "OVERALL",
-      timePeriod: "DAY",
-      orderBy: "PNL",
+      time_period: "DAY",
+      sort_by: "PNL",
       limit: "25",
-      offset: "0",
     });
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       next: { revalidate: 60 },

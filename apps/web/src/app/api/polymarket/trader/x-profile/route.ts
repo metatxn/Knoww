@@ -1,10 +1,8 @@
 import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import {
   createRequestDeadline,
-  fetchWithTimeout,
   isAbortLikeError,
 } from "@/lib/fetch-with-timeout";
 import {
@@ -12,6 +10,7 @@ import {
   normalizeXHandle,
   type TraderXProfile,
 } from "@/lib/trader-x-profile";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.trader.x_profile");
 
@@ -171,17 +170,10 @@ async function fetchLeaderboardPage(
     offset: String(offset),
   });
 
-  const response = await fetchWithTimeout(
-    `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?${params.toString()}`,
-    {
-      headers: {
-        Accept: "application/json",
-      },
-      next: {
-        revalidate: 1800,
-      },
-      signal,
-    }
+  const response = await fetchWalletDataResponse(
+    "leaderboard",
+    new URLSearchParams(`${params.toString()}`),
+    { cache: { revalidateSeconds: 1800 }, signal }
   );
 
   if (!response.ok) {
