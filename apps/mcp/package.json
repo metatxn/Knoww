@@ -16,8 +16,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome format --write",
-    "test": "vitest run && node --experimental-strip-types --test scripts/test-market-bridge.mjs",
+    "test": "vitest run && node --experimental-strip-types --test scripts/test-market-bridge.mjs && pnpm test:worker-startup",
     "test:market-bridge": "node --experimental-strip-types --test scripts/test-market-bridge.mjs",
+    "test:worker-startup": "node --test scripts/test-worker-startup.mjs",
     "cf-typegen": "node ./scripts/generate-worker-types.mjs"
   },
   "dependencies": {
