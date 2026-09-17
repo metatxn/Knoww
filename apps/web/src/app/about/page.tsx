@@ -132,8 +132,8 @@ export default function AboutPage() {
             <h2 id="contact">Contact</h2>
             <p>
               Questions, feedback, or privacy requests: write to{" "}
-              <a href="mailto:contact.us@knoww.app">contact.us@knoww.app</a>.
-              For how we handle data, see our{" "}
+              <a href="mailto:contact@knoww.app">contact@knoww.app</a>. For how
+              we handle data, see our{" "}
               <Link href="/privacy">privacy policy</Link>; for the terms that
               govern the product, see the{" "}
               <Link href="/terms">terms of service</Link>.

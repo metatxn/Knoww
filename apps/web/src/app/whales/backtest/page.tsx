@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { buildNoIndexMetadata } from "@/lib/seo";
 import { BacktestClient } from "./backtest-client";
@@ -5,7 +6,7 @@ import { BacktestClient } from "./backtest-client";
 // Internal tuning harness, dev-only: the page 404s outside development (the
 // backing /api/whales/backtest route is gated the same way). The noindex
 // metadata is belt-and-braces for the dev server itself.
-export const metadata = {
+export const metadata: Metadata = {
   ...buildNoIndexMetadata({
     title: "Insider Detection Backtest",
     description:

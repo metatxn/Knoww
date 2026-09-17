@@ -176,6 +176,8 @@ For conversational discovery, the host model calls `search_markets` with `result
 
 The display tool declares `ui.resourceUri` for `ui://knoww/markets/v2.html` and the OpenAI output-template compatibility alias. The resource uses the MCP Apps 2026-01-26 bridge, negotiates host capabilities, and sends tool calls through the host. It needs no direct network access, external scripts, or new dependencies. Existing OAuth scope and quota checks apply to the display and history tools. Refresh the ChatGPT connection after deploying a UI update, then test in a new conversation.
 
+If ChatGPT reports `HTML asset not found` or `Failed to fetch template`, check whether the connection still references an older template URI. Open Settings → Plugins → Knoww → Refresh and confirm that the output template is `ui://knoww/markets/v2.html`. Then start a new chat with Knoww selected. A successful market JSON response does not verify that the HTML template loaded.
+
 ### `get_market`
 
 Fetches one market using exactly one identifier.
