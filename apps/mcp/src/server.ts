@@ -15,6 +15,7 @@ import { registerListPlatformsTool } from "./tools/list-platforms";
 import { registerPublicMarketTools } from "./tools/public-markets";
 import { registerPublicWalletTools } from "./tools/public-wallets";
 import { registerSearchMarketsTool } from "./tools/search-markets";
+import { registerShowMarketsTool } from "./tools/show-markets";
 import { registerTradingTools } from "./tools/trading";
 
 export const SERVER_INFO = { name: "knoww-mcp", version: "0.1.0" } as const;
@@ -118,6 +119,7 @@ export function createKnowwMcpServer(
   registerGetPriceHistoryTool(server);
   registerPublicMarketTools(server);
   registerPublicWalletTools(server);
+  registerShowMarketsTool(server);
   // After the public tools on purpose: worker tests pin search_markets as the
   // first listed tool and list_platforms as the last public one.
   registerListPlatformsTool(server);

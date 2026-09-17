@@ -53,6 +53,12 @@ catalog:
   "wagmi": "3.7.6"
 
 packageExtensions:
+  # Published declarations import these SDK packages, but 3.0.0 lists them
+  # only as devDependencies. Resolve them with the provider's own Zod peer.
+  "@openrouter/ai-sdk-provider@3.0.0":
+    dependencies:
+      "@ai-sdk/provider": "4.0.8"
+      "@ai-sdk/provider-utils": "5.0.30"
   # The installer patch streams selected NuGet files with yauzl.
   "onnxruntime-node@1.24.3":
     dependencies:

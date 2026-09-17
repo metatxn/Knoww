@@ -54,6 +54,7 @@ export const PUBLIC_MCP_TOOL_NAMES = [
   "get_wallet_pnl",
   "polymarket_get_wallet_portfolio_value",
   "get_wallet_portfolio_value",
+  "show_markets",
   "list_platforms",
 ] as const;
 

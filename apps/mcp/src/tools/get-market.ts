@@ -97,7 +97,7 @@ const marketEventSchema = z.object({
   url: z.string().optional(),
 });
 
-const marketDetailSchema = z.object({
+export const marketDetailSchema = z.object({
   id: z
     .string()
     .describe("Canonical market id, e.g. polymarket:0x<conditionId>."),
@@ -294,7 +294,7 @@ function summarizeParentEvent(
   };
 }
 
-function buildMarketDetail(
+export function buildMarketDetail(
   detail: GammaMarketDetail,
   identity: MarketIdentity
 ): MarketDetail {
@@ -350,7 +350,7 @@ function buildMarketDetail(
   };
 }
 
-function mapLookupError(error: unknown): KnowwToolError {
+export function mapLookupError(error: unknown): KnowwToolError {
   if (isKnowwToolError(error)) return error;
   if (isUpstreamMarketError(error)) {
     return error.status === 429

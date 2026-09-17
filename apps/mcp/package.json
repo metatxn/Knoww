@@ -1,10 +1,11 @@
 {
   "name": "@knoww/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --env local",
+    "preview:markets": "node --experimental-strip-types scripts/preview-markets.mjs",
     "dev:oauth": "wrangler dev --env local --env-file .dev.vars --var MCP_AUTH_MODE:oauth-required",
     "build": "wrangler deploy --env=\"\" --dry-run --outdir dist",
     "deploy": "wrangler versions upload --env=\"\" --strict",
@@ -15,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome format --write",
-    "test": "vitest run",
+    "test": "vitest run && node --experimental-strip-types --test scripts/test-market-bridge.mjs",
+    "test:market-bridge": "node --experimental-strip-types --test scripts/test-market-bridge.mjs",
     "cf-typegen": "node ./scripts/generate-worker-types.mjs"
   },
   "dependencies": {
@@ -24,18 +26,18 @@
     "@knoww/services": "workspace:*",
     "@knoww/shared-types": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
-    "agents": "0.21.0",
+    "agents": "0.22.0",
     "decimal.js": "catalog:",
-    "jose": "6.2.10",
-    "zod": "4.4.3"
+    "jose": "6.2.12",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@cloudflare/workers-types": "5.20260820.1",
     "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "5.20260908.1",
     "@types/node": "24.13.3",
     "typescript": "catalog:",
     "vitest": "^4.1.11",
-    "wrangler": "4.125.0"
+    "wrangler": "4.130.0"
   }
 }

@@ -41,6 +41,9 @@ const MAX_OUTCOMES_PER_MARKET = 20;
 
 const SEARCH_MARKETS_DESCRIPTION = [
   "Search active prediction-market events on Knoww (Polymarket data).",
+  "Use when a user asks about the likelihood of a future event and current prediction-market prices would help answer, even if they do not mention Knoww or markets.",
+  "Do not use for unrelated conversation, settled historical facts, or personal financial advice. Search with a concise topic or event name, not the full conversation.",
+  'For conversational discovery, use resultType "markets" and sortBy "relevance", compare the question and dates to the user\'s intent, then call show_markets with up to three matching market slugs. If nothing closely matches, do not display unrelated markets.',
   "Returns event summaries with their markets, reusable identifiers, outcome prices, and CLOB token IDs.",
   'Set resultType to "markets" to get flat, enriched market matches with filtering, lifetime-volume sorting, and cursor pagination.',
   "Prices are decimal strings between 0 and 1 and represent probabilities.",

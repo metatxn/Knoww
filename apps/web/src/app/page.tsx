@@ -70,6 +70,11 @@ export default function LandingPage() {
             analytics: { cta: "nav_how_it_works", destination: "page_section" },
           },
           {
+            label: "MCP",
+            href: "/mcp",
+            analytics: { cta: "nav_mcp", destination: "mcp_page" },
+          },
+          {
             label: "Agent",
             href: "#agent",
             analytics: { cta: "nav_agent", destination: "page_section" },

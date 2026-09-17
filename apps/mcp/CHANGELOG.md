@@ -5,6 +5,8 @@
 ### Added
 
 - Seven trading tools (`get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders`, `preview_order`, `place_order`, `cancel_order`) implemented over `TradingAdapter`, registered only behind `EXPOSE_TRADING_TOOLS` (off) and gated by reserved scopes that nothing grants yet, so the public tool list is unchanged.
+- Conversational discovery guidance and a `show_markets` MCP App with current prices, outcome history, refresh, Knoww links, and text-only fallback. Includes a local fixture preview and bridge regression tests.
+
 - Five read-only prediction-market tools over stateless Streamable HTTP.
 - OAuth authorization-code flow with S256 PKCE, Google OpenID Connect consent, audience-bound opaque tokens, refresh rotation, and `markets:read` enforcement.
 - Production custom domain with OAuth state isolated from the web application.
@@ -26,6 +28,8 @@
 
 ### Fixed
 
+- Open markets remain visible after their listed end date passes. Gamma can report midnight on an event date before trading closes; cards now use lifecycle flags and explain passed dates.
+- Market cards keep their padding when embedded hosts reset body styles, identify how many markets are selected, and label snapshot probabilities. Knoww links select the displayed market within its parent event, and volume displays with two decimal places.
 - The Google consent page sends its own origin on authorization form posts, preventing incorrect 403 responses before sign-in.
 - `get_wallet_pnl` reads all-time PnL from Polymarket's overall leaderboard instead of treating an empty current-position list as zero lifetime PnL.
 - Full-record searches request the caller's complete bounded page size instead of capping nested results at ten.
