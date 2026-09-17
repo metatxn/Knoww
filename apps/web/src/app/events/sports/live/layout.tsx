@@ -1,9 +1,10 @@
+import type { Metadata } from "next";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { buildPageMetadata, canonicalUrl } from "@/lib/seo";
 
 // The page itself is a client component and cannot export metadata, so the
 // route segment's layout carries the title, description, and canonical.
-export const metadata = buildPageMetadata({
+export const metadata: Metadata = buildPageMetadata({
   title: "Live Sports Prediction Markets",
   description:
     "Follow live sports prediction markets with real-time odds, scores, and game lines across NFL, NBA, MLB, soccer, and more on Knoww.",

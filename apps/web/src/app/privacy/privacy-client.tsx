@@ -8,7 +8,7 @@ import {
   useKwTheme,
 } from "@/components/kw-theme";
 
-const LAST_UPDATED = "September 4, 2026";
+const LAST_UPDATED = "September 17, 2026";
 
 const SECTIONS = [
   { id: "overview", title: "Overview", roman: "i" },
@@ -30,7 +30,8 @@ const SECTIONS = [
   { id: "your-rights", title: "Your choices & rights", roman: "ix" },
   { id: "children", title: "Children\u2019s privacy", roman: "x" },
   { id: "changes", title: "Changes to this policy", roman: "xi" },
-  { id: "contact", title: "Contact", roman: "xii" },
+  { id: "google-data", title: "Knoww MCP and Google sign-in", roman: "xii" },
+  { id: "contact", title: "Contact", roman: "xiii" },
 ] as const;
 
 const PAGE_COUNT = SECTIONS.length;
@@ -65,7 +66,7 @@ function Section({
   return (
     <section
       id={id}
-      className="kw-reveal scroll-mt-24 pt-16 first:pt-0 border-t border-(--kw-fg)/10 first:border-t-0"
+      className="scroll-mt-24 pt-16 first:pt-0 border-t border-(--kw-fg)/10 first:border-t-0"
     >
       <div className="flex items-baseline justify-between gap-4 pb-5 mb-8 border-b border-(--kw-fg)/10">
         <h2 className="text-[11px] font-mono uppercase tracking-[0.2em] text-(--kw-fg)/60">
@@ -143,8 +144,12 @@ export default function PrivacyClient() {
               className="text-(--kw-accent-text) underline underline-offset-[3px] decoration-(--kw-accent)/40 hover:decoration-(--kw-accent)"
             >
               knoww.app
-            </a>{" "}
-            and our Chrome extension.
+            </a>
+            , our Chrome extension, and Knoww MCP. See the{" "}
+            <Link href="#google-data">
+              Knoww MCP and Google sign-in details
+            </Link>{" "}
+            for how we handle Google user data.
           </p>
 
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pt-5 border-t border-(--kw-fg)/10 text-[11px] font-mono uppercase tracking-[0.15em] text-(--kw-fg)/60">
@@ -636,11 +641,108 @@ export default function PrivacyClient() {
               </p>
             </Section>
 
-            <Section id="contact" title="Contact" roman="xii" index={12}>
+            <Section
+              id="google-data"
+              title="Knoww MCP and Google sign-in"
+              roman="xii"
+              index={12}
+            >
+              <p>
+                <Link href="/mcp">Knoww MCP</Link> connects compatible AI
+                assistants to prediction market data. Google sign-in identifies
+                the person approving a connection. The following details apply
+                specifically to Google user data and the MCP service.
+              </p>
+              <h3>Google data we access and use</h3>
+              <p>
+                We request the <code>openid</code> and <code>email</code>{" "}
+                permissions. Google provides an account identifier, email
+                address, and verified-email status in a signed identity token.
+                We verify these claims to authenticate you, associate your
+                approved MCP connections with your account, enforce usage
+                limits, and prevent unauthorized access. These permissions do
+                not provide access to Gmail messages, Drive files, Calendar, or
+                contacts.
+              </p>
+              <p>
+                We discard your email address and Google tokens after
+                verification. We retain your Google account identifier in
+                authorization records and use an identifier derived from it for
+                access control and usage limits. We also store a separate random
+                identifier for each Google account and MCP client pair.
+              </p>
+              <h3>Sharing and disclosure</h3>
+              <p>
+                Google processes the sign-in request. Cloudflare hosts the MCP
+                service and stores its authorization records on our behalf. Your
+                chosen MCP client receives Knoww authorization tokens and the
+                market data you request. We do not send it your Google email
+                address or Google tokens.
+              </p>
+              <p>
+                When MCP analytics is enabled, PostHog receives a hashed
+                identifier derived from your MCP identity, along with usage and
+                diagnostic events such as tool names, client type, request
+                status, and timing. These events help us understand usage and
+                diagnose failures. They do not include your Google email
+                address, raw Google account identifier, Google tokens, or the
+                contents of your tool requests.
+              </p>
+              <p>
+                We do not sell Google user data or use it for advertising or
+                training AI models. We disclose it only to operate these
+                features, comply with legal obligations, or protect users and
+                the service. Knoww&apos;s use and transfer of information
+                received from Google APIs will adhere to the{" "}
+                <ExternalLink href="https://developers.google.com/terms/api-services-user-data-policy">
+                  Google API Services User Data Policy
+                </ExternalLink>
+                , including its Limited Use requirements where applicable.
+              </p>
+              <h3>How we protect this data</h3>
+              <p>
+                We use HTTPS for Google sign-in and production MCP connections.
+                We verify Google&apos;s signed identity tokens and use one-time
+                authorization transactions, state and nonce checks, and PKCE to
+                protect the sign-in flow. MCP permissions restrict the actions a
+                connected client can perform. Google tokens are processed on the
+                server and are not given to MCP clients.
+              </p>
+              <h3>Retention and deletion</h3>
+              <p>
+                Sign-in transactions expire after five minutes and are removed
+                when consumed or expired. Knoww access tokens last up to one
+                hour; refresh tokens have a 30-day lifetime and rotate when
+                used. Token expiry does not delete all account data. The
+                separate account-to-client identifier has no automatic expiry.
+                Authorization records and usage records support your
+                connections, usage limits, and service diagnostics.
+              </p>
+              <p>
+                To request deletion of your MCP identity, authorization records,
+                and associated usage data, email{" "}
+                <a href="mailto:contact@knoww.app">contact@knoww.app</a>. We may
+                need to verify your identity before processing a request.
+                Records required for legal obligations or security may be
+                retained as needed for those purposes.
+              </p>
+              <p>
+                You can remove Knoww MCP from your assistant and revoke its
+                Google connection in your{" "}
+                <ExternalLink href="https://myaccount.google.com/connections">
+                  Google Account connections
+                </ExternalLink>
+                . Revoking Google access does not automatically revoke existing
+                Knoww tokens or delete Knoww&apos;s stored records. Contact us
+                to request removal of those records and connections.
+              </p>
+            </Section>
+
+            <Section id="contact" title="Contact" roman="xiii" index={13}>
               <p>
                 If you have questions or requests about this Privacy Policy,
                 contact us at{" "}
-                <a href="mailto:contact.us@knoww.app">contact.us@knoww.app</a>.
+                <a href="mailto:contact@knoww.app">contact@knoww.app</a>.
               </p>
             </Section>
           </div>

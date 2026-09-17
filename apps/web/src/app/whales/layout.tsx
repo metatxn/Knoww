@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import { WalletRouteProviders } from "@/components/wallet-route-providers";
 import { buildPageMetadata, TITLE_TEMPLATE } from "@/lib/seo";
 import "@/app/styles/product.css";
 
-export const metadata = {
+export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Polymarket Whale Tracker",
     description:

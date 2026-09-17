@@ -130,6 +130,14 @@ export function LandingFooter() {
               </Link>
             </li>
             <li>
+              <Link
+                href="/mcp"
+                className="hover:text-(--kw-fg)/60 transition-colors"
+              >
+                Knoww MCP
+              </Link>
+            </li>
+            <li>
               <a
                 href="/#agent"
                 className="hover:text-(--kw-fg)/60 transition-colors"

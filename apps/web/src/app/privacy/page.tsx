@@ -1,11 +1,12 @@
+import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/seo";
 import PrivacyClient from "./privacy-client";
 import "../styles/marketing.css";
 
-export const metadata = buildPageMetadata({
+export const metadata: Metadata = buildPageMetadata({
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Knoww (knoww.app) and the Knoww Extension — what we collect, what stays on your device, and how to reach us.",
+    "Privacy Policy for Knoww, the Knoww Extension, and Knoww MCP. How we collect, use, share, protect, retain, and delete your data, including Google sign-in data.",
   path: "/privacy",
 });
 

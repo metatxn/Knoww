@@ -440,7 +440,7 @@ export default function TermsClient() {
             <Section id="contact" title="Contact" roman="xii" index={12}>
               <p>
                 If you have questions about these Terms of Use, contact us at{" "}
-                <a href="mailto:contact.us@knoww.app">contact.us@knoww.app</a>.
+                <a href="mailto:contact@knoww.app">contact@knoww.app</a>.
               </p>
             </Section>
           </div>

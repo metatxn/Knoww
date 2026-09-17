@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import { WalletRouteProviders } from "@/components/wallet-route-providers";
 import { buildNoIndexMetadata } from "@/lib/seo";
 import "@/app/styles/product.css";
 
-export const metadata = buildNoIndexMetadata({
+export const metadata: Metadata = buildNoIndexMetadata({
   title: "Search Prediction Markets",
   description: "Search live prediction markets and Polymarket events on Knoww.",
 });
