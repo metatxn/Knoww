@@ -18,6 +18,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
     "agent:d1:list:local": "wrangler d1 migrations list knoww-agent-paper --local --config wrangler.jsonc",
