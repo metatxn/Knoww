@@ -4,7 +4,9 @@ The September 2026 review flagged missing Google data disclosures, an inaccessib
 
 ## Publish the pages first
 
-Deploy the web app with the public `/mcp` page and updated `/privacy` policy. The MCP page describes the current read-only service, explains Google sign-in, and links to the privacy policy. Both pages must work without a session, a wallet connection, or Google sign-in.
+Deploy the web app with the dedicated `/mcp` page and the updated `/privacy` policy. The homepage navbar uses the label "MCP" and links to `/mcp`. The dedicated page describes the current read-only service, provides setup instructions, explains Google sign-in, and links to the privacy policy. These pages must work without a session, a wallet connection, or Google sign-in.
+
+The main landing page stays at `https://knoww.app`, with MCP details on `/mcp`. The Google Auth Platform homepage setting below remains unchanged. Moving the explanation to a linked page does not by itself resolve Google's earlier findings about the submitted homepage's app name and purpose.
 
 Privacy sections now render without scroll reveal animations. Browser verification found that the animation could leave a section at zero opacity even after navigating to its anchor.
 
@@ -19,7 +21,7 @@ In the production project's Branding settings, use:
 | Field | Value |
 | --- | --- |
 | App name | Knoww MCP |
-| Application home page | https://knoww.app/mcp |
+| Application home page | https://knoww.app |
 | Application privacy policy | https://knoww.app/privacy |
 | Application terms of service | https://knoww.app/terms |
 | Authorized domain | knoww.app |
@@ -28,8 +30,8 @@ Verify domain ownership using an account with the required access to the Google 
 
 ## Check and resubmit
 
-1. Open both deployed pages in a fresh browser session. Confirm they load directly, show the expected content, and have no login or access challenge.
-2. Confirm the MCP page visibly says "Knoww MCP" and its privacy link matches the consent-screen privacy URL.
+1. Open the homepage, MCP page, and privacy policy in a fresh browser session. Confirm they load directly, show the expected content, and have no login or access challenge.
+2. Confirm the homepage's "MCP" link opens `/mcp`, which visibly says "Knoww MCP", explains Google sign-in, and links to the same privacy URL as the consent screen. Resolve any remaining homepage branding findings before resubmitting.
 3. Check the policy's Google section for collection, use, sharing, protection, retention, and deletion details.
 4. Submit the updated branding for verification. If Google has an open verification email thread, reply there with the updated URLs and the changes made.
 
