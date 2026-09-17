@@ -31,7 +31,6 @@ minimumReleaseAgeExclude:
   - "@polymarket/types"
   - "@polymarket/bindings"
   - "nanoid"
-  - "dompurify"
   # wagmi@3.7.6 pins @wagmi/connectors@8.1.0, removing the optional porto peer
   # that pulls the vulnerable React Native/Metro image-size chain. These
   # releases were published on 2026-08-03, so waive the release-age gate.
@@ -117,8 +116,7 @@ overrides:
   "vite": "8.2.2"
   # GHSA-55q2-fjhq-7xh7: with IN_PLACE, a hook that detaches a node leaves the
   # subtree sanitized-but-executable → XSS. Only fixed in >=3.4.13. Reached via
-  # posthog-js. Release-age gate waived above; drop the waiver after
-  # 2026-08-10, when 3.4.13 ages past the gate on its own.
+  # posthog-js. The pinned version is subject to the release-age gate.
   "dompurify": "3.4.15"
   # GHSA-2883-xcg3-v3hh: limit CPU use for empty merge sources on the v4 line.
   "js-yaml": "4.3.2"

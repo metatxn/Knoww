@@ -15,7 +15,7 @@ import { upstreamMarketError } from "./errors";
 
 const CLOB_MARKET_UPSTREAM_TIMEOUT_MS = 8500;
 
-const decimalLikeSchema = z.union([z.number().finite(), z.string().min(1)]);
+const decimalLikeSchema = z.union([z.number(), z.string().min(1)]);
 
 const clobMarketTokenSchema = z
   .object({
@@ -24,7 +24,7 @@ const clobMarketTokenSchema = z
     price: z.number().optional(),
     winner: z.boolean().optional(),
   })
-  .passthrough();
+  .loose();
 
 const clobMarketSchema = z
   .object({
@@ -41,7 +41,7 @@ const clobMarketSchema = z
     end_date_iso: z.string().nullable().optional(),
     tokens: z.array(clobMarketTokenSchema),
   })
-  .passthrough();
+  .loose();
 
 export type ClobMarketRecord = z.infer<typeof clobMarketSchema>;
 

@@ -27,13 +27,13 @@ const primitiveSchema = z.union([
 const analyticsEventSchema = z.object({
   event: z.string().min(1).max(64),
   distinctId: z.union([
-    z.string().uuid(),
+    z.uuid(),
     z
       .string()
       .refine((value) => isAddress(value))
       .transform((value) => getAddress(value)),
   ]),
-  timestamp: z.string().datetime(),
+  timestamp: z.iso.datetime(),
   properties: z.record(z.string().min(1).max(64), primitiveSchema).default({}),
 });
 

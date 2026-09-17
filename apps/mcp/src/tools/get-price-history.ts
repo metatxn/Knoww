@@ -166,8 +166,8 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
     {
       title: "Get price history",
       description,
-      inputSchema,
-      outputSchema,
+      inputSchema: z.object(inputSchema),
+      outputSchema: z.object(outputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     async (args: HistoryArgs, context: ServerContext) => {

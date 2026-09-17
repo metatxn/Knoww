@@ -562,7 +562,7 @@ async function handleDeriveProxyAddress(
   const walletMode = normalizeExtensionTradingWalletMode(msg.walletMode);
   const proxyAddress = deriveTradingWalletAddress(owner, walletMode);
 
-  const code = await publicClient.getBytecode({ address: proxyAddress });
+  const code = await publicClient.getCode({ address: proxyAddress });
   let isDeployed = !!code && code !== "0x";
   if (
     !isDeployed &&

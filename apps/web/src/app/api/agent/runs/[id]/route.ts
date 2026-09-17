@@ -6,7 +6,7 @@ import { getAgentRepository } from "@/lib/agent/repository";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
 const log = createLogger("api.agent.runs.detail");
-const RunIdSchema = z.string().uuid();
+const RunIdSchema = z.uuid();
 
 /**
  * @openapi

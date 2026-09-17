@@ -78,12 +78,12 @@ export const gammaEventDetailSchema: z.ZodType<GammaEventDetail> = z
             label: z.string().optional(),
             slug: z.string().optional(),
           })
-          .passthrough()
+          .loose()
       )
       .optional(),
     markets: z.array(gammaMarketDetailSchema).optional(),
   })
-  .passthrough();
+  .loose();
 
 function requestInit(signal: AbortSignal): RequestInit {
   return {

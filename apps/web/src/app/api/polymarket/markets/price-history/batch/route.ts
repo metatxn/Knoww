@@ -47,7 +47,7 @@ const optionalInteger = (min: number, max: number) =>
       return undefined;
     }
     return value;
-  }, z.coerce.number().int().finite().min(min).max(max).optional());
+  }, z.coerce.number().int().min(min).max(max).optional());
 
 const batchRequestSchema = z.object({
   tokenIds: z

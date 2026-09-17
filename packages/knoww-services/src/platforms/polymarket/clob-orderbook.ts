@@ -74,7 +74,7 @@ const snapshotSchema = z
     tick_size: positiveSizeSchema.optional(),
     tickSize: positiveSizeSchema.optional(),
   })
-  .passthrough();
+  .loose();
 
 function normalizeSnapshot(payload: unknown): OrderbookSnapshot {
   const parsed = snapshotSchema.safeParse(payload);

@@ -36,7 +36,7 @@ const tagSchema = z
     label: z.string().trim().min(1),
     slug: z.string().trim().min(1),
   })
-  .passthrough();
+  .loose();
 
 const eventSchema = z
   .object({
@@ -53,7 +53,7 @@ const eventSchema = z
     markets: z.array(gammaMarketDetailSchema).default([]),
     tags: z.array(tagSchema).default([]),
   })
-  .passthrough();
+  .loose();
 
 const eventPageSchema = z.object({
   events: z.array(eventSchema),
@@ -83,7 +83,7 @@ const tradeSchema = z
     outcomeIndex: z.number().int().nonnegative().optional(),
     transactionHash: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 const holderSchema = z
   .object({
@@ -92,14 +92,14 @@ const holderSchema = z
     amount: nonNegativeDecimalStringSchema,
     outcomeIndex: z.number().int().nonnegative().optional(),
   })
-  .passthrough();
+  .loose();
 
 const holderGroupSchema = z
   .object({
     token: z.string(),
     holders: z.array(holderSchema),
   })
-  .passthrough();
+  .loose();
 
 const leaderboardEntrySchema = z
   .object({
@@ -113,7 +113,7 @@ const leaderboardEntrySchema = z
     pnl: decimalStringSchema,
     verifiedBadge: z.boolean().optional(),
   })
-  .passthrough()
+  .loose()
   .transform(({ vol, ...entry }) => ({ ...entry, volume: vol }));
 
 const sportsMetadataSchema = z
@@ -131,7 +131,7 @@ const sportsMetadataSchema = z
       .optional()
       .transform((value) => (value === undefined ? undefined : String(value))),
   })
-  .passthrough();
+  .loose();
 
 const sportsMarketTypesSchema = z.union([
   z.array(z.string()),
@@ -147,7 +147,7 @@ const teamSchema = z
     league: z.string().optional(),
     abbreviation: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 export interface TraderLeaderboardParams {
   category: string;
@@ -344,7 +344,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
         BUY: probabilityStringSchema.optional(),
         SELL: probabilityStringSchema.optional(),
       })
-      .passthrough()
+      .loose()
   );
   const decimalMapSchema = z.record(z.string(), nonNegativeDecimalStringSchema);
   const lastTradeSchema = z.array(
@@ -354,7 +354,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
         price: probabilityStringSchema,
         side: z.enum(["BUY", "SELL"]),
       })
-      .passthrough()
+      .loose()
   );
 
   async function fetchMarketQuotes(
@@ -537,9 +537,16 @@ export function createPublicData(ctx: PolymarketClientContext) {
       rawEntries = await dataApi.rows(
         "leaderboard",
         params,
-        z.unknown().transform((raw) => {
+        z.record(z.string(), z.unknown()).transform((raw, ctx) => {
           const row = mapRow(raw);
-          leaderboardEntrySchema.parse(row);
+          const parsed = leaderboardEntrySchema.safeParse(row);
+          if (!parsed.success) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Invalid leaderboard row",
+            });
+            return z.NEVER;
+          }
           return row as DataApiLeaderboardRecord;
         }),
         {
@@ -557,8 +564,10 @@ export function createPublicData(ctx: PolymarketClientContext) {
         options
       );
     }
-    const entries = z.array(leaderboardEntrySchema).parse(rawEntries);
-    return { entries, rawEntries };
+    const parsed = z.array(leaderboardEntrySchema).safeParse(rawEntries);
+    if (!parsed.success)
+      throw upstreamPublicDataError("Data API returned an invalid leaderboard");
+    return { entries: parsed.data, rawEntries };
   }
   async function fetchTraderLeaderboard(
     input: TraderLeaderboardParams,

@@ -262,7 +262,7 @@ export default function EventDetailClient({
   const queryClient = useQueryClient();
 
   // Helper to quickly seed order book from REST (direct Polymarket call) for
-  // a token. Routes through React Query's cache (`queryClient.fetchQuery`)
+  // a token. Routes through React Query's cache (`queryClient.query`)
   // using the same `["orderBook", tokenId]` key that every other orderbook
   // consumer uses, so repeated preloads (StrictMode double-invokes, effect
   // re-runs on dep changes, hover handlers in the outcomes table, etc.)
@@ -272,7 +272,7 @@ export default function EventDetailClient({
     async (tokenId: string | undefined) => {
       if (!tokenId) return;
       try {
-        const data = await queryClient.fetchQuery<BookSnapshot>({
+        const data = await queryClient.query<BookSnapshot>({
           queryKey: qk.orderBook(tokenId),
           queryFn: async () => {
             const snapshot = await fetchBookSnapshot(tokenId);
@@ -952,7 +952,7 @@ export default function EventDetailClient({
 
     const seedBooks = async () => {
       try {
-        const books = await queryClient.fetchQuery<BookSnapshot[]>({
+        const books = await queryClient.query<BookSnapshot[]>({
           queryKey: qk.orderBooks(restQuoteTokenIds),
           queryFn: () => fetchBookSnapshots(restQuoteTokenIds),
           staleTime: 30_000,

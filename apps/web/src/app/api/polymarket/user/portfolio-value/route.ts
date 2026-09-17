@@ -24,9 +24,7 @@ const log = createLogger("api.user.portfolio-value");
  * - Open order collateral waiting in the book
  * - Amount still sitting as unused USDC (unless Polymarket counts it)
  */
-interface PortfolioValueResponse {
-  value: number;
-}
+const portfolioValueResponseSchema = z.array(z.object({ value: z.number() }));
 
 /**
  * Validation schema for query parameters
@@ -146,12 +144,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data: PortfolioValueResponse = await response.json();
+    const data = portfolioValueResponseSchema.safeParse(await response.json());
 
     return NextResponse.json({
       success: true,
       user,
-      portfolioValue: data.value ?? 0,
+      portfolioValue: data.success ? (data.data[0]?.value ?? 0) : 0,
       // Additional context
       description: "Total current positions value in USD (marked to market)",
       includes: [

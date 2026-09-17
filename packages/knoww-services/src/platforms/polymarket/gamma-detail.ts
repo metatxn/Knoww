@@ -76,8 +76,8 @@ export interface GammaMarketDetail {
   }[];
 }
 
-const probabilityNumberSchema = z.number().finite().min(0).max(1);
-const priceChangeSchema = z.number().finite().min(-1).max(1);
+const probabilityNumberSchema = z.number().min(0).max(1);
+const priceChangeSchema = z.number().min(-1).max(1);
 
 export const gammaMarketDetailSchema: z.ZodType<GammaMarketDetail> = z
   .object({
@@ -95,9 +95,9 @@ export const gammaMarketDetailSchema: z.ZodType<GammaMarketDetail> = z
     startDate: gammaTimestampSchema.optional(),
     endDate: gammaTimestampSchema.optional(),
     closedTime: gammaTimestampSchema.optional(),
-    volumeNum: z.number().finite().nonnegative().optional(),
+    volumeNum: z.number().nonnegative().optional(),
     volume: nonNegativeDecimalSchema.optional(),
-    liquidityNum: z.number().finite().nonnegative().optional(),
+    liquidityNum: z.number().nonnegative().optional(),
     liquidity: nonNegativeDecimalSchema.optional(),
     bestBid: probabilityNumberSchema.optional(),
     bestAsk: probabilityNumberSchema.optional(),
@@ -118,11 +118,11 @@ export const gammaMarketDetailSchema: z.ZodType<GammaMarketDetail> = z
             title: z.string().optional(),
             ticker: z.string().optional(),
           })
-          .passthrough()
+          .loose()
       )
       .optional(),
   })
-  .passthrough()
+  .loose()
   .superRefine((market, context) => {
     if (market.outcomes === undefined || market.outcomePrices === undefined) {
       return;

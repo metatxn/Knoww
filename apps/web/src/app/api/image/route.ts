@@ -43,7 +43,7 @@ function isAllowedImageSource(rawUrl: string): boolean {
 }
 
 const imageQuerySchema = z.object({
-  url: z.string().url().refine(isAllowedImageSource),
+  url: z.url().refine(isAllowedImageSource),
   w: z.coerce.number().int().min(1).max(4096),
   q: z.coerce.number().int().min(1).max(100).default(75),
   type: z

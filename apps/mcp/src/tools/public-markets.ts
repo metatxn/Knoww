@@ -111,10 +111,10 @@ const listEventsInputSchema = z.object({
   live: z.boolean().optional(),
   tagSlug: tagSlugSchema.optional(),
   seriesIds: z.array(z.number().int().positive()).min(1).max(20).optional(),
-  startDateMin: z.string().datetime().optional(),
-  startDateMax: z.string().datetime().optional(),
-  endDateMin: z.string().datetime().optional(),
-  endDateMax: z.string().datetime().optional(),
+  startDateMin: z.iso.datetime().optional(),
+  startDateMax: z.iso.datetime().optional(),
+  endDateMin: z.iso.datetime().optional(),
+  endDateMax: z.iso.datetime().optional(),
   order: z
     .enum(["volume", "liquidity", "startDate", "endDate", "volume24hr"])
     .default("volume24hr"),

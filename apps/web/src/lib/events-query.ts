@@ -19,7 +19,6 @@ const MAX_NUMERIC = 1e12;
 
 const optionalBoundedNumber = z.coerce
   .number()
-  .finite()
   .nonnegative()
   .max(MAX_NUMERIC)
   .optional();

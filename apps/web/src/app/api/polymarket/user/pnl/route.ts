@@ -23,14 +23,11 @@ const USER_PNL_API = "https://user-pnl-api.polymarket.com";
  * Position data for P&L calculation
  */
 interface PositionData {
-  size: string;
-  avgPrice: string;
-  currentPrice: string;
+  size: number;
+  avgPrice: number;
   curPrice: number;
-  realizedPnl: string;
-  unrealizedPnl: string;
-  curValue: string;
-  initialValue: string;
+  realizedPnl: number;
+  initialValue: number;
   currentValue: number;
   cashPnl: number;
   percentPnl: number;
@@ -454,7 +451,7 @@ export async function GET(request: NextRequest) {
     // If P&L API didn't work, calculate from positions
     if (unrealizedPnl.isZero() && realizedPnlFromPositions.isZero()) {
       unrealizedPnl = positions.reduce(
-        (sum, p) => sum.add(toDecimal(p.unrealizedPnl)),
+        (sum, p) => sum.add(toDecimal(p.cashPnl)),
         new Decimal(0)
       );
 
@@ -480,7 +477,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate current portfolio value
     const currentPortfolioValue = positions.reduce(
-      (sum, p) => sum.add(toDecimal(p.curValue)),
+      (sum, p) => sum.add(toDecimal(p.currentValue)),
       new Decimal(0)
     );
 
@@ -491,10 +488,10 @@ export async function GET(request: NextRequest) {
 
     // Calculate win rate (positions with positive P&L)
     const positionsWithPnl = positions.filter(
-      (p) => !toDecimal(p.unrealizedPnl).isZero()
+      (p) => !toDecimal(p.cashPnl).isZero()
     );
     const winningPositions = positionsWithPnl.filter((p) =>
-      toDecimal(p.unrealizedPnl).gt(0)
+      toDecimal(p.cashPnl).gt(0)
     );
     const winRate =
       positionsWithPnl.length > 0
@@ -541,7 +538,7 @@ export async function GET(request: NextRequest) {
 
     // Best and worst performing positions
     const sortedByPnl = [...positions].sort((a, b) =>
-      toDecimal(b.unrealizedPnl).cmp(toDecimal(a.unrealizedPnl))
+      toDecimal(b.cashPnl).cmp(toDecimal(a.cashPnl))
     );
 
     const bestPerformer = sortedByPnl[0];
@@ -584,10 +581,10 @@ export async function GET(request: NextRequest) {
               title: bestPerformer.title,
               slug: bestPerformer.slug,
               outcome: bestPerformer.outcome,
-              pnl: toNumber(toDecimal(bestPerformer.unrealizedPnl)),
+              pnl: toNumber(toDecimal(bestPerformer.cashPnl)),
               pnlPercent: toDecimal(bestPerformer.initialValue).gt(0)
                 ? toNumber(
-                    toDecimal(bestPerformer.unrealizedPnl)
+                    toDecimal(bestPerformer.cashPnl)
                       .div(toDecimal(bestPerformer.initialValue))
                       .mul(100)
                   )
@@ -599,10 +596,10 @@ export async function GET(request: NextRequest) {
               title: worstPerformer.title,
               slug: worstPerformer.slug,
               outcome: worstPerformer.outcome,
-              pnl: toNumber(toDecimal(worstPerformer.unrealizedPnl)),
+              pnl: toNumber(toDecimal(worstPerformer.cashPnl)),
               pnlPercent: toDecimal(worstPerformer.initialValue).gt(0)
                 ? toNumber(
-                    toDecimal(worstPerformer.unrealizedPnl)
+                    toDecimal(worstPerformer.cashPnl)
                       .div(toDecimal(worstPerformer.initialValue))
                       .mul(100)
                   )

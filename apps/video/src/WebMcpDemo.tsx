@@ -1,7 +1,7 @@
 import {
   AbsoluteFill,
-  Audio,
   Easing,
+  Html5Audio,
   interpolate,
   Sequence,
   staticFile,
@@ -1018,7 +1018,7 @@ export const KnowwWebMcpDemo: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: theme.bg }}>
-      <Audio src={staticFile("score.wav")} volume={0.16} />
+      <Html5Audio src={staticFile("score.wav")} volume={0.16} />
       {scenes.map(({ component: Scene, duration, name }) => {
         const start = from;
         from += duration;

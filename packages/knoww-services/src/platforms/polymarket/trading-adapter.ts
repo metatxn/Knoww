@@ -213,7 +213,7 @@ const openOrderSchema = z
     makerAddress: z.string().optional(),
     outcome: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 const cancelResponseSchema = z
   .object({
@@ -221,7 +221,7 @@ const cancelResponseSchema = z
     not_canceled: z.record(z.string(), z.string()).optional(),
     notCanceled: z.record(z.string(), z.string()).optional(),
   })
-  .passthrough();
+  .loose();
 
 const TIME_IN_FORCE_OF_CLOB: Record<string, TimeInForce> = {
   GTC: "gtc",
@@ -255,13 +255,13 @@ const postOrderResponseSchema = z
     tradeIds: z.array(z.string()).optional(),
     tradeIDs: z.array(z.string()).optional(),
   })
-  .passthrough();
+  .loose();
 
 const balanceAllowanceSchema = z
   .object({
     balance: z.union([z.string(), z.number(), z.bigint()]).optional(),
   })
-  .passthrough();
+  .loose();
 
 function isAbortError(error: unknown): boolean {
   return (

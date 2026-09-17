@@ -104,7 +104,7 @@ export function CommentInput({
   const [isFocused, setIsFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { signTypedDataAsync } = useSignTypedData();
+  const { mutateAsync: signTypedDataAsync } = useSignTypedData();
 
   const isReply = variant === "reply" || !!parentCommentId;
   const defaultPlaceholder = isReply

@@ -133,16 +133,16 @@ const marketSchema = z
     archived: z.boolean().optional(),
     startDate: gammaTimestampSchema.optional(),
     endDate: gammaTimestampSchema.optional(),
-    volumeNum: z.number().finite().nonnegative().optional(),
+    volumeNum: z.number().nonnegative().optional(),
     volume: nonNegativeDecimalSchema.optional(),
-    liquidityNum: z.number().finite().nonnegative().optional(),
+    liquidityNum: z.number().nonnegative().optional(),
     liquidity: nonNegativeDecimalSchema.optional(),
     outcomes: gammaStringArraySchema.optional(),
     outcomePrices: gammaProbabilityArraySchema.optional(),
     clobTokenIds: gammaStringArraySchema.optional(),
     groupItemTitle: z.string().optional(),
   })
-  .passthrough()
+  .loose()
   .superRefine((market, context) => {
     if (market.id === undefined && market.slug === undefined) {
       context.addIssue({
@@ -172,16 +172,16 @@ const searchEventSchema = z
     description: z.string().optional(),
     image: z.string().optional(),
     icon: z.string().optional(),
-    volume: z.number().finite().nonnegative().optional(),
-    volume24hr: z.number().finite().nonnegative().optional(),
-    liquidity: z.number().finite().nonnegative().optional(),
+    volume: z.number().nonnegative().optional(),
+    volume24hr: z.number().nonnegative().optional(),
+    liquidity: z.number().nonnegative().optional(),
     startDate: gammaTimestampSchema.optional(),
     endDate: gammaTimestampSchema.optional(),
     active: z.boolean().optional(),
     closed: z.boolean().optional(),
     live: z.boolean().optional(),
     ended: z.boolean().optional(),
-    competitive: z.number().finite().optional(),
+    competitive: z.number().optional(),
     markets: z.preprocess(
       removeUnavailableNestedMarkets,
       z.array(marketSchema).optional()
@@ -189,12 +189,12 @@ const searchEventSchema = z
     topOutcome: z
       .object({
         name: z.string().min(1),
-        price: z.number().finite().min(0).max(1),
+        price: z.number().min(0).max(1),
       })
       .optional(),
     _source: z.enum(["search", "tag"]).optional(),
   })
-  .passthrough();
+  .loose();
 
 const paginationSchema = z.object({
   hasMore: z.boolean(),
@@ -424,7 +424,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
         pagination: paginationSchema.optional(),
         hasMore: z.boolean().optional(),
       })
-      .passthrough()
+      .loose()
       .safeParse(payload);
     if (!parsed.success) {
       throw upstreamSearchError(

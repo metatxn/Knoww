@@ -41,6 +41,13 @@ interface UserPnlResponse {
     activityPagesFetched: number;
     activityTruncated: boolean;
   };
+  performance: {
+    winRate: number;
+    winningPositions: number;
+    losingPositions: number;
+    bestPerformer: { slug: string; pnl: number; pnlPercent: number };
+    worstPerformer: { slug: string; pnl: number; pnlPercent: number };
+  };
   history: Record<string, { volume: number }>;
 }
 
@@ -103,8 +110,7 @@ describe("GET /api/polymarket/user/pnl", () => {
             currentPrice: "0.2",
             curPrice: 1,
             realizedPnl: "0.1",
-            unrealizedPnl: "0.1",
-            curValue: "0.1",
+
             initialValue: "0.1",
             currentValue: 0.1,
             cashPnl: 0.1,
@@ -120,8 +126,7 @@ describe("GET /api/polymarket/user/pnl", () => {
             currentPrice: "0.4",
             curPrice: 1,
             realizedPnl: "0.2",
-            unrealizedPnl: "0.2",
-            curValue: "0.2",
+
             initialValue: "0.2",
             currentValue: 0.2,
             cashPnl: 0.2,
@@ -181,6 +186,13 @@ describe("GET /api/polymarket/user/pnl", () => {
     expect(body.pnl.unrealized).toBe(0.3);
     expect(body.pnl.realized).toBe(0.3);
     expect(body.pnl.total).toBe(0.6);
+    expect(body.performance).toMatchObject({
+      winRate: 100,
+      winningPositions: 2,
+      losingPositions: 0,
+      bestPerformer: { slug: "market-b", pnl: 0.2, pnlPercent: 100 },
+      worstPerformer: { slug: "market-a", pnl: 0.1, pnlPercent: 100 },
+    });
     expect(body.portfolio.currentValue).toBe(0.3);
     expect(body.portfolio.initialInvestment).toBe(0.3);
     expect(body.trading.totalBuyValue).toBe(0.3);
@@ -206,8 +218,7 @@ describe("GET /api/polymarket/user/pnl", () => {
             currentPrice: "0.5",
             curPrice: 0.5,
             realizedPnl: "0",
-            unrealizedPnl: "2.5",
-            curValue: "5",
+
             initialValue: "2.5",
             currentValue: 5,
             cashPnl: 2.5,
@@ -340,8 +351,7 @@ describe("GET /api/polymarket/user/pnl", () => {
       currentPrice: "0.6",
       curPrice: 0.6,
       realizedPnl: "0",
-      unrealizedPnl: "0.1",
-      curValue: "0.6",
+
       initialValue: "0.5",
       currentValue: 0.6,
       cashPnl: 0.1,

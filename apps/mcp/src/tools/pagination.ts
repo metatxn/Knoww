@@ -27,12 +27,12 @@ const offsetCursorSchema = z.object({
   v: z.literal(1),
   kind: z.literal("offset"),
   namespace: z.string().min(1),
-  offset: z.number().int().safe().nonnegative(),
+  offset: z.number().int().nonnegative(),
   fingerprint: z.string().min(1),
 });
 const legacyOffsetCursorSchema = z.object({
   v: z.literal(1),
-  offset: z.number().int().safe().nonnegative(),
+  offset: z.number().int().nonnegative(),
   fingerprint: z.string().min(1),
 });
 const stateCursorSchema = z.object({

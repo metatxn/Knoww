@@ -152,3 +152,40 @@ describe("fetchEventPage", () => {
     });
   });
 });
+
+describe("invalid leaderboard responses", () => {
+  it.each([null, { rank: 1, user_id: WALLET, volume: 10, pnl: "invalid" }])(
+    "wraps invalid list rows as upstream errors: %j",
+    async (row) => {
+      const { client } = createClient(() =>
+        jsonResponse({ data: [row], pagination: { next_cursor: null } })
+      );
+      await expect(
+        client.fetchTraderLeaderboardPage({
+          category: "OVERALL",
+          timePeriod: "ALL",
+          orderBy: "PNL",
+          limit: 25,
+          offset: 0,
+        })
+      ).rejects.toSatisfy(isUpstreamPublicDataError);
+    }
+  );
+  it("wraps invalid wallet standings as upstream errors", async () => {
+    const { client } = createClient(() =>
+      jsonResponse({
+        data: { user_id: WALLET, rank_pnl: 1, volume: 10, pnl: "invalid" },
+      })
+    );
+    await expect(
+      client.fetchTraderLeaderboardPage({
+        walletAddress: WALLET,
+        category: "OVERALL",
+        timePeriod: "ALL",
+        orderBy: "PNL",
+        limit: 25,
+        offset: 0,
+      })
+    ).rejects.toSatisfy(isUpstreamPublicDataError);
+  });
+});

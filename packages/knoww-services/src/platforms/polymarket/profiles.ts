@@ -36,7 +36,7 @@ const profileSchema = z
     profileImage: z.string().optional(),
     verifiedBadge: z.boolean().optional(),
   })
-  .passthrough();
+  .loose();
 
 const positionSchema = z
   .object({
@@ -71,7 +71,7 @@ const positionSchema = z
     endDate: z.string().optional(),
     negativeRisk: z.boolean().optional(),
   })
-  .passthrough();
+  .loose();
 
 const activitySchema = z
   .object({
@@ -91,7 +91,7 @@ const activitySchema = z
     eventSlug: z.string().optional(),
     outcome: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 const closedPositionSchema = z
   .object({
@@ -109,7 +109,7 @@ const closedPositionSchema = z
     outcome: z.string().optional(),
     outcomeIndex: z.number().int().nonnegative().optional(),
   })
-  .passthrough();
+  .loose();
 
 export interface WalletPositionsParams {
   walletAddress: string;

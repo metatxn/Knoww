@@ -23,10 +23,10 @@ import {
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
 const log = createLogger("api.agent.runs");
-const LiveRunIdempotencyKeySchema = z.string().uuid();
+const LiveRunIdempotencyKeySchema = z.uuid();
 
 const RunInputSchema = z.object({
-  watchlistItemIds: z.array(z.string().uuid()).max(25).optional(),
+  watchlistItemIds: z.array(z.uuid()).max(25).optional(),
   portfolio: z
     .object({
       bankrollUsd: DecimalStringSchema,
