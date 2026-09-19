@@ -12,6 +12,7 @@
     "release:ext": "pnpm --filter @knoww/extension run release",
     "build": "pnpm -r build",
     "test": "pnpm -r --if-present run test",
+    "test:hooks": "node --test tooling/knoww-hooks/user-prompt-submit.test.mjs",
     "preview": "pnpm --filter @knoww/web preview",
     "deploy": "pnpm --filter @knoww/web run deploy",
     "upload": "pnpm --filter @knoww/web run upload",

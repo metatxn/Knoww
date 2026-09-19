@@ -185,6 +185,8 @@ The display tool declares `ui.resourceUri` for `ui://knoww/markets/v2.html` and 
 
 If ChatGPT reports `HTML asset not found` or `Failed to fetch template`, check whether the connection still references an older template URI. Open Settings → Plugins → Knoww → Refresh and confirm that the output template is `ui://knoww/markets/v2.html`. Then start a new chat with Knoww selected. A successful market JSON response does not verify that the HTML template loaded.
 
+An optional [Codex conversation hook prototype](../../tooling/knoww-hooks/README.md) adds context-resolution guidance before each prompt and reuses these tools. Its configuration and local tests are separate from this Worker. It does not enable hooks in ordinary ChatGPT conversations.
+
 ### `get_market`
 
 Fetches one market using exactly one of `id`, `slug`, `conditionId`, or `tokenId`.
