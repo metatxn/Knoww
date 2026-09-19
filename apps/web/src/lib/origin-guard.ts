@@ -9,6 +9,7 @@ const ALLOWED_ORIGINS_WHITELIST = [
   "http://localhost:8787",
   "https://knoww.app",
   "https://www.knoww.app",
+  "https://agg-restructuring-knoww.prayag.workers.dev",
 ];
 
 function isDevelopmentOrigin(origin: string): boolean {
