@@ -74,7 +74,7 @@ export async function fetchPriceHistoryBatch(
 }> {
   if (tokenIds.length === 0) return { histories: [], partial: false };
 
-  const response = await fetch("/api/markets/price-history/batch", {
+  const response = await fetch("/api/polymarket/markets/price-history/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tokenIds, startTs, fidelity }),

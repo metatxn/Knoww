@@ -1,11 +1,4 @@
 import { createLogger } from "@knoww/logger";
-import {
-  buildEmptySearchResponse,
-  DEFAULT_SEARCH_LIMIT,
-  fetchAggregatedSearchData,
-  MAX_SEARCH_LIMIT,
-  type SearchResponseData,
-} from "@knoww/services";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
@@ -15,6 +8,13 @@ import {
 } from "@/lib/extension-auth";
 import { normalizeTagSlug } from "@/lib/tag-slugs";
 import { sanitizeSearchQuery } from "@/lib/validation";
+import {
+  buildEmptySearchResponse,
+  DEFAULT_SEARCH_LIMIT,
+  MAX_SEARCH_LIMIT,
+  type SearchResponseData,
+  searchPolymarket,
+} from "@/polymarket/search-reads";
 
 const log = createLogger("api.search");
 
@@ -146,11 +146,9 @@ async function getSearchData(
   const existing = inFlightSearches.get(key);
   if (existing) return existing;
 
-  const request = fetchAggregatedSearchData(query, limit, tagSlugs).finally(
-    () => {
-      inFlightSearches.delete(key);
-    }
-  );
+  const request = searchPolymarket(query, limit, tagSlugs).finally(() => {
+    inFlightSearches.delete(key);
+  });
   inFlightSearches.set(key, request);
   return request;
 }

@@ -123,13 +123,13 @@ export async function readTradingWalletBalance(
     options.includeNative
       ? client.getBalance({ address: owner }).catch(() => BigInt(0))
       : Promise.resolve(BigInt(0)),
-    // getBytecode resolves `undefined` for a successful no-code read, so a
+    // getCode resolves `undefined` for a successful no-code read, so a
     // caught error must not collapse into the same value — track read success
     // separately and omit `isDeployed` entirely when the read failed, or a
     // deployed wallet reads as "not deployed" during any RPC hiccup.
     options.includeDeployment
       ? client
-          .getBytecode({ address: owner })
+          .getCode({ address: owner })
           .then((code) => ({ ok: true as const, code }))
           .catch(() => ({ ok: false as const, code: undefined }))
       : Promise.resolve({ ok: false as const, code: undefined }),

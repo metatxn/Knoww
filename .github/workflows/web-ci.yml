@@ -1,0 +1,67 @@
+name: Web CI
+
+on:
+  pull_request:
+    # The ADR routes restructure PRs to the integration branch and one merge
+    # PR to main; nothing else needs this workflow.
+    branches:
+      - agg-restructuring
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # src/config/index.tsx throws at import time without a project id, and
+      # `next build` imports every page to collect its config. CI never opens
+      # a wallet, so a placeholder is enough; set the repository variable to
+      # build with the real (public) id instead.
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '00000000000000000000000000000000' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint web app and shared services
+        run: |
+          pnpm --filter @knoww/services lint
+          pnpm --filter @knoww/web lint
+
+      - name: Typecheck affected packages
+        run: |
+          pnpm --filter @knoww/services typecheck
+          pnpm --filter @knoww/web typecheck
+          pnpm --filter @knoww/extension typecheck
+
+      - name: Run affected tests
+        run: |
+          pnpm --filter @knoww/services test
+          pnpm --filter @knoww/web test
+          pnpm --filter @knoww/extension test
+
+      - name: Build production web app
+        run: pnpm --filter @knoww/web build
+
+      - name: Check whitespace
+        run: git diff --check

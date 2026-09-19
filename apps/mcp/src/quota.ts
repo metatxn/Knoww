@@ -1,6 +1,6 @@
 import type { McpPlan } from "./auth/scopes";
 import { type RequestPrincipal, requestContext } from "./context";
-import { KnowwToolError } from "./errors/tool-error";
+import { knowwToolError } from "./errors/tool-error";
 
 export const QUOTA_RETRY_AFTER_SECONDS = 60;
 
@@ -67,19 +67,19 @@ export async function requireToolQuota(toolName: string): Promise<void> {
   const context = requestContext.getStore();
   const principal = context?.principal;
   if (!principal) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "UNAUTHENTICATED",
       "Authenticate before calling this tool."
     );
   }
   if (!context.toolRateLimiter) {
-    throw new KnowwToolError("INTERNAL_ERROR", "Something went wrong.");
+    throw knowwToolError("INTERNAL_ERROR", "Something went wrong.");
   }
   const outcome = await context.toolRateLimiter.limit({
     key: `${principal.plan}:${principal.id}:${toolName}`,
   });
   if (!outcome.success) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "RATE_LIMITED",
       "This tool's request quota has been reached.",
       { retryAfterSeconds: QUOTA_RETRY_AFTER_SECONDS }

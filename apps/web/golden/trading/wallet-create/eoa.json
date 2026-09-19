@@ -1,0 +1,26 @@
+{
+  "family": "wallet-create",
+  "mode": "eoa",
+  "wallet": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "personality": "approved",
+  "relayerDeployed": true,
+  "mount": {
+    "requests": [],
+    "state": {
+      "proxyAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "hasDeployedSafe": true,
+      "walletMode": "eoa",
+      "error": null
+    }
+  },
+  "action": {
+    "requests": [],
+    "wallet": [],
+    "result": {
+      "success": true,
+      "transactionHash": "",
+      "proxyAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "alreadyDeployed": true
+    }
+  }
+}

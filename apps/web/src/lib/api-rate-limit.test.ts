@@ -4,12 +4,16 @@ import { checkRateLimit } from "./api-rate-limit";
 import { TRUSTED_CLIENT_IP_HEADER } from "./client-ip";
 import { _resetRateLimitStore } from "./rate-limit";
 
-function makeRequest(ip: string, headers?: HeadersInit): NextRequest {
+function makeRequest(
+  ip: string,
+  headers?: HeadersInit,
+  pathname = "/api/ai/extract-topics"
+): NextRequest {
   const requestHeaders = new Headers(headers);
   if (ip) requestHeaders.set(TRUSTED_CLIENT_IP_HEADER, ip);
   return {
     headers: requestHeaders,
-    nextUrl: new URL("http://localhost/api/ai/extract-topics"),
+    nextUrl: new URL(pathname, "http://localhost"),
   } as unknown as NextRequest;
 }
 
@@ -38,6 +42,22 @@ describe("checkRateLimit", () => {
     expect(
       checkRateLimit(req, { ...tight, keySuffix: "daily" })
     ).not.toBeNull();
+  });
+
+  it("shares one bucket across token ids under the Polymarket by-token route", () => {
+    const tight = { interval: 60_000, uniqueTokenPerInterval: 1 };
+    const first = makeRequest(
+      "3.3.3.3",
+      undefined,
+      "/api/polymarket/markets/by-token/111"
+    );
+    const second = makeRequest(
+      "3.3.3.3",
+      undefined,
+      "/api/polymarket/markets/by-token/222"
+    );
+    expect(checkRateLimit(first, tight)).toBeNull();
+    expect(checkRateLimit(second, tight)).not.toBeNull();
   });
 
   it("keeps separate buckets for trusted client identities", () => {

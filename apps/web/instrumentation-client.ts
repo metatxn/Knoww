@@ -1,11 +1,17 @@
 import { analyticsEventUuid } from "@knoww/shared-types/product-analytics";
 import posthog from "posthog-js";
+import { isProductionAnalyticsHost } from "./src/lib/analytics-environment";
 import { createJourneyAttribution } from "./src/lib/journey-attribution";
 import { getPostHogBrowserHost } from "./src/lib/posthog-browser-config";
 
 const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 
-if (token && process.env.NODE_ENV === "production") {
+if (
+  token &&
+  process.env.NODE_ENV === "production" &&
+  typeof window !== "undefined" &&
+  isProductionAnalyticsHost(window.location.hostname)
+) {
   let journey: ReturnType<typeof createJourneyAttribution> | undefined;
   try {
     journey = createJourneyAttribution(window.sessionStorage);
@@ -28,11 +34,7 @@ if (token && process.env.NODE_ENV === "production") {
         delete event.properties.entry_source;
         Object.assign(event.properties, journey?.properties());
       }
-      event.properties.environment = ["knoww.app", "www.knoww.app"].includes(
-        window.location.hostname
-      )
-        ? "production"
-        : "development";
+      event.properties.environment = "production";
       const uuid = analyticsEventUuid(
         event.event,
         String(event.properties.distinct_id),

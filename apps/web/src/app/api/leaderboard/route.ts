@@ -1,10 +1,10 @@
 import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { jsonError } from "@/lib/api-error";
 import { clampedInt, orAbsent } from "@/lib/api-query";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.leaderboard");
 
@@ -145,16 +145,11 @@ export async function GET(request: NextRequest) {
       queryParams.set("userName", userName);
     }
 
-    const url = `${POLYMARKET_API.DATA.BASE}/v1/leaderboard?${queryParams.toString()}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-      next: {
-        revalidate: 60, // Cache for 1 minute
-      },
-    });
+    const response = await fetchWalletDataResponse(
+      "leaderboard",
+      new URLSearchParams(`${queryParams.toString()}`),
+      { cache: { revalidateSeconds: 60 } }
+    );
 
     if (!response.ok) {
       log.error("upstream.error", { status: response.status });

@@ -6,7 +6,7 @@ import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  JsonBodyError,
+  isJsonBodyError,
   jsonError,
   readJson,
   requireAgentAdmin,
@@ -19,8 +19,8 @@ const log = createLogger("api.agent.watchlist");
 
 const WatchlistInputSchema = z
   .object({
-    id: z.string().uuid().optional(),
-    polymarketUrl: z.string().trim().url().max(500).optional(),
+    id: z.uuid().optional(),
+    polymarketUrl: z.string().trim().pipe(z.url().max(500)).optional(),
     question: z.string().trim().min(8).max(240).optional(),
     tokenId: z.string().trim().min(8).max(160).optional(),
     conditionId: z.string().trim().min(8).max(160).optional(),
@@ -33,13 +33,12 @@ const WatchlistInputSchema = z
     oppositeOutcomeLabel: z.string().trim().min(1).max(80).optional(),
     oppositeTokenId: z.string().trim().min(8).max(160).optional(),
     eventMarketCount: z.number().int().nonnegative().max(500).optional(),
-    eventStartTime: z.string().datetime().optional(),
-    eventEndTime: z.string().datetime().optional(),
-    resolutionSource: z.string().trim().url().max(500).optional(),
+    eventStartTime: z.iso.datetime().optional(),
+    eventEndTime: z.iso.datetime().optional(),
+    resolutionSource: z.string().trim().pipe(z.url().max(500)).optional(),
     newsUrls: z
       .array(
         z
-          .string()
           .url()
           .max(500)
           .refine(isAllowedAgentNewsUrl, "News URL host is not allowed")
@@ -201,7 +200,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await readJson(request);
     } catch (error) {
-      if (error instanceof JsonBodyError) {
+      if (isJsonBodyError(error)) {
         return jsonError(error.message, error.status);
       }
       return jsonError("Invalid JSON payload", 400);

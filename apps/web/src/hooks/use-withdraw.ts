@@ -360,7 +360,7 @@ export function useWithdraw() {
   /**
    * Submit transactions via relayer and poll for confirmation.
    *
-   * `executeViaRelayer` submits to /api/relayer and polls /transaction until
+   * `executeViaRelayer` submits to /api/polymarket/relayer and polls /transaction until
    * the relayer reports a success state (throws on failure/timeout). We surface
    * the on-chain hash to the caller once the tx lands.
    */

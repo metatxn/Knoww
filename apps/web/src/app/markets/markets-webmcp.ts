@@ -91,7 +91,7 @@ const tagSlugSchema = z
   .min(1)
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-const amountSchema = z.number().finite().min(0).max(MAX_FILTER_AMOUNT);
+const amountSchema = z.number().min(0).max(MAX_FILTER_AMOUNT);
 const emptyInputSchema = z.object({}).strict();
 const contextInputSchema = z
   .object({

@@ -108,9 +108,9 @@ const prepareTradeInputSchema = z
   .object({
     side: z.enum(["BUY", "SELL"]),
     order_type: z.enum(["MARKET", "LIMIT"]),
-    amount_usd: z.number().finite().positive().max(1_000_000).optional(),
-    shares: z.number().finite().positive().max(1_000_000).optional(),
-    limit_price: z.number().finite().gt(0).lt(1).optional(),
+    amount_usd: z.number().positive().max(1_000_000).optional(),
+    shares: z.number().positive().max(1_000_000).optional(),
+    limit_price: z.number().gt(0).lt(1).optional(),
     allow_partial_fill: z.boolean().optional(),
   })
   .strict();

@@ -19,6 +19,7 @@ export interface TraderProfile {
 
   // Stats
   totalVolume: number;
+  totalVolumeUnit?: "shares" | "USD";
   totalPnl: number;
   positionsCount: number;
   tradesCount: number;

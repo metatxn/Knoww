@@ -1,17 +1,17 @@
-import { fetchMarketByIdentifier, GAMMA_API_BASE } from "@knoww/services";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toolFailureContent,
 } from "../errors/tool-error";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
 import { requireToolQuota } from "../quota";
 import { MARKETS_HTML, MARKETS_RESOURCE_URI } from "../ui/markets";
-import { knowwEventUrl, SLUG_PATTERN } from "./gamma";
+import { knowwEventUrl, marketIdentity, SLUG_PATTERN } from "./gamma";
 import {
   buildMarketDetail,
   mapLookupError,
@@ -21,6 +21,7 @@ import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 import { CONDITION_ID_PATTERN } from "./public-read";
 
 const inputSchema = z.object({
+  platform: platformInputSchema,
   slugs: z
     .array(z.string().regex(SLUG_PATTERN))
     .max(3)
@@ -57,21 +58,27 @@ export async function handleShowMarkets(
   try {
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("show_markets");
-    const slugs = [...new Set(inputSchema.parse(args).slugs)];
+    const input = inputSchema.parse(args);
+    const client = requirePolymarketClient(input.platform);
+    const slugs = [...new Set(input.slugs)];
     const results = await Promise.allSettled(
       slugs.map(async (slug) => {
-        const detail = await fetchMarketByIdentifier(
+        const detail = await client.fetchMarketByIdentifier(
           { kind: "slug", value: slug },
           { signal: context.mcpReq.signal }
         );
         if (!detail) return null;
         if (detail.slug !== slug) {
-          throw new KnowwToolError(
+          throw knowwToolError(
             "UPSTREAM_UNAVAILABLE",
             "The market lookup returned an unexpected identifier."
           );
         }
-        const market = buildMarketDetail(detail);
+        const identity = marketIdentity(detail);
+        if (!identity || !CONDITION_ID_PATTERN.test(identity.sourceMarketId)) {
+          return null;
+        }
+        const market = buildMarketDetail(detail, identity);
         // Gamma may list midnight on the event date while trading remains open.
         // Lifecycle flags, rather than endDate, determine card eligibility.
         if (
@@ -124,7 +131,7 @@ export async function handleShowMarkets(
     const omittedCount = slugs.length - markets.length - unavailableCount;
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-gamma", url: GAMMA_API_BASE }],
+      sources: [{ name: "polymarket-gamma", url: client.baseUrls.gamma }],
       ...(unavailableCount > 0 ||
       markets.some(
         (market) => market.outcomesTruncated || market.descriptionTruncated

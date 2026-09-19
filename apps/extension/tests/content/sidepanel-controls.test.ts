@@ -471,14 +471,20 @@ test("side panel exposes a compact portfolio view without charts", () => {
   assert.equal(/renderPortfolioSetupSurface/.test(sidepanelSource), true);
   assert.equal(/resolvePortfolioWallet/.test(sidepanelSource), true);
   assert.equal(/trading:derive-proxy-address/.test(sidepanelSource), true);
-  assert.equal(/\/api\/user\/positions/.test(sidepanelSource), true);
-  assert.equal(/\/api\/user\/trades/.test(sidepanelSource), true);
-  assert.equal(/\/api\/user\/details/.test(sidepanelSource), true);
+  assert.equal(
+    /\/api\/polymarket\/user\/positions/.test(sidepanelSource),
+    true
+  );
+  assert.equal(/\/api\/polymarket\/user\/trades/.test(sidepanelSource), true);
+  assert.equal(/\/api\/polymarket\/user\/details/.test(sidepanelSource), true);
   assert.equal(/trading:get-balance/.test(sidepanelSource), true);
   assert.equal(/cashBalance/.test(sidepanelSource), true);
   assert.equal(/Cash/.test(sidepanelSource), true);
   assert.equal(/KNOWW_GET_PORTFOLIO_OPEN_ORDERS/.test(sidepanelSource), true);
-  assert.equal(/\/api\/markets\/by-token/.test(sidepanelSource), true);
+  assert.equal(
+    /\/api\/polymarket\/markets\/by-token/.test(sidepanelSource),
+    true
+  );
   assert.equal(/renderPortfolioSummary/.test(sidepanelSource), true);
   assert.equal(/renderCompactPositions/.test(sidepanelSource), true);
   assert.equal(/renderCompactOpenOrders/.test(sidepanelSource), true);
@@ -718,7 +724,7 @@ test("side panel portfolio fetches a full active positions page but displays com
     true
   );
   assert.equal(
-    /\/api\/user\/positions\?user=\$\{user\}&limit=\$\{PORTFOLIO_POSITIONS_FETCH_LIMIT\}&offset=0&active=true/.test(
+    /\/api\/polymarket\/user\/positions\?user=\$\{user\}&limit=\$\{PORTFOLIO_POSITIONS_FETCH_LIMIT\}&offset=0&active=true/.test(
       sidepanelSource
     ),
     true

@@ -9,12 +9,13 @@ import { qk } from "@/lib/query-keys";
  * User details from Polymarket
  */
 export interface UserDetails {
-  rank: number;
+  rank: number | null;
   proxyWallet: string;
   userName: string;
   xUsername: string | null;
   verifiedBadge: boolean;
   volume: number;
+  volumeUnit?: "shares";
   pnl: number;
   profileImage: string | null;
 }
@@ -70,7 +71,7 @@ async function fetchUserDetails(
   });
 
   return fetchJson<UserDetailsResponse>(
-    `/api/user/details?${params.toString()}`
+    `/api/polymarket/user/details?${params.toString()}`
   );
 }
 

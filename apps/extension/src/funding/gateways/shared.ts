@@ -6,7 +6,7 @@
 // number→decimal-string conversions. Neutral home so neither surface's
 // gateway imports from the other.
 import Decimal from "decimal.js";
-import { FundingGatewayError } from "../gateway";
+import { type FundingGatewayError, fundingGatewayError } from "../gateway";
 import type { FundingAttempt, FundingAttemptPhase } from "../types";
 
 /** The background `sendResponse` envelope every gateway message resolves to. */
@@ -29,14 +29,14 @@ export function executionError(
 ): FundingGatewayError {
   const message = rawError ?? "Could not complete the transaction.";
   if (rawError === "NO_CONTENT_TAB") {
-    return new FundingGatewayError({
+    return fundingGatewayError({
       code: "NO_CONTENT_TAB",
       message,
       retryable: false,
     });
   }
   if (rawError === "PENDING_RECONCILIATION") {
-    return new FundingGatewayError({
+    return fundingGatewayError({
       code: "PENDING_RECONCILIATION",
       message,
       retryable: false,
@@ -46,13 +46,13 @@ export function executionError(
     rawError === "IDEMPOTENCY_FINGERPRINT_MISMATCH" ||
     rawError === "INVALID_IDEMPOTENCY_KEY"
   ) {
-    return new FundingGatewayError({
+    return fundingGatewayError({
       code: "IDEMPOTENCY_FINGERPRINT_MISMATCH",
       message,
       retryable: false,
     });
   }
-  return new FundingGatewayError({
+  return fundingGatewayError({
     code: "EXECUTION_FAILED",
     message,
     retryable: true,

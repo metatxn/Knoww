@@ -31,7 +31,7 @@ export function isBoundedDecimal(
 
 export function decimalValueSchema(bounds: DecimalBounds = {}) {
   return z
-    .union([z.string().trim().min(1), z.number().finite()])
+    .union([z.string().trim().min(1), z.number()])
     .refine(
       (value) => isBoundedDecimal(value, bounds),
       "Invalid decimal value"

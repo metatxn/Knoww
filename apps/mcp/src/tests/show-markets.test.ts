@@ -101,7 +101,9 @@ describe("show_markets MCP App", () => {
     expect(result.structuredContent).toMatchObject({
       markets: [
         {
-          id: "42",
+          id: `polymarket:${market.conditionId}`,
+          platform: "polymarket",
+          sourceMarketId: market.conditionId,
           url: `https://knoww.app/events/detail/fed-meeting?conditionId=${market.conditionId}`,
           outcomes: [
             {
@@ -120,6 +122,17 @@ describe("show_markets MCP App", () => {
     expect(result.content?.[0].text).toContain("14.5%");
     expect(result.content?.[0].text).toContain(
       "https://knoww.app/events/detail/fed-meeting"
+    );
+  });
+
+  it("rejects a disabled platform before fetching upstream", async () => {
+    const { message } = await callTool("show_markets", 24, {
+      platform: "kalshi",
+      slugs: [market.slug],
+    });
+    expect(message.result?.isError).toBe(true);
+    expect((message.result as ToolCallResult).content?.[0].text).toContain(
+      "PLATFORM_DISABLED"
     );
   });
 
@@ -157,14 +170,15 @@ describe("show_markets MCP App", () => {
   });
 
   it.each([undefined, "invalid&side=BUY"])(
-    "keeps an event-only link without a valid condition id: %s",
+    "omits a market without a canonical condition id: %s",
     async (conditionId) => {
       mockMarket(market.slug, { ...market, conditionId });
       const { message } = await callTool("show_markets", 22, {
         slugs: [market.slug],
       });
       expect(message.result?.structuredContent).toMatchObject({
-        markets: [{ url: "https://knoww.app/events/detail/fed-meeting" }],
+        markets: [],
+        omittedCount: 1,
       });
     }
   );

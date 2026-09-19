@@ -19,6 +19,8 @@ export interface Position {
   currentPrice: number;
   currentValue: number;
   initialValue: number;
+  grossInitialValue?: number;
+  entryFeesUsdc?: number;
   unrealizedPnl: number;
   unrealizedPnlPercent: number;
   realizedPnl: number;
@@ -45,6 +47,8 @@ export interface LostPosition {
   size: number;
   avgPrice: number;
   initialValue: number;
+  grossInitialValue?: number;
+  entryFeesUsdc?: number;
   endDate: string;
   negRisk?: boolean;
   market: {
@@ -121,7 +125,7 @@ async function fetchPositions(
   }
 
   return fetchJson<PositionsResponse>(
-    `/api/user/positions?${params.toString()}`
+    `/api/polymarket/user/positions?${params.toString()}`
   );
 }
 

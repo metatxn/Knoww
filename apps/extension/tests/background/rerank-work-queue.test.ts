@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { afterEach, test, vi } from "vitest";
 import {
   createRerankWorkQueue,
-  RerankQueueCapacityError,
-  RerankQueueDeadlineError,
-  RerankSupersededError,
+  isRerankQueueCapacityError,
+  isRerankQueueDeadlineError,
+  isRerankSupersededError,
 } from "../../src/background/rerank-work-queue";
 
 afterEach(() => {
@@ -32,7 +32,7 @@ test("rerank queue keeps pending work bounded and preserves the newest requests"
     executionOrder.push("dropped");
     return "dropped";
   });
-  const droppedRejection = assert.rejects(dropped, RerankQueueCapacityError);
+  const droppedRejection = assert.rejects(dropped, isRerankQueueCapacityError);
   const retained = queue.enqueue("post:retained", async () => {
     executionOrder.push("retained");
     return "retained";
@@ -67,7 +67,7 @@ test("rerank queue supersedes older pending work for the same post", async () =>
     return "stale";
   });
   const staleRejection = assert.rejects(stale, (error: unknown) => {
-    assert.ok(error instanceof RerankSupersededError);
+    assert.ok(isRerankSupersededError(error));
     assert.equal(error.message.includes("post:same"), false);
     return true;
   });
@@ -121,7 +121,7 @@ test("rerank queue rejects expired work before ONNX inference starts", async () 
     expiredWorkStarted = true;
   });
   const expiredRejection = assert.rejects(expired, (error: unknown) => {
-    assert.ok(error instanceof RerankQueueDeadlineError);
+    assert.ok(isRerankQueueDeadlineError(error));
     assert.equal(error.queueWaitMs, 51);
     return true;
   });

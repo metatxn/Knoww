@@ -1,0 +1,47 @@
+{
+  "execute": {
+    "submitted": [
+      {
+        "type": "WALLET",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x00000000000Fb5C9ADea0298D729A0CB3823Cc07",
+        "nonce": "0",
+        "signature": "0x30eafd3c48a30926c17713016f2ce5a120be8d425d9daafa113bdf4de8aa5d8133a5a0519ef5c17e73b839a9877454d43ddfd85f869c0d7c7fedfc64f0ae36eb1c",
+        "depositWalletParams": {
+          "depositWallet": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+          "deadline": "1700001200",
+          "calls": [
+            {
+              "target": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "value": "0",
+              "data": "0x095ea7b30000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000e8d4a51000"
+            },
+            {
+              "target": "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB",
+              "value": "0",
+              "data": "0x095ea7b3000000000000000000000000e111180000d2663c0091e4f400237545b87b996bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          ]
+        }
+      }
+    ],
+    "result": {
+      "transactionID": "golden-tx-1",
+      "transactionHash": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    }
+  },
+  "deploy": {
+    "submitted": [
+      {
+        "type": "WALLET-CREATE",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x00000000000Fb5C9ADea0298D729A0CB3823Cc07"
+      }
+    ],
+    "result": {
+      "transactionID": "golden-tx-1",
+      "transactionHash": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "walletAddress": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e"
+    }
+  }
+}

@@ -9,6 +9,9 @@ import {
 
 setupGammaFetchStub();
 
+const TRUMP_CONDITION_ID = `0x${"ee".repeat(32)}`;
+const TRUMPET_CONDITION_ID = `0x${"ef".repeat(32)}`;
+
 const searchEvent = {
   id: "evt-war",
   slug: "geopolitical-outcomes",
@@ -64,6 +67,8 @@ const searchEvent = {
       question: "Will Warcraft release?",
       active: true,
       closed: false,
+      conditionId:
+        "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       volumeNum: 500,
       outcomes: '["Yes","No"]',
       outcomePrices: '["0.1","0.9"]',
@@ -135,7 +140,7 @@ describe("search_markets ranked market results", () => {
           | Array<{ id: string }>
           | undefined
       )?.map(({ id }) => id)
-    ).toEqual(["evt-war-2"]);
+    ).toEqual(["polymarket:evt-war-2"]);
     expect(secondResult.structuredContent?.page).toEqual({
       returnedResults: 1,
       totalResults: 2,
@@ -164,7 +169,9 @@ describe("search_markets ranked market results", () => {
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.markets).toEqual([
       {
-        id: "mkt-war-funding",
+        id: "polymarket:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        sourceMarketId:
+          "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         slug: "war-funding",
         conditionId:
           "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -182,14 +189,18 @@ describe("search_markets ranked market results", () => {
           { name: "No", price: "0.55", tokenId: "22" },
         ],
         event: {
-          id: "evt-war",
+          id: "polymarket:evt-war",
+          platform: "polymarket",
+          sourceEventId: "evt-war",
           slug: "geopolitical-outcomes",
           title: "Geopolitical outcomes",
           url: "https://knoww.app/events/detail/geopolitical-outcomes",
         },
       },
       {
-        id: "mkt-war-end",
+        id: "polymarket:0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        sourceMarketId:
+          "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         slug: "war-end",
         conditionId:
           "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -206,7 +217,9 @@ describe("search_markets ranked market results", () => {
           { name: "No", price: "0.8", tokenId: "32" },
         ],
         event: {
-          id: "evt-war",
+          id: "polymarket:evt-war",
+          platform: "polymarket",
+          sourceEventId: "evt-war",
           slug: "geopolitical-outcomes",
           title: "Geopolitical outcomes",
           url: "https://knoww.app/events/detail/geopolitical-outcomes",
@@ -269,8 +282,8 @@ describe("search_markets ranked market results", () => {
       | Array<{ id: string }>
       | undefined;
     expect(secondMarkets?.map(({ id }) => id)).toEqual([
-      "mkt-war-funding",
-      "mkt-war-end",
+      "polymarket:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "polymarket:0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     ]);
     expect(secondResult.structuredContent?.page).toEqual({
       totalResults: 4,
@@ -298,6 +311,7 @@ describe("search_markets ranked market results", () => {
               markets: [
                 {
                   id: "mkt-donald-trump",
+                  conditionId: TRUMP_CONDITION_ID,
                   question: "Will Donald   Trump attend?",
                   active: true,
                   closed: false,
@@ -306,6 +320,7 @@ describe("search_markets ranked market results", () => {
                 },
                 {
                   id: "mkt-donald-trumpet",
+                  conditionId: TRUMPET_CONDITION_ID,
                   question: "Will Donald Trumpet perform?",
                   active: true,
                   closed: false,
@@ -332,7 +347,9 @@ describe("search_markets ranked market results", () => {
     const markets = result.structuredContent?.markets as
       | Array<{ id: string }>
       | undefined;
-    expect(markets?.map(({ id }) => id)).toEqual(["mkt-donald-trump"]);
+    expect(markets?.map(({ id }) => id)).toEqual([
+      `polymarket:${TRUMP_CONDITION_ID}`,
+    ]);
   });
 
   it("rejects an invalid cursor before calling the upstream search", async () => {

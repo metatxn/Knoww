@@ -1,0 +1,52 @@
+{
+  "enable_order_book": true,
+  "active": true,
+  "closed": false,
+  "archived": false,
+  "accepting_orders": true,
+  "accepting_order_timestamp": "2026-09-02T11:05:15Z",
+  "minimum_order_size": 5,
+  "minimum_tick_size": 0.01,
+  "condition_id": "0x8ac0ba0e2bf6866038b9a1f2a765f17fee577e3facccf794ff98d992bbb7cd6d",
+  "question_id": "0x94ae68244a55c7878fe2471a4cb48bd7ddd868cb3d77cb2f904da3c25c816f10",
+  "question": "US Open ATP: Alexander Zverev vs Quentin Halys",
+  "description": "This market refers to the tennis match between Alexander Zverev and Quentin Halys in the US Open ATP, originally scheduled for September 3, 2026 at 11:00AM ET.\n\nThis market will resolve to 'Alexander Zverev' if Alexander Zverev advances against Quentin Halys.\n\nThis market will resolve to 'Quentin Halys' if Quentin Halys advances against Alexander Zverev.\n\nIf the match is canceled (not played at all), ends in a tie, or a winner has not been determined by September 17, 2026, 11:59 PM ET (14 days after the scheduled start), this market will resolve to 50-50.\n\nIf the match begins but is not completed, and one player advances due to the opponent's retirement, default, or disqualification, this market will resolve to the player who advances.\n\nIf the match ends in a walkover (player withdraws before the start and the other advances automatically), this market will resolve to 50-50.\n\nThe primary resolution source will be official information from the ATP Tour. A consensus of credible reporting may also be used.",
+  "market_slug": "atp-zverev-halys-2026-09-03",
+  "end_date_iso": "2026-09-10T00:00:00Z",
+  "game_start_time": "2026-09-04T01:30:00Z",
+  "seconds_delay": 1,
+  "fpmm": "",
+  "maker_base_fee": 1000,
+  "taker_base_fee": 1000,
+  "notifications_enabled": true,
+  "neg_risk": false,
+  "neg_risk_market_id": "",
+  "neg_risk_request_id": "",
+  "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/atp-tour-b4390c4fb8.jpg",
+  "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/atp-tour-b4390c4fb8.jpg",
+  "rewards": {
+    "rates": null,
+    "min_size": 50,
+    "max_spread": 4.5
+  },
+  "is_50_50_outcome": false,
+  "tokens": [
+    {
+      "token_id": "34397574656059404129684572103759634972857321473106697911428547533582938361264",
+      "outcome": "Alexander Zverev",
+      "price": 0.755,
+      "winner": false
+    },
+    {
+      "token_id": "111677288788322716285721802321462214269337893592189338144026898987337904380415",
+      "outcome": "Quentin Halys",
+      "price": 0.245,
+      "winner": false
+    }
+  ],
+  "tags": [
+    "Sports",
+    "Tennis",
+    "Games"
+  ]
+}

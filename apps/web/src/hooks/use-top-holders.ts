@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { fetchJson } from "@/lib/fetch-json";
 import { qk } from "@/lib/query-keys";
 
@@ -39,7 +38,7 @@ async function fetchTopHolders(
   });
 
   return fetchJson<TopHoldersResponse[]>(
-    `${POLYMARKET_API.DATA.HOLDERS}?${params.toString()}`
+    `/api/polymarket/markets/holders?${params.toString()}`
   );
 }
 

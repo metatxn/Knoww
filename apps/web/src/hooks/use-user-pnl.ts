@@ -116,7 +116,9 @@ async function fetchPnL(
     includeHistory: (options.includeHistory || false).toString(),
   });
 
-  return fetchJson<PnLResponse>(`/api/user/pnl?${params.toString()}`);
+  return fetchJson<PnLResponse>(
+    `/api/polymarket/user/pnl?${params.toString()}`
+  );
 }
 
 /**

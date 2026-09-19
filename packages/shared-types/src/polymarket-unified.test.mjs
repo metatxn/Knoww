@@ -183,9 +183,9 @@ test("fetchUnifiedClobPriceHistory wraps SDK history arrays in the existing resp
     { startTs: "1716000000", endTs: 1716000600, fidelity: "60" },
     {
       client: {
-        async fetchPriceHistory(request) {
+        async *listPriceHistory(request) {
           calls.push(request);
-          return [{ t: 1716000000, p: 0.42 }];
+          yield { items: [{ timestamp: 1716000000000, price: "0.42" }] };
         },
       },
     }
@@ -193,10 +193,10 @@ test("fetchUnifiedClobPriceHistory wraps SDK history arrays in the existing resp
 
   assert.deepEqual(calls, [
     {
-      tokenId: "123",
-      startTs: 1716000000,
-      endTs: 1716000600,
-      fidelity: 60,
+      assetId: "123",
+      start: 1716000000,
+      end: 1716000600,
+      bucketSeconds: 3600,
     },
   ]);
   assert.deepEqual(history, { history: [{ t: 1716000000, p: 0.42 }] });

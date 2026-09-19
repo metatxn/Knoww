@@ -24,16 +24,36 @@ export interface IndexNowSubmissionResult {
   submitted: number;
 }
 
-export class IndexNowSubmissionError extends Error {
-  readonly retryAfterMs: number | null;
+export interface IndexNowSubmissionError extends Error {
+  readonly name: "IndexNowSubmissionError";
   readonly status: number;
+  readonly retryAfterMs: number | null;
+}
 
-  constructor(status: number, retryAfterMs: number | null = null) {
-    super(`IndexNow submission failed (${status})`);
-    this.name = "IndexNowSubmissionError";
-    this.status = status;
-    this.retryAfterMs = retryAfterMs;
-  }
+export function indexNowSubmissionError(
+  status: number,
+  retryAfterMs: number | null = null
+): IndexNowSubmissionError {
+  const error = new Error(`IndexNow submission failed (${status})`) as Error & {
+    name: "IndexNowSubmissionError";
+    status: number;
+    retryAfterMs: number | null;
+  };
+  error.name = "IndexNowSubmissionError";
+  error.status = status;
+  error.retryAfterMs = retryAfterMs;
+  return error;
+}
+
+export function isIndexNowSubmissionError(
+  value: unknown
+): value is IndexNowSubmissionError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; status?: unknown };
+  return (
+    candidate.name === "IndexNowSubmissionError" &&
+    typeof candidate.status === "number"
+  );
 }
 
 type FetchIndexNow = (
@@ -183,7 +203,7 @@ export async function submitIndexNow(
   });
 
   if (response.status !== 200 && response.status !== 202) {
-    throw new IndexNowSubmissionError(
+    throw indexNowSubmissionError(
       response.status,
       response.status === 429
         ? parseRetryAfterMs(response.headers.get("Retry-After"))

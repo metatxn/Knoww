@@ -609,12 +609,12 @@ requests.
 | --- | --- | --- | --- |
 | P0 | `GET /api/whales/backtest` | Up to 40 × 500 resolved-market discovery rows, up to 200 market-trade requests, then per-wallet histories, a 10 × 500 resolution build, and price histories | Long-running data pipeline is executed synchronously by a public GET |
 | P1 | `GET /sitemap.xml` | Cold 10.79 s versus warm 32 ms; 151,480-byte response built from up to 13 pages; first active/resolved pages were 9,297,799 and 8,140,208 bytes | Concurrent multi-megabyte JSON parsing during cache regeneration |
-| P1 | `POST /api/markets/price-history/batch` | Accepts 40 tokens through one `Promise.all`; 40-token probe exceeded 90 s, a later five-token probe exceeded 45 s, and one token took 10.4 s | Six-connection queueing, missing per-fetch timeout, silent empty histories |
+| P1 | `POST /api/polymarket/markets/price-history/batch` | Accepts 40 tokens through one `Promise.all`; 40-token probe exceeded 90 s, a later five-token probe exceeded 45 s, and one token took 10.4 s | Six-connection queueing, missing per-fetch timeout, silent empty histories |
 | P1 | `GET /api/events/list` | Default response 2,359,715 bytes; Soccer `limit=100` response 6,168,779 bytes | Direct proxy of full nested Gamma events plus weak parameter validation |
 | P1 | `/api/events/{trending,new,breaking,paginated}` | UI-default responses 28–46 KB, but matching upstream bodies were 0.68–2.77 MB; accepted `limit=100` produced upstream bodies as large as 9.46 MB | Hidden buffering/parsing cost; `markets=full` can also return 1.49 MB |
 | P1 | `GET /api/search` | Two tag filters with five events each returned 1,083,892 bytes | Search cards retain full nested tag-event objects |
 | P1 | `GET /api/whales/activity` | Maximum accepted query returned 1,712,435 bytes and can make 102 upstream requests | N+1 activity fanout followed by Decimal transforms, sorting, and serialization |
-| P1 | `GET /api/user/pnl` | High-activity wallet took 13.19 s, read 18 pages and approximately 1.57 MB, then reported activity truncation | Synchronous historical aggregation is slow and can still be incomplete |
+| P1 | `GET /api/polymarket/user/pnl` | High-activity wallet took 13.19 s, read 18 pages and approximately 1.57 MB, then reported activity truncation | Synchronous historical aggregation is slow and can still be incomplete |
 | P1 | `GET /api/markets/closed-time` | A miss scans five 500-market pages (~3.2 MB), then may make 50 event and 50 CLOB lookups | Global catalog scan is used to answer a keyed lookup |
 | P1 | `POST /api/rpc/polygon` | 100 KB request-body allowance, no JSON-RPC batch-count cap, denylist permits large read methods, and upstream JSON is fully parsed | Caller can induce a very large RPC response or repeated fallback parsing |
 | P1/P2 | `GET /api/whales/suspicious` | In one current 500-trade sample, `minUsdValue=0` selected 305 unique wallets; each history can walk five pages; cold KB refresh walks 10 × 500 markets | Caller-controlled fanout plus a 30–60 second background crawl |
@@ -635,7 +635,7 @@ requests.
 - `/api/whales/suspicious`: precompute the resolution knowledge base and
   bounded wallet features on a schedule. The request path should score a
   bounded candidate set from persisted data, not crawl wallet histories.
-- `/api/user/pnl`: make the dedicated PnL API or a materialized per-wallet
+- `/api/polymarket/user/pnl`: make the dedicated PnL API or a materialized per-wallet
   snapshot primary. Historical reconstruction should be an asynchronous job
   when the requested period exceeds a small bounded page budget.
 
@@ -645,7 +645,7 @@ materialization.
 
 #### Bound fanout and deadlines
 
-- `/api/markets/price-history/batch`: reduce the client/server batch to visible
+- `/api/polymarket/markets/price-history/batch`: reduce the client/server batch to visible
   series (target maximum 8–12), run at concurrency four, apply a strict
   per-token timeout and an overall deadline, cancel on client abort, and return
   a per-token status instead of silently converting failures to empty history.

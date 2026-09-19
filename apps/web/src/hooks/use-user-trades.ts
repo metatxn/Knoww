@@ -119,7 +119,9 @@ async function fetchTrades(
     params.set("endDate", options.endDate);
   }
 
-  return fetchJson<TradesResponse>(`/api/user/trades?${params.toString()}`);
+  return fetchJson<TradesResponse>(
+    `/api/polymarket/user/trades?${params.toString()}`
+  );
 }
 
 /**

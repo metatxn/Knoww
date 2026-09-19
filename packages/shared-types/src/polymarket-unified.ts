@@ -34,6 +34,10 @@ import {
   TRADING_SIDES,
   type TradingSide,
 } from "./polymarket.ts";
+import {
+  type PriceHistoryClient,
+  readSdkPriceHistory,
+} from "./price-history.ts";
 
 /**
  * The only two order types a V2 market order may carry. GTC/GTD are resting
@@ -43,19 +47,13 @@ export type MarketClobOrderType =
   | typeof CLOB_ORDER_TYPES.FAK
   | typeof CLOB_ORDER_TYPES.FOK;
 
-export interface UnifiedPolymarketPublicClient {
+export interface UnifiedPolymarketPublicClient extends PriceHistoryClient {
   fetchOrderBook(request: { tokenId: string }): Promise<unknown>;
   fetchOrderBooks?(request: Array<{ tokenId: string }>): Promise<unknown>;
   fetchMarketInfo?(request: { conditionId: string }): Promise<unknown>;
   fetchPrice?(request: {
     tokenId: string;
     side: TradingSide;
-  }): Promise<unknown>;
-  fetchPriceHistory?(request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
   }): Promise<unknown>;
   fetchBuilderFeeRates?(request: { builderCode: string }): Promise<unknown>;
 }
@@ -321,41 +319,31 @@ async function assertWalletClientChain(
   }
 }
 
-class ViemTransactionHandle implements TransactionHandle {
-  readonly transactionId = null;
+function createViemTransactionHandle(
+  initialTransactionHash: TransactionOutcome["transactionHash"],
+  walletClient: WalletClient
+): TransactionHandle {
+  let transactionHash = initialTransactionHash;
+  return {
+    transactionId: null,
+    get transactionHash() {
+      return transactionHash;
+    },
+    async wait(): Promise<TransactionOutcome> {
+      const receipt = await waitForTransactionReceipt(
+        walletClient as Parameters<typeof waitForTransactionReceipt>[0],
+        { hash: transactionHash as `0x${string}` }
+      );
+      transactionHash =
+        receipt.transactionHash as TransactionOutcome["transactionHash"];
 
-  readonly #walletClient: WalletClient;
-  #transactionHash: TransactionOutcome["transactionHash"];
+      if (receipt.status === "reverted") {
+        throw new Error(`Transaction ${transactionHash} reverted`);
+      }
 
-  constructor(
-    transactionHash: TransactionOutcome["transactionHash"],
-    walletClient: WalletClient
-  ) {
-    this.#transactionHash = transactionHash;
-    this.#walletClient = walletClient;
-  }
-
-  get transactionHash() {
-    return this.#transactionHash;
-  }
-
-  async wait(): Promise<TransactionOutcome> {
-    const receipt = await waitForTransactionReceipt(
-      this.#walletClient as Parameters<typeof waitForTransactionReceipt>[0],
-      { hash: this.#transactionHash as `0x${string}` }
-    );
-    this.#transactionHash =
-      receipt.transactionHash as TransactionOutcome["transactionHash"];
-
-    if (receipt.status === "reverted") {
-      throw new Error(`Transaction ${this.#transactionHash} reverted`);
-    }
-
-    return {
-      transactionHash: this.#transactionHash,
-      transactionId: null,
-    };
-  }
+      return { transactionHash, transactionId: null };
+    },
+  };
 }
 
 export function createUnifiedPolymarketViemSigner(
@@ -399,7 +387,7 @@ export function createUnifiedPolymarketViemSigner(
         data: request.data,
         value: request.value,
       });
-      return new ViemTransactionHandle(
+      return createViemTransactionHandle(
         transactionHash as TransactionOutcome["transactionHash"],
         walletClient
       );
@@ -787,9 +775,17 @@ export function adaptUnifiedSecureClientForLegacyClob(
         const trade = pageItems(page).find(
           (entry) => isRecord(entry) && entry.id === request.id
         );
-        if (trade) return trade;
+        if (isRecord(trade)) {
+          return {
+            ...trade,
+            status:
+              typeof trade.status === "string"
+                ? trade.status.replace(/^TRADE_STATUS_/, "")
+                : trade.status,
+          };
+        }
       }
-      throw new Error("Trade not available yet");
+      return null;
     },
 
     async updateBalanceAllowance(request) {
@@ -923,41 +919,6 @@ export async function fetchUnifiedClobOrderBook(
   return normalizeClobOrderBook(data);
 }
 
-function optionalFiniteNumber(
-  value: string | number | undefined
-): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-}
-
-function buildPriceHistoryRequest(
-  tokenId: string,
-  params: ClobPriceHistoryParams
-): {
-  tokenId: string;
-  startTs?: number;
-  endTs?: number;
-  fidelity?: number;
-} {
-  const request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
-  } = { tokenId };
-  const startTs = optionalFiniteNumber(params.startTs);
-  const endTs = optionalFiniteNumber(params.endTs);
-  const fidelity = optionalFiniteNumber(params.fidelity);
-  if (startTs !== undefined) request.startTs = startTs;
-  if (endTs !== undefined) request.endTs = endTs;
-  if (fidelity !== undefined) request.fidelity = fidelity;
-  return request;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -1074,14 +1035,8 @@ export async function fetchUnifiedClobPriceHistory<
       environment: options.environment,
     });
 
-  if (!client.fetchPriceHistory) {
-    throw new Error("Unified Polymarket SDK client cannot fetch price history");
-  }
-
-  const data = await client.fetchPriceHistory(
-    buildPriceHistoryRequest(tokenId, params)
-  );
-  return { history: Array.isArray(data) ? data : [] } as T;
+  const history = await readSdkPriceHistory(client, tokenId, params);
+  return { history: history.map(({ t, p }) => ({ t, p: Number(p) })) } as T;
 }
 
 export async function fetchUnifiedClobBuilderFeeRates(

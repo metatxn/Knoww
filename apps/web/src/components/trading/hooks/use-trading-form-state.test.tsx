@@ -3,18 +3,21 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PreparedTradeTicket } from "@/types/market";
+import type {
+  BuyFeeEstimateInput,
+  OrderReadinessInput,
+  PlatformTradingUi,
+  TradingSlotProps,
+} from "../types";
 import { useTradingFormState } from "./use-trading-form-state";
 
-const clobClientState = vi.hoisted(() => ({
+const placeOrderState = vi.hoisted(() => ({
   createOrder: vi.fn(),
   isLoading: false,
   operationStep: "idle",
   error: null,
   hasCredentials: true,
   canTrade: true,
-  updateAllowance: vi.fn(),
-  getUsdcAllowance: vi.fn(),
-  estimateBuyFee: vi.fn().mockResolvedValue(null),
 }));
 
 const proxyWalletState = vi.hoisted(() => ({
@@ -34,7 +37,7 @@ vi.mock("wagmi", () => ({
   }),
 }));
 
-vi.mock("@/hooks/use-clob-client", () => ({
+vi.mock("@/hooks/use-place-order", () => ({
   OrderType: {
     FAK: "FAK",
     FOK: "FOK",
@@ -45,7 +48,7 @@ vi.mock("@/hooks/use-clob-client", () => ({
     BUY: "BUY",
     SELL: "SELL",
   },
-  useClobClient: () => clobClientState,
+  usePlaceOrder: () => placeOrderState,
 }));
 
 vi.mock("@/hooks/use-proxy-wallet", () => ({
@@ -54,26 +57,6 @@ vi.mock("@/hooks/use-proxy-wallet", () => ({
 
 vi.mock("@/hooks/use-user-positions", () => ({
   useUserPositions: () => ({ data: { positions: [] } }),
-}));
-
-vi.mock("@/lib/approvals", () => ({
-  checkAllApprovals: vi.fn().mockResolvedValue({
-    pusdCtf: false,
-    pusdCtfExchange: false,
-    pusdNegRiskExchange: true,
-    pusdCtfCollateralAdapter: false,
-    pusdNegRiskCtfCollateralAdapter: false,
-    usdcOnramp: false,
-    ctfExchangeApproval: false,
-    ctfNegRiskExchangeApproval: false,
-    ctfCollateralAdapterApproval: false,
-    ctfNegRiskCollateralAdapterApproval: false,
-    allApproved: false,
-    clobTradingApproved: false,
-    autoWrapApproved: false,
-    ctfOperationsApproved: false,
-    negRiskConversionApproved: false,
-  }),
 }));
 
 const CONDITION_ID =
@@ -94,7 +77,12 @@ const DEFAULT_ORDER_BOOK: TestOrderBook = {
 function renderTradingFormState(
   orderBook: TestOrderBook | null = DEFAULT_ORDER_BOOK,
   conditionId?: string,
-  options?: { tickSize?: number }
+  options?: {
+    tickSize?: number;
+    platformUi?: PlatformTradingUi;
+    slot?: TradingSlotProps;
+    onOrderError?: (error: Error) => void;
+  }
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -120,6 +108,9 @@ function renderTradingFormState(
         orderBook: orderBook ?? undefined,
         conditionId,
         tickSize: options?.tickSize,
+        platformUi: options?.platformUi,
+        slot: options?.slot,
+        onOrderError: options?.onOrderError,
       }),
     { wrapper }
   );
@@ -133,13 +124,6 @@ describe("useTradingFormState", () => {
       "0x0000000000000000000000000000000000000002";
     proxyWalletState.isDeployed = true;
     proxyWalletState.usdcBalance = 10;
-    clobClientState.updateAllowance.mockResolvedValue({ success: true });
-    clobClientState.estimateBuyFee.mockResolvedValue(null);
-    clobClientState.getUsdcAllowance.mockResolvedValue({
-      allowance: 0,
-      allowanceRaw: "0",
-      decimals: 6,
-    });
   });
 
   it("applies each prepared trade ticket once without submitting it", async () => {
@@ -194,7 +178,7 @@ describe("useTradingFormState", () => {
       expect(result.current.shares).toBe(7);
       expect(result.current.limitPrice).toBe(0.43);
     });
-    expect(clobClientState.createOrder).not.toHaveBeenCalled();
+    expect(placeOrderState.createOrder).not.toHaveBeenCalled();
 
     rerender({
       preparedTradeTicket: {
@@ -210,20 +194,90 @@ describe("useTradingFormState", () => {
     expect(result.current.orderType).toBe("LIMIT");
   });
 
-  it("approves the current ticket amount and order scope instead of the default amount", async () => {
+  it("asks the platform slot whether the order is ready and runs its step", async () => {
+    const prepare = vi.fn().mockResolvedValue(true);
+    const inputs: OrderReadinessInput[] = [];
+    const platformUi: PlatformTradingUi = {
+      useOrderReadiness: (input) => {
+        inputs.push(input);
+        return {
+          isChecking: false,
+          requiredStep: "setup",
+          isPreparing: false,
+          prepare,
+          refresh: vi.fn().mockResolvedValue(undefined),
+        };
+      },
+    };
+    const { result } = renderTradingFormState(DEFAULT_ORDER_BOOK, undefined, {
+      platformUi,
+    });
+
+    expect(result.current.hasMissingTradingApprovals).toBe(true);
+    expect(result.current.isCheckingTradingApprovals).toBe(false);
+
+    await act(async () => {
+      result.current.setMarketBuyAmount(3.74);
+    });
+    expect(inputs[inputs.length - 1]).toMatchObject({
+      side: "BUY",
+      totalUsd: 3.74,
+      enabled: true,
+    });
+
+    let approved: boolean | undefined;
+    await act(async () => {
+      approved = await result.current.handleSetAllowance();
+    });
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(approved).toBe(true);
+  });
+
+  it("gates nothing when the platform has no readiness step", async () => {
     const { result } = renderTradingFormState();
 
     await act(async () => {
       result.current.setMarketBuyAmount(3.74);
     });
+
+    expect(result.current.isCheckingTradingApprovals).toBe(false);
+    expect(result.current.hasMissingTradingApprovals).toBe(false);
+    expect(result.current.hasInsufficientAllowance).toBe(false);
+
+    let approved: boolean | undefined;
     await act(async () => {
-      await result.current.handleSetAllowance();
+      approved = await result.current.handleSetAllowance();
+    });
+    expect(approved).toBe(true);
+  });
+
+  it("reports a failed platform step through onOrderError", async () => {
+    const failure = new Error("Approval rejected");
+    const onOrderError = vi.fn();
+    const platformUi: PlatformTradingUi = {
+      useOrderReadiness: () => ({
+        isChecking: false,
+        requiredStep: "limit",
+        isPreparing: false,
+        prepare: vi.fn().mockRejectedValue(failure),
+        refresh: vi.fn().mockResolvedValue(undefined),
+      }),
+    };
+    const { result } = renderTradingFormState(DEFAULT_ORDER_BOOK, undefined, {
+      platformUi,
+      onOrderError,
     });
 
-    expect(clobClientState.updateAllowance).toHaveBeenCalledWith("4", {
-      side: "BUY",
-      negRisk: true,
+    expect(result.current.hasInsufficientAllowance).toBe(true);
+
+    let approved: boolean | undefined;
+    await act(async () => {
+      approved = await result.current.handleSetAllowance();
     });
+
+    expect(approved).toBe(false);
+    expect(onOrderError).toHaveBeenCalledWith(failure);
   });
 
   it("does not report insufficient liquidity before an amount is entered", () => {
@@ -345,40 +399,47 @@ describe("useTradingFormState", () => {
   });
 
   // The fee is charged on top of the typed amount, so the ticket has to show it
-  // for the real debit to be legible.
-  it("surfaces the market's taker fee for the ticket", async () => {
-    // 6-decimal pUSD base units: 12_500 raw = $0.0125.
-    clobClientState.estimateBuyFee.mockResolvedValue(BigInt(12_500));
-    const { result } = renderTradingFormState(DEFAULT_ORDER_BOOK, CONDITION_ID);
+  // for the real debit to be legible. The platform quotes it from the sized
+  // ticket; the form only shows what comes back.
+  it("shows the platform's taker fee quote for the sized ticket", async () => {
+    const useBuyFeeEstimate = vi.fn((input: BuyFeeEstimateInput) => ({
+      feeUsd: input.side === "BUY" && input.totalUsd > 0 ? 0.0125 : null,
+      isFetching: false,
+    }));
+    // The form hands the platform's slot through untouched; only its
+    // identity matters here.
+    const slot = {
+      details: { platform: "polymarket", conditionId: CONDITION_ID },
+    } as unknown as TradingSlotProps;
+    const { result } = renderTradingFormState(
+      DEFAULT_ORDER_BOOK,
+      CONDITION_ID,
+      { platformUi: { useBuyFeeEstimate }, slot }
+    );
 
     await act(async () => {
       result.current.setMarketBuyAmount(5);
     });
-    await waitFor(() => {
-      expect(result.current.estimatedFeeUsd).not.toBeNull();
-    });
 
     expect(result.current.estimatedFeeUsd).toBeCloseTo(0.0125, 6);
-    expect(clobClientState.estimateBuyFee).toHaveBeenCalledWith(
+    expect(useBuyFeeEstimate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        conditionId: CONDITION_ID,
-        notional: 5,
+        side: "BUY",
+        totalUsd: 5,
         isMarketableBuy: true,
+        enabled: true,
+        slot,
       })
     );
   });
 
-  // A fee we could not read is not a zero fee — the ticket renders nothing
-  // rather than a confident "$0.00".
-  it("reports no fee estimate when the market fee cannot be read", async () => {
-    clobClientState.estimateBuyFee.mockResolvedValue(null);
+  // Without a platform quote there is no fee to show. Not "$0.00": a fee the
+  // ticket cannot read is charged all the same.
+  it("reports no fee estimate without a platform quote", async () => {
     const { result } = renderTradingFormState(DEFAULT_ORDER_BOOK, CONDITION_ID);
 
     await act(async () => {
       result.current.setMarketBuyAmount(5);
-    });
-    await waitFor(() => {
-      expect(clobClientState.estimateBuyFee).toHaveBeenCalled();
     });
 
     expect(result.current.estimatedFeeUsd).toBeNull();

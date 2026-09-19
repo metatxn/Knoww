@@ -221,19 +221,19 @@ test("fetchClobPriceHistory uses the unified SDK client and keeps the existing h
   const calls = [];
   const history = await fetchClobPriceHistory(
     "123",
-    { startTs: "1716000000", fidelity: "60" },
+    { startTs: "1716000000", endTs: 1716000600, fidelity: "60" },
     {
       unifiedClient: {
-        async fetchPriceHistory(request) {
+        async *listPriceHistory(request) {
           calls.push(request);
-          return [{ t: 1716000000, p: 0.42 }];
+          yield { items: [{ timestamp: 1716000000000, price: "0.42" }] };
         },
       },
     }
   );
 
   assert.deepEqual(calls, [
-    { tokenId: "123", startTs: 1716000000, fidelity: 60 },
+    { assetId: "123", start: 1716000000, end: 1716000600, bucketSeconds: 3600 },
   ]);
   assert.deepEqual(history, { history: [{ t: 1716000000, p: 0.42 }] });
 });
@@ -351,4 +351,22 @@ test("fetchClobPrice preserves direct REST behavior when no price side is suppli
     "https://clob.polymarket.com/price?token_id=123",
   ]);
   assert.deepEqual(price, { price: "0.5" });
+});
+
+test("raw v2 whole history respects a historical end bound", async () => {
+  const result = await fetchClobPriceHistory(
+    "123",
+    { startTs: 0, endTs: 150 },
+    {
+      fetchImpl: async () =>
+        Response.json({
+          data: [
+            { timestamp: 100, price: 0.2 },
+            { timestamp: 200, price: 0.3 },
+          ],
+          pagination: { next_cursor: null },
+        }),
+    }
+  );
+  assert.deepEqual(result.history, [{ t: 100, p: 0.2 }]);
 });

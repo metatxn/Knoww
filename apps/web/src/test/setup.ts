@@ -5,5 +5,7 @@ import { afterEach } from "vitest";
 
 afterEach(() => {
   cleanup();
-  sessionStorage.clear();
+  // Files that opt into the node environment have no DOM storage, and Node
+  // below 25 defines no sessionStorage of its own.
+  if (typeof sessionStorage !== "undefined") sessionStorage.clear();
 });

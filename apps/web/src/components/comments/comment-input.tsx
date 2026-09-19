@@ -41,7 +41,7 @@ interface PostCommentResponse {
 async function postComment(
   payload: PostCommentPayload
 ): Promise<PostCommentResponse> {
-  const response = await fetch("/api/comments", {
+  const response = await fetch("/api/polymarket/comments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -104,7 +104,7 @@ export function CommentInput({
   const [isFocused, setIsFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { signTypedDataAsync } = useSignTypedData();
+  const { mutateAsync: signTypedDataAsync } = useSignTypedData();
 
   const isReply = variant === "reply" || !!parentCommentId;
   const defaultPlaceholder = isReply

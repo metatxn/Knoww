@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   type AuthorizationTransaction,
   consumeAuthorizationTransaction,
@@ -28,6 +28,19 @@ const transaction: AuthorizationTransaction = {
     state: "state-1",
   },
 };
+
+// The first Durable Object request loads the Worker entrypoint and its imports.
+// Keep that cold startup outside the transaction tests' execution deadline.
+beforeAll(async () => {
+  const namespace = env.MCP_AUTH_CHALLENGES;
+  const stub = namespace.get(
+    namespace.idFromName("challenge-store-test-startup")
+  );
+  const response = await stub.fetch(
+    new Request("https://authorization-transaction.internal/health")
+  );
+  expect(response.status).toBe(204);
+}, 30_000);
 
 describe("OAuth authorization transaction store", () => {
   it("allows an authorization transaction to be consumed exactly once", async () => {

@@ -1,7 +1,7 @@
 {
   "name": "knoww-monorepo",
   "private": true,
-  "packageManager": "pnpm@10.25.0",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev:web": "pnpm --filter @knoww/web dev",
     "dev:ext": "pnpm --filter @knoww/extension dev",
@@ -14,6 +14,7 @@
     "test": "pnpm -r --if-present run test",
     "preview": "pnpm --filter @knoww/web preview",
     "deploy": "pnpm --filter @knoww/web run deploy",
+    "upload": "pnpm --filter @knoww/web run upload",
     "lint": "biome check",
     "lint:ext": "pnpm --filter @knoww/extension lint",
     "lint:web": "pnpm --filter @knoww/web lint",

@@ -140,12 +140,12 @@ finds a different uncovered state.
 | --- | --- | --- | --- | --- |
 | P0 | `GET /api/whales/backtest` | Public synchronous data pipeline | Authorized asynchronous Workflow with persisted results | Open |
 | P1 | `GET /sitemap.xml` | Cold catalog regeneration and multi-MB parsing | Pre-generated versioned sitemap artifacts | Open |
-| P1 | `POST /api/markets/price-history/batch` | Forty-way fanout without complete deadline semantics | Smaller bounded batches with concurrency, timeouts, and per-item status | Interim mitigations implemented — lower token cap and delta caching open |
+| P1 | `POST /api/polymarket/markets/price-history/batch` | Forty-way fanout without complete deadline semantics | Smaller bounded batches with concurrency, timeouts, and per-item status | Interim mitigations implemented — lower token cap and delta caching open |
 | P1 | `GET /api/events/list` | Full nested Gamma objects and unbounded query controls | Remove if unused; otherwise validate, cap, and return a slim projection | Open |
 | P1 | Event feed routes | Large upstream bodies, inconsistent validation, and an uncapped breaking feed | One strict query policy and tighter use of the existing slim projection | Open |
 | P1 | `GET /api/search` | Full nested tag-event objects retained | Dedicated search-card projection and bounded merging | Open |
 | P1 | `GET /api/whales/activity` | N+1 wallet fanout and large response | Shared materialized snapshot plus paginated live overlay | Open |
-| P1 | `GET /api/user/pnl` | Long, incomplete historical reconstruction | Materialized wallet PnL or asynchronous history job | Open |
+| P1 | `GET /api/polymarket/user/pnl` | Long, incomplete historical reconstruction | Materialized wallet PnL or asynchronous history job | Open |
 | P1 | `GET /api/markets/closed-time` | Global scan for a keyed lookup | Persisted condition-ID index with direct-lookup fallback | Interim mitigations implemented — persisted index still open |
 | P1 | `POST /api/rpc/polygon` | Caller-controlled batch and response size | Method allowlist, batch/range caps, and byte-limited responses | Largely implemented — durable rate limiting and production integration tests open |
 | P1/P2 | `GET /api/whales/suspicious` | Caller-controlled wallet-history crawl | Scheduled feature materialization and bounded scoring | Open |
@@ -251,7 +251,7 @@ reintroduce the full cost.
 
 ## P1: Batch price history
 
-**Route:** `apps/web/src/app/api/markets/price-history/batch/route.ts`
+**Route:** `apps/web/src/app/api/polymarket/markets/price-history/batch/route.ts`
 
 ### Baseline findings (original audit)
 
@@ -495,7 +495,7 @@ multiplies the same public aggregation work across isolates.
 
 ## P1: User PnL
 
-**Route:** `apps/web/src/app/api/user/pnl/route.ts`
+**Route:** `apps/web/src/app/api/polymarket/user/pnl/route.ts`
 
 ### Evidence
 

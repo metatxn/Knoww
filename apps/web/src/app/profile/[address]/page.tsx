@@ -80,7 +80,7 @@ function RankCaption({
       <span className="whitespace-nowrap">{pnlStr}</span>
       <span className="mx-1.5 text-border/80">·</span>
       <span className="opacity-60 mr-1">VOL</span>
-      {formatCurrencyCompact(volValue)}
+      {`${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(volValue)} shares`}
     </>
   );
 }
@@ -305,7 +305,11 @@ export default function ProfilePage() {
               />
               <PullStat
                 label="Total Volume"
-                value={formatCurrencyCompact(profile.totalVolume)}
+                value={
+                  profile.totalVolumeUnit === "shares"
+                    ? `${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(profile.totalVolume)} shares`
+                    : formatCurrencyCompact(profile.totalVolume)
+                }
                 caption="All categories"
               />
               <PullStat

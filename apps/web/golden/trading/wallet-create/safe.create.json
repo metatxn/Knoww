@@ -1,0 +1,119 @@
+{
+  "family": "wallet-create",
+  "mode": "safe",
+  "wallet": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893",
+  "personality": "undeployed",
+  "relayerDeployed": false,
+  "mount": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/rpc/polygon",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 0,
+          "method": "eth_getCode",
+          "params": [
+            "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893",
+            "latest"
+          ]
+        }
+      }
+    ],
+    "state": {
+      "proxyAddress": null,
+      "hasDeployedSafe": false,
+      "walletMode": "safe",
+      "error": null
+    }
+  },
+  "action": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/relayer/submit",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          "to": "0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b",
+          "proxyWallet": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893",
+          "data": "0x",
+          "signature": "0x54e3af7c6a371e7cd0dc7807cf6082d85d4302949d22a334c72c791a8e4a0d590bcc84d4580090a4460dbe8ec396e46cfaa1e2987f7219af2dd2acd7fe2317b41c",
+          "signatureParams": {
+            "paymentToken": "0x0000000000000000000000000000000000000000",
+            "payment": "0",
+            "paymentReceiver": "0x0000000000000000000000000000000000000000"
+          },
+          "type": "SAFE-CREATE"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/api/relayer/transaction?id=golden-tx-1",
+        "headers": {},
+        "body": null
+      }
+    ],
+    "wallet": [
+      {
+        "method": "eth_signTypedData_v4",
+        "params": [
+          "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+          {
+            "domain": {
+              "name": "Polymarket Contract Proxy Factory",
+              "chainId": 137,
+              "verifyingContract": "0xaacfeea03eb1561c4e67d661e40682bd20e3541b"
+            },
+            "message": {
+              "paymentToken": "0x0000000000000000000000000000000000000000",
+              "payment": "0",
+              "paymentReceiver": "0x0000000000000000000000000000000000000000"
+            },
+            "primaryType": "CreateProxy",
+            "types": {
+              "EIP712Domain": [
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "chainId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "verifyingContract",
+                  "type": "address"
+                }
+              ],
+              "CreateProxy": [
+                {
+                  "name": "paymentToken",
+                  "type": "address"
+                },
+                {
+                  "name": "payment",
+                  "type": "uint256"
+                },
+                {
+                  "name": "paymentReceiver",
+                  "type": "address"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "result": {
+      "success": true,
+      "transactionHash": "0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "proxyAddress": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893"
+    }
+  }
+}

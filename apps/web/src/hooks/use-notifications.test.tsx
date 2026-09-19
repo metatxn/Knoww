@@ -38,6 +38,7 @@ const notificationClient = vi.hoisted(() => ({
 }));
 
 const unifiedSdkMock = vi.hoisted(() => ({
+  adaptUnifiedSecureClientForLegacyClob: vi.fn((client: unknown) => client),
   createUnifiedPolymarketCredentialsOnlySigner: vi.fn((address: string) => ({
     address,
     getAddress: vi.fn().mockResolvedValue(address),

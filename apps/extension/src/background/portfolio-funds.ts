@@ -85,7 +85,7 @@ export interface PortfolioWalletToken {
 
 async function fetchTokenPrices(): Promise<Record<string, number>> {
   try {
-    const res = await fetch(`${getKnowwAppUrl()}/api/price/tokens`, {
+    const res = await fetch(`${getKnowwAppUrl()}/api/polymarket/price/tokens`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return {};

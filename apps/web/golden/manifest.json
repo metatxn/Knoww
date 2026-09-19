@@ -1,0 +1,65 @@
+{
+  "baseUrl": "http://localhost:8000",
+  "entries": [
+    {
+      "name": "home",
+      "path": "/",
+      "kind": "html"
+    },
+    {
+      "name": "markets",
+      "path": "/markets",
+      "kind": "html"
+    },
+    {
+      "name": "tag-politics",
+      "path": "/events/politics",
+      "kind": "html"
+    },
+    {
+      "name": "sports-nfl",
+      "path": "/events/sports/nfl",
+      "kind": "html"
+    },
+    {
+      "name": "event-fed-september",
+      "path": "/events/detail/fed-decision-in-september-762",
+      "kind": "html"
+    },
+    {
+      "name": "leaderboard",
+      "path": "/leaderboard",
+      "kind": "html"
+    },
+    {
+      "name": "api-search-fed",
+      "path": "/api/search?q=fed&limit=5",
+      "kind": "json"
+    },
+    {
+      "name": "api-events-by-id",
+      "path": "/api/events/481717",
+      "kind": "json"
+    },
+    {
+      "name": "api-markets-by-slug",
+      "path": "/api/markets/slug/will-the-fed-decrease-interest-rates-by-50-bps-after-the-september-2026-meeting-863",
+      "kind": "json"
+    },
+    {
+      "name": "api-markets-by-token",
+      "path": "/api/polymarket/markets/by-token/97186030785608128217926542396950266594898339988989015155120280107165449433603",
+      "kind": "json"
+    },
+    {
+      "name": "api-events-list-politics",
+      "path": "/api/events/list?tag=politics&limit=6",
+      "kind": "json"
+    },
+    {
+      "name": "api-events-paginated-politics",
+      "path": "/api/events/paginated?tag_slug=politics&limit=6",
+      "kind": "json"
+    }
+  ]
+}

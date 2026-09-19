@@ -22,7 +22,7 @@ import {
 } from "@knoww/shared-types/bridge";
 import { formatPortfolioTokenBaseUnitAmount } from "../../background/portfolio-withdraw-flow";
 import { EXTENSION_AUTH_REQUIRED_ERROR } from "../../types/chrome-messages";
-import { type FundingGateway, FundingGatewayError } from "../gateway";
+import { type FundingGateway, fundingGatewayError } from "../gateway";
 import type { FundingTokenSource } from "../machine";
 import type {
   FundingAttempt,
@@ -245,7 +245,7 @@ export function createSidepanelFundingGateway(
       tokenId: command.tokenId,
     });
     if (!quoteResponse.ok) {
-      throw new FundingGatewayError({
+      throw fundingGatewayError({
         code: "EXECUTION_FAILED",
         message: quoteResponse.error || "Could not prepare the withdrawal.",
         retryable: true,
@@ -311,7 +311,7 @@ export function createSidepanelFundingGateway(
 
     // Side panel has no passive bridge-address deposit UI.
     async loadBridgeAssets(): Promise<FundingBridgeAsset[]> {
-      throw new FundingGatewayError({
+      throw fundingGatewayError({
         code: "LOAD_FAILED",
         message: "Bridge deposits are not available in the side panel.",
         retryable: false,
@@ -319,7 +319,7 @@ export function createSidepanelFundingGateway(
     },
 
     async resolveBridgeAddress(): Promise<string> {
-      throw new FundingGatewayError({
+      throw fundingGatewayError({
         code: "LOAD_FAILED",
         message: "Bridge deposits are not available in the side panel.",
         retryable: false,
@@ -334,7 +334,7 @@ export function createSidepanelFundingGateway(
     async fetchQuote(_input: FundingQuoteRequest): Promise<FundingQuote> {
       const params = readWithdrawParams();
       if (!params) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "QUOTE_FAILED",
           message: "Enter valid withdrawal details.",
           retryable: false,
@@ -361,7 +361,7 @@ export function createSidepanelFundingGateway(
           tokenId: params.tokenId,
           recipientAddress: params.destination,
         });
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "QUOTE_FAILED",
           message: response.error || "Quote unavailable",
           retryable: false,
@@ -428,7 +428,7 @@ export function createSidepanelFundingGateway(
       if (!response.ok) throw executionError(response.error);
       const attempt = toFundingAttempt(response.data);
       if (!attempt) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: "Could not start the transaction.",
           retryable: true,
@@ -471,7 +471,7 @@ export function createSidepanelFundingGateway(
       if (!response.ok) {
         // Transport failure — surface it so the controller retries (and, after
         // its bounded give-up, reports AMBIGUOUS_OUTCOME).
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "AMBIGUOUS_OUTCOME",
           message: AMBIGUOUS_MESSAGE,
           retryable: true,
@@ -512,7 +512,7 @@ export function createSidepanelFundingGateway(
       // Fire-and-forget from the controller's perspective; a failure here must
       // not change UI state, but surface it so the controller can log it.
       if (!response.ok) {
-        throw new FundingGatewayError({
+        throw fundingGatewayError({
           code: "EXECUTION_FAILED",
           message: response.error || "Could not finalize the attempt.",
           retryable: false,

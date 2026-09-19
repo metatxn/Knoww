@@ -1,7 +1,8 @@
+import { platformError } from "@knoww/services/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requestContext } from "../context";
 import {
-  KnowwToolError,
+  knowwToolError,
   toKnowwToolError,
   toolErrorContent,
   toolFailureContent,
@@ -13,14 +14,14 @@ afterEach(() => {
 
 describe("KnowwToolError", () => {
   it("marks RATE_LIMITED, UPSTREAM_TIMEOUT, and UPSTREAM_UNAVAILABLE as retryable", () => {
+    expect(knowwToolError("RATE_LIMITED", "Too many requests.").retryable).toBe(
+      true
+    );
     expect(
-      new KnowwToolError("RATE_LIMITED", "Too many requests.").retryable
+      knowwToolError("UPSTREAM_TIMEOUT", "Upstream timed out.").retryable
     ).toBe(true);
     expect(
-      new KnowwToolError("UPSTREAM_TIMEOUT", "Upstream timed out.").retryable
-    ).toBe(true);
-    expect(
-      new KnowwToolError("UPSTREAM_UNAVAILABLE", "Upstream is down.").retryable
+      knowwToolError("UPSTREAM_UNAVAILABLE", "Upstream is down.").retryable
     ).toBe(true);
   });
 
@@ -32,13 +33,14 @@ describe("KnowwToolError", () => {
       "NOT_FOUND",
       "CONFLICT",
       "INTERNAL_ERROR",
+      "PLATFORM_DISABLED",
     ] as const) {
-      expect(new KnowwToolError(code, "message").retryable).toBe(false);
+      expect(knowwToolError(code, "message").retryable).toBe(false);
     }
   });
 
   it("carries retryAfterSeconds when provided", () => {
-    const error = new KnowwToolError("RATE_LIMITED", "Too many requests.", {
+    const error = knowwToolError("RATE_LIMITED", "Too many requests.", {
       retryAfterSeconds: 30,
     });
     expect(error.retryAfterSeconds).toBe(30);
@@ -47,7 +49,7 @@ describe("KnowwToolError", () => {
 
 describe("toKnowwToolError", () => {
   it("returns a KnowwToolError unchanged", () => {
-    const original = new KnowwToolError("NOT_FOUND", "Market not found.");
+    const original = knowwToolError("NOT_FOUND", "Market not found.");
     expect(toKnowwToolError(original)).toBe(original);
   });
 
@@ -71,7 +73,7 @@ describe("toKnowwToolError", () => {
 describe("toolErrorContent", () => {
   it("renders a non-retryable error as one text block with code and guidance", () => {
     const result = toolErrorContent(
-      new KnowwToolError("NOT_FOUND", "Market not found.")
+      knowwToolError("NOT_FOUND", "Market not found.")
     );
     expect(result.isError).toBe(true);
     expect(result.content).toHaveLength(1);
@@ -83,7 +85,7 @@ describe("toolErrorContent", () => {
 
   it("renders a retryable error with plain retry guidance", () => {
     const result = toolErrorContent(
-      new KnowwToolError("UPSTREAM_TIMEOUT", "Upstream timed out.")
+      knowwToolError("UPSTREAM_TIMEOUT", "Upstream timed out.")
     );
     expect(result.content[0].text).toBe(
       "UPSTREAM_TIMEOUT: Upstream timed out. Safe to retry."
@@ -93,7 +95,7 @@ describe("toolErrorContent", () => {
   it("surfaces retryAfterSeconds in the retry guidance", () => {
     const result = requestContext.run({ requestId: "request-123" }, () =>
       toolErrorContent(
-        new KnowwToolError("RATE_LIMITED", "Too many requests.", {
+        knowwToolError("RATE_LIMITED", "Too many requests.", {
           retryAfterSeconds: 30,
         })
       )
@@ -134,5 +136,62 @@ describe("toolFailureContent", () => {
     expect(rendered).toContain("INTERNAL_ERROR");
     expect(rendered).not.toContain("ECONNREFUSED");
     expect(rendered).not.toContain("secret.internal");
+  });
+});
+
+describe("toKnowwToolError from PlatformError", () => {
+  it("maps a disabled platform to PLATFORM_DISABLED and names the platform", () => {
+    const error = toKnowwToolError(
+      platformError("kalshi adapter is off", {
+        platform: "kalshi",
+        operation: "searchMarkets",
+        kind: "disabled",
+      })
+    );
+
+    expect(error.code).toBe("PLATFORM_DISABLED");
+    expect(error.message).toBe(
+      "Platform kalshi is not enabled on this server."
+    );
+    expect(error.retryable).toBe(false);
+  });
+
+  it("maps not_found to NOT_FOUND", () => {
+    const error = toKnowwToolError(
+      platformError("No market for that id", {
+        platform: "polymarket",
+        operation: "getMarket",
+        kind: "not_found",
+      })
+    );
+
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.retryable).toBe(false);
+  });
+
+  it("maps an upstream 429 to a retryable RATE_LIMITED", () => {
+    const error = toKnowwToolError(
+      platformError("Gamma returned 429", {
+        platform: "polymarket",
+        operation: "searchMarkets",
+        upstreamStatus: 429,
+      })
+    );
+
+    expect(error.code).toBe("RATE_LIMITED");
+    expect(error.retryable).toBe(true);
+  });
+
+  it("maps a timeout to a retryable UPSTREAM_TIMEOUT", () => {
+    const error = toKnowwToolError(
+      platformError("CLOB timed out", {
+        platform: "polymarket",
+        operation: "getOrderbook",
+        kind: "timeout",
+      })
+    );
+
+    expect(error.code).toBe("UPSTREAM_TIMEOUT");
+    expect(error.retryable).toBe(true);
   });
 });

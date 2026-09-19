@@ -9,7 +9,7 @@ import type { McpOAuthEnv } from "./types";
 
 describe("tool scope enforcement", () => {
   it("rejects a tool call without an authenticated principal", () => {
-    expect(() => requireToolScope(MARKETS_READ_SCOPE)).toThrowError(
+    expect(() => requireToolScope(MARKETS_READ_SCOPE)).toThrow(
       expect.objectContaining<Partial<KnowwToolError>>({
         code: "UNAUTHENTICATED",
       })
@@ -30,7 +30,7 @@ describe("tool scope enforcement", () => {
         },
         () => requireToolScope(MARKETS_READ_SCOPE)
       )
-    ).toThrowError(
+    ).toThrow(
       expect.objectContaining<Partial<KnowwToolError>>({ code: "FORBIDDEN" })
     );
   });

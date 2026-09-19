@@ -1,32 +1,27 @@
+import type { PlatformId } from "@knoww/services/core";
 import {
-  CLOB_API_BASE,
-  fetchPriceHistoryByTokenId,
+  isUpstreamPriceHistoryError,
   type PriceHistoryPoint,
-  UpstreamPriceHistoryError,
-} from "@knoww/services";
+} from "@knoww/services/platforms/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
 import { MARKETS_READ_SCOPE } from "../auth/scopes";
 import { currentRequestId } from "../context";
 import {
-  KnowwToolError,
+  isKnowwToolError,
+  type KnowwToolError,
+  knowwToolError,
   requireToolScope,
   toKnowwToolError,
   toolFailureContent,
 } from "../errors/tool-error";
+import { platformInputSchema, requirePolymarketClient } from "../platforms";
 import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 
-/**
- * Upstream /prices-history quirks this tool absorbs (probed 2026-08-25):
- * the query key is `market` but carries the token id, `t` is a seconds
- * epoch while /book uses a milliseconds string, and an unknown token
- * answers HTTP 200 with an empty history. An empty window is therefore a
- * success, never NOT_FOUND. The time range is validated here, so an
- * upstream 400 is unexpected and maps to UPSTREAM_UNAVAILABLE.
- */
+/** The adapter normalizes v2 pages to seconds and decimal-string prices. */
 
 const TOKEN_ID_PATTERN = /^[0-9]{1,80}$/;
 const DEFAULT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -36,14 +31,14 @@ const DEFAULT_FIDELITY_MINUTES = 60;
 const MAX_POINTS = 1000;
 
 const description = [
-  "Fetches price history for one outcome token from the Polymarket CLOB.",
+  "Fetches price history for one outcome token from the Polymarket Data API.",
   "Points are upstream price samples derived from trade activity, returned",
   "in ascending time order with ISO 8601 timestamps and decimal-string",
   "prices in USDC (0 to 1). The window defaults to the last 24 hours, is",
   "capped at 31 days, and fidelityMinutes controls the sample spacing.",
   "Series longer than 1000 points are downsampled evenly with the",
   "endpoints kept. An empty result means no trades in the window or an",
-  "unknown token; upstream does not distinguish the two.",
+  "unknown token or unavailable retained history.",
 ].join(" ");
 
 const inputSchema = {
@@ -56,6 +51,7 @@ const inputSchema = {
     .min(1)
     .max(1440)
     .default(DEFAULT_FIDELITY_MINUTES),
+  platform: platformInputSchema,
 };
 
 const outputSchema = {
@@ -71,6 +67,7 @@ const outputSchema = {
 };
 
 interface HistoryArgs {
+  platform?: PlatformId;
   tokenId?: string;
   startTime?: string;
   endTime?: string;
@@ -80,7 +77,7 @@ interface HistoryArgs {
 function resolveTokenId(args: HistoryArgs): string {
   const tokenId = args.tokenId;
   if (typeof tokenId !== "string" || !TOKEN_ID_PATTERN.test(tokenId)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "tokenId must be a string of up to 80 decimal digits."
     );
@@ -91,7 +88,7 @@ function resolveTokenId(args: HistoryArgs): string {
 function parseIsoMs(value: string, field: string): number {
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       `${field} must be an ISO 8601 timestamp.`
     );
@@ -109,13 +106,13 @@ function resolveWindow(args: HistoryArgs): { startMs: number; endMs: number } {
       ? endMs - DEFAULT_WINDOW_MS
       : parseIsoMs(args.startTime, "startTime");
   if (startMs >= endMs) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "startTime must be before endTime."
     );
   }
   if (endMs - startMs > MAX_WINDOW_MS) {
-    throw new KnowwToolError(
+    throw knowwToolError(
       "VALIDATION_ERROR",
       "The requested window must be 31 days or shorter."
     );
@@ -139,23 +136,23 @@ function downsample(points: PriceHistoryPoint[]): {
 }
 
 function mapHistoryError(error: unknown): KnowwToolError {
-  if (error instanceof KnowwToolError) {
+  if (isKnowwToolError(error)) {
     return error;
   }
-  if (error instanceof UpstreamPriceHistoryError) {
+  if (isUpstreamPriceHistoryError(error)) {
     if (error.status === 429) {
-      return new KnowwToolError(
+      return knowwToolError(
         "RATE_LIMITED",
         "The CLOB API rate limited this request."
       );
     }
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_UNAVAILABLE",
       "The CLOB API could not serve price history."
     );
   }
   if (isAbortLike(error)) {
-    return new KnowwToolError(
+    return knowwToolError(
       "UPSTREAM_TIMEOUT",
       "The CLOB API took too long to answer."
     );
@@ -169,8 +166,8 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
     {
       title: "Get price history",
       description,
-      inputSchema,
-      outputSchema,
+      inputSchema: z.object(inputSchema),
+      outputSchema: z.object(outputSchema),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     async (args: HistoryArgs, context: ServerContext) => {
@@ -178,13 +175,14 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
         requireToolScope(MARKETS_READ_SCOPE);
         await requireToolQuota("get_price_history");
         const tokenId = resolveTokenId(args);
+        const client = requirePolymarketClient(args.platform);
         const { startMs, endMs } = resolveWindow(args);
         const fidelityMinutes =
           args.fidelityMinutes ?? DEFAULT_FIDELITY_MINUTES;
 
         let raw: PriceHistoryPoint[];
         try {
-          raw = await fetchPriceHistoryByTokenId(
+          raw = await client.fetchPriceHistoryByTokenId(
             tokenId,
             {
               startTs: Math.floor(startMs / 1000),
@@ -220,7 +218,7 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
 
         const meta = buildToolMeta({
           requestId: currentRequestId(),
-          sources: [{ name: "polymarket-clob", url: CLOB_API_BASE }],
+          sources: [{ name: "polymarket-data", url: client.baseUrls.dataApi }],
           ...(lastPoint === undefined ? {} : { asOf: lastPoint.timestamp }),
           ...(downsampled ? { truncated: true } : {}),
         });

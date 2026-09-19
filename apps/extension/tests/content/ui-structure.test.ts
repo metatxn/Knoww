@@ -259,7 +259,7 @@ function staticDependencies(
       add(
         "import",
         node.moduleSpecifier,
-        clause?.isTypeOnly === true || namedTypesOnly
+        clause?.phaseModifier === ts.SyntaxKind.TypeKeyword || namedTypesOnly
       );
       return;
     }

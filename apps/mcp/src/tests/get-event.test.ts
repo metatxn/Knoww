@@ -14,6 +14,7 @@ import {
 } from "./helpers";
 
 const CONDITION_ID = `0x${"cd".repeat(32)}`;
+const CONDITION_ID_TWO = `0x${"ce".repeat(32)}`;
 const TOKEN_ID = "53135072462907880191400140706440867753044989936304433583131";
 
 /**
@@ -38,13 +39,16 @@ const MARKET_TWO = {
   id: "1163700",
   question: "Clarity Act signed into law in 2027?",
   slug: "clarity-act-signed-into-law-in-2027",
+  conditionId: CONDITION_ID_TWO,
   closed: false,
   outcomes: '["Yes", "No"]',
   outcomePrices: '["0.4", "0.6"]',
 };
 
 const MARKET_ONE_SUMMARY = {
-  id: "1163699",
+  id: `polymarket:${CONDITION_ID}`,
+  platform: "polymarket",
+  sourceMarketId: CONDITION_ID,
   question: "Clarity Act signed into law in 2026?",
   slug: "clarity-act-signed-into-law-in-2026",
   conditionId: CONDITION_ID,
@@ -58,9 +62,12 @@ const MARKET_ONE_SUMMARY = {
 };
 
 const MARKET_TWO_SUMMARY = {
-  id: "1163700",
+  id: `polymarket:${CONDITION_ID_TWO}`,
+  platform: "polymarket",
+  sourceMarketId: CONDITION_ID_TWO,
   question: "Clarity Act signed into law in 2027?",
   slug: "clarity-act-signed-into-law-in-2027",
+  conditionId: CONDITION_ID_TWO,
   status: "active",
   totalOutcomes: 2,
   outcomes: [
@@ -113,6 +120,7 @@ describe("get_event tool (dev bypass)", () => {
       description?: string;
       annotations?: Record<string, unknown>;
       inputSchema?: { properties?: Record<string, unknown> };
+      outputSchema?: { properties?: Record<string, unknown> };
     }>;
     const getEvent = tools.find((tool) => tool.name === "get_event");
     expect(getEvent).toBeDefined();
@@ -120,10 +128,19 @@ describe("get_event tool (dev bypass)", () => {
       readOnlyHint: true,
       destructiveHint: false,
     });
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("id");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("slug");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("marketOffset");
-    expect(getEvent?.inputSchema?.properties).toHaveProperty("marketLimit");
+    expect(Object.keys(getEvent?.inputSchema?.properties ?? {}).sort()).toEqual(
+      ["cursor", "id", "marketLimit", "marketOffset", "platform", "slug"]
+    );
+    expect(
+      Object.keys(getEvent?.outputSchema?.properties ?? {}).sort()
+    ).toEqual([
+      "event",
+      "markets",
+      "marketsIncomplete",
+      "meta",
+      "page",
+      "totalMarkets",
+    ]);
     expect(getEvent?.description).toContain("not instructions");
   });
 
@@ -189,7 +206,9 @@ describe("get_event tool (dev bypass)", () => {
     expect(result.content?.[0]?.text).not.toContain("Resolution details");
 
     expect(result.structuredContent?.event).toEqual({
-      id: "35908",
+      id: "polymarket:35908",
+      platform: "polymarket",
+      sourceEventId: "35908",
       title: "Clarity Act",
       slug: "clarity-act",
       status: "active",
@@ -282,7 +301,7 @@ describe("get_event tool (dev bypass)", () => {
     const event = result.structuredContent?.event as
       | Record<string, unknown>
       | undefined;
-    expect(event?.id).toBe("35908");
+    expect(event?.id).toBe("polymarket:35908");
     expect(event?.url).toBe("https://knoww.app/events/detail/clarity-act");
   });
 
@@ -481,6 +500,23 @@ describe("get_event tool (dev bypass)", () => {
     const result = message.result as ToolCallResult;
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.markets).toEqual([MARKET_TWO_SUMMARY]);
+    expect(result.structuredContent?.totalMarkets).toBe(1);
+  });
+
+  it("omits a market without a condition id, which has no canonical id", async () => {
+    expectGammaFetch("event by id", gammaUrl("/events/35908"), () =>
+      Response.json({
+        ...PARENT_EVENT,
+        markets: [MARKET_ONE, { ...MARKET_TWO, conditionId: undefined }],
+      })
+    );
+
+    const { message } = await callTool("get_event", 71, { id: "35908" });
+
+    const result = message.result as ToolCallResult;
+    expect(result.isError).toBeFalsy();
+    expect(result.content?.[0]?.text).toContain("Markets 1-1 of 1");
+    expect(result.structuredContent?.markets).toEqual([MARKET_ONE_SUMMARY]);
     expect(result.structuredContent?.totalMarkets).toBe(1);
   });
 
