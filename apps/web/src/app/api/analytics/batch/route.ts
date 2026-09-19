@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAddress, isAddress } from "viem";
 import { z } from "zod";
+import { isProductionAnalyticsHost } from "@/lib/analytics-environment";
 import { sanitizeAnalyticsProperties } from "@/lib/analytics-sanitization";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { readJsonBodyWithLimit } from "@/lib/api-request-body";
@@ -92,7 +93,7 @@ const requestSchema = z.object({
  *                           - type: "null"
  *     responses:
  *       202:
- *         description: Events accepted and forwarded
+ *         description: Events forwarded on production hosts; ignored on other hosts
  *       400:
  *         description: Invalid request payload
  *       429:
@@ -106,6 +107,13 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const cors = extensionCorsHeaders(request);
+
+  if (!isProductionAnalyticsHost(request.nextUrl.hostname)) {
+    return NextResponse.json(
+      { success: true, accepted: 0 },
+      { status: 202, headers: cors }
+    );
+  }
 
   const rateLimitResponse = checkRateLimit(request, {
     interval: 60 * 1000,

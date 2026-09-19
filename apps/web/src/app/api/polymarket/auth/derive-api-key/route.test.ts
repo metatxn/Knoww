@@ -28,9 +28,10 @@ describe("API-key analytics environment", () => {
   beforeEach(() => vi.clearAllMocks());
   it.each([
     ["https://knoww.app", "production"],
-    ["http://localhost:8000", "development"],
-    ["https://preview.example.invalid", "development"],
-  ])("labels events from %s as %s", async (origin, environment) => {
+    ["https://www.knoww.app", "production"],
+    ["http://localhost:8000", null],
+    ["https://preprod-knoww.prayag.workers.dev", null],
+  ])("limits analytics from %s to production", async (origin, environment) => {
     const response = await POST(
       new NextRequest(`${origin}/api/polymarket/auth/derive-api-key`, {
         method: "POST",
@@ -43,6 +44,11 @@ describe("API-key analytics environment", () => {
       })
     );
     expect(response.status).toBe(200);
+    if (!environment) {
+      expect(analytics.capture).not.toHaveBeenCalled();
+      expect(analytics.flush).not.toHaveBeenCalled();
+      return;
+    }
     expect(analytics.capture).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "trading_api_key_derived",

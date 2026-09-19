@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getAddress } from "viem";
 import { z } from "zod";
 import { CLOB_BASE_URL } from "@/constants/polymarket";
+import { isProductionAnalyticsHost } from "@/lib/analytics-environment";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { readJsonBodyWithLimit } from "@/lib/api-request-body";
 import {
@@ -38,7 +39,8 @@ function trackApiKeyEvent(
   method: string,
   hostname: string
 ): void {
-  if (!isPostHogServerConfigured()) return;
+  if (!isProductionAnalyticsHost(hostname) || !isPostHogServerConfigured())
+    return;
   try {
     const posthog = getPostHogClient();
     posthog.capture({
@@ -47,9 +49,7 @@ function trackApiKeyEvent(
       properties: {
         product: "web",
         analytics_version: 2,
-        environment: ["knoww.app", "www.knoww.app"].includes(hostname)
-          ? "production"
-          : "development",
+        environment: "production",
         wallet_address: getAddress(address),
         method,
       },
