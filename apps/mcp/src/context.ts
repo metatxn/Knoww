@@ -9,7 +9,7 @@ import type { McpPlan } from "./auth/scopes";
  * the x-request-id header.
  */
 export interface RequestPrincipal {
-  authMethod: "dev-bypass" | "google-oidc";
+  authMethod: "dev-bypass" | "google-oidc" | "reviewer-code";
   id: string;
   plan: McpPlan;
   scopes: string[];

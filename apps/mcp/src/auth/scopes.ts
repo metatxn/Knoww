@@ -42,13 +42,17 @@ export type McpScope =
 
 const activeScopeSet = new Set<string>(ACTIVE_MCP_SCOPES);
 
-export interface McpAuthProps {
-  authMethod: "google-oidc";
-  googleSubject: string;
+interface BaseAuthProps {
   principalId: string;
   plan: McpPlan;
   scopes: ActiveMcpScope[];
 }
+
+export type McpAuthProps = BaseAuthProps &
+  (
+    | { authMethod: "google-oidc"; googleSubject: string }
+    | { authMethod: "reviewer-code"; reviewerCodeHash: string }
+  );
 
 export function resolveRequestedScopes(
   requested: readonly string[]
@@ -76,14 +80,7 @@ export function hasScope(
 export function validateMcpAuthProps(value: unknown): McpAuthProps | null {
   if (typeof value !== "object" || value === null) return null;
   const candidate = value as Record<string, unknown>;
-  if (candidate.authMethod !== "google-oidc") return null;
   if (candidate.plan !== FREE_MCP_PLAN) return null;
-  if (
-    typeof candidate.googleSubject !== "string" ||
-    !/^[A-Za-z0-9_-]{1,255}$/.test(candidate.googleSubject)
-  ) {
-    return null;
-  }
   if (!Array.isArray(candidate.scopes)) return null;
   const scopes: ActiveMcpScope[] = [];
   for (const scope of candidate.scopes) {
@@ -92,6 +89,29 @@ export function validateMcpAuthProps(value: unknown): McpAuthProps | null {
       scopes.push(scope as ActiveMcpScope);
     }
   }
+  if (candidate.authMethod === "reviewer-code") {
+    if (
+      candidate.principalId !== "reviewer-demo" ||
+      typeof candidate.reviewerCodeHash !== "string" ||
+      !/^[a-f0-9]{64}$/.test(candidate.reviewerCodeHash) ||
+      scopes.length !== 1 ||
+      scopes[0] !== MARKETS_READ_SCOPE
+    )
+      return null;
+    return {
+      authMethod: "reviewer-code",
+      reviewerCodeHash: candidate.reviewerCodeHash,
+      principalId: "reviewer-demo",
+      plan: FREE_MCP_PLAN,
+      scopes,
+    };
+  }
+  if (
+    candidate.authMethod !== "google-oidc" ||
+    typeof candidate.googleSubject !== "string" ||
+    !/^[A-Za-z0-9_-]{1,255}$/.test(candidate.googleSubject)
+  )
+    return null;
   const principalId = `google-${candidate.googleSubject}`;
   if (candidate.principalId !== principalId) return null;
 

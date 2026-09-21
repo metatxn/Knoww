@@ -8,6 +8,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "knoww-mcp",
+  "keep_vars": true,
   "main": "src/index.ts",
   // Use one ESM entry for the SDK's zod/v4 and our zod imports. Otherwise
   // esbuild can call SDK schema factories before Zod's constructors initialize

@@ -19,8 +19,10 @@ import {
   type GoogleAuthenticator,
   googleAuthenticationLogFields,
 } from "./google";
+import { reviewerCodeHash, verifyReviewerCode } from "./reviewer";
 import {
   FREE_MCP_PLAN,
+  MARKETS_READ_SCOPE,
   resolveRequestedScopes,
   validateMcpAuthProps,
 } from "./scopes";
@@ -207,7 +209,10 @@ function consentHeaders(nonce: string, redirectUri: string): HeadersInit {
   };
 }
 
-function consentPage(transaction: AuthorizationTransaction): Response {
+function consentPage(
+  transaction: AuthorizationTransaction,
+  reviewerEnabled: boolean
+): Response {
   const nonce = randomId();
   const scopes = transaction.scopes.join(" ");
   const body = `<!doctype html>
@@ -217,6 +222,7 @@ function consentPage(transaction: AuthorizationTransaction): Response {
 </style></head><body><main class="card">
 <h1>Authorize Knoww MCP</h1><p><span class="client">${htmlEscape(transaction.clientName)}</span> is requesting access to your Knoww MCP connection.</p><p>Requested permission:</p><div class="scope">${htmlEscape(scopes)}</div><p>Sign in with Google to confirm who is approving this connection. Knoww will not share your Google password or Google access token with the MCP client.</p><p class="privacy">Your sign-in identifies your Knoww MCP principal. The requested permission still limits what the client can access.</p>
 <form method="post" action="/authorize"><input type="hidden" name="transaction" value="${htmlEscape(transaction.id)}"><div class="actions"><button class="button deny" type="submit" name="decision" value="deny">Cancel</button><button class="button google" type="submit" name="decision" value="allow"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 18 18"><path fill="#EA4335" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.715v2.259h2.909c1.702-1.568 2.684-3.878 2.684-6.614Z"/><path fill="#4285F4" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.259c-.806.54-1.835.859-3.047.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z"/><path fill="#FBBC05" d="M3.963 10.705A5.42 5.42 0 0 1 3.681 9c0-.592.102-1.168.282-1.705V4.963H.956A9 9 0 0 0 0 9c0 1.45.347 2.824.956 4.037l3.007-2.332Z"/><path fill="#34A853" d="M9 3.581c1.321 0 2.507.454 3.44 1.346l2.581-2.581C13.464.896 11.426 0 9 0A9 9 0 0 0 .956 4.963l3.007 2.332C4.672 5.166 6.656 3.581 9 3.581Z"/></svg>Continue with Google</button></div></form>
+${reviewerEnabled ? `<details><summary>Reviewer demo access</summary><p>Use the access code supplied for the Knoww reviewer demo. This connection can read public market data only.</p><form method="post" action="/authorize"><input type="hidden" name="transaction" value="${htmlEscape(transaction.id)}"><p><label for="reviewer-code">Reviewer access code</label><br><input id="reviewer-code" name="reviewer_code" type="password" autocomplete="off" required minlength="64" maxlength="64" pattern="[a-f0-9]{64}"></p><button class="button google" type="submit" name="decision" value="reviewer">Authorize reviewer demo</button></form></details>` : ""}
 </main></body></html>`;
   return new Response(body, {
     status: 200,
@@ -290,7 +296,7 @@ async function handleConsentGet(
     oauthRequest,
   };
   await createAuthorizationTransaction(env.MCP_AUTH_CHALLENGES, transaction);
-  return consentPage(transaction);
+  return consentPage(transaction, reviewerCodeHash(env) !== null);
 }
 
 async function handleConsentPost(
@@ -318,6 +324,47 @@ async function handleConsentPost(
       "access_denied",
       "The user denied the authorization request."
     );
+  }
+  if (form.get("decision") === "reviewer") {
+    // Consume even a failed attempt so the consent transaction cannot be replayed.
+    const transaction = await consumeAuthorizationTransaction(
+      env.MCP_AUTH_CHALLENGES,
+      transactionId
+    );
+    if (!transaction || transaction.resource !== config.canonicalResource) {
+      return localError("Invalid or expired authorization request.", 401);
+    }
+    const hash = await verifyReviewerCode(form.get("reviewer_code") ?? "", env);
+    if (
+      !hash ||
+      transaction.scopes.some((scope) => scope !== MARKETS_READ_SCOPE)
+    ) {
+      return localError(
+        "Reviewer sign-in failed. Start the connection again and check the access code.",
+        401
+      );
+    }
+    const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+      request: transaction.oauthRequest,
+      userId: await getOAuthUserId(
+        env.MCP_AUTH_CHALLENGES,
+        `reviewer:${hash}`,
+        transaction.oauthRequest.clientId
+      ),
+      metadata: {
+        authMethod: "reviewer-code",
+        clientName: transaction.clientName,
+      },
+      scope: [MARKETS_READ_SCOPE],
+      props: {
+        authMethod: "reviewer-code",
+        reviewerCodeHash: hash,
+        principalId: "reviewer-demo",
+        plan: FREE_MCP_PLAN,
+        scopes: [MARKETS_READ_SCOPE],
+      },
+    });
+    return redirectResponse(redirectTo);
   }
   if (form.get("decision") !== "allow") {
     return localError("Invalid authorization decision.", 400);
@@ -478,15 +525,15 @@ async function handleGoogleCallback(
  *     tags: [OAuth]
  *     responses:
  *       200:
- *         description: Google sign-in consent page.
+ *         description: Google sign-in consent page with optional reviewer demo access.
  *       503:
  *         description: Google authentication is not configured in this environment.
  *   post:
- *     summary: Continue to Google sign-in or deny MCP authorization.
+ *     summary: Continue to Google, authorize reviewer demo access, or deny MCP authorization.
  *     tags: [OAuth]
  *     responses:
  *       302:
- *         description: Redirect to Google or back to the MCP client.
+ *         description: Redirect to Google or to the MCP client with a reviewer code or OAuth error.
  *       400:
  *         description: Invalid authorization decision.
  *       401:
