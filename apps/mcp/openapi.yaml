@@ -155,7 +155,7 @@ paths:
             format: uri
       responses:
         "200":
-          description: Google sign-in consent page.
+          description: Google sign-in consent page with optional reviewer demo access.
           content:
             text/html:
               schema:
@@ -170,7 +170,7 @@ paths:
           $ref: "#/components/responses/ServiceUnavailable"
     post:
       operationId: completeMcpAuthorization
-      summary: Continue to Google sign-in or deny authorization
+      summary: Continue to Google, authorize reviewer demo access, or deny authorization
       tags: [OAuth]
       requestBody:
         required: true
@@ -185,10 +185,16 @@ paths:
                   pattern: "^[A-Za-z0-9_-]{32,128}$"
                 decision:
                   type: string
-                  enum: [allow, deny]
+                  enum: [allow, deny, reviewer]
+                reviewer_code:
+                  type: string
+                  format: password
+                  writeOnly: true
+                  pattern: "^[a-f0-9]{64}$"
+                  description: Required for decision=reviewer. Random 256-bit access code for the dedicated read-only demo identity.
       responses:
         "302":
-          description: Redirect to Google or to the registered client with an error.
+          description: Redirect to Google, or to the registered client with a reviewer authorization code or an OAuth error.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

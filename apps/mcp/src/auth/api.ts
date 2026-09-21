@@ -8,6 +8,7 @@ import {
 } from "../context";
 import { dispatchMcpRequest } from "../mcp-handler";
 import { checkPrincipalQuota, quotaResponse, toolLimiterFor } from "../quota";
+import { isReviewerGrantEnabled } from "./reviewer";
 import { hasScope, MARKETS_READ_SCOPE, validateMcpAuthProps } from "./scopes";
 import type { McpOAuthEnv } from "./types";
 
@@ -65,7 +66,8 @@ export const mcpOAuthApiHandler = {
     const props = validateMcpAuthProps(
       (executionContext as OAuthExecutionContext).props
     );
-    if (!props) return authError(request, 401, "UNAUTHENTICATED");
+    if (!props || !isReviewerGrantEnabled(props, env))
+      return authError(request, 401, "UNAUTHENTICATED");
     if (!hasScope(props.scopes, MARKETS_READ_SCOPE)) {
       return authError(request, 403, "FORBIDDEN", MARKETS_READ_SCOPE);
     }

@@ -6,6 +6,8 @@ The code is a production release candidate. Knoww uses one remote MCP environmen
 
 For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the initial implementation record, read [mcp-implementation-report.md](../../mcp-implementation-report.md). Release operators should follow [OPERATIONS.md](OPERATIONS.md).
 
+For OpenAI submission reviewers, [REVIEWER-ACCESS.md](REVIEWER-ACCESS.md) describes the optional dedicated read-only login, credential setup, and revocation. It is disabled until `MCP_REVIEWER_CODE_SHA256` is configured.
+
 ## Contents
 
 - [What is implemented](#what-is-implemented)
