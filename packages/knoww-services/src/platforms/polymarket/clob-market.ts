@@ -1,3 +1,7 @@
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -73,7 +77,10 @@ export function createClobMarket(ctx: PolymarketClientContext) {
           );
         }
 
-        const payload: unknown = await response.json();
+        const payload = await readBoundedJson(
+          response,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        );
         const parsed = clobMarketSchema.safeParse(payload);
         if (!parsed.success) {
           throw upstreamMarketError("CLOB market returned a malformed payload");

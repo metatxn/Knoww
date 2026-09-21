@@ -13,12 +13,10 @@ import { fetchOrderBook } from "@/lib/polymarket";
 import { GET } from "./route";
 
 function clobError(message: string, status: number): ClobRequestError {
-  return clobRequestError(message, {
-    ok: false,
-    status,
-    statusText: "Error",
-    json: async () => null,
-  });
+  return clobRequestError(
+    message,
+    new Response(null, { status, statusText: "Error" })
+  );
 }
 
 describe("GET /api/polymarket/markets/orderbook/[tokenID] error handling", () => {

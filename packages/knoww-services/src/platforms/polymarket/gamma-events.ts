@@ -1,3 +1,7 @@
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -129,7 +133,10 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
             response.status
           );
         }
-        const payload: unknown = await response.json();
+        const payload = await readBoundedJson(
+          response,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        );
         if (payload === null || payload === undefined) {
           return null;
         }
@@ -183,7 +190,10 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
             response.status
           );
         }
-        const payload: unknown = await response.json();
+        const payload = await readBoundedJson(
+          response,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        );
         if (!Array.isArray(payload)) {
           throw upstreamEventError(
             "Gamma child event payload was not an array"
@@ -233,7 +243,10 @@ export function createGammaEvents(ctx: PolymarketClientContext) {
             response.status
           );
         }
-        const payload: unknown = await response.json();
+        const payload = await readBoundedJson(
+          response,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        );
         if (!Array.isArray(payload)) {
           throw upstreamEventError(
             "Gamma event market payload was not an array"

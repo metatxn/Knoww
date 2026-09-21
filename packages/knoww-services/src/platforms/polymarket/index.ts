@@ -27,6 +27,7 @@ export {
   type PolymarketClobOrderbook,
 } from "./clob-orderbook";
 export {
+  type BoundedPriceHistory,
   createClobPriceHistory,
   type PolymarketClobPriceHistory,
   type PriceHistoryParams,

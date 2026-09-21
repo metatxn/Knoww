@@ -1,3 +1,7 @@
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { z } from "zod";
 import {
@@ -175,7 +179,10 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
           );
         }
 
-        const payload: unknown = await response.json();
+        const payload = await readBoundedJson(
+          response,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        );
 
         if (!Array.isArray(payload)) {
           throw upstreamMarketError("Gamma market lookup returned a non-array");

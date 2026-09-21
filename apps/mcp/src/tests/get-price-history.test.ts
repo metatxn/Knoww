@@ -174,6 +174,42 @@ describe("get_price_history tool", () => {
     expect(structured.meta.truncated).toBeUndefined();
   });
 
+  it("returns valid history when Polymarket includes an earlier boundary bucket", async () => {
+    const startTs = START_TS + 37;
+    const startTime = new Date(startTs * 1000).toISOString();
+    expectGammaFetch(
+      "history with an earlier boundary bucket",
+      dataUrl(
+        "/v2/prices-history",
+        `token_id=${TOKEN_ID}&start=${startTs}&end=${END_TS}&bucket_seconds=3600`
+      ),
+      () =>
+        jsonResponse(
+          dataV2Page([
+            { timestamp: START_TS, price: 0.4 },
+            { timestamp: START_TS + 3600, price: 0.5 },
+          ])
+        )
+    );
+
+    const { message } = await callTool("get_price_history", 831, {
+      tokenId: TOKEN_ID,
+      startTime,
+      endTime: END_ISO,
+      fidelityMinutes: 60,
+    });
+    const result = message.result as ToolCallResult;
+    const structured = structuredOf(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(structured.history.points).toEqual([
+      {
+        timestamp: new Date((START_TS + 3600) * 1000).toISOString(),
+        price: "0.5",
+      },
+    ]);
+  });
+
   it("defaults to a 24 hour window ending now", async () => {
     expectGammaFetch(
       "data-history",
@@ -278,6 +314,61 @@ describe("get_price_history tool", () => {
     expect(structured.history.downsampled).toBe(true);
     expect(structured.meta.truncated).toBe(true);
     expect(result.content?.[0]?.text).toContain("downsampled");
+  });
+
+  it("does not label lossless timestamp deduplication as truncated", async () => {
+    expectGammaFetch(
+      "first history page with boundary timestamp",
+      (url) =>
+        dataUrl("/v2/prices-history", `token_id=${TOKEN_ID}`)(url) &&
+        !url.searchParams.has("cursor"),
+      () =>
+        jsonResponse(
+          dataV2Page(
+            [
+              { timestamp: START_TS, price: 0.5 },
+              { timestamp: START_TS + 60, price: 0.55 },
+            ],
+            "history-next"
+          )
+        )
+    );
+    expectGammaFetch(
+      "second history page with boundary timestamp",
+      dataUrl("/v2/prices-history", "cursor=history-next"),
+      () =>
+        jsonResponse(
+          dataV2Page([
+            { timestamp: START_TS + 60, price: 0.6 },
+            { timestamp: START_TS + 120, price: 0.7 },
+          ])
+        )
+    );
+
+    const { message } = await callTool("get_price_history", 881, {
+      tokenId: TOKEN_ID,
+      startTime: START_ISO,
+      endTime: END_ISO,
+      fidelityMinutes: 1,
+    });
+    const result = message.result as ToolCallResult;
+    const structured = structuredOf(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(structured.history.points).toEqual([
+      { timestamp: START_ISO, price: "0.5" },
+      {
+        timestamp: new Date((START_TS + 60) * 1000).toISOString(),
+        price: "0.6",
+      },
+      {
+        timestamp: new Date((START_TS + 120) * 1000).toISOString(),
+        price: "0.7",
+      },
+    ]);
+    expect(structured.history.downsampled).toBeUndefined();
+    expect(structured.meta.truncated).toBeUndefined();
+    expect(result.content?.[0]?.text).not.toContain("downsampled");
   });
 
   it("treats an empty history as success, not NOT_FOUND", async () => {

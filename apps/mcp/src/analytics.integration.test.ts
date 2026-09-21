@@ -57,10 +57,10 @@ describe("MCP analytics lifecycle", () => {
         id: 1,
         method: "ping",
       })),
-      200,
+      400,
     ],
   ])(
-    "bounds telemetry for batches without changing protocol handling",
+    "bounds telemetry and rejects oversized protocol batches",
     async (messages, status) => {
       const body = JSON.stringify(messages);
       expect(new TextEncoder().encode(body).length).toBeLessThan(1024 * 1024);
@@ -98,6 +98,37 @@ describe("MCP analytics lifecycle", () => {
       );
     }
   );
+
+  it("keeps bounded legacy batches compatible", async () => {
+    const ctx = createExecutionContext();
+    const response = await worker.fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          host: "localhost",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-11-25",
+        },
+        body: JSON.stringify(
+          Array.from({ length: 10 }, (_, index) => ({
+            jsonrpc: "2.0",
+            id: index + 1,
+            method: "ping",
+          }))
+        ),
+      }),
+      {
+        ...env,
+        ...DEV_VARS,
+        POSTHOG_PROJECT_API_KEY: "test-project-token",
+      } as unknown as Env,
+      ctx
+    );
+    await waitOnExecutionContext(ctx);
+
+    expect(response.status).toBe(200);
+  });
 
   it("captures HTTP, protocol, and tool outcomes without request arguments", async () => {
     const testEnv = {

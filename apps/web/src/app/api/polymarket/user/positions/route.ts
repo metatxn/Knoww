@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
@@ -155,7 +159,10 @@ async function fetchPolymarketPositionsPage(
 
   return {
     success: true,
-    batch: (await response.json()) as PolymarketPosition[],
+    batch: (await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    )) as PolymarketPosition[],
   };
 }
 

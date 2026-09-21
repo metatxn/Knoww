@@ -4,12 +4,7 @@ import { fetchLeaderboardRows, fetchTagRecord } from "./profile-reads";
 const WALLET = `0x${"b".repeat(40)}`;
 
 function stubFetch(body: unknown, status = 200): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? "OK" : "Error",
-    json: async () => body,
-  } satisfies Partial<Response>);
+  const fetchMock = vi.fn().mockResolvedValue(Response.json(body, { status }));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

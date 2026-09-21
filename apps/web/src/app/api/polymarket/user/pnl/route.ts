@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import Decimal from "decimal.js";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -220,7 +224,10 @@ async function fetchActivity(
     );
     if (!response.ok) throw new Error("Failed to fetch trades");
 
-    const pageData: unknown = await response.json();
+    const pageData = await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    );
     if (!Array.isArray(pageData)) throw new Error("Failed to fetch trades");
     pagesFetched++;
 
@@ -274,7 +281,10 @@ async function fetchPositions(
     );
     if (!response.ok) throw new Error("Failed to fetch positions");
 
-    const pageData: unknown = await response.json();
+    const pageData = await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    );
     if (!Array.isArray(pageData)) throw new Error("Failed to fetch positions");
     for (const position of pageData as PositionData[]) {
       const identity = `${position.slug ?? ""}:${position.outcome ?? ""}`;
@@ -434,7 +444,10 @@ export async function GET(request: NextRequest) {
 
     if (pnlApiResponse.ok) {
       try {
-        pnlApiData = await pnlApiResponse.json();
+        pnlApiData = (await readBoundedJson(
+          pnlApiResponse,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        )) as { t: number; p: number }[];
         // The P&L API returns an array of { t: timestamp, p: pnl_value }
         // The last value is the current P&L
         if (Array.isArray(pnlApiData) && pnlApiData.length > 0) {

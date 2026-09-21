@@ -181,8 +181,11 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
           args.fidelityMinutes ?? DEFAULT_FIDELITY_MINUTES;
 
         let raw: PriceHistoryPoint[];
+        let observedPoints = 0;
+        let sourceDownsampled = false;
+        let sourceTruncated = false;
         try {
-          raw = await client.fetchPriceHistoryByTokenId(
+          const result = await client.fetchBoundedPriceHistoryByTokenId(
             tokenId,
             {
               startTs: Math.floor(startMs / 1000),
@@ -191,11 +194,18 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
             },
             { signal: context.mcpReq.signal }
           );
+          raw = result.points;
+          observedPoints = result.observedPoints;
+          sourceDownsampled = result.downsampled;
+          sourceTruncated = result.truncated;
         } catch (error) {
           throw mapHistoryError(error);
         }
 
-        const { points: keptPoints, downsampled } = downsample(raw);
+        const locallySampled = downsample(raw);
+        const keptPoints = locallySampled.points;
+        const downsampled = sourceDownsampled || locallySampled.downsampled;
+        const truncated = sourceTruncated || downsampled;
         const points = keptPoints.map((point) => ({
           timestamp: new Date(point.t * 1000).toISOString(),
           price: new Decimal(point.p).toString(),
@@ -212,7 +222,12 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
                 `${points.length} price points from ${startTime} to ${endTime}.`,
                 `Latest price ${lastPoint.price} at ${lastPoint.timestamp}.`,
                 ...(downsampled
-                  ? [`Series downsampled from ${raw.length} upstream samples.`]
+                  ? [
+                      `Series downsampled after ${observedPoints} upstream samples.`,
+                    ]
+                  : []),
+                ...(sourceTruncated
+                  ? ["Upstream pagination stopped at the safety limit."]
                   : []),
               ].join(" ");
 
@@ -220,7 +235,7 @@ export function registerGetPriceHistoryTool(server: McpServer): void {
           requestId: currentRequestId(),
           sources: [{ name: "polymarket-data", url: client.baseUrls.dataApi }],
           ...(lastPoint === undefined ? {} : { asOf: lastPoint.timestamp }),
-          ...(downsampled ? { truncated: true } : {}),
+          ...(truncated ? { truncated: true } : {}),
         });
 
         return {

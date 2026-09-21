@@ -91,6 +91,35 @@ describe("show_markets MCP App", () => {
     });
   });
 
+  it("charges resource quota before returning the market-card document", async () => {
+    let quotaCalls = 0;
+    const response = await dispatch(
+      mcpRequest(
+        {
+          jsonrpc: "2.0",
+          id: 51,
+          method: "resources/read",
+          params: { uri: MARKETS_RESOURCE_URI },
+        },
+        { headers: { "mcp-protocol-version": PROTOCOL_VERSION } }
+      ),
+      {
+        ...devEnv,
+        MCP_FREE_TOOL_RATE_LIMITER: {
+          limit: async () => {
+            quotaCalls++;
+            return { success: false };
+          },
+        },
+      } as unknown as Env
+    );
+    const message = await readJsonRpc(response);
+
+    expect(quotaCalls).toBe(1);
+    expect(message.error).toBeDefined();
+    expect(JSON.stringify(message)).not.toContain("ui/initialize");
+  });
+
   it("fetches authoritative prices, deduplicates selection and links to the parent event", async () => {
     mockMarket(market.slug);
     const { message } = await callTool("show_markets", 1, {

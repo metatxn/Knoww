@@ -1,4 +1,10 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_ERROR_MAX_BYTES,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+  readBoundedText,
+} from "@knoww/shared-types/bounded-json";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ERROR_MESSAGES } from "@/constants/polymarket";
@@ -133,7 +139,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await readBoundedText(
+        response,
+        DEFAULT_UPSTREAM_ERROR_MAX_BYTES
+      ).catch(() => "");
       log.error("upstream.error", {
         status: response.status,
         body: sanitizeUpstreamBody(errorText),
@@ -148,7 +157,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data: PolymarketUserDetails[] = await response.json();
+    const data = (await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    )) as PolymarketUserDetails[];
 
     if (!data || data.length === 0) {
       return NextResponse.json(

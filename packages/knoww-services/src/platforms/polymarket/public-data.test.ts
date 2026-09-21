@@ -118,6 +118,20 @@ describe("fetchTagBySlug", () => {
       isUpstreamPublicDataError
     );
   });
+
+  it("rejects an oversized upstream body before JSON parsing", async () => {
+    const { client } = createClient(
+      () =>
+        new Response('{"private":"upstream diagnostics"}', {
+          headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+        })
+    );
+
+    await expect(client.fetchTagBySlug("nba")).rejects.toMatchObject({
+      name: "UpstreamPublicDataError",
+      message: "Public data response exceeded its size limit",
+    });
+  });
 });
 
 describe("fetchEventPage", () => {

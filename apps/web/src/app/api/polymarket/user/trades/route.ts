@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import Decimal from "decimal.js";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -204,7 +208,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let data: PolymarketActivity[] = await response.json();
+    let data = (await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    )) as PolymarketActivity[];
 
     // Filter by type if specified
     if (type !== "ALL") {

@@ -1,3 +1,8 @@
+import {
+  BoundedJsonError,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import Decimal from "decimal.js";
 import { z } from "zod";
 import {
@@ -231,8 +236,19 @@ export function createProfiles(
 
         let payload: unknown;
         try {
-          payload = await response.json();
-        } catch {
+          payload = await readBoundedJson(
+            response,
+            DEFAULT_UPSTREAM_JSON_MAX_BYTES
+          );
+        } catch (error) {
+          if (
+            error instanceof BoundedJsonError &&
+            error.reason === "too_large"
+          ) {
+            throw upstreamPublicDataError(
+              "Public profile response exceeded its size limit"
+            );
+          }
           throw upstreamPublicDataError(
             "Public profile request returned malformed JSON"
           );

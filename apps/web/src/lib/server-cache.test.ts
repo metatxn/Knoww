@@ -8,15 +8,18 @@ import {
   getTagDetails,
 } from "./server-cache";
 
+function jsonResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
+}
+
 describe("getInitialEvents", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   it("keeps market outcome fields in initial events for stable card SSR", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
         events: [
           {
             id: "event-1",
@@ -36,8 +39,8 @@ describe("getInitialEvents", () => {
         ],
         next_cursor: "next",
         total_results: "1",
-      }),
-    } satisfies Partial<Response>);
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await getInitialEvents();
@@ -68,14 +71,13 @@ describe("tag event fetch policies", () => {
   });
 
   it("limits related-event requests to a small payload", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
         events: [],
         next_cursor: null,
         total_results: 0,
-      }),
-    } satisfies Partial<Response>);
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await getRelatedEventsByTag("related-payload-test");
@@ -152,15 +154,13 @@ describe("getEvent", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({
+        .mockResolvedValueOnce(
+          jsonResponse({
             id: "event-9",
             slug: "event-nine",
             markets: [],
-          }),
-        } satisfies Partial<Response>)
+          })
+        )
         .mockRejectedValueOnce(new Error("children unavailable"))
     );
 
@@ -173,20 +173,14 @@ describe("getEvent", () => {
   it("bypasses Next's R2-backed data cache for event detail reads", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse({
           id: "event-cache",
           slug: "event-cache",
           markets: [],
-        }),
-      } satisfies Partial<Response>)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => [],
-      } satisfies Partial<Response>);
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
 
     await getEvent("event-cache");
@@ -201,19 +195,15 @@ describe("getEvent", () => {
   it("folds open negRisk child markets into the parent's market list", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse({
           id: "event-1",
           slug: "event-one",
           markets: [{ id: "m1", conditionId: "0xa", question: "Parent?" }],
-        }),
-      } satisfies Partial<Response>)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => [
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse([
           {
             id: "41001",
             title: "Most Sixes",
@@ -222,8 +212,8 @@ describe("getEvent", () => {
               { id: "m1", conditionId: "0xa", question: "Already listed" },
             ],
           },
-        ],
-      } satisfies Partial<Response>);
+        ])
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const event = await getEvent("event-one");
@@ -245,12 +235,7 @@ describe("getEvent", () => {
 });
 
 function stubJsonFetch(body: unknown, status = 200) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? "OK" : "Error",
-    json: async () => body,
-  } satisfies Partial<Response>);
+  const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body, status));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }

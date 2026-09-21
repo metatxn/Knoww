@@ -1,4 +1,9 @@
 import {
+  type BoundedJsonResponse,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "./bounded-json.ts";
+import {
   normalizePriceHistoryPoint,
   type PriceHistoryClient,
   priceHistoryRequests,
@@ -21,11 +26,10 @@ export interface ClobFetchInit {
   [key: string]: unknown;
 }
 
-export interface ClobFetchResponse {
+export interface ClobFetchResponse extends BoundedJsonResponse {
   ok: boolean;
   status: number;
   statusText?: string;
-  json(): Promise<unknown>;
 }
 
 export type ClobFetch = (
@@ -124,6 +128,7 @@ export function isClobRequestError(value: unknown): value is ClobRequestError {
 }
 
 type ClobQueryValue = string | number | boolean | bigint | null | undefined;
+const MAX_CLOB_ERROR_JSON_BYTES = 64 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -188,7 +193,9 @@ async function readClobError(
   response: ClobFetchResponse,
   fallback: string
 ): Promise<string> {
-  const data = await response.json().catch(() => null);
+  const data = await readBoundedJson(response, MAX_CLOB_ERROR_JSON_BYTES).catch(
+    () => null
+  );
 
   if (isRecord(data)) {
     if (typeof data.error === "string" && data.error) return data.error;
@@ -289,7 +296,10 @@ export async function fetchClobJson<T = unknown>(
     );
   }
 
-  return (await response.json()) as T;
+  return (await readBoundedJson(
+    response,
+    DEFAULT_UPSTREAM_JSON_MAX_BYTES
+  )) as T;
 }
 
 export async function fetchClobOrderBook(

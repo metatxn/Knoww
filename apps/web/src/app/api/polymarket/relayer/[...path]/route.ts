@@ -1,4 +1,10 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_ERROR_MAX_BYTES,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+  readBoundedText,
+} from "@knoww/shared-types/bounded-json";
 import { RELAYER_API_ORIGIN } from "@knoww/shared-types/polymarket";
 import { type NextRequest, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api-error";
@@ -46,6 +52,7 @@ const log = createLogger("api.relayer");
 const UPSTREAM_BASE = RELAYER_API_ORIGIN;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_BODY_SIZE = 16 * 1024;
+const MAX_UPSTREAM_BODY_BYTES = DEFAULT_UPSTREAM_JSON_MAX_BYTES;
 
 // Allow-listed Polymarket relayer endpoints.
 const ALLOWED_PATHS = new Set(["submit", "nonce", "transaction", "deployed"]);
@@ -91,7 +98,10 @@ async function getBuilderHmacHeaders(
       });
       return null;
     }
-    return (await res.json()) as BuilderHmacHeaders;
+    return (await readBoundedJson(
+      res,
+      DEFAULT_UPSTREAM_ERROR_MAX_BYTES
+    )) as BuilderHmacHeaders;
   } catch (err) {
     log.error("signing.fetch.failed", { err });
     return null;
@@ -289,7 +299,7 @@ async function proxy(
       throw fetchError;
     }
 
-    upstreamBody = await upstream.text();
+    upstreamBody = await readBoundedText(upstream, MAX_UPSTREAM_BODY_BYTES);
 
     if (
       safeCreateBody !== null &&
@@ -325,7 +335,10 @@ async function proxy(
             body: safeSubmitBody,
             signal: controller.signal,
           });
-          upstreamBody = await upstream.text();
+          upstreamBody = await readBoundedText(
+            upstream,
+            MAX_UPSTREAM_BODY_BYTES
+          );
         } catch (fetchError) {
           if (fetchError instanceof Error && fetchError.name === "AbortError") {
             log.error("upstream.timeout", {

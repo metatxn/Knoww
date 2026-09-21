@@ -1,3 +1,8 @@
+import {
+  BoundedJsonError,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -64,9 +69,14 @@ export function createDataApi(ctx: PolymarketClientContext) {
           response.status
         );
       try {
-        return await response.json();
-      } catch {
+        return await readBoundedJson(response, DEFAULT_UPSTREAM_JSON_MAX_BYTES);
+      } catch (error) {
         signal.throwIfAborted();
+        if (error instanceof BoundedJsonError && error.reason === "too_large") {
+          throw upstreamPublicDataError(
+            "Data API response exceeded its size limit"
+          );
+        }
         throw upstreamPublicDataError("Data API returned malformed JSON");
       }
     }

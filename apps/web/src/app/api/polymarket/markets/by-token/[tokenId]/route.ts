@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -47,7 +51,10 @@ async function resolveEventSlug(
         next: { revalidate: 300 },
       });
       if (res.ok) {
-        const event = (await res.json()) as Record<string, unknown>;
+        const event = (await readBoundedJson(
+          res,
+          DEFAULT_UPSTREAM_JSON_MAX_BYTES
+        )) as Record<string, unknown>;
         if (event.slug) return event.slug as string;
       }
     } catch {
@@ -110,7 +117,10 @@ export async function GET(
     );
 
     if (gammaResponse.ok) {
-      const gammaData = await gammaResponse.json();
+      const gammaData = await readBoundedJson(
+        gammaResponse,
+        DEFAULT_UPSTREAM_JSON_MAX_BYTES
+      );
 
       if (Array.isArray(gammaData) && gammaData.length > 0) {
         const market = gammaData[0];

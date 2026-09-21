@@ -19,15 +19,14 @@ describe("GET /api/search", () => {
   it("adds extension CORS headers to successful search responses", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
+      vi.fn(async () =>
+        Response.json({
           events: [],
           tags: [],
           profiles: [],
           pagination: { hasMore: false, totalResults: 0 },
-        }),
-      }))
+        })
+      )
     );
 
     const req = new NextRequest(

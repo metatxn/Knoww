@@ -18,11 +18,7 @@ describe("searchPolymarket", () => {
               profiles: [],
               pagination: { hasMore: false, totalResults: 0 },
             };
-        return {
-          ok: true,
-          status: 200,
-          json: async () => body,
-        } satisfies Partial<Response>;
+        return Response.json(body);
       }
     );
     vi.stubGlobal("fetch", fetchMock);

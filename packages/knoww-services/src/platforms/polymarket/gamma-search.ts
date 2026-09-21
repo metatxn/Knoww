@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import Decimal from "decimal.js";
 import { z } from "zod";
@@ -369,7 +373,7 @@ export function createGammaSearch(ctx: PolymarketClientContext) {
           );
         }
 
-        return response.json();
+        return readBoundedJson(response, DEFAULT_UPSTREAM_JSON_MAX_BYTES);
       }
     );
   }

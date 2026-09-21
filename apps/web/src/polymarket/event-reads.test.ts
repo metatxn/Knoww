@@ -12,10 +12,11 @@ describe("fetchSeriesEventPage", () => {
   });
 
   it("asks Gamma for the active series page the sports lists always used", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ events: [gammaEventFixture], next_cursor: null }),
-    } satisfies Partial<Response>);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ events: [gammaEventFixture], next_cursor: null })
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await fetchSeriesEventPage({

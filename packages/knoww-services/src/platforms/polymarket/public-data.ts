@@ -1,3 +1,8 @@
+import {
+  BoundedJsonError,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -249,8 +254,19 @@ export function createPublicData(ctx: PolymarketClientContext) {
 
         let payload: unknown;
         try {
-          payload = await response.json();
-        } catch {
+          payload = await readBoundedJson(
+            response,
+            DEFAULT_UPSTREAM_JSON_MAX_BYTES
+          );
+        } catch (error) {
+          if (
+            error instanceof BoundedJsonError &&
+            error.reason === "too_large"
+          ) {
+            throw upstreamPublicDataError(
+              "Public data response exceeded its size limit"
+            );
+          }
           throw upstreamPublicDataError(
             "Public data request returned malformed JSON"
           );

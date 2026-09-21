@@ -180,6 +180,7 @@ export function registerShowMarketsTool(server: McpServer): void {
     },
     async () => {
       requireToolScope(MARKETS_READ_SCOPE);
+      await requireToolQuota("resource:knoww-markets");
       return {
         contents: [
           {

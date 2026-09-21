@@ -26,6 +26,29 @@ const position = {
   mergeable: false,
 };
 describe("Data API v2", () => {
+  it("rejects an oversized response before JSON parsing", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response('{"private":"upstream diagnostics"}', {
+          headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+        })
+    );
+    const api = createDataApi(
+      createPolymarketClientContext({
+        baseUrls: DEFAULT_POLYMARKET_BASE_URLS,
+        fetchImpl,
+      })
+    );
+
+    await expect(
+      api.rows("activity", {}, z.number(), { limit: 1 })
+    ).rejects.toMatchObject({
+      name: "UpstreamPublicDataError",
+      message: "Data API response exceeded its size limit",
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
   it("walks opaque cursors with unchanged filters and never sends offset", async () => {
     const calls: URL[] = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
@@ -160,6 +183,186 @@ describe("Data API v2", () => {
     ]);
     expect(calls[0].origin).toBe(DEFAULT_POLYMARKET_BASE_URLS.dataApi);
     expect(calls[0].searchParams.get("bucket_seconds")).toBe("60");
+  });
+
+  it("keeps valid price history when bucket-edge points fall outside the requested window", async () => {
+    const start = 1700000037;
+    const end = 1700003637;
+    const calls: URL[] = [];
+    const client = createPolymarketClient({
+      fetchImpl: vi.fn(async (input) => {
+        calls.push(new URL(String(input)));
+        return envelope([
+          { timestamp: 1700000000, price: 0.4 },
+          { timestamp: 1700003600, price: 0.5 },
+          { timestamp: 1700007200, price: 0.6 },
+        ]);
+      }),
+    });
+
+    const result = await client.fetchBoundedPriceHistoryByTokenId("123", {
+      startTs: start,
+      endTs: end,
+      fidelity: 60,
+    });
+
+    expect(calls[0].searchParams.get("start")).toBe(String(start));
+    expect(calls[0].searchParams.get("end")).toBe(String(end));
+    expect(result.points).toEqual([{ t: 1700003600, p: "0.5" }]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it("bounds MCP price-history pages and retained samples", async () => {
+    const start = 1700000000;
+    const pageSize = 2000;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const cursor = Number(url.searchParams.get("cursor") ?? "0");
+      const data = Array.from({ length: pageSize }, (_, index) => ({
+        timestamp: start + cursor * pageSize + index,
+        price: 0.5,
+      }));
+      return envelope(data, String(cursor + 1));
+    });
+    const client = createPolymarketClient({ fetchImpl });
+
+    const result = await client.fetchBoundedPriceHistoryByTokenId("123", {
+      startTs: start,
+      endTs: start + 20000,
+      fidelity: 1,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(8);
+    expect(result.points).toHaveLength(1000);
+    expect(result.points[0]).toEqual({ t: start, p: "0.5" });
+    expect(result.points[result.points.length - 1]).toEqual({
+      t: start + 8 * pageSize - 1,
+      p: "0.5",
+    });
+    const quarterCounts = [0, 0, 0, 0];
+    for (const point of result.points) {
+      const quarter = Math.min(3, Math.floor((point.t - start) / 4000));
+      quarterCounts[quarter]++;
+    }
+    expect(quarterCounts).toEqual([250, 250, 250, 250]);
+    expect(
+      Math.max(
+        ...result.points.slice(1).map((point, index) => {
+          return point.t - result.points[index].t;
+        })
+      )
+    ).toBeLessThanOrEqual(32);
+    expect(result.observedPoints).toBe(8 * pageSize);
+    expect(result.downsampled).toBe(true);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("samples evenly when upstream points arrive out of timestamp order", async () => {
+    const start = 1700000000;
+    const timestamps: number[] = [];
+    for (let index = 0; index < 1000; index++) {
+      timestamps.push(index, index + 2000);
+    }
+    for (let index = 1000; index < 2000; index++) timestamps.push(index);
+    const client = createPolymarketClient({
+      fetchImpl: vi.fn(async () =>
+        envelope(
+          timestamps.map((offset) => ({
+            timestamp: start + offset,
+            price: 0.5,
+          }))
+        )
+      ),
+    });
+
+    const result = await client.fetchBoundedPriceHistoryByTokenId("123", {
+      startTs: start,
+      endTs: start + 2999,
+      fidelity: 1,
+    });
+    const thirdCounts = [0, 0, 0];
+    for (const point of result.points) {
+      const third = Math.min(2, Math.floor((point.t - start) / 1000));
+      thirdCounts[third]++;
+    }
+
+    expect(thirdCounts.every((count) => count >= 320 && count <= 347)).toBe(
+      true
+    );
+    expect(
+      Math.max(
+        ...result.points.slice(1).map((point, index) => {
+          return point.t - result.points[index].t;
+        })
+      )
+    ).toBeLessThanOrEqual(8);
+  });
+
+  it("does not give replayed timestamps extra sampling weight", async () => {
+    const start = 1700000000;
+    const base = Array.from({ length: 3000 }, (_, index) => ({
+      timestamp: start + index,
+      price: index < 2000 && index % 2 === 1 ? 0.6 : 0.5,
+    }));
+    const replayed = [
+      ...base.map((point) => ({ ...point, price: 0.5 })),
+      ...Array.from({ length: 1000 }, (_, index) => ({
+        timestamp: start + index * 2 + 1,
+        price: 0.6,
+      })),
+    ];
+    const fetchHistory = async (data: unknown[]) => {
+      const client = createPolymarketClient({
+        fetchImpl: vi.fn(async () => envelope(data)),
+      });
+      return client.fetchBoundedPriceHistoryByTokenId("123", {
+        startTs: start,
+        endTs: start + 2999,
+        fidelity: 1,
+      });
+    };
+
+    const deduplicatedResult = await fetchHistory(base);
+    const replayedResult = await fetchHistory(replayed);
+
+    expect(replayedResult.points.map((point) => point.t)).toEqual(
+      deduplicatedResult.points.map((point) => point.t)
+    );
+  });
+
+  it("does not report timestamp deduplication as downsampling", async () => {
+    const start = 1700000000;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      return url.searchParams.has("cursor")
+        ? envelope([
+            { timestamp: start + 60, price: 0.6 },
+            { timestamp: start + 120, price: 0.7 },
+          ])
+        : envelope(
+            [
+              { timestamp: start, price: 0.5 },
+              { timestamp: start + 60, price: 0.55 },
+            ],
+            "next"
+          );
+    });
+    const client = createPolymarketClient({ fetchImpl });
+
+    const result = await client.fetchBoundedPriceHistoryByTokenId("123", {
+      startTs: start,
+      endTs: start + 120,
+      fidelity: 1,
+    });
+
+    expect(result.points).toEqual([
+      { t: start, p: "0.5" },
+      { t: start + 60, p: "0.6" },
+      { t: start + 120, p: "0.7" },
+    ]);
+    expect(result.observedPoints).toBe(4);
+    expect(result.downsampled).toBe(false);
+    expect(result.truncated).toBe(false);
   });
 });
 

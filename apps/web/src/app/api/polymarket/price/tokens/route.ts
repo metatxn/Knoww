@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
@@ -203,7 +207,10 @@ export async function GET(request: NextRequest) {
       throw new Error(`CoinMarketCap API error: ${response.status}`);
     }
 
-    const responseData: CoinMarketCapResponse = await response.json();
+    const responseData = (await readBoundedJson(
+      response,
+      DEFAULT_UPSTREAM_JSON_MAX_BYTES
+    )) as CoinMarketCapResponse;
 
     // Extract prices from the response
     const prices: Record<string, number> = {};

@@ -1,4 +1,8 @@
 import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "@knoww/shared-types/bounded-json";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import {
@@ -186,6 +190,9 @@ async function fetchLeaderboardPage(
     return [];
   }
 
-  const payload: unknown = await response.json();
+  const payload = await readBoundedJson(
+    response,
+    DEFAULT_UPSTREAM_JSON_MAX_BYTES
+  );
   return Array.isArray(payload) ? payload : [];
 }

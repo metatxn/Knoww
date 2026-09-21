@@ -133,11 +133,10 @@ describe("POST /api/polymarket/markets/price-history/batch", () => {
     const [okId, missingId, brokenId] = makeTokenIds(3);
     vi.mocked(fetchClobPriceHistory).mockImplementation(async (tokenId) => {
       if (tokenId === missingId) {
-        throw clobRequestError("not found", {
-          ok: false,
-          status: 404,
-          json: async () => ({}),
-        });
+        throw clobRequestError(
+          "not found",
+          new Response(null, { status: 404 })
+        );
       }
       if (tokenId === brokenId) throw new Error("upstream exploded");
       return { history: [{ t: 1, p: 0.5 }] };
@@ -163,11 +162,10 @@ describe("POST /api/polymarket/markets/price-history/batch", () => {
     const [okId, missingId] = makeTokenIds(2);
     vi.mocked(fetchClobPriceHistory).mockImplementation(async (tokenId) => {
       if (tokenId === missingId) {
-        throw clobRequestError("not found", {
-          ok: false,
-          status: 404,
-          json: async () => ({}),
-        });
+        throw clobRequestError(
+          "not found",
+          new Response(null, { status: 404 })
+        );
       }
       return { history: [{ t: 1, p: 0.5 }] };
     });
