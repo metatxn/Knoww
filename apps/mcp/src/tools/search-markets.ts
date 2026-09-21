@@ -44,6 +44,7 @@ const SEARCH_MARKETS_DESCRIPTION = [
   "Use when a user asks about the likelihood of a future event and current prediction-market prices would help answer, even if they do not mention Knoww or markets.",
   "Do not use for unrelated conversation, settled historical facts, or personal financial advice. Search with a concise topic or event name, not the full conversation.",
   'For conversational discovery, use resultType "markets" and sortBy "relevance", compare the question and dates to the user\'s intent, then call show_markets with up to three matching market slugs. If nothing closely matches, do not display unrelated markets.',
+  'Keep query a short contiguous phrase such as "Fed". For a resolved meeting, add titleTerms such as ["December", "2026"] to filter candidate titles/questions before pagination. These terms narrow the fetched candidates; they do not expand the upstream search. Verify the meeting in get_market or get_event before selection. Annual outcomes do not establish meeting-specific odds.',
   "Returns event summaries with their markets, reusable identifiers, outcome prices, and CLOB token IDs.",
   'Set resultType to "markets" to get flat, enriched market matches with filtering, lifetime-volume sorting, and cursor pagination.',
   "Prices are decimal strings between 0 and 1 and represent probabilities.",
@@ -83,6 +84,14 @@ const searchMarketsInputSchema = z.object({
     .default("contains")
     .describe(
       "Flat-market matching mode. whole_word excludes substring matches such as war in awards; exact_phrase also normalizes whitespace and requires phrase boundaries."
+    ),
+  titleTerms: z
+    .array(z.string().trim().min(1).max(80))
+    .min(1)
+    .max(6)
+    .optional()
+    .describe(
+      'Only for resultType "markets". Every term must occur as a whole word or phrase in the event title or this market\'s question, ignoring case and repeated whitespace. Applied before pagination. Use resolved context, e.g. ["December", "2026"] with query "Fed"; dates and descriptions are not searched. Still verify the event and outcome.'
     ),
   sortBy: z
     .enum(["relevance", "volume"])
@@ -388,6 +397,14 @@ function cursorFingerprint(
     args.match,
     args.sortBy,
     args.sortOrder,
+    // Preserve cursors for existing callers that do not use titleTerms.
+    ...(args.titleTerms
+      ? [
+          JSON.stringify(
+            [...new Set(args.titleTerms.map(normalizeSearchText))].sort()
+          ),
+        ]
+      : []),
   ]);
 }
 
@@ -408,6 +425,15 @@ function rankedMarketPage(
       if (
         !eventMatches &&
         !textMatches(market.question, args.query, args.match)
+      ) {
+        continue;
+      }
+      if (
+        args.titleTerms?.some(
+          (term) =>
+            !textMatches(event.title, term, "exact_phrase") &&
+            !textMatches(market.question, term, "exact_phrase")
+        )
       ) {
         continue;
       }
@@ -454,6 +480,12 @@ async function handleSearchMarkets(
   try {
     requireToolScope(MARKETS_READ_SCOPE);
     await requireToolQuota("search_markets");
+    if (args.titleTerms && args.resultType !== "markets") {
+      throw knowwToolError(
+        "VALIDATION_ERROR",
+        'titleTerms requires resultType "markets".'
+      );
+    }
     const tagSlugs: string[] = [];
     let categorySlug: string | undefined;
     if (args.category !== undefined) {

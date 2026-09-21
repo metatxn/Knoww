@@ -13,6 +13,30 @@ tags:
   - name: OAuth
   - name: MCP
 paths:
+  /.well-known/openai-apps-challenge:
+    get:
+      operationId: getOpenAiDomainVerification
+      summary: Read the OpenAI plugin domain verification challenge
+      tags: [Operations]
+      security: []
+      responses:
+        "200":
+          description: The exact configured verification token, without JSON or a trailing newline.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: No valid verification token is configured.
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: Not found.
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /healthz:
     get:
       operationId: getMcpLiveness

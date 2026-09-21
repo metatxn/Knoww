@@ -162,6 +162,7 @@ Searches active prediction-market events.
 | `category`   | string                                            | Optional, up to 100 characters                             |
 | `resultType` | `"events"` or `"markets"`                         | Optional, defaults to `events`                             |
 | `match`      | `"contains"`, `"whole_word"`, or `"exact_phrase"` | Optional, defaults to `contains`                           |
+| `titleTerms` | string[] | Optional, 1 to 6 trimmed terms of 1 to 80 characters; requires `resultType: "markets"` |
 | `sortBy`     | `"relevance"` or `"volume"`                       | Optional, defaults to `relevance`                          |
 | `sortOrder`  | `"asc"` or `"desc"`                               | Optional; applies to volume sorting and defaults to `desc` |
 | `cursor`     | string                                            | Optional; continues either result type                     |
@@ -170,6 +171,25 @@ Searches active prediction-market events.
 The default event records remain unchanged: they contain nested market summaries, reusable identifiers, outcome prices, CLOB token IDs, total counts, and truncation flags.
 
 Set `resultType` to `markets` for flat market records without the duplicate event-summary payload. This mode can remove substring matches with `whole_word`, match a bounded multi-word phrase with `exact_phrase`, and sort individual markets by lifetime volume. Each record includes the market status, Polymarket platform, Knoww URL, available dates, lifetime volume and liquidity, outcomes, and parent event. Volume is a canonical decimal string, but `volumeUnit` is `unspecified` because the upstream API does not document its currency.
+
+For a resolved meeting, keep the upstream query short and supply independent
+`titleTerms`. Every term must match a whole word or phrase in the event title or
+that market's question, ignoring case and repeated whitespace. Terms never match
+descriptions, sibling markets, or expiry dates. Filtering happens before sorting
+and pagination, so earlier meetings and annual contracts do not consume the page.
+
+```json
+{"query":"Fed","titleTerms":["December","2026"],"resultType":"markets","sortBy":"relevance","limit":5}
+```
+
+This narrows the existing bounded upstream candidates; it does not fetch more
+events. If no candidate matches, try a different contiguous query while retaining
+the intent, for example `query: "December"` with `titleTerms: ["Fed", "2026"]`.
+Check the returned event and resolution details before treating a price as odds
+for that meeting. Annual cut counts are a different outcome. A changed meeting
+needs a new search without the previous cursor. Omitting `titleTerms` preserves
+the existing search behavior and cursor format. The filter is rejected in event
+mode rather than silently ignored.
 
 Both result types include `page.totalResults`, `page.returnedResults`, and `page.hasMore`. Pass `meta.nextCursor` unchanged to continue the same query, filters, and ordering. Search is live rather than snapshot-isolated, so results can move between pages. `page.totalResults` covers the upstream candidates inspected for that call; when `meta.truncated` is true, narrow the query or category because more upstream candidates or nested event summaries may exist.
 
@@ -430,6 +450,36 @@ Run these from the repository root.
 | `pnpm --filter @knoww/mcp deploy:promote`                | Manually assign production traffic to uploaded versions while automatic deployment is paused        |
 | `pnpm --filter @knoww/mcp deploy:status`                 | Show the active production deployment                                                               |
 | `pnpm --filter @knoww/mcp deploy:rollback -- VERSION_ID` | Roll back to a known healthy production version                                                     |
+
+## OpenAI plugin domain verification
+
+The Worker serves `GET /.well-known/openai-apps-challenge` before OAuth authentication,
+after the existing hostname check and public edge rate limit. Configure the optional
+`OPENAI_APPS_VERIFICATION_TOKEN` Worker text variable with the exact token shown in
+the OpenAI submission portal. This value is public proof of domain control, not an
+OAuth token, Google client secret, or API key. Never put those credentials in this setting.
+
+The route returns HTTP 200 with `Content-Type: text/plain; charset=utf-8`,
+`Cache-Control: no-store`, and only the token. An unset, blank, whitespace-containing,
+non-ASCII, or oversized value returns 404. Tokens are limited to 4096 printable ASCII
+characters and are never trimmed or otherwise rewritten. Other methods return 405.
+
+After deploying this route and configuring the production variable, check:
+
+```bash
+curl -i https://mcp.knoww.app/.well-known/openai-apps-challenge
+```
+
+Confirm the body matches the portal's token exactly, then select **Verify Domain**.
+The portal's Challenge Base URL can remain blank for the default MCP hostname.
+Do not use a placeholder token or replace another plugin's existing challenge.
+If the portal's Token field is blank, resolve that first; deploying this route alone
+does not complete domain verification.
+
+Keep this variable configured on subsequent deployments. It is intentionally absent
+from the checked-in Wrangler vars; supply it through deployment configuration and
+preserve it when promoting Worker versions. See the
+[OpenAI domain verification requirements](https://developers.openai.com/plugins/deploy/submission#domain-verification).
 
 ## Automated verification
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "knoww": {
+      "type": "http",
+      "url": "https://mcp.knoww.app/mcp"
+    }
+  }
+}

@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(
-  new URL("./user-prompt-submit.mjs", import.meta.url)
+  new URL("../../plugins/knoww/scripts/user-prompt-submit.mjs", import.meta.url)
 );
 const event = (prompt) => ({ hook_event_name: "UserPromptSubmit", prompt });
 

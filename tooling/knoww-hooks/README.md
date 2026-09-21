@@ -1,5 +1,9 @@
 # Knoww conversation hook prototype
 
+For distribution, use the self-contained [Knoww plugin](../../plugins/knoww/README.md)
+and [public submission guide](./PUBLISHING.md). Build its versioned ZIP with
+`pnpm package:knoww-plugin`. The project configuration below remains supported.
+
 ## Scope
 
 Add a local Codex `UserPromptSubmit` command hook that asks the existing assistant to resolve market intent from the current prompt and its conversation context. Reuse the connected Knoww MCP tools for search, verification and display. This prototype does not add hooks to ordinary ChatGPT plugin conversations.
@@ -10,7 +14,7 @@ This is an experiment in consistent tool routing. It does not establish improved
 
 ## Implementation and acceptance criteria
 
-- `user-prompt-submit.mjs`: Node.js 22+ command, no dependencies or build step. Consume one bounded JSON event on stdin and return the documented `hookSpecificOutput.additionalContext` shape.
+- `plugins/knoww/scripts/user-prompt-submit.mjs`: Node.js 22+ command, no dependencies or build step. Consume one bounded JSON event on stdin and return the documented `hookSpecificOutput.additionalContext` shape. The original `tooling/knoww-hooks/user-prompt-submit.mjs` entry point forwards to this handler.
 - `hooks.example.json`: optional project configuration. Resolve the script from the Git root so subdirectory sessions work.
 - `user-prompt-submit.test.mjs`: Node test runner checks the command contract, input limits, silent failure, prompt isolation and configured command from a subdirectory.
 - No production MCP, extension or global Codex configuration changes. Keep OAuth, quotas, candidate ranking and card rendering in the existing MCP path.
@@ -60,7 +64,25 @@ Passing the automated tests proves the hook transport contract, not these semant
 
 ### Retrieval check, 2026-09-19
 
-The first live Codex test called Knoww but returned no matches for `Fed October 2026 rate decision` and `Fed October`. Direct tool calls reproduced both empty results. Searching `Fed` returned five markets on the first page, including the October 2026 cut contracts. The current `contains` filter requires a contiguous phrase; it does not independently match query words. The hook now recommends short entity queries, verification of dates in the results, one shorter-query fallback after an empty result, and at most one additional page. These tool calls verify retrieval behavior, not the assistant's adherence to the revised guidance. Repeat the conversational test after this change.
+The first live Codex test called Knoww but returned no matches for `Fed October 2026 rate decision` and `Fed October`. Direct tool calls reproduced both empty results. Searching `Fed` returned five markets on the first page, including the October 2026 cut contracts. The `contains` filter requires a contiguous phrase; it does not independently match query words. The initial workaround used short entity queries and one additional page.
+
+### Meeting coverage regression, 2026-09-20
+
+The saved December follow-up returned October contracts on page one and annual
+cut-count contracts on page two. The assistant had inspected only ten of 106
+flat results. The updated search accepts `titleTerms`, such as `["December",
+"2026"]` with query `Fed`, and filters event titles and market questions before
+pagination. The hook uses this only when the connected tool advertises it.
+Older servers use event summaries followed by `get_event` for a verified event.
+Search remains bounded to three calls, including refinements and at most one
+cursor continuation. No result means no matching contract was found in the
+checked candidates, not that none exists.
+
+Repeat the following-meeting test after deploying the MCP change, refreshing the
+tool schema and reinstalling plugin 0.1.2. Inspect that the search carries the
+new month and year, that any selected market covers that meeting, and that an
+unmatched meeting does not get annual odds or an unrelated card. Automated tests
+cover retrieval, input validation and transport, not model adherence.
 
 ## Sources
 

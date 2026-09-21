@@ -1,0 +1,25 @@
+{
+  "name": "knoww",
+  "version": "0.1.2",
+  "description": "Find relevant prediction markets and show Knoww market cards, with an optional conversation hook for Codex.",
+  "author": {
+    "name": "Knoww",
+    "url": "https://knoww.app"
+  },
+  "homepage": "https://knoww.app",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Knoww",
+    "shortDescription": "Find prediction markets related to your conversation.",
+    "longDescription": "Search and display prediction markets through Knoww. An optional, separately trusted Codex hook guides the assistant to match relevant future events and respect requests to skip markets.",
+    "developerName": "Knoww",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "websiteURL": "https://knoww.app",
+    "defaultPrompt": [
+      "How likely is the Fed to cut rates at its next meeting?"
+    ],
+    "privacyPolicyURL": "https://knoww.app/privacy",
+    "termsOfServiceURL": "https://knoww.app/terms"
+  }
+}
