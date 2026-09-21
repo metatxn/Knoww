@@ -1,0 +1,65 @@
+{
+  "transactions": [
+    {
+      "to": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+      "data": "0x095ea7b300000000000000000000000093070a847efef7f70739046a929d47a521f5b8ee0000000000000000000000000000000000000000000000000000000000bc614e",
+      "value": "0"
+    },
+    {
+      "to": "0x93070a847efEf7F70739046A929D47a521F5B8ee",
+      "data": "0x623556380000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa8417400000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000000000000000000000000000000000000000bc614e",
+      "value": "0"
+    }
+  ],
+  "noop": [],
+  "plans": {
+    "covered": {
+      "requiredPusdRaw": "20000000n",
+      "reservedPusdRaw": "0n",
+      "availablePusdRaw": "50000000n",
+      "feeRequirementRaw": "600000n",
+      "targetPusdRaw": "20600000n",
+      "shortfallRaw": "0n",
+      "baseShortfallRaw": "0n",
+      "wrapAmountRaw": "0n",
+      "needsWrap": false,
+      "hasEnoughBaseCollateral": true
+    },
+    "wrapFromUsdc": {
+      "requiredPusdRaw": "20000000n",
+      "reservedPusdRaw": "0n",
+      "availablePusdRaw": "5000000n",
+      "feeRequirementRaw": "600000n",
+      "targetPusdRaw": "20600000n",
+      "shortfallRaw": "15600000n",
+      "baseShortfallRaw": "15000000n",
+      "wrapAmountRaw": "15600000n",
+      "needsWrap": true,
+      "hasEnoughBaseCollateral": true
+    },
+    "reservedAndFee": {
+      "requiredPusdRaw": "20000000n",
+      "reservedPusdRaw": "15000000n",
+      "availablePusdRaw": "15000000n",
+      "feeRequirementRaw": "250000n",
+      "targetPusdRaw": "20250000n",
+      "shortfallRaw": "5250000n",
+      "baseShortfallRaw": "5000000n",
+      "wrapAmountRaw": "5250000n",
+      "needsWrap": true,
+      "hasEnoughBaseCollateral": true
+    },
+    "insufficient": {
+      "requiredPusdRaw": "20000000n",
+      "reservedPusdRaw": "0n",
+      "availablePusdRaw": "1000000n",
+      "feeRequirementRaw": "600000n",
+      "targetPusdRaw": "20600000n",
+      "shortfallRaw": "19600000n",
+      "baseShortfallRaw": "19000000n",
+      "wrapAmountRaw": "2000000n",
+      "needsWrap": true,
+      "hasEnoughBaseCollateral": false
+    }
+  }
+}

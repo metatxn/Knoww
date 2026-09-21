@@ -7,7 +7,7 @@
 // module only threads the effect's own {epoch, effectId} into the event it
 // constructs; it never re-derives them from "current" state.
 import { createLogger } from "@knoww/logger";
-import { type FundingGateway, FundingGatewayError } from "./gateway";
+import { type FundingGateway, isFundingGatewayError } from "./gateway";
 import {
   type FundingEffect,
   type FundingEvent,
@@ -85,7 +85,7 @@ function toFundingError(
   kind: FundingEffect["kind"],
   reason: unknown
 ): FundingError {
-  if (reason instanceof FundingGatewayError) {
+  if (isFundingGatewayError(reason)) {
     return reason.funding;
   }
   log.error(`${kind}.rejected`, reason);

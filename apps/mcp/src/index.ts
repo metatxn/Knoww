@@ -14,6 +14,10 @@ import {
   type RequestPrincipal,
   requestContext,
 } from "./context";
+import {
+  type DomainVerificationEnv,
+  handleDomainVerificationRequest,
+} from "./domain-verification";
 import { handleHealthRequest } from "./health";
 import { dispatchMcpRequest } from "./mcp-handler";
 import {
@@ -159,7 +163,7 @@ function dispatchOAuthRequest(
 const worker = {
   async fetch(
     request: Request,
-    env: Env,
+    env: Env & DomainVerificationEnv,
     ctx: ExecutionContext
   ): Promise<Response> {
     const requestId = crypto.randomUUID();
@@ -241,13 +245,11 @@ const worker = {
           if (boundedRequest instanceof Response) {
             response = boundedRequest;
           } else {
-            const healthResponse = await handleHealthRequest(
-              boundedRequest,
-              env,
-              requestId
-            );
-            if (healthResponse) {
-              response = healthResponse;
+            const publicResponse =
+              handleDomainVerificationRequest(boundedRequest, env) ??
+              (await handleHealthRequest(boundedRequest, env, requestId));
+            if (publicResponse) {
+              response = publicResponse;
             } else if (config.authMode === "dev-bypass") {
               response = await dispatchDevelopmentRequest(
                 boundedRequest,
@@ -285,6 +287,6 @@ const worker = {
       }
     });
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env & DomainVerificationEnv>;
 
 export default worker;

@@ -73,7 +73,7 @@ async function handleDeriveProxyAddress(
         ? derivePolymarketDepositWallet(owner)
         : derivePolymarketSafe(owner);
 
-  const code = await getPublicClient().getBytecode({ address: proxyAddress });
+  const code = await getPublicClient().getCode({ address: proxyAddress });
   return {
     ok: true,
     data: { proxyAddress, isDeployed: !!code && code !== "0x" },

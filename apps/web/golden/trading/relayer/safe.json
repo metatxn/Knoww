@@ -1,0 +1,50 @@
+{
+  "execute": {
+    "submitted": [
+      {
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761",
+        "proxyWallet": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893",
+        "data": "0x8d80ff0a0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000013200c011a7e12a19f7b1f670d46f03b03f3342e82dfb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000004d97dcd97ec945f40cf65f87097ace5ea0476045000000000000000000000000000000000000000000000000000000e8d4a5100000c011a7e12a19f7b1f670d46f03b03f3342e82dfb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000044095ea7b3000000000000000000000000e111180000d2663c0091e4f400237545b87b996bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000",
+        "nonce": "0",
+        "signature": "0x5ed296917578c7e50d57dcf5473e5e9cd022a186831ee705db37d1159e91eb8f1a9a70979c33f9971b7581438025239d77d56dda9633fcb594af070d37e85ae31f",
+        "signatureParams": {
+          "gasPrice": "0",
+          "operation": "1",
+          "safeTxnGas": "0",
+          "baseGas": "0",
+          "gasToken": "0x0000000000000000000000000000000000000000",
+          "refundReceiver": "0x0000000000000000000000000000000000000000"
+        },
+        "type": "SAFE",
+        "metadata": ""
+      }
+    ],
+    "result": {
+      "transactionID": "golden-tx-1",
+      "transactionHash": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    }
+  },
+  "deploy": {
+    "submitted": [
+      {
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b",
+        "proxyWallet": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893",
+        "data": "0x",
+        "signature": "0x54e3af7c6a371e7cd0dc7807cf6082d85d4302949d22a334c72c791a8e4a0d590bcc84d4580090a4460dbe8ec396e46cfaa1e2987f7219af2dd2acd7fe2317b41c",
+        "signatureParams": {
+          "paymentToken": "0x0000000000000000000000000000000000000000",
+          "payment": "0",
+          "paymentReceiver": "0x0000000000000000000000000000000000000000"
+        },
+        "type": "SAFE-CREATE"
+      }
+    ],
+    "result": {
+      "transactionID": "golden-tx-1",
+      "transactionHash": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "safeAddress": "0x8ac5D4Bd2752AFc9F5CA531f19D617647216B893"
+    }
+  }
+}

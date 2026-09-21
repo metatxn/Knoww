@@ -6,7 +6,7 @@ import { qk } from "@/lib/query-keys";
  * Hook: useBatchPriceHistory
  *
  * Fetches 30D price history for a set of CLOB token IDs in a single
- * POST to `/api/markets/price-history/batch`. Returns a map keyed by
+ * POST to `/api/polymarket/markets/price-history/batch`. Returns a map keyed by
  * token id with the history array; consumers use this to draw small
  * sparklines and compute a "move since last point" cents delta.
  *
@@ -85,7 +85,7 @@ export function useBatchPriceHistory(
     refetchInterval: (query) =>
       query.state.data?.partial ? PARTIAL_STALE_TIME_MS : false,
     queryFn: async (): Promise<BatchQueryData> => {
-      const res = await fetch("/api/markets/price-history/batch", {
+      const res = await fetch("/api/polymarket/markets/price-history/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

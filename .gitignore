@@ -96,3 +96,7 @@ cloudflare-worker-cpu-fix-review*
 2026-08-07-*
 CODE_REVIEW_GUIDED_TRADING_SETUP.md
 .playwright-cli
+
+# golden harness run output (fixtures, responses and clock.json are committed)
+apps/web/golden/diff/
+apps/web/golden/replay-misses.log

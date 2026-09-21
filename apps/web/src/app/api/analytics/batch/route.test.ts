@@ -23,9 +23,10 @@ const anonymous = "00000000-0000-4000-8000-000000000001";
 function request(
   distinctId: string,
   event = "wallet_connected",
-  properties: Record<string, string | number> = {}
+  properties: Record<string, string | number> = {},
+  origin = "https://knoww.app"
 ) {
-  return new NextRequest("http://localhost:8000/api/analytics/batch", {
+  return new NextRequest(`${origin}/api/analytics/batch`, {
     method: "POST",
     body: JSON.stringify({
       events: [
@@ -39,6 +40,18 @@ describe("extension analytics ingestion", () => {
   beforeEach(() => {
     capture.mockReset();
     capture.mockResolvedValue(undefined);
+  });
+  it.each([
+    "http://localhost:8000",
+    "https://preprod-knoww.prayag.workers.dev",
+    "https://staging.knoww.app",
+  ])("discards analytics on %s without forwarding", async (origin) => {
+    const response = await POST(
+      request(anonymous, "extension_installed", {}, origin)
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ accepted: 0 });
+    expect(capture).not.toHaveBeenCalled();
   });
   it("accepts anonymous IDs and wallet IDs, preserving anonymous-to-wallet linkage", async () => {
     expect((await POST(request(anonymous, "extension_installed"))).status).toBe(

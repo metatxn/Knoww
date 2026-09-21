@@ -10,6 +10,7 @@
     "./abi": "./src/abi.ts",
     "./approvals": "./src/approvals.ts",
     "./balances": "./src/balances.ts",
+    "./bounded-json": "./src/bounded-json.ts",
     "./bridge": "./src/bridge.ts",
     "./chains": "./src/chains.ts",
     "./clob": "./src/clob.ts",

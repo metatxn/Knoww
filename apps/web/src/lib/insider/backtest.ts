@@ -1,3 +1,4 @@
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 /**
  * Backtest harness for insider detection.
  *
@@ -21,7 +22,6 @@
  */
 
 import Decimal from "decimal.js";
-import { POLYMARKET_API } from "@/constants/polymarket";
 import { getTraderHistoriesBatch } from "@/lib/trader-history-cache";
 import { scoreFundingCluster } from "./archetypes/funding-cluster";
 import { scoreOwnerCluster } from "./archetypes/owner-cluster";
@@ -117,12 +117,14 @@ async function fetchMarketTradesAtOffset(
   offset: number,
   limit: number
 ): Promise<RawTrade[]> {
-  const url = `${POLYMARKET_API.DATA.BASE}/trades?market=${conditionId}&limit=${limit}&offset=${offset}`;
   try {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 300 },
-    });
+    const response = await fetchWalletDataResponse(
+      "trades",
+      new URLSearchParams(
+        `market=${conditionId}&limit=${limit}&offset=${offset}`
+      ),
+      { cache: { revalidateSeconds: 300 } }
+    );
     if (!response.ok) return [];
     const page = (await response.json()) as unknown;
     return Array.isArray(page) ? (page as RawTrade[]) : [];

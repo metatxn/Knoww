@@ -1,0 +1,17 @@
+{
+  "description": "Optional Knoww conversation matching. Review and trust this hook separately from MCP authorization.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/user-prompt-submit.mjs\"",
+            "timeout": 3,
+            "additionalContextLimit": 1500
+          }
+        ]
+      }
+    ]
+  }
+}

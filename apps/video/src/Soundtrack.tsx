@@ -1,4 +1,4 @@
-import { Audio, Sequence, staticFile } from "remotion";
+import { Html5Audio, Sequence, staticFile } from "remotion";
 
 /**
  * Audio bed per spec §6 — minimal score (sustained drone + sparse motif that
@@ -17,7 +17,7 @@ const SFX_DURATION = 60; // generous tail; clips are all < 2s
 export const Soundtrack: React.FC = () => {
   return (
     <>
-      <Audio src={staticFile("score.wav")} volume={0.5} name="Score" />
+      <Html5Audio src={staticFile("score.wav")} volume={0.5} name="Score" />
       {WHOOSH_FRAMES.map((from) => (
         <Sequence
           key={`whoosh-${from}`}
@@ -25,7 +25,7 @@ export const Soundtrack: React.FC = () => {
           durationInFrames={SFX_DURATION}
           name="SFX: whoosh"
         >
-          <Audio src={staticFile("sfx/whoosh.wav")} volume={0.3} />
+          <Html5Audio src={staticFile("sfx/whoosh.wav")} volume={0.3} />
         </Sequence>
       ))}
       {TICK_FRAMES.map((from) => (
@@ -35,7 +35,7 @@ export const Soundtrack: React.FC = () => {
           durationInFrames={SFX_DURATION}
           name="SFX: odds tick"
         >
-          <Audio src={staticFile("sfx/switch.wav")} volume={0.25} />
+          <Html5Audio src={staticFile("sfx/switch.wav")} volume={0.25} />
         </Sequence>
       ))}
       {CLICK_FRAMES.map((from) => (
@@ -45,7 +45,7 @@ export const Soundtrack: React.FC = () => {
           durationInFrames={SFX_DURATION}
           name="SFX: click"
         >
-          <Audio src={staticFile("sfx/mouse-click.wav")} volume={0.4} />
+          <Html5Audio src={staticFile("sfx/mouse-click.wav")} volume={0.4} />
         </Sequence>
       ))}
     </>

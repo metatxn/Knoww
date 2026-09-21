@@ -529,7 +529,7 @@ async function fetchTokenPrices(): Promise<Record<string, number>> {
       chrome.runtime.sendMessage(
         {
           type: "fetch-json",
-          url: `${baseUrl}/api/price/tokens`,
+          url: `${baseUrl}/api/polymarket/price/tokens`,
           method: "GET",
         },
         (response: { ok: boolean; data?: unknown; error?: string }) => {

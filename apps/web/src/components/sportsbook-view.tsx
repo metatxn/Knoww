@@ -1,5 +1,6 @@
 "use client";
 
+import type { CanonicalOutcome } from "@knoww/services/core";
 import {
   parseGammaStringArray,
   resolveNegRisk,
@@ -16,6 +17,7 @@ import {
   ScheduledSportsbook,
   type SelectedMarketInfo,
 } from "@/components/live-sportsbook";
+import { findOutcomeIndex } from "@/components/trading/ticket-props";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBestPrices, useOrderBookStore } from "@/hooks/use-orderbook-store";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
@@ -31,6 +33,7 @@ import {
   isUpcomingSportsEvent,
 } from "@/lib/sports-event-activity";
 import { selectedSportsMarketExists } from "@/lib/sports-selected-market";
+import { toTradingTarget } from "@/polymarket/trading-target";
 
 const TradingForm = dynamic(
   () =>
@@ -639,6 +642,30 @@ export function SportsbookView({
       };
     });
   }, [selectedMarket, orderBooks, lastTrades]);
+  const tradingTarget = useMemo(
+    () =>
+      selectedMarket
+        ? toTradingTarget({
+            conditionId: selectedMarket.conditionId,
+            title: selectedMarket.marketTitle,
+            image: selectedMarket.marketImage,
+            outcomes: tradingOutcomes,
+            selectedIndex: selectedOutcomeIndex,
+            negRisk: selectedMarket.negRisk ?? false,
+          })
+        : null,
+    [selectedMarket, tradingOutcomes, selectedOutcomeIndex]
+  );
+  const handleTradingOutcomeChange = useCallback(
+    (outcome: CanonicalOutcome) => {
+      if (tradingTarget) {
+        setSelectedOutcomeIndex(
+          findOutcomeIndex(tradingTarget.market, outcome)
+        );
+      }
+    },
+    [tradingTarget]
+  );
 
   const isLoading = liveLoading || scheduledLoading;
   const error = liveError || scheduledError;
@@ -722,25 +749,21 @@ export function SportsbookView({
 
         {/* Right: trade panel — sticky sidebar */}
         <div className="hidden min-w-0 lg:sticky lg:top-4 lg:block lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto">
-          {selectedMarket && tradingOutcomes.length > 0 ? (
+          {tradingTarget ? (
             <ErrorBoundary name="Trading Form">
               <TradingForm
-                marketTitle={selectedMarket.marketTitle}
-                tokenId={tradingOutcomes[selectedOutcomeIndex]?.tokenId || ""}
-                outcomes={tradingOutcomes}
-                selectedOutcomeIndex={selectedOutcomeIndex}
-                onOutcomeChange={setSelectedOutcomeIndex}
-                conditionId={selectedMarket.conditionId}
-                marketImage={selectedMarket.marketImage}
-                yesProbability={tradingOutcomes[0]?.probability}
-                bestBid={bestBid ?? undefined}
-                bestAsk={bestAsk ?? undefined}
-                orderBook={
-                  selectedTokenId
+                market={tradingTarget.market}
+                outcome={tradingTarget.outcome}
+                onOutcomeChange={handleTradingOutcomeChange}
+                quote={{
+                  bestBid: bestBid ?? undefined,
+                  bestAsk: bestAsk ?? undefined,
+                  orderBook: selectedTokenId
                     ? (orderBooks.get(selectedTokenId) ?? undefined)
-                    : undefined
-                }
-                negRisk={selectedMarket.negRisk}
+                    : undefined,
+                  platformDetails: tradingTarget.platformDetails,
+                }}
+                yesProbability={tradingOutcomes[0]?.probability}
                 isLiveData={isConnected}
                 maxSlippagePercent={2}
                 disableSticky

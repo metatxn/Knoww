@@ -1,0 +1,50 @@
+{
+  "family": "wallet-create",
+  "mode": "deposit",
+  "wallet": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+  "personality": "approved",
+  "relayerDeployed": true,
+  "mount": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/rpc/polygon",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 0,
+          "method": "eth_getCode",
+          "params": [
+            "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+            "latest"
+          ]
+        }
+      }
+    ],
+    "state": {
+      "proxyAddress": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+      "hasDeployedSafe": true,
+      "walletMode": "deposit",
+      "error": null
+    }
+  },
+  "action": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/relayer/deployed?address=0x4Fe2CC4925607a473264FA89e7138075695A5F8e&type=WALLET",
+        "headers": {},
+        "body": null
+      }
+    ],
+    "wallet": [],
+    "result": {
+      "success": true,
+      "transactionHash": "",
+      "proxyAddress": "0x4Fe2CC4925607a473264FA89e7138075695A5F8e",
+      "alreadyDeployed": true
+    }
+  }
+}

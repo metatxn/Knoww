@@ -250,7 +250,7 @@ export function LeaderboardTable({
               </div>
 
               <div className="text-right font-mono tabular-nums text-sm text-(--kwm-ink)">
-                {formatCurrency(trader.vol)}
+                {`${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(trader.vol)} shares`}
               </div>
 
               <div className="text-right">
@@ -369,7 +369,7 @@ export function LeaderboardTable({
                 )}
                 <div className="flex items-center gap-4 font-mono tabular-nums text-xs">
                   <span className="text-(--kwm-ink)">
-                    {formatCurrency(trader.vol)}
+                    {`${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(trader.vol)} shares`}
                   </span>
                   <span
                     className={cn(

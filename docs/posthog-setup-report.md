@@ -18,7 +18,7 @@ The wizard has completed a deep integration of PostHog analytics into the Knoww 
 - `apps/web/src/app/markets/[slug]/market-detail-client.tsx` — market_shared
 - `apps/web/src/components/comments/comment-input.tsx` — comment_submitted
 - `apps/web/src/app/search/page.tsx` — market_search_result_clicked
-- `apps/web/src/app/api/auth/derive-api-key/route.ts` — trading_api_key_created, trading_api_key_derived (server-side, with wallet address as distinct ID)
+- `apps/web/src/app/api/polymarket/auth/derive-api-key/route.ts` — trading_api_key_created, trading_api_key_derived (server-side, with wallet address as distinct ID)
 
 **Environment:**
 - `apps/web/.env.local` — `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST`
@@ -37,8 +37,8 @@ The wizard has completed a deep integration of PostHog analytics into the Knoww 
 | `market_shared` | User shares a market via the native share API | `apps/web/src/app/markets/[slug]/market-detail-client.tsx` |
 | `comment_submitted` | User successfully posts a comment or reply | `apps/web/src/components/comments/comment-input.tsx` |
 | `market_search_result_clicked` | User clicks a search result | `apps/web/src/app/search/page.tsx` |
-| `trading_api_key_created` | Server: new trading API key created (first-time user) | `apps/web/src/app/api/auth/derive-api-key/route.ts` |
-| `trading_api_key_derived` | Server: existing trading API key derived (returning user) | `apps/web/src/app/api/auth/derive-api-key/route.ts` |
+| `trading_api_key_created` | Server: new trading API key created (first-time user) | `apps/web/src/app/api/polymarket/auth/derive-api-key/route.ts` |
+| `trading_api_key_derived` | Server: existing trading API key derived (returning user) | `apps/web/src/app/api/polymarket/auth/derive-api-key/route.ts` |
 
 ## Next steps
 

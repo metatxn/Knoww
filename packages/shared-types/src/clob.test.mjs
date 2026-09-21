@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   fetchClobBuilderFeeRates,
+  fetchClobJson,
   fetchClobMarket,
   fetchClobMarketInfo,
   fetchClobOrderBook,
@@ -9,6 +10,13 @@ import {
   fetchClobPrice,
   fetchClobPriceHistory,
 } from "./clob.ts";
+
+function jsonResponse(value, init) {
+  return new Response(JSON.stringify(value), {
+    headers: { "content-type": "application/json" },
+    ...init,
+  });
+}
 
 test("fetchClobOrderBook uses the unified SDK client for default-host order books", async () => {
   const calls = [];
@@ -36,17 +44,11 @@ test("fetchClobOrderBook preserves direct REST behavior for custom fetch impleme
     host: "https://custom-clob.example",
     fetchImpl: async (url, init) => {
       requested.push({ url, init });
-      return {
-        ok: true,
-        status: 200,
-        async json() {
-          return {
-            asset_id: "abc",
-            bids: [{ price: "0.1", size: "2" }],
-            asks: [],
-          };
-        },
-      };
+      return jsonResponse({
+        asset_id: "abc",
+        bids: [{ price: "0.1", size: "2" }],
+        asks: [],
+      });
     },
   });
 
@@ -55,6 +57,50 @@ test("fetchClobOrderBook preserves direct REST behavior for custom fetch impleme
     "https://custom-clob.example/book?token_id=abc"
   );
   assert.deepEqual(orderBook.bids, [{ price: "0.1", size: "2" }]);
+});
+
+test("fetchClobJson cancels a chunked success body above the byte limit", async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(4 * 1024 * 1024));
+      controller.enqueue(new Uint8Array(1));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  await assert.rejects(
+    fetchClobJson("book", undefined, {
+      fetchImpl: async () => new Response(body),
+    }),
+    (error) =>
+      error?.name === "BoundedJsonError" && error?.reason === "too_large"
+  );
+  assert.equal(cancelled, true);
+});
+
+test("fetchClobJson does not parse or expose an oversized error body", async () => {
+  await assert.rejects(
+    fetchClobJson("book", undefined, {
+      fetchImpl: async () =>
+        new Response('{"message":"private upstream diagnostics"}', {
+          status: 502,
+          statusText: "Bad Gateway",
+          headers: { "content-length": String(64 * 1024 + 1) },
+        }),
+    }),
+    (error) => {
+      assert.equal(error?.name, "ClobRequestError");
+      assert.equal(error?.message, "CLOB request failed: Bad Gateway");
+      assert.equal(
+        error?.message.includes("private upstream diagnostics"),
+        false
+      );
+      return true;
+    }
+  );
 });
 
 test("fetchClobOrderBooks uses the unified SDK client for default-host batch order books", async () => {
@@ -83,13 +129,7 @@ test("fetchClobMarket preserves legacy direct REST behavior by default", async (
   const market = await fetchClobMarket("0xcondition", {
     fetchImpl: async (url) => {
       requested.push(url);
-      return {
-        ok: true,
-        status: 200,
-        async json() {
-          return { end_date_iso: "2026-01-01T00:00:00Z" };
-        },
-      };
+      return jsonResponse({ end_date_iso: "2026-01-01T00:00:00Z" });
     },
   });
 
@@ -104,13 +144,7 @@ test("fetchClobMarket does not use an injected unified client unless explicitly 
   const requested = [];
   globalThis.fetch = async (url) => {
     requested.push(url);
-    return {
-      ok: true,
-      status: 200,
-      async json() {
-        return { end_date_iso: "2026-01-01T00:00:00Z" };
-      },
-    };
+    return jsonResponse({ end_date_iso: "2026-01-01T00:00:00Z" });
   };
 
   try {
@@ -143,13 +177,7 @@ test("fetchClobMarket stays on /markets even when the unified SDK is enabled", a
   const requested = [];
   globalThis.fetch = async (url) => {
     requested.push(url);
-    return {
-      ok: true,
-      status: 200,
-      async json() {
-        return { end_date_iso: "2026-01-01T00:00:00Z" };
-      },
-    };
+    return jsonResponse({ end_date_iso: "2026-01-01T00:00:00Z" });
   };
 
   try {
@@ -194,13 +222,7 @@ test("fetchClobMarketInfo reads /clob-markets on the raw REST path", async () =>
   const requested = [];
   globalThis.fetch = async (url) => {
     requested.push(url);
-    return {
-      ok: true,
-      status: 200,
-      async json() {
-        return { fd: { r: 0.04, e: 1 }, tbf: 1000 };
-      },
-    };
+    return jsonResponse({ fd: { r: 0.04, e: 1 }, tbf: 1000 });
   };
 
   try {
@@ -221,19 +243,19 @@ test("fetchClobPriceHistory uses the unified SDK client and keeps the existing h
   const calls = [];
   const history = await fetchClobPriceHistory(
     "123",
-    { startTs: "1716000000", fidelity: "60" },
+    { startTs: "1716000000", endTs: 1716000600, fidelity: "60" },
     {
       unifiedClient: {
-        async fetchPriceHistory(request) {
+        async *listPriceHistory(request) {
           calls.push(request);
-          return [{ t: 1716000000, p: 0.42 }];
+          yield { items: [{ timestamp: 1716000000000, price: "0.42" }] };
         },
       },
     }
   );
 
   assert.deepEqual(calls, [
-    { tokenId: "123", startTs: 1716000000, fidelity: 60 },
+    { assetId: "123", start: 1716000000, end: 1716000600, bucketSeconds: 3600 },
   ]);
   assert.deepEqual(history, { history: [{ t: 1716000000, p: 0.42 }] });
 });
@@ -284,17 +306,13 @@ test("fetchClobBuilderFeeRates rejects malformed unified-client payloads", async
 test("fetchClobBuilderFeeRates rejects malformed direct-endpoint bps", async () => {
   const responses = [
     { builder_maker_fee_rate_bps: 10, builder_taker_fee_rate_bps: -20 },
-    { builder_taker_fee_rate_bps: Number.NaN },
+    { builder_taker_fee_rate_bps: "NaN" },
   ];
 
   for (const body of responses) {
     await assert.rejects(
       fetchClobBuilderFeeRates("0xabc", {
-        fetchImpl: async () => ({
-          ok: true,
-          status: 200,
-          json: async () => body,
-        }),
+        fetchImpl: async () => jsonResponse(body),
       }),
       /Malformed builder fee rate/,
       JSON.stringify(body)
@@ -306,11 +324,7 @@ test("fetchClobBuilderFeeRates treats absent direct-endpoint bps as zero", async
   // The REST endpoint omits zero-fee fields; absent is its spelling of zero,
   // unlike a present-but-invalid value.
   const rates = await fetchClobBuilderFeeRates("0xabc", {
-    fetchImpl: async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ builder_taker_fee_rate_bps: 20 }),
-    }),
+    fetchImpl: async () => jsonResponse({ builder_taker_fee_rate_bps: 20 }),
   });
 
   assert.deepEqual(rates, { maker: 0, taker: 0.002 });
@@ -337,13 +351,7 @@ test("fetchClobPrice preserves direct REST behavior when no price side is suppli
   const price = await fetchClobPrice("123", {
     fetchImpl: async (url) => {
       requested.push(url);
-      return {
-        ok: true,
-        status: 200,
-        async json() {
-          return { price: "0.5" };
-        },
-      };
+      return jsonResponse({ price: "0.5" });
     },
   });
 
@@ -351,4 +359,22 @@ test("fetchClobPrice preserves direct REST behavior when no price side is suppli
     "https://clob.polymarket.com/price?token_id=123",
   ]);
   assert.deepEqual(price, { price: "0.5" });
+});
+
+test("raw v2 whole history respects a historical end bound", async () => {
+  const result = await fetchClobPriceHistory(
+    "123",
+    { startTs: 0, endTs: 150 },
+    {
+      fetchImpl: async () =>
+        Response.json({
+          data: [
+            { timestamp: 100, price: 0.2 },
+            { timestamp: 200, price: 0.3 },
+          ],
+          pagination: { next_cursor: null },
+        }),
+    }
+  );
+  assert.deepEqual(result.history, [{ t: 100, p: 0.2 }]);
 });

@@ -9,6 +9,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "knoww-mcp",
   "main": "src/index.ts",
+  // Use one ESM entry for the SDK's zod/v4 and our zod imports. Otherwise
+  // esbuild can call SDK schema factories before Zod's constructors initialize
+  // when the Polymarket client is also reachable through a dynamic import.
+  "alias": {
+    "zod/v4": "./node_modules/zod/index.js"
+  },
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   // No workers.dev URL: the only public entry point is the custom domain.

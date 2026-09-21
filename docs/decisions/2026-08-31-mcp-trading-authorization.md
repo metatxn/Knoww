@@ -4,6 +4,8 @@ Status: Proposed
 
 Date: 2026-08-31
 
+> Update 2026-09-06: the identity layer proposed here (Google plus Privy, Session Keys) is superseded by the per-platform connections in `2026-09-03-aggregator-platform-adapters.md`. The tool contract shipped in reduced form: `get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders` (this document's `list_open_orders`), `preview_order`, `place_order` and `cancel_order` exist in `apps/mcp/src/tools/trading.ts` behind `EXPOSE_TRADING_TOOLS = false` and the reserved scopes below. Setup, order status, cancel-all, redeem, revocation and Session Keys stay proposed until the owner decides how a wallet reaches the MCP.
+
 ## Summary
 
 Knoww should keep Google OpenID Connect as the identity layer for MCP, then add a separate Polymarket authorization layer for wallet operations.
@@ -43,7 +45,7 @@ Knoww currently has two separate authorization paths:
 
 This separation is correct. The MCP OAuth token authorizes access to Knoww. The wallet signature authorizes a Polymarket operation.
 
-The current MCP scope is defined in `apps/mcp/src/auth/scopes.ts`. The browser trading paths are implemented in `apps/web/src/hooks/use-clob-credentials.ts`, `apps/web/src/hooks/use-clob-client.ts`, `apps/web/src/hooks/use-ctf-operations.ts`, and `apps/web/src/lib/relayer-client.ts`.
+The current MCP scope is defined in `apps/mcp/src/auth/scopes.ts`. The browser trading paths are implemented in `apps/web/src/hooks/use-clob-credentials.ts`, `apps/web/src/hooks/use-place-order.ts`, `apps/web/src/polymarket/order-preflight.ts`, `apps/web/src/hooks/use-ctf-operations.ts`, and `apps/web/src/lib/relayer-client.ts`.
 
 ## The two authorization layers
 

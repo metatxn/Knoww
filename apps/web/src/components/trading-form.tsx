@@ -8,9 +8,6 @@ import {
   AlertCircle,
   ArrowDownToLine,
   Loader2,
-  Merge,
-  MoreHorizontal,
-  Split,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -18,7 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import posthog from "posthog-js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DepositModal } from "@/components/deposit-modal";
 import { useOnboarding } from "@/context/onboarding-context";
@@ -27,10 +24,13 @@ import { formatSlippageDisplay } from "@/lib/slippage";
 import { openWalletModal, preloadWalletModal } from "@/lib/wallet-modal";
 import { useTradingFormState } from "./trading/hooks/use-trading-form-state";
 import { LimitExpiration } from "./trading/limit-expiration";
-import { MergeSharesModal } from "./trading/merge-shares-modal";
-import { SplitSharesModal } from "./trading/split-shares-modal";
-// Types & Hooks
-import type { TradingFormProps } from "./trading/types";
+import { getPlatformTradingUi } from "./trading/platform-ui";
+import {
+  findOutcomeIndex,
+  readNegRisk,
+  toOutcomeData,
+} from "./trading/ticket-props";
+import type { TradingFormProps, TradingTicketProps } from "./trading/types";
 
 /**
  * Limit-order queue status badge — surfaces where the chosen limit
@@ -153,12 +153,52 @@ function formatMarketBuyAmountInput(amount: number): string {
 }
 
 /**
- * TradingForm Component (Refactored)
- *
- * A comprehensive trading form for placing limit and market orders
- * on Polymarket prediction markets.
+ * The trading form every mount renders with a canonical market, the selected
+ * canonical outcome and an adapter-provided quote. It derives the ticket's
+ * platform-shaped props once per market and looks up the platform's optional
+ * slots in the platform UI map.
  */
 export function TradingForm(props: TradingFormProps) {
+  const { market, outcome, onOutcomeChange, quote, ...rest } = props;
+  const outcomes = useMemo(() => market.outcomes.map(toOutcomeData), [market]);
+  const handleOutcomeChange = useCallback(
+    (index: number) => {
+      const next = market.outcomes[index];
+      if (next) {
+        onOutcomeChange(next);
+      }
+    },
+    [market, onOutcomeChange]
+  );
+  const index = findOutcomeIndex(market, outcome);
+
+  return (
+    <TradingTicket
+      {...rest}
+      marketTitle={market.title}
+      marketImage={market.image}
+      conditionId={market.sourceMarketId}
+      tokenId={outcome.sourceOutcomeId}
+      outcomes={outcomes}
+      selectedOutcomeIndex={index < 0 ? 0 : index}
+      onOutcomeChange={handleOutcomeChange}
+      negRisk={readNegRisk(quote.platformDetails)}
+      bestBid={quote.bestBid}
+      bestAsk={quote.bestAsk}
+      orderBook={quote.orderBook}
+      tickSize={quote.tickSize}
+      minOrderSize={quote.minOrderSize}
+      platformUi={getPlatformTradingUi(market.platform)}
+      slot={{ market, outcome, details: quote.platformDetails }}
+    />
+  );
+}
+
+/**
+ * The order ticket for limit and market orders. Its props keep the CLOB's
+ * shape until the CLOB hooks sit behind the trading adapter.
+ */
+function TradingTicket(props: TradingTicketProps) {
   const {
     marketTitle,
     outcomes,
@@ -168,8 +208,9 @@ export function TradingForm(props: TradingFormProps) {
     yesProbability,
     isLiveData = false,
     maxSlippagePercent = 2,
-    conditionId,
     disableSticky = false,
+    platformUi,
+    slot,
   } = props;
 
   const { setShowOnboarding } = useOnboarding();
@@ -185,28 +226,6 @@ export function TradingForm(props: TradingFormProps) {
       setConnecting(false);
     }
   };
-
-  const [showSplitModal, setShowSplitModal] = useState(false);
-  const [showMergeModal, setShowMergeModal] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close more menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        moreMenuRef.current &&
-        !moreMenuRef.current.contains(event.target as Node)
-      ) {
-        setShowMoreMenu(false);
-      }
-    }
-    if (showMoreMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showMoreMenu]);
 
   // Centralized form state and logic
   const {
@@ -235,7 +254,6 @@ export function TradingForm(props: TradingFormProps) {
     effectiveBalance,
     hasInsufficientBalance,
     hasInsufficientAllowance,
-    hasNoAllowance,
     hasMissingTradingApprovals,
     isCheckingTradingApprovals,
     isBelowMarketableBuyMinNotional,
@@ -287,7 +305,7 @@ export function TradingForm(props: TradingFormProps) {
   const belowLimitMin = orderType === "LIMIT" && shares < minShares;
   const needsApproval =
     (hasMissingTradingApprovals ||
-      (side === "BUY" && (hasNoAllowance || hasInsufficientAllowance))) &&
+      (side === "BUY" && hasInsufficientAllowance)) &&
     !hasInsufficientBalance;
 
   // Bid/ask values in cents (0..100) — used by the limit-mode header
@@ -392,7 +410,9 @@ export function TradingForm(props: TradingFormProps) {
             <div className="tk-subject-info flex-1 min-w-0">
               <div className="nm truncate">{marketTitle}</div>
               <div className="meta">
-                {props.negRisk && <span className="neg">Neg Risk</span>}
+                {platformUi?.MarketBadge && slot && (
+                  <platformUi.MarketBadge {...slot} />
+                )}
                 <span className="pct">
                   {yesProbability != null
                     ? `${yesProbability}% Yes`
@@ -429,57 +449,8 @@ export function TradingForm(props: TradingFormProps) {
                 ↘ Limit
               </button>
             </div>
-            {/* More Menu — Split/Merge */}
-            {hasCredentials && conditionId && (
-              <div className="relative shrink-0 mt-3" ref={moreMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className={`h-[30px] w-9 transition-colors flex items-center justify-center border border-(--kwm-hl) rounded-md ${
-                    showMoreMenu
-                      ? "text-(--kwm-ink) bg-(--kwm-bg-3)"
-                      : "text-(--kwm-ink-3) hover:text-(--kwm-ink)"
-                  }`}
-                  title="More options"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-                <AnimatePresence>
-                  {showMoreMenu && (
-                    <m.div
-                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-(--kwm-panel) border border-(--kwm-hl-2) rounded-md overflow-hidden"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSplitModal(true);
-                          setShowMoreMenu(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-(--kwm-ink) hover:bg-(--kwm-bg-3) transition-colors"
-                      >
-                        <Split className="h-3.5 w-3.5 text-(--kwm-ink-3)" />
-                        Split
-                      </button>
-                      <div className="h-px bg-(--kwm-hl)" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMergeModal(true);
-                          setShowMoreMenu(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-(--kwm-ink) hover:bg-(--kwm-bg-3) transition-colors"
-                      >
-                        <Merge className="h-3.5 w-3.5 text-(--kwm-ink-3)" />
-                        Merge
-                      </button>
-                    </m.div>
-                  )}
-                </AnimatePresence>
-              </div>
+            {hasCredentials && platformUi?.TradingExtras && slot && (
+              <platformUi.TradingExtras {...slot} />
             )}
           </div>
 
@@ -988,7 +959,7 @@ export function TradingForm(props: TradingFormProps) {
                 <div className="tk-warn info">
                   <AlertCircle className="ic h-4 w-4" />
                   <span className="body">
-                    {hasNoAllowance || hasMissingTradingApprovals
+                    {hasMissingTradingApprovals
                       ? "Approve pUSD spending to trade"
                       : `Increase allowance to $${calculations.total.toFixed(2)}`}
                     <span className="sub">
@@ -1219,30 +1190,6 @@ export function TradingForm(props: TradingFormProps) {
         open={showDepositModal}
         onOpenChange={setShowDepositModal}
       />
-
-      {/* Split Shares Modal */}
-      {conditionId && (
-        <SplitSharesModal
-          open={showSplitModal}
-          onOpenChange={setShowSplitModal}
-          conditionId={conditionId}
-          marketTitle={marketTitle}
-          negRisk={props.negRisk}
-        />
-      )}
-
-      {/* Merge Shares Modal */}
-      {conditionId && (
-        <MergeSharesModal
-          open={showMergeModal}
-          onOpenChange={setShowMergeModal}
-          conditionId={conditionId}
-          yesTokenId={outcomes[0]?.tokenId || ""}
-          noTokenId={outcomes[1]?.tokenId || ""}
-          marketTitle={marketTitle}
-          negRisk={props.negRisk}
-        />
-      )}
     </div>
   );
 }

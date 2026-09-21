@@ -147,7 +147,7 @@ async function fetchTraderProfile(
 async function fetchTraderProfileUncached(
   handle: string
 ): Promise<TraderXProfile | null> {
-  const url = `${window.KNOWW_CONFIG.KNOWW_APP_URL}/api/trader/x-profile?handle=${encodeURIComponent(handle)}`;
+  const url = `${window.KNOWW_CONFIG.KNOWW_APP_URL}/api/polymarket/trader/x-profile?handle=${encodeURIComponent(handle)}`;
 
   try {
     const response = await window.KNOWW_UTILS.safeSendMessage({

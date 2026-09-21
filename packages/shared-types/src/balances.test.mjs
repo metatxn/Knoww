@@ -4,7 +4,7 @@ import { readTradingWalletBalance } from "./balances.ts";
 
 const owner = "0x0000000000000000000000000000000000000001";
 
-function clientWithBytecode(getBytecode) {
+function clientWithBytecode(getCode) {
   return {
     async multicall({ contracts }) {
       return contracts.map(() => ({ status: "success", result: 0n }));
@@ -12,12 +12,12 @@ function clientWithBytecode(getBytecode) {
     async getBalance() {
       return 0n;
     },
-    getBytecode,
+    getCode,
   };
 }
 
 test("deployment flag distinguishes a failed bytecode read from an empty one", async () => {
-  // viem's getBytecode resolves `undefined` for a successful no-code read, so
+  // viem's getCode resolves `undefined` for a successful no-code read, so
   // a caught RPC error must not collapse into the same value — every consumer
   // would see a deployed wallet flip to "not deployed" during an outage.
   const failed = await readTradingWalletBalance(

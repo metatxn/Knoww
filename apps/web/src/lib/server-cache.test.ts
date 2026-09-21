@@ -3,8 +3,14 @@ import {
   getEvent,
   getInitialEvents,
   getInitialEventsByTagStrict,
+  getInitialLeaderboard,
   getRelatedEventsByTag,
+  getTagDetails,
 } from "./server-cache";
+
+function jsonResponse(body: unknown, status = 200) {
+  return Response.json(body, { status });
+}
 
 describe("getInitialEvents", () => {
   afterEach(() => {
@@ -12,9 +18,8 @@ describe("getInitialEvents", () => {
   });
 
   it("keeps market outcome fields in initial events for stable card SSR", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
         events: [
           {
             id: "event-1",
@@ -34,8 +39,8 @@ describe("getInitialEvents", () => {
         ],
         next_cursor: "next",
         total_results: "1",
-      }),
-    } satisfies Partial<Response>);
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await getInitialEvents();
@@ -66,14 +71,13 @@ describe("tag event fetch policies", () => {
   });
 
   it("limits related-event requests to a small payload", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
         events: [],
         next_cursor: null,
         total_results: 0,
-      }),
-    } satisfies Partial<Response>);
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await getRelatedEventsByTag("related-payload-test");
@@ -150,15 +154,13 @@ describe("getEvent", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({
+        .mockResolvedValueOnce(
+          jsonResponse({
             id: "event-9",
             slug: "event-nine",
             markets: [],
-          }),
-        } satisfies Partial<Response>)
+          })
+        )
         .mockRejectedValueOnce(new Error("children unavailable"))
     );
 
@@ -171,20 +173,14 @@ describe("getEvent", () => {
   it("bypasses Next's R2-backed data cache for event detail reads", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse({
           id: "event-cache",
           slug: "event-cache",
           markets: [],
-        }),
-      } satisfies Partial<Response>)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => [],
-      } satisfies Partial<Response>);
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
 
     await getEvent("event-cache");
@@ -194,5 +190,172 @@ describe("getEvent", () => {
       expect(init).toMatchObject({ cache: "no-store" });
       expect(init).not.toHaveProperty("next");
     }
+  });
+
+  it("folds open negRisk child markets into the parent's market list", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "event-1",
+          slug: "event-one",
+          markets: [{ id: "m1", conditionId: "0xa", question: "Parent?" }],
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: "41001",
+            title: "Most Sixes",
+            markets: [
+              { id: "m2", conditionId: "0xb", question: "Child?" },
+              { id: "m1", conditionId: "0xa", question: "Already listed" },
+            ],
+          },
+        ])
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const event = await getEvent("event-one");
+
+    expect(event?.markets).toEqual([
+      { id: "m1", conditionId: "0xa", question: "Parent?" },
+      {
+        id: "m2",
+        conditionId: "0xb",
+        question: "Child?",
+        parentEventId: "41001",
+        parentEventTitle: "Most Sixes",
+      },
+    ]);
+    const childUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
+    expect(childUrl.searchParams.get("parent_event_id")).toBe("event-1");
+    expect(childUrl.searchParams.get("closed")).toBe("false");
+  });
+});
+
+function stubJsonFetch(body: unknown, status = 200) {
+  const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body, status));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+describe("getTagDetails", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("serves Gamma's label and description under the sports-list cache hint", async () => {
+    const fetchMock = stubJsonFetch({
+      id: 745,
+      label: "NBA",
+      slug: "nba",
+      description: "Basketball markets",
+    });
+
+    await expect(getTagDetails("nba")).resolves.toEqual({
+      slug: "nba",
+      label: "NBA",
+      description: "Basketball markets",
+    });
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/tags/slug/nba");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      next: { revalidate: 3600 },
+    });
+  });
+
+  it("falls back to the known definition when Gamma has no record for a category", async () => {
+    stubJsonFetch({ error: "not found" }, 404);
+
+    await expect(getTagDetails("politics")).resolves.toEqual({
+      slug: "politics",
+      label: "Politics",
+      description: "Political events, elections, and government decisions",
+    });
+  });
+
+  it("reports an unknown tag Gamma rejects as missing", async () => {
+    stubJsonFetch({ error: "not found" }, 404);
+
+    await expect(getTagDetails("unknown-thing")).resolves.toBeNull();
+  });
+
+  it("formats the slug as the label when the lookup fails outright", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Gamma down")));
+
+    await expect(getTagDetails("made-up")).resolves.toEqual({
+      slug: "made-up",
+      label: "Made Up",
+    });
+  });
+});
+
+describe("getInitialLeaderboard", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const row = {
+    rank: "1",
+    proxyWallet: `0x${"b".repeat(40)}`,
+    userName: "alice",
+    vol: 1000.5,
+    pnl: -12.25,
+    profileImage: null,
+    xUsername: null,
+    verifiedBadge: true,
+  };
+
+  it("serves the daily overall P&L leaderboard rows as the Data API sent them", async () => {
+    const fetchMock = stubJsonFetch({
+      data: [
+        {
+          rank: row.rank,
+          user_id: row.proxyWallet,
+          user_name: row.userName,
+          volume: row.vol,
+          pnl: row.pnl,
+          profile_image: row.profileImage,
+          x_username: row.xUsername,
+          verified: row.verifiedBadge,
+        },
+      ],
+      pagination: { next_cursor: null },
+    });
+
+    await expect(getInitialLeaderboard()).resolves.toEqual({
+      traders: [row],
+      category: "OVERALL",
+      timePeriod: "DAY",
+      orderBy: "PNL",
+      total: 1,
+    });
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/v2/leaderboard");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      category: "OVERALL",
+      time_period: "DAY",
+      sort_by: "PNL",
+      limit: "25",
+    });
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      next: { revalidate: 60 },
+    });
+  });
+
+  it("returns null when the Data API answers with an error status", async () => {
+    stubJsonFetch({ error: "unavailable" }, 503);
+
+    await expect(getInitialLeaderboard()).resolves.toBeNull();
+  });
+
+  it("returns null when the Data API is unreachable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("socket hang up"))
+    );
+
+    await expect(getInitialLeaderboard()).resolves.toBeNull();
   });
 });

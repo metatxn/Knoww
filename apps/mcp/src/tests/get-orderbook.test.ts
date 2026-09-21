@@ -104,8 +104,11 @@ describe("get_orderbook tool", () => {
     const inputSchema = tool?.inputSchema as {
       properties: Record<string, unknown>;
     };
-    expect(inputSchema.properties).toHaveProperty("tokenId");
-    expect(inputSchema.properties).toHaveProperty("depth");
+    expect(Object.keys(inputSchema.properties).sort()).toEqual([
+      "depth",
+      "platform",
+      "tokenId",
+    ]);
     expect(String(tool?.description)).toContain("order book");
     expect(String(tool?.description)).toContain("decimal strings");
   });

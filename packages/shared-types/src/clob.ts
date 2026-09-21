@@ -1,3 +1,20 @@
+import {
+  type BoundedJsonResponse,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+} from "./bounded-json.ts";
+import {
+  normalizePriceHistoryPoint,
+  type PriceHistoryClient,
+  priceHistoryRequests,
+  readSdkPriceHistory,
+} from "./price-history.ts";
+
+export {
+  normalizePriceHistoryPoint,
+  priceHistoryRequests,
+} from "./price-history.ts";
+
 import { POLYMARKET_API, type TradingSide } from "./polymarket.ts";
 
 export type ClobHeaders = Record<string, string>;
@@ -9,11 +26,10 @@ export interface ClobFetchInit {
   [key: string]: unknown;
 }
 
-export interface ClobFetchResponse {
+export interface ClobFetchResponse extends BoundedJsonResponse {
   ok: boolean;
   status: number;
   statusText?: string;
-  json(): Promise<unknown>;
 }
 
 export type ClobFetch = (
@@ -21,7 +37,7 @@ export type ClobFetch = (
   init?: ClobFetchInit
 ) => Promise<ClobFetchResponse>;
 
-export interface UnifiedClobOrderBookClient {
+export interface UnifiedClobOrderBookClient extends PriceHistoryClient {
   fetchOrderBook(request: { tokenId: string }): Promise<unknown>;
   fetchOrderBooks?(request: Array<{ tokenId: string }>): Promise<unknown>;
   fetchMarketInfo?(request: { conditionId: string }): Promise<unknown>;
@@ -29,17 +45,12 @@ export interface UnifiedClobOrderBookClient {
     tokenId: string;
     side: TradingSide;
   }): Promise<unknown>;
-  fetchPriceHistory?(request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
-  }): Promise<unknown>;
   fetchBuilderFeeRates?(request: { builderCode: string }): Promise<unknown>;
 }
 
 export interface ClobRequestOptions {
   host?: string;
+  dataApiHost?: string;
   fetchImpl?: ClobFetch;
   headers?: ClobHeaders;
   requestInit?: ClobFetchInit;
@@ -81,19 +92,43 @@ export interface ClobPriceHistoryParams {
   fidelity?: string | number;
 }
 
-export class ClobRequestError extends Error {
+/**
+ * A CLOB request that came back with a non-OK status. A plain `Error` tagged
+ * with `name: "ClobRequestError"`; narrow with `isClobRequestError`, never
+ * `instanceof`.
+ */
+export interface ClobRequestError extends Error {
+  readonly name: "ClobRequestError";
   readonly status: number;
   readonly statusText: string | undefined;
+}
 
-  constructor(message: string, response: ClobFetchResponse) {
-    super(message);
-    this.name = "ClobRequestError";
-    this.status = response.status;
-    this.statusText = response.statusText;
-  }
+export function clobRequestError(
+  message: string,
+  response: ClobFetchResponse
+): ClobRequestError {
+  const error = new Error(message) as Error & {
+    name: "ClobRequestError";
+    status: number;
+    statusText: string | undefined;
+  };
+  error.name = "ClobRequestError";
+  error.status = response.status;
+  error.statusText = response.statusText;
+  return error;
+}
+
+export function isClobRequestError(value: unknown): value is ClobRequestError {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { name?: unknown; status?: unknown };
+  return (
+    candidate.name === "ClobRequestError" &&
+    typeof candidate.status === "number"
+  );
 }
 
 type ClobQueryValue = string | number | boolean | bigint | null | undefined;
+const MAX_CLOB_ERROR_JSON_BYTES = 64 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -158,7 +193,9 @@ async function readClobError(
   response: ClobFetchResponse,
   fallback: string
 ): Promise<string> {
-  const data = await response.json().catch(() => null);
+  const data = await readBoundedJson(response, MAX_CLOB_ERROR_JSON_BYTES).catch(
+    () => null
+  );
 
   if (isRecord(data)) {
     if (typeof data.error === "string" && data.error) return data.error;
@@ -207,30 +244,6 @@ function optionalNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function buildUnifiedPriceHistoryRequest(
-  tokenId: string,
-  params: ClobPriceHistoryParams
-): {
-  tokenId: string;
-  startTs?: number;
-  endTs?: number;
-  fidelity?: number;
-} {
-  const request: {
-    tokenId: string;
-    startTs?: number;
-    endTs?: number;
-    fidelity?: number;
-  } = { tokenId };
-  const startTs = optionalNumber(params.startTs);
-  const endTs = optionalNumber(params.endTs);
-  const fidelity = optionalNumber(params.fidelity);
-  if (startTs !== undefined) request.startTs = startTs;
-  if (endTs !== undefined) request.endTs = endTs;
-  if (fidelity !== undefined) request.fidelity = fidelity;
-  return request;
-}
-
 export function buildClobPublicUrl(
   path: string,
   params?: Record<string, ClobQueryValue>,
@@ -274,7 +287,7 @@ export async function fetchClobJson<T = unknown>(
   );
 
   if (!response.ok) {
-    throw new ClobRequestError(
+    throw clobRequestError(
       await readClobError(
         response,
         `CLOB request failed: ${response.statusText || response.status}`
@@ -283,7 +296,10 @@ export async function fetchClobJson<T = unknown>(
     );
   }
 
-  return (await response.json()) as T;
+  return (await readBoundedJson(
+    response,
+    DEFAULT_UPSTREAM_JSON_MAX_BYTES
+  )) as T;
 }
 
 export async function fetchClobOrderBook(
@@ -420,36 +436,79 @@ export function fetchClobPrice<T = unknown>(
   return fetchClobJson<T>("price", { token_id: tokenId }, options);
 }
 
-export function fetchClobPriceHistory<T = ClobPriceHistoryResponse>(
+export async function fetchClobPriceHistory<T = ClobPriceHistoryResponse>(
   tokenId: string,
   params: ClobPriceHistoryParams = {},
   options?: ClobRequestOptions
 ): Promise<T> {
   if (canUseUnifiedSdkForPublicRead(options)) {
-    if (options?.unifiedClient?.fetchPriceHistory) {
-      return options.unifiedClient
-        .fetchPriceHistory(buildUnifiedPriceHistoryRequest(tokenId, params))
-        .then((data) => ({
-          history: Array.isArray(data) ? data : [],
-        })) as Promise<T>;
+    if (options?.unifiedClient) {
+      const history = await readSdkPriceHistory(
+        options.unifiedClient,
+        tokenId,
+        params
+      );
+      return { history: history.map(({ t, p }) => ({ t, p: Number(p) })) } as T;
     }
-
-    return import("./polymarket-unified.ts").then(
-      ({ fetchUnifiedClobPriceHistory }) =>
-        fetchUnifiedClobPriceHistory<T>(tokenId, params)
+    const { fetchUnifiedClobPriceHistory } = await import(
+      "./polymarket-unified.ts"
     );
+    return fetchUnifiedClobPriceHistory<T>(tokenId, params);
   }
-
-  return fetchClobJson<T>(
-    "prices-history",
-    {
-      market: tokenId,
-      startTs: params.startTs,
-      endTs: params.endTs,
-      fidelity: params.fidelity,
-    },
-    options
-  );
+  const history = new Map<number, { t: number; p: number }>();
+  for (const request of priceHistoryRequests(tokenId, params)) {
+    const query: Record<string, string | number | undefined> = {
+      token_id: tokenId,
+      start: request.start,
+      end: request.end,
+      interval: request.interval,
+      bucket_seconds: request.bucketSeconds,
+    };
+    const seen = new Set<string>();
+    for (let pages = 0; ; pages++) {
+      if (pages >= 1000)
+        throw new Error("Price history pagination exceeded limit");
+      const result = await fetchClobJson<{
+        data: unknown[];
+        pagination: { next_cursor: string | null };
+      }>("v2/prices-history", query, {
+        ...options,
+        host: options?.dataApiHost ?? POLYMARKET_API.DATA.BASE,
+      });
+      if (
+        !Array.isArray(result.data) ||
+        !result.pagination ||
+        !(
+          result.pagination.next_cursor === null ||
+          typeof result.pagination.next_cursor === "string"
+        )
+      )
+        throw new Error("Malformed price history page");
+      for (const raw of result.data) {
+        const point = normalizePriceHistoryPoint(raw);
+        if (
+          request.start !== undefined &&
+          (point.t < request.start ||
+            (request.end !== undefined && point.t > request.end))
+        )
+          throw new Error("Price history point outside requested window");
+        history.set(point.t, { t: point.t, p: Number(point.p) });
+      }
+      const cursor = result.pagination.next_cursor;
+      if (cursor === null) break;
+      if (!cursor || seen.has(cursor))
+        throw new Error("Price history repeated pagination cursor");
+      seen.add(cursor);
+      query.cursor = cursor;
+    }
+  }
+  return {
+    history: [...history.values()]
+      .filter(
+        (point) => params.endTs === undefined || point.t <= Number(params.endTs)
+      )
+      .sort((a, b) => a.t - b.t),
+  } as T;
 }
 
 /**

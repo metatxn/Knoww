@@ -212,36 +212,29 @@ test("builds market evidence from the order book without side-less price fetches
   globalThis.fetch = async (input) => {
     const url = String(input);
     requestedUrls.push(url);
-    if (url.includes("/prices-history?")) {
+    if (url.includes("/v2/prices-history?")) {
       const nowSec = Math.floor(Date.now() / 1000);
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          history: [
-            { t: nowSec - 86_400, p: 0.45 },
-            { t: nowSec - 3_600, p: 0.46 },
-            { t: nowSec - 300, p: 0.48 },
-            { t: nowSec, p: 0.5 },
-          ],
-        }),
-      };
+      return Response.json({
+        data: [
+          { timestamp: nowSec - 86_400, price: 0.45 },
+          { timestamp: nowSec - 3_600, price: 0.46 },
+          { timestamp: nowSec - 300, price: 0.48 },
+          { timestamp: nowSec, price: 0.5 },
+        ],
+        pagination: { next_cursor: null },
+      });
     }
     assert.match(url, /\/book\?/);
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        bids: [
-          { price: "0.40", size: "100" },
-          { price: "0.39", size: "50" },
-        ],
-        asks: [
-          { price: "0.60", size: "50" },
-          { price: "0.61", size: "25" },
-        ],
-      }),
-    };
+    return Response.json({
+      bids: [
+        { price: "0.40", size: "100" },
+        { price: "0.39", size: "50" },
+      ],
+      asks: [
+        { price: "0.60", size: "50" },
+        { price: "0.61", size: "25" },
+      ],
+    });
   };
 
   try {
@@ -293,65 +286,57 @@ test("adds top related markets from grouped Gamma events", async () => {
   globalThis.fetch = async (input) => {
     const url = String(input);
     if (url.includes("gamma-api.polymarket.com/events/slug/")) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          slug: "grouped-event",
-          title: "Grouped event",
-          archived: false,
-          markets: [
-            {
-              question: "Will it happen by May 31, 2026?",
-              conditionId: "condition_may",
-              slug: "may-market",
-              outcomes: '["Yes", "No"]',
-              clobTokenIds: '["may_yes", "may_no"]',
-              outcomePrices: '["0.2", "0.8"]',
-              endDate: "2026-05-31T00:00:00.000Z",
-              active: true,
-              closed: false,
-              acceptingOrders: true,
-            },
-            {
-              question: "Will it happen by December 31, 2026?",
-              conditionId: "condition_dec",
-              slug: "dec-market",
-              outcomes: '["Yes", "No"]',
-              clobTokenIds: '["dec_yes", "dec_no"]',
-              outcomePrices: '["0.7", "0.3"]',
-              endDate: "2026-12-31T00:00:00.000Z",
-              active: true,
-              closed: false,
-              acceptingOrders: true,
-            },
-            {
-              question: "Will it happen by June 30, 2026?",
-              conditionId: "condition_june",
-              slug: "june-market",
-              outcomes: '["Yes", "No"]',
-              clobTokenIds: '["june_yes", "june_no"]',
-              outcomePrices: '["0.4", "0.6"]',
-              endDate: "2026-05-31T00:00:00.000Z",
-              active: true,
-              closed: false,
-              acceptingOrders: true,
-            },
-          ],
-        }),
-      };
+      return Response.json({
+        slug: "grouped-event",
+        title: "Grouped event",
+        archived: false,
+        markets: [
+          {
+            question: "Will it happen by May 31, 2026?",
+            conditionId: "condition_may",
+            slug: "may-market",
+            outcomes: '["Yes", "No"]',
+            clobTokenIds: '["may_yes", "may_no"]',
+            outcomePrices: '["0.2", "0.8"]',
+            endDate: "2026-05-31T00:00:00.000Z",
+            active: true,
+            closed: false,
+            acceptingOrders: true,
+          },
+          {
+            question: "Will it happen by December 31, 2026?",
+            conditionId: "condition_dec",
+            slug: "dec-market",
+            outcomes: '["Yes", "No"]',
+            clobTokenIds: '["dec_yes", "dec_no"]',
+            outcomePrices: '["0.7", "0.3"]',
+            endDate: "2026-12-31T00:00:00.000Z",
+            active: true,
+            closed: false,
+            acceptingOrders: true,
+          },
+          {
+            question: "Will it happen by June 30, 2026?",
+            conditionId: "condition_june",
+            slug: "june-market",
+            outcomes: '["Yes", "No"]',
+            clobTokenIds: '["june_yes", "june_no"]',
+            outcomePrices: '["0.4", "0.6"]',
+            endDate: "2026-05-31T00:00:00.000Z",
+            active: true,
+            closed: false,
+            acceptingOrders: true,
+          },
+        ],
+      });
     }
-    if (url.includes("/prices-history?")) {
-      return { ok: true, status: 200, json: async () => ({ history: [] }) };
+    if (url.includes("/v2/prices-history?")) {
+      return Response.json({ data: [], pagination: { next_cursor: null } });
     }
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        bids: [{ price: "0.69", size: "100" }],
-        asks: [{ price: "0.71", size: "100" }],
-      }),
-    };
+    return Response.json({
+      bids: [{ price: "0.69", size: "100" }],
+      asks: [{ price: "0.71", size: "100" }],
+    });
   };
 
   try {

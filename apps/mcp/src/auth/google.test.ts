@@ -4,8 +4,9 @@ import {
   buildGoogleAuthorizationUrl,
   createGooglePkce,
   exchangeGoogleAuthorizationCode,
-  GoogleAuthenticationError,
+  googleAuthenticationError,
   googleAuthenticationLogFields,
+  isGoogleAuthenticationError,
   verifyGoogleIdToken,
 } from "./google";
 
@@ -163,7 +164,7 @@ describe("Google OIDC", () => {
       failure = error;
     }
 
-    expect(failure).toBeInstanceOf(GoogleAuthenticationError);
+    expect(isGoogleAuthenticationError(failure)).toBe(true);
     expect(failure).toMatchObject({
       googleFailure: "upstream_rejected",
       googleOAuthError: "invalid_client",
@@ -193,7 +194,7 @@ describe("Google OIDC", () => {
   it("returns an allowlisted diagnostic object and redacts unknown errors", () => {
     expect(
       googleAuthenticationLogFields(
-        new GoogleAuthenticationError({
+        googleAuthenticationError({
           googleFailure: "upstream_rejected",
           googleOAuthError: "invalid_grant",
           googleStage: "token_exchange",

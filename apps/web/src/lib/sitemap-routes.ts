@@ -1,6 +1,4 @@
 import { unstable_cache } from "next/cache";
-import { POLYMARKET_API } from "@/constants/polymarket";
-import { fetchGammaKeysetPage } from "@/lib/gamma-keyset";
 import { GUIDES } from "@/lib/guides";
 import { getLeagueCountSnapshot } from "@/lib/league-count-snapshot";
 import { logger } from "@/lib/logger";
@@ -12,6 +10,13 @@ import {
 } from "@/lib/seo";
 import { ALL_SPORTS_TAG_SLUG, SPORT_GROUPS } from "@/lib/sport-categories";
 import { buildFallbackTags } from "@/lib/tag-slugs";
+import {
+  readSitemapEventPages,
+  type SitemapEvent,
+  type SitemapMarketKind,
+} from "@/polymarket/sitemap-reads";
+
+export type { SitemapMarketKind } from "@/polymarket/sitemap-reads";
 
 /**
  * Shared logic for the segmented sitemap (§11.3): /sitemap.xml is a sitemap
@@ -35,85 +40,6 @@ export type SitemapRoute = {
 };
 
 export const SITEMAP_REVALIDATE_SECONDS = 3600;
-const SITEMAP_PAGE_LIMIT = "100";
-// Keep the sitemap focused on canonical, high-value URLs. The app can browse
-// the full catalog, but SEO should not ask crawlers to revisit thousands of
-// low-volume or duplicate market detail URLs every hour.
-const SITEMAP_MAX_EVENTS = 1000;
-const DURABLE_PENDING_SITEMAP_MAX_EVENTS = 500;
-const EVERGREEN_SITEMAP_MAX_EVENTS = 500;
-const RECENT_CLOSED_SITEMAP_MAX_EVENTS = 500;
-
-export type SitemapMarketKind = "active" | "evergreen";
-
-type SitemapEvent = {
-  slug?: string;
-  title?: string;
-  description?: string;
-  volume?: string | number;
-  active?: boolean;
-  closed?: boolean;
-  archived?: boolean;
-  ended?: boolean;
-  parentEventId?: string | number | null;
-  marketCount?: number;
-  markets?: Array<{
-    id?: string | number;
-    active?: boolean;
-    closed?: boolean;
-    umaResolutionStatus?: string | null;
-    umaResolutionStatuses?: string | null;
-  }>;
-  updatedAt?: string;
-};
-
-async function fetchAllKeysetItems<T, R>(
-  endpoint: string,
-  params: URLSearchParams,
-  preferredKeys: Array<"data" | "events" | "markets">,
-  maxItems: number,
-  mapPage: (items: T[]) => R[]
-): Promise<R[]> {
-  const items: R[] = [];
-  let sourceItemCount = 0;
-  let nextCursor: string | undefined;
-  const seenCursors = new Set<string>();
-
-  while (sourceItemCount < maxItems) {
-    const pageParams = new URLSearchParams(params);
-    if (nextCursor) {
-      pageParams.set("after_cursor", nextCursor);
-    }
-
-    const page = await fetchGammaKeysetPage<T>(
-      {
-        endpoint,
-        params: pageParams,
-        cache: "no-store",
-      },
-      preferredKeys
-    );
-
-    if (page.items.length === 0) {
-      break;
-    }
-
-    const remainingItems = maxItems - sourceItemCount;
-    const sourceItems = page.items.slice(0, remainingItems);
-    items.push(...mapPage(sourceItems));
-    sourceItemCount += sourceItems.length;
-
-    if (!page.nextCursor || seenCursors.has(page.nextCursor)) {
-      break;
-    }
-
-    seenCursors.add(page.nextCursor);
-    nextCursor = page.nextCursor;
-  }
-
-  return items;
-}
-
 export const getCachedSitemapEventRoutes = unstable_cache(
   () => fetchSitemapEventRoutes("active"),
   ["knoww-sitemap-event-routes-v7"],
@@ -128,19 +54,10 @@ export const getCachedEvergreenSitemapEventRoutes = unstable_cache(
 
 export async function fetchSitemapEventRoutes(kind: SitemapMarketKind) {
   try {
-    const queryResults = await Promise.all(
-      buildSitemapEventQueries(kind).map((query) =>
-        fetchAllKeysetItems<SitemapEvent, SitemapRoute>(
-          POLYMARKET_API.GAMMA.EVENTS_KEYSET,
-          query.params,
-          ["events", "data"],
-          query.maxItems,
-          (events) => buildEventSitemapRoutes(events, kind)
-        )
-      )
+    const routes = await readSitemapEventPages(kind, (events) =>
+      buildEventSitemapRoutes(events, kind)
     );
-
-    return dedupeSitemapRoutes(queryResults.flat());
+    return dedupeSitemapRoutes(routes);
   } catch (error) {
     logger.error("sitemap.events.fetch_failed", {
       kind,
@@ -174,62 +91,6 @@ export function buildEventSitemapRoutes(
     .flatMap((event) =>
       event.slug ? [buildEventSitemapRoute({ ...event, slug: event.slug })] : []
     );
-}
-
-export function buildSitemapEventQueries(kind: SitemapMarketKind = "active") {
-  if (kind === "evergreen") {
-    return [
-      {
-        params: new URLSearchParams({
-          closed: "true",
-          archived: "false",
-          order: "volume",
-          ascending: "false",
-          limit: SITEMAP_PAGE_LIMIT,
-        }),
-        maxItems: EVERGREEN_SITEMAP_MAX_EVENTS,
-      },
-      {
-        // Give recent results a discovery path even when their total volume
-        // cannot compete with the largest historical events.
-        params: new URLSearchParams({
-          closed: "true",
-          archived: "false",
-          order: "closedTime",
-          ascending: "false",
-          limit: SITEMAP_PAGE_LIMIT,
-        }),
-        maxItems: RECENT_CLOSED_SITEMAP_MAX_EVENTS,
-      },
-    ];
-  }
-
-  return [
-    {
-      params: new URLSearchParams({
-        active: "true",
-        closed: "false",
-        archived: "false",
-        order: "volume24hr",
-        ascending: "false",
-        limit: SITEMAP_PAGE_LIMIT,
-      }),
-      maxItems: SITEMAP_MAX_EVENTS,
-    },
-    {
-      // A finished event can remain closed=false while settlement is pending,
-      // but its 24-hour volume quickly becomes zero. A total-volume pass keeps
-      // substantial pending/disputed pages discoverable during that interval.
-      params: new URLSearchParams({
-        closed: "false",
-        archived: "false",
-        order: "volume",
-        ascending: "false",
-        limit: SITEMAP_PAGE_LIMIT,
-      }),
-      maxItems: DURABLE_PENDING_SITEMAP_MAX_EVENTS,
-    },
-  ];
 }
 
 export function buildStaticSitemapRoutes(): SitemapRoute[] {

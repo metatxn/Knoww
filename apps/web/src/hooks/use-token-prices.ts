@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { TokenPricesResponse } from "@/app/api/price/tokens/route";
+import type { TokenPricesResponse } from "@/app/api/polymarket/price/tokens/route";
 import { fetchJson } from "@/lib/fetch-json";
 import { qk } from "@/lib/query-keys";
 
@@ -33,7 +33,7 @@ export const TOKEN_PRICES_QUERY_KEY = ["token-prices"] as const;
  * Fetch token prices from the API
  */
 async function fetchTokenPrices(): Promise<TokenPricesResponse> {
-  return fetchJson<TokenPricesResponse>("/api/price/tokens", {
+  return fetchJson<TokenPricesResponse>("/api/polymarket/price/tokens", {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -176,7 +176,7 @@ export function useTokenPrices(
  */
 export async function getTokenPrice(symbol: string): Promise<number> {
   try {
-    const response = await fetch("/api/price/tokens");
+    const response = await fetch("/api/polymarket/price/tokens");
     if (!response.ok) {
       throw new Error("Failed to fetch prices");
     }

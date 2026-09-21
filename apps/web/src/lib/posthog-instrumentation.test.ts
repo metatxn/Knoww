@@ -14,7 +14,15 @@ vi.mock("posthog-js", () => ({
 describe("PostHog browser instrumentation", () => {
   beforeEach(() => {
     vi.resetModules();
-    posthog.init.mockReset();
+    vi.clearAllMocks();
+    vi.stubGlobal("window", {
+      location: { hostname: "knoww.app", href: "https://knoww.app/" },
+      sessionStorage: {
+        getItem: () => null,
+        removeItem: vi.fn(),
+        setItem: vi.fn(),
+      },
+    });
     posthog.has_opted_out_capturing.mockReturnValue(false);
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-project-token");
@@ -26,7 +34,7 @@ describe("PostHog browser instrumentation", () => {
     vi.unstubAllGlobals();
   });
 
-  it("tags preview traffic and preserves the handoff captured with the accepted order", async () => {
+  it("preserves the handoff captured with the accepted production order", async () => {
     await import("../../instrumentation-client");
     const beforeSend = posthog.init.mock.calls[0][1].before_send;
     const event = beforeSend({
@@ -39,7 +47,7 @@ describe("PostHog browser instrumentation", () => {
     });
     expect(event.properties).toEqual(
       expect.objectContaining({
-        environment: "development",
+        environment: "production",
         handoff_id: "original-handoff",
         entry_source: "knoww_extension",
       })
@@ -85,6 +93,32 @@ describe("PostHog browser instrumentation", () => {
       "test-project-token",
       expect.objectContaining({ api_host: "https://a.knoww.app" })
     );
+  });
+
+  it.each([
+    "localhost",
+    "preprod-knoww.prayag.workers.dev",
+    "staging.knoww.app",
+    "knoww.app.example.com",
+  ])(
+    "does not initialize analytics on %s even with a token",
+    async (hostname) => {
+      vi.stubGlobal("window", {
+        location: { hostname, href: `https://${hostname}/` },
+      });
+      await import("../../instrumentation-client");
+      expect(posthog.init).not.toHaveBeenCalled();
+      expect(posthog.capture).not.toHaveBeenCalled();
+      expect(posthog.register).not.toHaveBeenCalled();
+    }
+  );
+
+  it("initializes analytics on www.knoww.app", async () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "www.knoww.app", href: "https://www.knoww.app/" },
+    });
+    await import("../../instrumentation-client");
+    expect(posthog.init).toHaveBeenCalledOnce();
   });
 
   it("does not initialize without a project token", async () => {

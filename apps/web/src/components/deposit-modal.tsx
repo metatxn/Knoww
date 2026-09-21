@@ -62,8 +62,11 @@ export function DepositModal({
 }: DepositModalProps) {
   const { address, isConnected } = useConnection();
   const { data: walletClient } = useWalletClient();
-  const { usdcBalance: polymarketBalance, refresh: refreshProxyWallet } =
-    useProxyWallet();
+  const {
+    usdcBalance: polymarketBalance,
+    walletMode,
+    refresh: refreshProxyWallet,
+  } = useProxyWallet();
   const {
     tokens: walletTokens,
     isLoading: loadingTokens,
@@ -774,6 +777,7 @@ export function DepositModal({
                   isConnected={isConnected}
                   address={address}
                   walletTokens={walletTokens}
+                  walletIsTradingWallet={walletMode === "eoa"}
                   onSelectMethod={handleSelectMethod}
                 />
               )}

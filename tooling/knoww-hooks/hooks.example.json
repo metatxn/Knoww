@@ -1,0 +1,17 @@
+{
+  "description": "Optional Knoww conversation matching prototype for Codex.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tooling/knoww-hooks/user-prompt-submit.mjs\"",
+            "timeout": 3,
+            "additionalContextLimit": 1500
+          }
+        ]
+      }
+    ]
+  }
+}

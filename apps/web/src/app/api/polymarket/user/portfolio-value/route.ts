@@ -1,0 +1,184 @@
+import { createLogger } from "@knoww/logger";
+import {
+  DEFAULT_UPSTREAM_ERROR_MAX_BYTES,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+  readBoundedJson,
+  readBoundedText,
+} from "@knoww/shared-types/bounded-json";
+import { type NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { ERROR_MESSAGES } from "@/constants/polymarket";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { sanitizeUpstreamBody } from "@/lib/upstream-error";
+import { isValidAddress } from "@/lib/validation";
+import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
+
+const log = createLogger("api.user.portfolio-value");
+
+/**
+ * Portfolio Value API Response
+ * Based on: GET https://data-api.polymarket.com/value?user=<WALLET_ADDRESS>
+ *
+ * This returns total current positions value in USD.
+ *
+ * Includes:
+ * - Value of YES/NO tokens you hold (positions)
+ * - Value of any fully matched trades
+ * - Unrealized P/L included
+ *
+ * Does NOT include:
+ * - Open order collateral waiting in the book
+ * - Amount still sitting as unused USDC (unless Polymarket counts it)
+ */
+const portfolioValueResponseSchema = z.array(z.object({ value: z.number() }));
+
+/**
+ * Validation schema for query parameters
+ */
+const querySchema = z.object({
+  user: z
+    .string()
+    .min(1, "User address is required")
+    .refine(isValidAddress, { message: "Invalid Ethereum address format" }),
+});
+
+/**
+ * GET /api/polymarket/user/portfolio-value
+ *
+ * Fetch portfolio value from Polymarket Data API
+ * Uses: GET https://data-api.polymarket.com/value?user=<WALLET_ADDRESS>
+ *
+ * This endpoint returns the total current positions value in USD.
+ * "Everything you currently own, marked to market"
+ *
+ * Query Parameters:
+ * - user: User's wallet address (required) - should be the proxy wallet address
+ *
+ * Response:
+ * - value: Total portfolio value in USD
+ */
+/**
+ * @openapi
+ * /api/polymarket/user/portfolio-value:
+ *   get:
+ *     summary: Fetch /api/polymarket/user/portfolio-value.
+ *     tags: [User]
+ *     responses:
+ *       200:
+ *         description: Successful response.
+ *       400:
+ *         description: Invalid request.
+ *       401:
+ *         description: Authentication required.
+ *       403:
+ *         description: Request forbidden.
+ *       404:
+ *         description: Resource not found.
+ *       429:
+ *         description: Rate limit exceeded.
+ *       500:
+ *         description: Request failed.
+ */
+export async function GET(request: NextRequest) {
+  // Rate limit: 60 requests per minute
+  const rateLimitResponse = checkRateLimit(request, {
+    uniqueTokenPerInterval: 60,
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
+  try {
+    const searchParams = request.nextUrl.searchParams;
+
+    // Parse and validate query parameters
+    const parsed = querySchema.safeParse({
+      user: searchParams.get("user"),
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid query parameters",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { user } = parsed.data;
+
+    // Fetch portfolio value from Polymarket Data API
+    // Note: Use the proxy wallet address, not EOA
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+    let response: Response;
+    try {
+      response = await fetchWalletDataResponse(
+        "value",
+        new URLSearchParams({ user: user.toLowerCase() }),
+        { signal: controller.signal, cache: { revalidateSeconds: 30 } }
+      );
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request to Polymarket timed out",
+          },
+          { status: 504 }
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      const errorText = await readBoundedText(
+        response,
+        DEFAULT_UPSTREAM_ERROR_MAX_BYTES
+      ).catch(() => "");
+      log.error("upstream.error", {
+        status: response.status,
+        body: sanitizeUpstreamBody(errorText),
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to fetch portfolio value from Polymarket",
+          details: response.status,
+        },
+        { status: response.status }
+      );
+    }
+
+    const data = portfolioValueResponseSchema.safeParse(
+      await readBoundedJson(response, DEFAULT_UPSTREAM_JSON_MAX_BYTES)
+    );
+
+    return NextResponse.json({
+      success: true,
+      user,
+      portfolioValue: data.success ? (data.data[0]?.value ?? 0) : 0,
+      // Additional context
+      description: "Total current positions value in USD (marked to market)",
+      includes: [
+        "Value of YES/NO tokens held",
+        "Value of fully matched trades",
+        "Unrealized P/L",
+      ],
+      excludes: ["Open order collateral", "Unused USDC balance"],
+    });
+  } catch (error) {
+    log.error("fetch.failed", { error });
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR,
+      },
+      { status: 500 }
+    );
+  }
+}

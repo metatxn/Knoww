@@ -562,7 +562,7 @@ async function handleDeriveProxyAddress(
   const walletMode = normalizeExtensionTradingWalletMode(msg.walletMode);
   const proxyAddress = deriveTradingWalletAddress(owner, walletMode);
 
-  const code = await publicClient.getBytecode({ address: proxyAddress });
+  const code = await publicClient.getCode({ address: proxyAddress });
   let isDeployed = !!code && code !== "0x";
   if (
     !isDeployed &&
@@ -967,7 +967,8 @@ async function handleRelayerApprove(
   // "Approve pUSD" CTA) pass the visible order cost, but the place-order
   // pre-flight requires allowance against the fee-inclusive collateral, so
   // approving exactly the cost would still fail. Mirrors the web's behaviour
-  // (use-clob-client.ts: max(requiredPusdRaw, DEFAULT_TRADING_APPROVAL_RAW)).
+  // (apps/web src/polymarket/order-preflight.ts:
+  // max(requiredPusdRaw, DEFAULT_TRADING_APPROVAL_RAW)).
   const requestedApprovalAmount = parseApprovalAmountRaw(msg.approvalAmount);
   const defaultApprovalAmount = parseApprovalAmountRaw();
   const approvalAmount =

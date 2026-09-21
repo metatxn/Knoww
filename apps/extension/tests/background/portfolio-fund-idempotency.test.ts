@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   createPortfolioFundIdempotencyCoordinator,
-  PortfolioFundIdempotencyError,
+  isPortfolioFundIdempotencyError,
   type PortfolioFundIdempotencyStorage,
   portfolioFundIdempotencyStorageKey,
 } from "../../src/background/portfolio-fund-idempotency";
@@ -191,7 +191,7 @@ test("fails closed by fingerprint when pending survives with a different key", a
       },
     }),
     (error: unknown) =>
-      error instanceof PortfolioFundIdempotencyError &&
+      isPortfolioFundIdempotencyError(error) &&
       error.code === "PENDING_RECONCILIATION"
   );
   assert.equal(executionCount, 0);
@@ -216,7 +216,7 @@ test("rejects reuse of one fund key for a different normalized fingerprint", asy
       execute: async () => ({ txHash: "0xduplicate" }),
     }),
     (error: unknown) =>
-      error instanceof PortfolioFundIdempotencyError &&
+      isPortfolioFundIdempotencyError(error) &&
       error.code === "IDEMPOTENCY_FINGERPRINT_MISMATCH"
   );
 });
@@ -277,7 +277,7 @@ test("keeps a post-boundary submission failure pending for reconciliation", asyn
       execute: async () => ({ txHash: "0xduplicate" }),
     }),
     (error: unknown) =>
-      error instanceof PortfolioFundIdempotencyError &&
+      isPortfolioFundIdempotencyError(error) &&
       error.code === "PENDING_RECONCILIATION"
   );
 });

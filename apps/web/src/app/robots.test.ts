@@ -14,9 +14,9 @@ describe("robots", () => {
         "/",
         "/api/image",
         "/api/events/",
-        "/api/comments",
-        "/api/markets/price-history/",
-        "/api/markets/price-history/batch",
+        "/api/polymarket/comments",
+        "/api/polymarket/markets/price-history/",
+        "/api/polymarket/markets/price-history/batch",
       ])
     );
   });

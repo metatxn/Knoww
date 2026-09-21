@@ -2,7 +2,7 @@
  * Polymarket V2 Relayer Client (web).
  *
  * Replaces @polymarket/builder-relayer-client with a thin custom client that:
- *   - Talks to /api/relayer/[...path] (which proxies to Polymarket's relayer
+ *   - Talks to /api/polymarket/relayer/[...path] (which proxies to Polymarket's relayer
  *     and adds RELAYER_API_KEY headers server-side)
  *   - Builds Safe multiSend transactions with viem
  *   - Signs SafeTx EIP-712 with the user's viem WalletClient
@@ -30,14 +30,14 @@ import {
 } from "@knoww/shared-types/relayer";
 import type { Address, WalletClient } from "viem";
 
-const PROXY_BASE = "/api/relayer";
+const PROXY_BASE = "/api/polymarket/relayer";
 
 export {
   derivePolymarketDepositWallet,
   derivePolymarketSafe,
 } from "@knoww/shared-types/relayer";
 
-// ── HTTP helpers (always go through /api/relayer/[...path]) ──
+// ── HTTP helpers (always go through /api/polymarket/relayer/[...path]) ──
 
 function buildProxyUrl(path: string, params?: Record<string, string>): string {
   const url = new URL(`${PROXY_BASE}/${path}`, window.location.origin);

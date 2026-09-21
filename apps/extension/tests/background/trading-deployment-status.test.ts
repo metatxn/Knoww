@@ -4,7 +4,7 @@ import { getExtensionSessionInfoViaMessage } from "../../src/background/extensio
 import { isRelayerWalletDeployed } from "../../src/background/relayer-client";
 import { EXTENSION_AUTH_REQUIRED_ERROR } from "../../src/types/chrome-messages";
 
-const rpc = vi.hoisted(() => ({ getBytecode: vi.fn() }));
+const rpc = vi.hoisted(() => ({ getCode: vi.fn() }));
 vi.mock("viem", async (original) => ({
   ...(await original<object>()),
   createPublicClient: () => rpc,
@@ -21,7 +21,7 @@ const owner = "0x0000000000000000000000000000000000000001";
 
 beforeEach(() => {
   vi.resetAllMocks();
-  rpc.getBytecode.mockResolvedValue("0x");
+  rpc.getCode.mockResolvedValue("0x");
   vi.mocked(getExtensionSessionInfoViaMessage).mockResolvedValue({
     loggedIn: false,
     address: null,
@@ -57,7 +57,7 @@ describe("deployment status before Knoww sign-in", () => {
   });
 
   it("recognizes deployed contracts without requiring authentication", async () => {
-    rpc.getBytecode.mockResolvedValue("0x6000");
+    rpc.getCode.mockResolvedValue("0x6000");
     expect(await checkDeployment()).toMatchObject({
       ok: true,
       data: { isDeployed: true },
@@ -124,7 +124,7 @@ describe("deployment status before Knoww sign-in", () => {
   });
 
   it("does not turn a failed RPC read into an undeployed result", async () => {
-    rpc.getBytecode.mockRejectedValue(new Error("RPC unavailable"));
+    rpc.getCode.mockRejectedValue(new Error("RPC unavailable"));
     expect(await checkDeployment()).toMatchObject({
       ok: false,
       error: "RPC unavailable",

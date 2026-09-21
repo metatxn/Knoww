@@ -18,8 +18,10 @@ export default defineConfig({
   ],
   test: {
     include: ["src/**/*.test.ts"],
-    // Durable Object startup can exceed Vitest's 5-second default when all
-    // Workers suites initialize concurrently on a cold CI runner.
+    // Bound workerd startup while pnpm runs the other workspace suites.
+    // Per-file storage isolation remains enabled.
+    maxWorkers: 2,
+    // Allow for Durable Object startup on cold runners.
     testTimeout: 10_000,
   },
 });

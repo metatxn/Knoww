@@ -48,7 +48,7 @@ test("extension proxy derivation falls back to relayer deployment status", () =>
     true
   );
   assert.equal(
-    /publicClient\.getBytecode[\s\S]*isRelayerWalletDeployed\(\s*proxyAddress,\s*walletType/.test(
+    /publicClient\.getCode[\s\S]*isRelayerWalletDeployed\(\s*proxyAddress,\s*walletType/.test(
       handlerSource
     ),
     true

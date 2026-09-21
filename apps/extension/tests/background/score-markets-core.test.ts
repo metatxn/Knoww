@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { RerankSupersededError } from "../../src/background/rerank-work-queue";
+import { rerankSupersededError } from "../../src/background/rerank-work-queue";
 import {
   createScoreMarkets,
   type ScoreMarketsDeps,
@@ -216,7 +216,7 @@ test("score-markets core forwards the rerank request identity", async () => {
 test("score-markets core records superseded rerank work as skipped", async () => {
   const deps = createDeps({
     rerankMarketPairs: async () => {
-      throw new RerankSupersededError();
+      throw rerankSupersededError();
     },
   });
   const scoreMarkets = createScoreMarkets(deps);

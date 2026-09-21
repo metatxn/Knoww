@@ -10,23 +10,23 @@ import { createLogger } from "@knoww/logger";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  JsonBodyError,
+  isJsonBodyError,
   jsonError,
   readJson,
   requireAgentAdmin,
   requireMutatingAgentAdmin,
 } from "@/lib/agent/api";
 import {
-  DurableAgentRepositoryUnavailableError,
   getAgentRepository,
+  isDurableAgentRepositoryUnavailableError,
 } from "@/lib/agent/repository";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
 const log = createLogger("api.agent.runs");
-const LiveRunIdempotencyKeySchema = z.string().uuid();
+const LiveRunIdempotencyKeySchema = z.uuid();
 
 const RunInputSchema = z.object({
-  watchlistItemIds: z.array(z.string().uuid()).max(25).optional(),
+  watchlistItemIds: z.array(z.uuid()).max(25).optional(),
   portfolio: z
     .object({
       bankrollUsd: DecimalStringSchema,
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       try {
         body = await readJson(request);
       } catch (error) {
-        if (error instanceof JsonBodyError) {
+        if (isJsonBodyError(error)) {
           return jsonError(error.message, error.status);
         }
         return jsonError("Invalid JSON payload", 400);
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
       await repository.releaseSchedulerLock(AGENT_EXECUTION_LOCK_KEY, ownerId);
     }
   } catch (error) {
-    if (error instanceof DurableAgentRepositoryUnavailableError) {
+    if (isDurableAgentRepositoryUnavailableError(error)) {
       return jsonError("Durable live-run storage is unavailable", 503);
     }
     log.error("run.failed", { error });

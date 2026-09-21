@@ -127,7 +127,7 @@ function WalletMenuPanel({
 }: WalletMenuPanelProps) {
   const router = useRouter();
   const { address } = useConnection();
-  const { disconnect } = useDisconnect();
+  const { mutate: disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
 
   // ENS lookup forces mainnet because Polygon doesn't index ENS. wagmi

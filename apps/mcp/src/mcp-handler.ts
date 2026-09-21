@@ -10,6 +10,7 @@ import {
 import { createKnowwMcpServer } from "./server";
 
 const log = createLogger("mcp");
+export const MAX_LEGACY_BATCH_MESSAGES = 10;
 
 // Deployment configuration is static. The map keeps local test overrides from
 // sharing a handler with production-shaped requests in the same isolate.
@@ -45,14 +46,17 @@ export async function dispatchMcpRequest(
   config: WorkerConfig
 ): Promise<Response> {
   const startedAt = Date.now();
-  const metadataPromise =
+  const parsedBodyPromise =
     request.method === "POST"
       ? request
           .clone()
           .json<unknown>()
-          .then(parseMcpProtocolMessages)
-          .catch(() => [])
-      : Promise.resolve([]);
+          .then((value) => ({ ok: true as const, value }))
+          .catch(() => ({ ok: false as const }))
+      : Promise.resolve({ ok: false as const });
+  const metadataPromise = parsedBodyPromise.then((parsed) =>
+    parsed.ok ? parseMcpProtocolMessages(parsed.value) : []
+  );
 
   const captureOutcome = async (status: number) => {
     const analytics = currentAnalytics();
@@ -76,6 +80,29 @@ export async function dispatchMcpRequest(
   };
 
   try {
+    const parsedBody = await parsedBodyPromise;
+    if (
+      parsedBody.ok &&
+      Array.isArray(parsedBody.value) &&
+      parsedBody.value.length > MAX_LEGACY_BATCH_MESSAGES
+    ) {
+      const response = Response.json(
+        {
+          jsonrpc: "2.0",
+          error: {
+            code: -32600,
+            message: `Invalid Request: JSON-RPC batch exceeds ${MAX_LEGACY_BATCH_MESSAGES} messages.`,
+          },
+          id: null,
+        },
+        {
+          status: 400,
+          headers: { "cache-control": "no-store" },
+        }
+      );
+      await captureOutcome(response.status);
+      return response;
+    }
     const response = await handlerFor(config)(request, env, ctx);
     await captureOutcome(response.status);
     return response;
