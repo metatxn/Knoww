@@ -325,7 +325,7 @@ async function proxy(
       );
       if (hmacHeaders) {
         try {
-          upstream = await fetch(upstreamUrl, {
+          const retryUpstream = await fetch(upstreamUrl, {
             method,
             headers: {
               "Content-Type": "application/json",
@@ -335,10 +335,12 @@ async function proxy(
             body: safeSubmitBody,
             signal: controller.signal,
           });
-          upstreamBody = await readBoundedText(
-            upstream,
+          const retryBody = await readBoundedText(
+            retryUpstream,
             MAX_UPSTREAM_BODY_BYTES
           );
+          upstream = retryUpstream;
+          upstreamBody = retryBody;
         } catch (fetchError) {
           if (fetchError instanceof Error && fetchError.name === "AbortError") {
             log.error("upstream.timeout", {

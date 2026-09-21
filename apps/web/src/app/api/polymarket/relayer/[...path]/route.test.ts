@@ -1,3 +1,4 @@
+import { DEFAULT_UPSTREAM_JSON_MAX_BYTES } from "@knoww/shared-types/bounded-json";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -262,6 +263,75 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
 
     expect(res.status).toBe(504);
     expect(body).toContain("Relayer request timed out");
+    expect(upstreamFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the initial response when the safe submit retry body cannot be read", async () => {
+    process.env.POLY_RELAYER_API_KEY = "relayer-key";
+    process.env.POLY_RELAYER_API_KEY_ADDRESS =
+      "0x0000000000000000000000000000000000000001";
+    process.env.BUILDER_SIGNING_SERVER_URL = "https://signer.knoww.test/hmac";
+    process.env.INTERNAL_AUTH_TOKEN = "internal-token";
+
+    let relayerAttempts = 0;
+    const upstreamFetch = vi.fn(
+      async (input: string | URL | Request, _init?: RequestInit) => {
+        if (String(input) === "https://signer.knoww.test/hmac") {
+          return new Response(
+            JSON.stringify({
+              POLY_BUILDER_API_KEY: "builder-key",
+              POLY_BUILDER_TIMESTAMP: "1",
+              POLY_BUILDER_PASSPHRASE: "builder-passphrase",
+              POLY_BUILDER_SIGNATURE: "builder-signature",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        relayerAttempts += 1;
+        if (relayerAttempts === 1) {
+          return new Response(
+            JSON.stringify({ error: "relayer key rejected" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        return new Response(JSON.stringify({ error: "retry failed" }), {
+          status: 502,
+          headers: {
+            "Content-Length": String(DEFAULT_UPSTREAM_JSON_MAX_BYTES + 1),
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    );
+    vi.stubGlobal("fetch", upstreamFetch);
+
+    const req = new NextRequest(
+      "https://knoww.app/api/polymarket/relayer/submit",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          type: "SAFE",
+          transactions: [],
+        }),
+      }
+    );
+
+    const res = await POST(req, {
+      params: Promise.resolve({ path: ["submit"] }),
+    });
+    const body = await res.text();
+
+    expect(res.status).toBe(400);
+    expect(body).toContain("relayer key rejected");
+    expect(body).not.toContain("retry failed");
     expect(upstreamFetch).toHaveBeenCalledTimes(3);
   });
 });
