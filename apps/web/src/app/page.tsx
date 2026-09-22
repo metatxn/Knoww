@@ -20,6 +20,7 @@ import {
 } from "@/components/landing/landing-chrome";
 import { LandingPageAnalytics } from "@/components/landing/landing-page-analytics";
 import { LandingShell } from "@/components/landing/landing-shell";
+import { McpHeroInstall } from "@/components/landing/mcp-hero-install";
 import { TweetOverlayHero } from "@/components/tweet-overlay-hero";
 import { buildPageMetadata } from "@/lib/seo";
 import "./styles/landing-route.css";
@@ -117,8 +118,8 @@ export default function LandingPage() {
             {/* Top-align on landscape tablets so the CTA never gets pushed
               below the fold by the tall side-by-side card; desktop (xl) keeps
               the balanced vertical centering. */}
-            <div className="grid grid-cols-12 gap-8 xl:gap-12 items-center min-[1024px]:max-[1279px]:landscape:items-start">
-              <div className="col-span-12 lg:landscape:col-span-7 xl:col-span-7 [text-shadow:0_2px_22px_var(--kw-bg),0_0_8px_var(--kw-bg)]">
+            <div className="grid grid-cols-12 gap-y-8 gap-x-0 sm:gap-x-8 xl:gap-12 items-center min-[1024px]:max-[1279px]:landscape:items-start">
+              <div className="min-w-0 col-span-12 lg:landscape:col-span-7 xl:col-span-7 [text-shadow:0_2px_22px_var(--kw-bg),0_0_8px_var(--kw-bg)]">
                 {/* Keyword-bearing H1 (SEO audit §5.2). Three descending
                     lines — the widest is "Prediction markets" (18ch), which
                     the responsive sizes are tuned against so the block never
@@ -195,6 +196,7 @@ export default function LandingPage() {
                     Or explore markets without installing
                   </Link>
                 </div>
+                <McpHeroInstall />
               </div>
 
               {/* Hero artifact visibility + placement (CSS can't read physical
