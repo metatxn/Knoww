@@ -147,6 +147,20 @@ test("reads every history page and requests retired versions", async () => {
   );
 });
 
+test("null, undefined, and empty cursors finish pagination", async () => {
+  const servers = [versionEntry("0.2.2")];
+  for (const nextCursor of [null, undefined, ""]) {
+    let calls = 0;
+    const versions = await listVersions(source.name, async () => {
+      calls++;
+      assert.equal(calls, 1);
+      return Response.json({ servers, metadata: { nextCursor } });
+    });
+    assert.deepEqual(versions, servers);
+    assert.equal(calls, 1);
+  }
+});
+
 test("history lookup fails closed on API errors, malformed data, and repeated cursors", async () => {
   for (const status of [404, 429, 500]) {
     await assert.rejects(

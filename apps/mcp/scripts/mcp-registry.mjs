@@ -94,7 +94,8 @@ export async function listVersions(name, request = fetch) {
       throw new Error("Invalid registry history response.");
     versions.push(...page.servers);
     const cursor = page.metadata.nextCursor;
-    if (cursor === undefined || cursor === "") return versions;
+    if (cursor === null || cursor === undefined || cursor === "")
+      return versions;
     if (typeof cursor !== "string" || cursors.has(cursor))
       throw new Error("Invalid registry history cursor.");
     cursors.add(cursor);
