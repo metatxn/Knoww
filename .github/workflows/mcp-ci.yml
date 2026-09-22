@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PUBLISHER_VERSION: v1.8.1
+  PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+
 concurrency:
   group: mcp-ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -57,6 +61,17 @@ jobs:
           pnpm --filter @knoww/services typecheck
           pnpm --filter @knoww/web typecheck
           pnpm --filter @knoww/extension typecheck
+
+      - name: Validate MCP Registry manifest
+        run: |
+          mkdir -p "$RUNNER_TEMP/mcp-registry"
+          cd "$RUNNER_TEMP/mcp-registry"
+          curl --fail --silent --show-error --location --retry 3 --max-time 60 \
+            "https://github.com/modelcontextprotocol/registry/releases/download/$PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz" \
+            --output publisher.tar.gz
+          printf '%s  publisher.tar.gz\n' "$PUBLISHER_SHA256" | sha256sum --check
+          tar -xzf publisher.tar.gz mcp-publisher
+          ./mcp-publisher validate "$GITHUB_WORKSPACE/apps/mcp/server.json"
 
       - name: Run affected tests
         run: |
@@ -112,9 +127,6 @@ jobs:
 
       - name: Install verified MCP publisher
         if: steps.metadata.outputs.publish_required == 'true'
-        env:
-          PUBLISHER_VERSION: v1.8.1
-          PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
         run: |
           cd "$RUNNER_TEMP/mcp-registry"
           curl --fail --silent --show-error --location --retry 3 --max-time 60 \
