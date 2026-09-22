@@ -161,6 +161,21 @@ test("null, undefined, and empty cursors finish pagination", async () => {
   }
 });
 
+for (const [label, metadata] of [
+  ["string", "invalid metadata"],
+  ["array", []],
+  ["null", null],
+]) {
+  test(`rejects ${label} metadata with the invalid-response error`, async () => {
+    await assert.rejects(
+      listVersions(source.name, async () =>
+        Response.json({ servers: [], metadata })
+      ),
+      { message: "Invalid registry history response." }
+    );
+  });
+}
+
 test("history lookup fails closed on API errors, malformed data, and repeated cursors", async () => {
   for (const status of [404, 429, 500]) {
     await assert.rejects(

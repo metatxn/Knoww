@@ -90,7 +90,12 @@ export async function listVersions(name, request = fetch) {
         `Registry history lookup failed with HTTP ${response.status}.`
       );
     const page = await response.json();
-    if (!Array.isArray(page.servers) || !page.metadata)
+    if (
+      !Array.isArray(page.servers) ||
+      page.metadata === null ||
+      typeof page.metadata !== "object" ||
+      Array.isArray(page.metadata)
+    )
       throw new Error("Invalid registry history response.");
     versions.push(...page.servers);
     const cursor = page.metadata.nextCursor;
