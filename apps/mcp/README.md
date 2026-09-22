@@ -2,7 +2,7 @@
 
 Knoww's remote Model Context Protocol server exposes read-only prediction-market tools for AI clients and agents. It runs as a dedicated Cloudflare Worker and reads public market data from Polymarket's Gamma, Data, and CLOB APIs through the shared `@knoww/services` package.
 
-The code is a production release candidate. Knoww uses one remote MCP environment: production. Production traffic remains off until an approved operator provisions the Cloudflare resources, configures alerts, and performs the first attended production deployment. After that bootstrap release, Cloudflare Workers Builds deploys MCP-affecting merges to `main`; GitHub Actions remains a pre-merge quality gate.
+The code is a production release candidate. Knoww uses one remote MCP environment: production. Production traffic remains off until an approved operator provisions the Cloudflare resources, configures alerts, and performs the first attended production deployment. After that bootstrap release, Cloudflare Workers Builds deploys MCP-affecting merges to `main`. GitHub Actions checks pull requests and publishes MCP Registry metadata after checks pass on MCP-affecting pushes to `main`.
 
 For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the initial implementation record, read [mcp-implementation-report.md](../../mcp-implementation-report.md). Release operators should follow [OPERATIONS.md](OPERATIONS.md).
 
@@ -913,7 +913,7 @@ When debugging a request, start with `x-request-id`, then find the matching stru
 
 ## Deployment status
 
-The repository now contains the production route, OAuth and quota bindings, probes, PR quality gate, HTTP contract, and rollback commands. GitHub Actions validates every pull request but never deploys. After the bootstrap release, Cloudflare Workers Builds is the only automatic production deployer and runs for MCP-affecting merges to `main`.
+The repository now contains the production route, OAuth and quota bindings, probes, PR quality gate, HTTP contract, and rollback commands. GitHub Actions validates every pull request and automatically publishes registry metadata after checks pass on MCP-affecting pushes to `main`. After the bootstrap release, Cloudflare Workers Builds is the only automatic Worker deployer and runs for MCP-affecting merges to `main`. See [Automatic MCP Registry publication](OPERATIONS.md#automatic-mcp-registry-publication) for authentication, generated versions, and recovery.
 
 There is no remote staging Worker. The first live CIMD, DCR, Google OAuth, quota, and tool checks run against production immediately after the first attended deployment. Protect `main` so `MCP CI / quality` is required and direct pushes are blocked. Follow [OPERATIONS.md](OPERATIONS.md) for the exact release checks, monitoring thresholds, Cloudflare build settings, and rollback commands.
 

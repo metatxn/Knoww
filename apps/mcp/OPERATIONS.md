@@ -102,7 +102,23 @@ git diff --check
 git diff --cached --check
 ```
 
-The `MCP CI` GitHub workflow repeats these gates for every pull request. It never deploys a Worker and does not run again after merge. Running it on every pull request ensures that the required check cannot remain pending because of a path-filtered workflow. Configure branch protection so `MCP CI / quality` must pass before merge, require pull requests, and block direct pushes to `main`.
+The `MCP CI` GitHub workflow repeats these gates for every pull request and for MCP-affecting pushes to `main`. Running it on every pull request ensures that the required check cannot remain pending because of a path-filtered workflow. Configure branch protection so `MCP CI / quality` must pass before merge, require pull requests, and block direct pushes to `main`.
+
+## Automatic MCP Registry publication
+
+After the checks pass on `main`, `MCP CI / publish-registry` publishes Knoww's listing to the official MCP Registry. Changes under `apps/mcp`, the shared service, logger, and types packages, or the workflow and listed root build configuration files trigger a run. The workflow also supports **Run workflow** on `main` for recovery. Pull requests, other branches, and fork repositories cannot run the publishing job.
+
+Publishing uses GitHub OIDC with `id-token: write`. No registry secret, personal access token, or interactive login is needed. GitHub Actions must be enabled for `metatxn/Knoww` and allowed to request OIDC tokens. Merge the workflow into `main` to enable it.
+
+Edit `apps/mcp/server.json` to change the listing. CI copies that file to a temporary directory and replaces its version with `YYYY.M.D-ci.RUN_ID`, using the commit's UTC date and the GitHub workflow run ID. For example, `2026.9.22-ci.123456789`. These calendar versions sort above the existing `0.2.x` listings. CI ignores the checked-in version, so routine publication does not need a version bump or a bot commit. Use **Run workflow** for manual recovery; publishing the checked-in `0.2.x` version would not replace a calendar version as the latest listing.
+
+Each new run has a unique registry version. Retrying the same run reuses its version and skips publishing if the registry already contains identical active metadata. Conflicting metadata, inactive versions, and registry lookup failures fail the job. The final step reads the published version back and records it in the Actions summary. An old run can publish an older version without replacing the registry's newest version.
+
+The publisher is pinned to v1.8.1 and its Linux archive SHA-256 is checked before execution. Update the version and digest together when upgrading it. Authentication files and generated metadata stay in the runner's temporary directory.
+
+Registry publication updates discovery metadata only. Cloudflare Workers Builds deploys the MCP service independently. A successful registry job does not prove that the corresponding Worker deployment succeeded; verify the Cloudflare build status separately. To correct listing metadata, edit `server.json` and merge another change to `main`. Published versions are immutable.
+
+References: [registry GitHub Actions authentication](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx) and [registry versioning](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/versioning.mdx).
 
 ## Production-only release policy
 
@@ -174,7 +190,7 @@ The normal path is:
 4. Confirm that Cloudflare Workers Builds deploys the same merge commit to `knoww-mcp`.
 5. Verify `/healthz`, `/readyz`, OAuth discovery, one authenticated tool call, logs, and release thresholds.
 
-GitHub Actions owns pre-merge verification. Cloudflare Workers Builds owns production deployment. Do not add a second deployment job to GitHub Actions.
+GitHub Actions owns verification and MCP Registry publication. Cloudflare Workers Builds owns production deployment. Do not add a second Worker deployment job to GitHub Actions.
 
 Cloudflare's normal `wrangler deploy` path assigns production traffic to the new version. For a deliberately gradual high-risk release, first disable the automatic production trigger, then use the manual version commands below.
 

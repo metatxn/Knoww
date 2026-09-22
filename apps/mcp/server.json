@@ -3,8 +3,8 @@
   "name": "io.github.metatxn/knoww",
   "title": "Knoww",
   "description": "Read-only Polymarket search, market details, order books, price history, and market cards.",
-  "version": "0.2.0",
-  "websiteUrl": "https://knoww.app/mcp",
+  "version": "0.2.1",
+  "websiteUrl": "https://knoww.app",
   "repository": {
     "url": "https://github.com/metatxn/Knoww",
     "source": "github"
