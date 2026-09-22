@@ -4,20 +4,120 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 const registryUrl = "https://registry.modelcontextprotocol.io";
+const publisherMetadataKey =
+  "io.modelcontextprotocol.registry/publisher-provided";
 
-export function prepareManifest(source, commitTimestamp, runId) {
+function stableVersion(version) {
+  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)
+    ? version.split(".").map(BigInt)
+    : null;
+}
+
+function compareVersions(left, right) {
+  for (let index = 0; index < 3; index++) {
+    if (left[index] !== right[index])
+      return left[index] > right[index] ? 1 : -1;
+  }
+  return 0;
+}
+
+export function prepareManifest(source, versions, runId, commitSha) {
   if (source.name !== "io.github.metatxn/knoww") {
     throw new Error("Expected the Knoww registry namespace.");
   }
-  if (!/^\d+$/.test(commitTimestamp) || !/^[1-9]\d*$/.test(runId)) {
-    throw new Error("A commit timestamp and GitHub run ID are required.");
+  if (!/^[1-9]\d*$/.test(runId) || !/^[a-f0-9]{40}$/.test(commitSha)) {
+    throw new Error("A GitHub run ID and commit SHA are required.");
   }
-  const date = new Date(Number(commitTimestamp) * 1000);
-  if (!Number.isFinite(date.getTime())) {
-    throw new Error("Invalid commit timestamp.");
+  let highest = stableVersion(source.version);
+  if (!highest)
+    throw new Error("The baseline version must be MAJOR.MINOR.PATCH.");
+
+  const manifest = {
+    ...source,
+    _meta: {
+      ...source._meta,
+      [publisherMetadataKey]: {
+        ...source._meta?.[publisherMetadataKey],
+        githubActions: { runId, commitSha },
+      },
+    },
+  };
+  let previous;
+  for (const entry of versions) {
+    if (
+      entry.server?.name !== source.name ||
+      typeof entry.server.version !== "string"
+    ) {
+      throw new Error("Unexpected server in registry version history.");
+    }
+    const version = stableVersion(entry.server.version);
+    if (version && compareVersions(version, highest) > 0) highest = version;
+    if (
+      entry.server._meta?.[publisherMetadataKey]?.githubActions?.runId === runId
+    ) {
+      if (previous)
+        throw new Error("Multiple versions belong to this workflow run.");
+      previous = entry;
+    }
   }
-  const version = `${date.getUTCFullYear()}.${date.getUTCMonth() + 1}.${date.getUTCDate()}-ci.${runId}`;
-  return { ...source, version };
+  if (previous) {
+    const expected = { ...manifest, version: previous.server.version };
+    if (!stableVersion(expected.version))
+      throw new Error("Invalid version for this workflow run.");
+    assertPublished(previous, expected);
+    return expected;
+  }
+  return {
+    ...manifest,
+    version: `${highest[0]}.${highest[1]}.${highest[2] + 1n}`,
+  };
+}
+
+export async function listVersions(name, request = fetch) {
+  const url = new URL(
+    `${registryUrl}/v0.1/servers/${encodeURIComponent(name)}/versions`
+  );
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("include_deleted", "true");
+  const versions = [];
+  const cursors = new Set();
+  while (true) {
+    const response = await request(url.toString(), {
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok)
+      throw new Error(
+        `Registry history lookup failed with HTTP ${response.status}.`
+      );
+    const page = await response.json();
+    if (
+      !Array.isArray(page.servers) ||
+      page.metadata === null ||
+      typeof page.metadata !== "object" ||
+      Array.isArray(page.metadata)
+    )
+      throw new Error("Invalid registry history response.");
+    versions.push(...page.servers);
+    const cursor = page.metadata.nextCursor;
+    if (cursor === null || cursor === undefined || cursor === "")
+      return versions;
+    if (typeof cursor !== "string" || cursors.has(cursor))
+      throw new Error("Invalid registry history cursor.");
+    cursors.add(cursor);
+    url.searchParams.set("cursor", cursor);
+  }
+}
+
+function assertPublished(published, manifest) {
+  if (
+    !isDeepStrictEqual(published.server, manifest) ||
+    published._meta?.["io.modelcontextprotocol.registry/official"]?.status !==
+      "active"
+  ) {
+    throw new Error(
+      "The published version differs from the expected active listing."
+    );
+  }
 }
 
 export async function isPublished(manifest, request = fetch) {
@@ -30,15 +130,7 @@ export async function isPublished(manifest, request = fetch) {
     throw new Error(`Registry lookup failed with HTTP ${response.status}.`);
   }
   const published = await response.json();
-  if (
-    !isDeepStrictEqual(published.server, manifest) ||
-    published._meta?.["io.modelcontextprotocol.registry/official"]?.status !==
-      "active"
-  ) {
-    throw new Error(
-      "The published version differs from the expected active listing."
-    );
-  }
+  assertPublished(published, manifest);
   return true;
 }
 
@@ -48,8 +140,9 @@ async function main() {
   if (mode === "prepare") {
     const manifest = prepareManifest(
       source,
-      process.env.MCP_COMMIT_TIMESTAMP ?? "",
-      process.env.GITHUB_RUN_ID ?? ""
+      await listVersions(source.name),
+      process.env.GITHUB_RUN_ID ?? "",
+      process.env.GITHUB_SHA ?? ""
     );
     writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
     const published = await isPublished(manifest);
