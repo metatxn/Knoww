@@ -121,7 +121,6 @@ jobs:
         id: metadata
         run: |
           mkdir -p "$RUNNER_TEMP/mcp-registry"
-          export MCP_COMMIT_TIMESTAMP="$(git show -s --format=%ct HEAD)"
           node apps/mcp/scripts/mcp-registry.mjs prepare \
             apps/mcp/server.json "$RUNNER_TEMP/mcp-registry/server.json"
 
