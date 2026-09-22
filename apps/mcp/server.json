@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.metatxn/knoww",
+  "title": "Knoww",
+  "description": "Read-only Polymarket search, market details, order books, price history, and market cards.",
+  "version": "0.2.0",
+  "websiteUrl": "https://knoww.app/mcp",
+  "repository": {
+    "url": "https://github.com/metatxn/Knoww",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.knoww.app/mcp"
+    }
+  ]
+}
