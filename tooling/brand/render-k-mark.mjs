@@ -43,6 +43,7 @@ const TARGETS = [
   ["apps/web/public/favicon-32x32.png", 32],
   ["apps/web/public/favicon-48x48.png", 48],
   ["apps/web/public/logo-256x256.png", 256],
+  ["apps/web/public/logo-400x400.png", 400],
   ["apps/web/public/logo-512x512.png", 512],
   ["apps/web/public/logo-1024x1024.png", 1024],
 ];
