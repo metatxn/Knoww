@@ -2,7 +2,9 @@
 
 Knoww's remote Model Context Protocol server exposes read-only prediction-market tools for AI clients and agents. It runs as a dedicated Cloudflare Worker and reads public market data from Polymarket's Gamma, Data, and CLOB APIs through the shared `@knoww/services` package.
 
-The code is a production release candidate. Knoww uses one remote MCP environment: production. Production traffic remains off until an approved operator provisions the Cloudflare resources, configures alerts, and performs the first attended production deployment. After that bootstrap release, Cloudflare Workers Builds deploys MCP-affecting merges to `main`. GitHub Actions checks pull requests and publishes MCP Registry metadata after checks pass on MCP-affecting pushes to `main`.
+Connect to the hosted server at `https://mcp.knoww.app/mcp` using Streamable HTTP and OAuth with Google sign-in. For Cline, follow [llms-install.md](./llms-install.md). Hosted clients do not need to clone this repository, build the Worker, or configure Cloudflare.
+
+Knoww uses one remote MCP environment: production. Cloudflare Workers Builds deploys MCP-affecting merges to `main`. GitHub Actions checks pull requests and publishes MCP Registry metadata after checks pass on MCP-affecting pushes to `main`.
 
 For the full architecture and rollout plan, read [mcp.md](../../mcp.md). For the initial implementation record, read [mcp-implementation-report.md](../../mcp-implementation-report.md). Release operators should follow [OPERATIONS.md](OPERATIONS.md).
 
