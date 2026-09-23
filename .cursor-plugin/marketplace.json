@@ -1,0 +1,16 @@
+{
+  "name": "knoww",
+  "owner": {
+    "name": "Knoww",
+    "email": "contact@knoww.app"
+  },
+  "metadata": {
+    "description": "Prediction-market research with Knoww."
+  },
+  "plugins": [
+    {
+      "name": "knoww",
+      "source": "plugins/knoww-cursor"
+    }
+  ]
+}

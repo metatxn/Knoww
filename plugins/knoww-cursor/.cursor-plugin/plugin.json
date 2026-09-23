@@ -1,0 +1,17 @@
+{
+  "name": "knoww",
+  "displayName": "Knoww",
+  "version": "0.1.0",
+  "description": "Search Polymarket prediction markets, inspect market data, and display interactive Knoww market cards.",
+  "author": {
+    "name": "Knoww",
+    "email": "contact@knoww.app"
+  },
+  "homepage": "https://knoww.app",
+  "repository": "https://github.com/metatxn/Knoww",
+  "license": "AGPL-3.0-only",
+  "keywords": ["prediction-markets", "polymarket", "market-research", "mcp"],
+  "logo": "assets/logo.png",
+  "rules": "./rules",
+  "mcpServers": "./mcp.json"
+}
