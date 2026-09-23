@@ -142,6 +142,7 @@ pnpm --filter @knoww/agent test         # Agent node tests
 
 ## Documentation
 
+- [Knoww for Cursor](./plugins/knoww-cursor/README.md) - MCP plugin setup and marketplace package
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Architecture overview
 - [docs/API.md](./docs/API.md) - API route reference
 - [Polymarket Docs](https://docs.polymarket.com/)
