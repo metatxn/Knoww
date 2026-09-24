@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { UserRejectedRequestError } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { qk } from "@/lib/query-keys";
 import { TradingOnboarding } from "./trading-onboarding";
@@ -145,6 +146,60 @@ describe("TradingOnboarding", () => {
       }
     );
   });
+
+  it.each([
+    ["approval", "returned"],
+    ["approval", "thrown"],
+    ["deployment", "returned"],
+    ["deployment", "thrown"],
+  ])(
+    "shows only the rejection message for %s errors that are %s",
+    async (step, errorKind) => {
+      const error = new UserRejectedRequestError(
+        new Error("User rejected the request.")
+      );
+      const operation =
+        step === "approval"
+          ? relayerState.approveUsdcForTrading
+          : relayerState.deploySafe;
+      if (step === "deployment") {
+        relayerState.hasDeployedSafe = false;
+        relayerState.proxyAddress = null;
+        proxyWalletState.isDeployed = false;
+        proxyWalletState.proxyAddress = null;
+      }
+      if (errorKind === "returned") {
+        operation.mockResolvedValueOnce({
+          success: false,
+          error: error.message,
+        });
+      } else {
+        operation.mockRejectedValueOnce(error);
+      }
+
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <TradingOnboarding />
+        </QueryClientProvider>
+      );
+
+      const action = await screen.findByRole("button", {
+        name: step === "approval" ? /approve/i : /sign/i,
+      });
+      fireEvent.click(action);
+
+      const message = await screen.findByText(
+        /User rejected|Request cancelled/
+      );
+      expect(message).toBeVisible();
+      expect(message).toHaveTextContent(/^User rejected the request\.$/);
+      expect(
+        screen.queryByText(/Details:|Version:|viem@/)
+      ).not.toBeInTheDocument();
+      expect(action).toBeEnabled();
+      expect(credentialsState.deriveCredentials).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([false, true])(
     "distinguishes a newly created wallet from an existing wallet: alreadyDeployed=%s",

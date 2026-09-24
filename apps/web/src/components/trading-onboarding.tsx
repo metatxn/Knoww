@@ -343,7 +343,11 @@ export function TradingOnboarding({
           product: "web",
           wallet_mode: walletMode,
         });
-        updateStepStatus("deploy", "error", result.error);
+        updateStepStatus(
+          "deploy",
+          "error",
+          formatTradingOnboardingError(result.error, "Failed to deploy wallet")
+        );
       }
     } catch (err) {
       posthog.capture("trading_account_creation_failed", {
@@ -404,7 +408,14 @@ export function TradingOnboarding({
           product: "web",
           wallet_mode: walletMode,
         });
-        updateStepStatus("approve", "error", result.error);
+        updateStepStatus(
+          "approve",
+          "error",
+          formatTradingOnboardingError(
+            result.error,
+            "Failed to submit approval batch"
+          )
+        );
       }
     } catch (err) {
       posthog.capture("trading_token_approval_failed", {

@@ -77,10 +77,15 @@ function getSessionRecordKey(jti: string): string {
   return `${SESSION_RECORD_PREFIX}/${jti}.json`;
 }
 
-function getSubjectRecordKey(sub: string, scope: ExtensionScope[]): string {
+function getSubjectRecordKey(
+  sub: string,
+  scope: ExtensionScope[],
+  jti: string
+): string {
+  // Each web tab keeps its own relayer session; extension sessions still rotate per wallet.
   const slot =
     scope.length === 1 && scope[0] === "relayer:submit"
-      ? `${sub}-relayer`
+      ? `${sub}-relayer-${jti}`
       : sub;
   return `${SUBJECT_RECORD_PREFIX}/${slot}.json`;
 }
@@ -180,15 +185,16 @@ async function getStoredSessionRecord(
 
 async function getStoredSubjectRecord(
   sub: string,
-  scope: ExtensionScope[]
+  scope: ExtensionScope[],
+  jti: string
 ): Promise<ExtensionSubjectRecord | null> {
   const record = await readStoreJson<ExtensionSubjectRecord>(
-    getSubjectRecordKey(sub, scope)
+    getSubjectRecordKey(sub, scope, jti)
   );
   if (!record) return null;
 
   if (record.expiresAt <= Date.now()) {
-    await deleteStoreKey(getSubjectRecordKey(sub, scope));
+    await deleteStoreKey(getSubjectRecordKey(sub, scope, jti));
     return null;
   }
 
@@ -201,7 +207,8 @@ async function registerExtensionSession(
   const now = Date.now();
   const currentSubjectRecord = await getStoredSubjectRecord(
     claims.sub,
-    claims.scope
+    claims.scope,
+    claims.jti
   );
 
   if (
@@ -242,7 +249,7 @@ async function registerExtensionSession(
 
   await writeStoreJson(getSessionRecordKey(claims.jti), record);
   await writeStoreJson(
-    getSubjectRecordKey(claims.sub, claims.scope),
+    getSubjectRecordKey(claims.sub, claims.scope, claims.jti),
     subjectRecord
   );
 }
@@ -259,7 +266,11 @@ async function isPersistedSessionActive(
     return false;
   }
 
-  const subjectRecord = await getStoredSubjectRecord(claims.sub, claims.scope);
+  const subjectRecord = await getStoredSubjectRecord(
+    claims.sub,
+    claims.scope,
+    claims.jti
+  );
   if (subjectRecord?.currentJti !== claims.jti) {
     return false;
   }
@@ -294,9 +305,15 @@ export async function revokeExtensionSession(
 
   await writeStoreJson(getSessionRecordKey(claims.jti), revokedRecord);
 
-  const subjectRecord = await getStoredSubjectRecord(claims.sub, claims.scope);
+  const subjectRecord = await getStoredSubjectRecord(
+    claims.sub,
+    claims.scope,
+    claims.jti
+  );
   if (subjectRecord?.currentJti === claims.jti) {
-    await deleteStoreKey(getSubjectRecordKey(claims.sub, claims.scope));
+    await deleteStoreKey(
+      getSubjectRecordKey(claims.sub, claims.scope, claims.jti)
+    );
   }
 }
 
