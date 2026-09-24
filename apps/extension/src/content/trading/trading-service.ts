@@ -785,7 +785,7 @@ export const TradingService = {
     }
   },
 
-  async deriveCredentials(): Promise<void> {
+  async deriveCredentials(onboardingSigningPermit?: string): Promise<void> {
     if (!ctx.address) {
       update({ state: "error", error: "Wallet not connected" });
       return;
@@ -813,7 +813,10 @@ export const TradingService = {
     trackTradingAnalytics("trading_api_key_requested");
 
     try {
-      const result = await CredentialManager.derive(ctx.address);
+      const result = await CredentialManager.derive(
+        ctx.address,
+        onboardingSigningPermit
+      );
       trackTradingAnalytics(
         result.method === "create"
           ? "trading_api_key_created"

@@ -68,6 +68,15 @@ export function observeFirstMountedTradingCard(
 
 (async function main(): Promise<void> {
   if (isWebmailUrl(window.location.href)) return;
+  // The background worker owns this page's signing flow. It has no feed
+  // adapter and must not start discovery or inject the general wallet bridge.
+  if (
+    window.location.pathname === "/extension-credentials.html" &&
+    ["https://knoww.app", "http://localhost:8000"].includes(
+      window.location.origin
+    )
+  )
+    return;
   const { log, safeSendMessage } = window.KNOWW_UTILS;
   const {
     CONFIG,

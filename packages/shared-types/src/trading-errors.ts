@@ -9,7 +9,6 @@ export interface MappedTradingError {
   title: string;
   body: string;
   code?: string;
-  raw: string;
 }
 
 const CLOB_PREFIX = "clob rejected order:";
@@ -128,17 +127,22 @@ export function mapTradingError(
     return {
       title: "Something went wrong",
       body: "Please try again.",
-      raw: "",
     };
   }
 
   const lower = raw.toLowerCase();
 
+  if (/^select 0x[a-f\d]{40} in /i.test(raw)) {
+    return {
+      title: "Connect the same account",
+      body: "In your wallet's connection prompt, select the same account as in the trading panel, then retry.",
+    };
+  }
+
   if (isNetworkErrorText(lower)) {
     return {
       title: "Network issue",
       body: "Check your connection and retry the order.",
-      raw,
     };
   }
 
@@ -146,7 +150,6 @@ export function mapTradingError(
     return {
       title: "Taking too long",
       body: "The request did not respond in time. Retry to start a fresh one.",
-      raw,
     };
   }
 
@@ -158,7 +161,6 @@ export function mapTradingError(
     return {
       title: "Session expired",
       body: "Reconnect your wallet from the Knoww panel, then try again.",
-      raw,
     };
   }
 
@@ -166,7 +168,6 @@ export function mapTradingError(
     return {
       title: "Signing cancelled",
       body: "You declined the wallet prompt. Retry and approve to continue.",
-      raw,
     };
   }
 
@@ -179,31 +180,28 @@ export function mapTradingError(
     return {
       title: "Trading wallet not set up",
       body: "Create your trading vault in the Knoww setup flow, then retry.",
-      raw,
     };
   }
 
   if (lower.startsWith(CLOB_PREFIX)) {
-    return mapClobBody(raw.slice(CLOB_PREFIX.length).trim(), raw);
+    return mapClobBody(raw.slice(CLOB_PREFIX.length).trim());
   }
 
   if (RELAYER_PREFIX_RE.test(lower)) {
-    return mapRelayerBody(raw, lower);
+    return mapRelayerBody(lower);
   }
 
   if (lower.includes("transaction failed")) {
     return {
       title: "Transaction failed",
       body: "The network rejected the transaction. This is usually transient. Retry.",
-      raw,
     };
   }
 
   return {
-    title: "Order rejected",
-    body: truncate(raw, 160),
+    title: "Request failed",
+    body: "The request could not be completed. Please try again.",
     code: "UNKNOWN",
-    raw,
   };
 }
 
@@ -283,7 +281,7 @@ export function formatTradingOnboardingError(
   return message.length > 180 ? fallback : message;
 }
 
-function mapClobBody(body: string, raw: string): MappedTradingError {
+function mapClobBody(body: string): MappedTradingError {
   const lower = body.toLowerCase();
 
   if (
@@ -295,7 +293,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Not enough funds",
       body: "Your account does not have enough pUSD for this order. Deposit more or reduce the size.",
-      raw,
     };
   }
 
@@ -303,7 +300,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Allowance missing",
       body: "Trading allowance needs to be re-enabled. Reopen the Knoww panel to fix it.",
-      raw,
     };
   }
 
@@ -317,7 +313,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Market closed",
       body: "This market is not accepting orders right now.",
-      raw,
     };
   }
 
@@ -325,7 +320,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Invalid price",
       body: "Price must match the market's tick size, usually 1 cent increments. Adjust and retry.",
-      raw,
     };
   }
 
@@ -338,7 +332,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Order too small",
       body: "Size is below this market's minimum. Increase it and retry.",
-      raw,
     };
   }
 
@@ -351,7 +344,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Order too large",
       body: "Size exceeds this market's maximum. Reduce it and retry.",
-      raw,
     };
   }
 
@@ -364,7 +356,6 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Price moved",
       body: "The order book shifted before your order landed. Refresh the quote and retry.",
-      raw,
     };
   }
 
@@ -376,25 +367,22 @@ function mapClobBody(body: string, raw: string): MappedTradingError {
     return {
       title: "Signing failed",
       body: "The exchange could not verify your wallet signature. Reconnect and retry.",
-      raw,
     };
   }
 
   return {
     title: "Order rejected by exchange",
-    body: truncate(body, 160) || "The exchange rejected this order.",
+    body: "The exchange rejected this order. Review the order details and try again.",
     code: "CLOB_UNKNOWN",
-    raw,
   };
 }
 
-function mapRelayerBody(raw: string, lower: string): MappedTradingError {
+function mapRelayerBody(lower: string): MappedTradingError {
   if (lower.includes("relayer 400") || lower.includes("bad request")) {
     return {
       title: "Relayer rejected",
       body: "The relayer would not process the transaction. Reconnect your wallet and retry.",
       code: "RELAYER_400",
-      raw,
     };
   }
   if (
@@ -405,14 +393,12 @@ function mapRelayerBody(raw: string, lower: string): MappedTradingError {
     return {
       title: "Relayer unavailable",
       body: "The relayer is temporarily down. Wait a moment and retry.",
-      raw,
     };
   }
   return {
     title: "Relayer error",
     body: "The transaction could not be submitted. Retry, or reconnect your wallet if it persists.",
     code: "RELAYER_UNKNOWN",
-    raw,
   };
 }
 
@@ -424,10 +410,4 @@ function isNetworkErrorText(lower: string): boolean {
     lower.includes("err_network") ||
     lower.includes("err_internet_disconnected")
   );
-}
-
-function truncate(value: string, maxLength: number): string {
-  return value.length > maxLength
-    ? `${value.slice(0, maxLength - 3)}...`
-    : value;
 }

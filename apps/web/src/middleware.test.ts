@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { middleware } from "./middleware";
@@ -7,6 +9,40 @@ afterEach(() => {
 });
 
 describe("middleware security headers", () => {
+  it("applies the same signing policy when credentials HTML is served as a static asset", () => {
+    const headers = readFileSync(
+      resolve(process.cwd(), "public/_headers"),
+      "utf8"
+    );
+    const block =
+      headers
+        .match(
+          /^\/extension-credentials\.html\r?\n((?:[ \t]+[^\n]*\r?\n?)*)/m
+        )?.[1]
+        ?.split("\n") ?? [];
+    const staticPolicy = block
+      .find((line) => line.trim().startsWith("Content-Security-Policy:"))
+      ?.trim()
+      .slice("Content-Security-Policy:".length)
+      .trim();
+    const response = middleware(
+      new NextRequest("https://knoww.app/extension-credentials.html")
+    );
+    expect(staticPolicy).toBe(response.headers.get("Content-Security-Policy"));
+  });
+  it("keeps the extension signing page free of site scripts and network access", () => {
+    const response = middleware(
+      new NextRequest("https://knoww.app/extension-credentials.html")
+    );
+    const policy = response.headers.get("Content-Security-Policy");
+    expect(policy).toContain("default-src 'none'");
+    expect(policy).toContain("script-src chrome-extension:");
+    expect(policy).toContain("script-src-attr 'none'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).not.toContain("script-src 'self'");
+    expect(policy).not.toContain("connect-src");
+  });
+
   it("allows packaged extension frames only on the extension setup page", () => {
     const setup = middleware(
       new NextRequest("https://knoww.app/extension/connect")
@@ -21,8 +57,7 @@ describe("middleware security headers", () => {
   });
   it("allows managed PostHog proxy scripts and event requests", () => {
     const response = middleware(new NextRequest("https://knoww.app/"));
-    const directives = response.headers
-      .get("Content-Security-Policy")!
+    const directives = (response.headers.get("Content-Security-Policy") ?? "")
       .split(";")
       .map((directive) => directive.trim().split(/\s+/));
 

@@ -38,7 +38,8 @@ function isApiKeyCreds(value: unknown): value is ApiKeyCreds {
  * For a successful `trading:derive-credentials` offscreen response, pull out the
  * raw credentials for the SW to persist and produce a content-safe response
  * carrying only the derivation method. Returns null when there's nothing to
- * persist (the caller then relays the original response unchanged).
+ * persist. The caller must reject malformed success responses without relaying
+ * their data, which may contain partial credentials.
  */
 export function extractDerivedCredentials(
   result: BackgroundResponse | undefined

@@ -8,6 +8,8 @@ const RECORD_KEY = "authorization-transaction";
 const INTERNAL_ORIGIN = "https://authorization-transaction.internal";
 
 export interface AuthorizationTransaction {
+  approved?: boolean;
+  browserSessionHash?: string;
   codeChallenge: string;
   codeVerifier: string;
   id: string;
@@ -17,6 +19,30 @@ export interface AuthorizationTransaction {
   resource: string;
   scopes: string[];
   oauthRequest: AuthRequest;
+}
+
+export async function approveAuthorizationTransaction(
+  namespace: DurableObjectNamespace,
+  transactionId: string,
+  browserSessionHash: string
+): Promise<boolean> {
+  const response = await transactionStub(namespace, transactionId).fetch(
+    new Request(`${INTERNAL_ORIGIN}/transaction/approve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ browserSessionHash }),
+    })
+  );
+  if (
+    response.status === 403 ||
+    response.status === 404 ||
+    response.status === 410
+  ) {
+    return false;
+  }
+  if (!response.ok)
+    throw new Error("Could not approve authorization transaction.");
+  return true;
 }
 
 function transactionStub(
@@ -110,6 +136,30 @@ export class WalletChallengeStore extends DurableObject<Env> {
       return new Response(userId, { headers: { "cache-control": "no-store" } });
     }
     if (url.pathname === "/health" && request.method === "GET") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/transaction/approve" && request.method === "POST") {
+      const { browserSessionHash } = await request.json<{
+        browserSessionHash?: string;
+      }>();
+      const transaction =
+        await this.ctx.storage.get<AuthorizationTransaction>(RECORD_KEY);
+      if (!transaction) return new Response(null, { status: 404 });
+      if (Date.parse(transaction.expirationTime) <= Date.now()) {
+        await this.ctx.storage.delete(RECORD_KEY);
+        await this.ctx.storage.deleteAlarm();
+        return new Response(null, { status: 410 });
+      }
+      if (
+        !browserSessionHash ||
+        transaction.browserSessionHash !== browserSessionHash
+      ) {
+        return new Response(null, { status: 403 });
+      }
+      await this.ctx.storage.put(RECORD_KEY, {
+        ...transaction,
+        approved: true,
+      });
       return new Response(null, { status: 204 });
     }
     if (url.pathname !== "/transaction") {

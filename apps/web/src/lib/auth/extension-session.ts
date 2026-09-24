@@ -77,8 +77,17 @@ function getSessionRecordKey(jti: string): string {
   return `${SESSION_RECORD_PREFIX}/${jti}.json`;
 }
 
-function getSubjectRecordKey(sub: string): string {
-  return `${SUBJECT_RECORD_PREFIX}/${sub}.json`;
+function getSubjectRecordKey(
+  sub: string,
+  scope: ExtensionScope[],
+  jti: string
+): string {
+  // Each web tab keeps its own relayer session; extension sessions still rotate per wallet.
+  const slot =
+    scope.length === 1 && scope[0] === "relayer:submit"
+      ? `${sub}-relayer-${jti}`
+      : sub;
+  return `${SUBJECT_RECORD_PREFIX}/${slot}.json`;
 }
 
 let memoryFallbackWarned = false;
@@ -175,26 +184,50 @@ async function getStoredSessionRecord(
 }
 
 async function getStoredSubjectRecord(
-  sub: string
+  sub: string,
+  scope: ExtensionScope[],
+  jti: string
 ): Promise<ExtensionSubjectRecord | null> {
   const record = await readStoreJson<ExtensionSubjectRecord>(
-    getSubjectRecordKey(sub)
+    getSubjectRecordKey(sub, scope, jti)
   );
   if (!record) return null;
 
   if (record.expiresAt <= Date.now()) {
-    await deleteStoreKey(getSubjectRecordKey(sub));
+    await deleteStoreKey(getSubjectRecordKey(sub, scope, jti));
     return null;
   }
 
   return record;
 }
 
+async function cleanupExpiredSession(
+  claims: ExtensionSessionClaims
+): Promise<void> {
+  if (claims.scope.length !== 1 || claims.scope[0] !== "relayer:submit") {
+    return;
+  }
+  try {
+    // Relayer keys belong to one session; extension subject keys can be replaced concurrently.
+    await Promise.all([
+      getStoredSessionRecord(claims.jti),
+      getStoredSubjectRecord(claims.sub, claims.scope, claims.jti),
+    ]);
+  } catch {
+    // Storage failures must not prevent expired tokens from being rejected.
+    log.warn("storage.expired_session_cleanup_failed");
+  }
+}
+
 async function registerExtensionSession(
   claims: ExtensionSessionClaims
 ): Promise<void> {
   const now = Date.now();
-  const currentSubjectRecord = await getStoredSubjectRecord(claims.sub);
+  const currentSubjectRecord = await getStoredSubjectRecord(
+    claims.sub,
+    claims.scope,
+    claims.jti
+  );
 
   if (
     currentSubjectRecord?.currentJti &&
@@ -233,7 +266,10 @@ async function registerExtensionSession(
   };
 
   await writeStoreJson(getSessionRecordKey(claims.jti), record);
-  await writeStoreJson(getSubjectRecordKey(claims.sub), subjectRecord);
+  await writeStoreJson(
+    getSubjectRecordKey(claims.sub, claims.scope, claims.jti),
+    subjectRecord
+  );
 }
 
 async function isPersistedSessionActive(
@@ -248,7 +284,11 @@ async function isPersistedSessionActive(
     return false;
   }
 
-  const subjectRecord = await getStoredSubjectRecord(claims.sub);
+  const subjectRecord = await getStoredSubjectRecord(
+    claims.sub,
+    claims.scope,
+    claims.jti
+  );
   if (subjectRecord?.currentJti !== claims.jti) {
     return false;
   }
@@ -260,6 +300,10 @@ export async function revokeExtensionSession(
   claims: ExtensionSessionClaims
 ): Promise<void> {
   const now = Date.now();
+  if (claims.exp <= now) {
+    await cleanupExpiredSession(claims);
+    return;
+  }
   const existingRecord = await getStoredSessionRecord(claims.jti);
 
   const revokedRecord: ExtensionSessionRecord = existingRecord
@@ -283,9 +327,15 @@ export async function revokeExtensionSession(
 
   await writeStoreJson(getSessionRecordKey(claims.jti), revokedRecord);
 
-  const subjectRecord = await getStoredSubjectRecord(claims.sub);
+  const subjectRecord = await getStoredSubjectRecord(
+    claims.sub,
+    claims.scope,
+    claims.jti
+  );
   if (subjectRecord?.currentJti === claims.jti) {
-    await deleteStoreKey(getSubjectRecordKey(claims.sub));
+    await deleteStoreKey(
+      getSubjectRecordKey(claims.sub, claims.scope, claims.jti)
+    );
   }
 }
 
@@ -475,10 +525,15 @@ export async function verifyExtensionSessionToken(
   if (claims.aud !== TOKEN_AUDIENCE || claims.iss !== TOKEN_ISSUER) {
     return null;
   }
-  if (claims.exp <= Date.now()) {
+  if (
+    !Array.isArray(claims.scope) ||
+    typeof claims.sub !== "string" ||
+    typeof claims.jti !== "string"
+  ) {
     return null;
   }
-  if (!Array.isArray(claims.scope) || typeof claims.sub !== "string") {
+  if (claims.exp <= Date.now()) {
+    await cleanupExpiredSession(claims);
     return null;
   }
   if (!(await isPersistedSessionActive(claims))) {

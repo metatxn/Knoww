@@ -37,7 +37,9 @@ if (
       "display:block;position:absolute;visibility:hidden;width:100%;height:100%;border:0;background:transparent";
     const extensionOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
     const themeRoot = slot.closest(".kw-page") ?? document.documentElement;
+    let frameReady = false;
     const syncTheme = () => {
+      if (!frameReady) return;
       const styles = getComputedStyle(themeRoot);
       frame.contentWindow?.postMessage(
         {
@@ -53,7 +55,6 @@ if (
         extensionOrigin
       );
     };
-    frame.addEventListener("load", syncTheme);
     new MutationObserver(syncTheme).observe(themeRoot, {
       attributes: true,
       attributeFilter: ["data-theme", "data-scheme", "class", "style"],
@@ -67,6 +68,7 @@ if (
         return;
       const height = event.data.height;
       if (typeof height === "number" && Number.isFinite(height)) {
+        frameReady = true;
         syncTheme();
         frame.style.position = "static";
         frame.style.visibility = "visible";

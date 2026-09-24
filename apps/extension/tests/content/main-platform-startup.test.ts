@@ -32,6 +32,29 @@ beforeEach(() => {
   mocks.loadPlatformAdapter.mockResolvedValue(false);
 });
 
+test.each(["https://knoww.app", "http://localhost:8000"])(
+  "the dedicated signing page on %s does not start market discovery",
+  async (origin) => {
+    vi.stubGlobal("window", {
+      location: new URL(`${origin}/extension-credentials.html`),
+      KNOWW_UTILS: {},
+      KNOWW_CONFIG: { loadUserSettings: vi.fn(async () => {}) },
+      KNOWW_STYLES: {},
+      KNOWW_API: {},
+      KNOWW_INJECTION: {},
+      KNOWW_UI: {},
+    });
+    try {
+      await import("../../src/content/main");
+      expect(mocks.loadPlatformAdapter).not.toHaveBeenCalled();
+      expect(mocks.loggerWarn).not.toHaveBeenCalled();
+      expect(mocks.prefetchTradingRuntime).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
 test("main stops before every downstream boot effect when no adapter loads", async () => {
   const calls = {
     getCurrentPlatform: vi.fn(() => null),

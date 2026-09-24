@@ -20,6 +20,7 @@ import {
   maxUint256,
   multicall3Abi,
   parseAbi,
+  type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
@@ -28,6 +29,7 @@ import {
   USDC_E_ADDRESS,
 } from "@/constants/contracts";
 import { polygon } from "@/lib/chains";
+import { getDeployed, registerRelayerWallet } from "@/lib/relayer-client";
 import {
   type CapturedRequest,
   type RouteHandler,
@@ -330,13 +332,59 @@ export function clobAccountRoutes(personality: Personality): RouteHandler {
 }
 
 export const RELAYER_TX_HASH = `0x${"ef".repeat(32)}`;
+const GOLDEN_RELAYER_SESSION = "golden-relayer-session";
+
+export async function prepareRelayerSession(
+  walletClient: WalletClient,
+  calls: CapturedRequest[],
+  walletLog: WalletRequest[]
+): Promise<() => void> {
+  const unregister = registerRelayerWallet(walletClient, THROWAWAY_EOA);
+  await getDeployed(THROWAWAY_EOA);
+  const challenge = calls.find((call) =>
+    call.url.includes("/api/extension/session/challenge")
+  );
+  const verify = calls.find((call) =>
+    call.url.includes("/api/extension/session/verify")
+  );
+  if (
+    !challenge ||
+    !verify ||
+    (verify.body as { scope?: string }).scope !== "relayer:submit" ||
+    !walletLog.some((request) => request.method === "personal_sign")
+  ) {
+    unregister();
+    throw new Error("golden harness: relayer wallet sign-in was not completed");
+  }
+  calls.splice(0);
+  walletLog.splice(0);
+  return unregister;
+}
 
 /** The app's relayer proxy, as `src/lib/relayer-client.ts` calls it. */
 export function relayerProxyRoutes(
   options: { deployed?: boolean } = {}
 ): RouteHandler {
   const deployed = options.deployed ?? true;
-  return (_request, url) => {
+  return (request, url) => {
+    if (url.pathname === "/api/extension/session/challenge") {
+      return {
+        message: "Sign in to Knoww",
+        challengeToken: "golden-challenge",
+      };
+    }
+    if (url.pathname === "/api/extension/session/verify") {
+      return {
+        token: GOLDEN_RELAYER_SESSION,
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      };
+    }
+    if (
+      url.pathname.startsWith("/api/relayer/") &&
+      request.headers.authorization !== `Bearer ${GOLDEN_RELAYER_SESSION}`
+    ) {
+      throw new Error("golden harness: relayer request has no signed session");
+    }
     switch (url.pathname) {
       case "/api/relayer/nonce":
         return { nonce: "0" };
@@ -381,10 +429,17 @@ export function composeRoutes(handlers: readonly RouteHandler[]): RouteHandler {
 export function toFixtureRequest(request: CapturedRequest) {
   const url = normalizeAppPath(new URL(request.url));
   const isAppLocal = url.hostname === "localhost";
+  const headers = { ...request.headers };
+  if (url.pathname.startsWith("/api/relayer/")) {
+    if (headers.authorization !== `Bearer ${GOLDEN_RELAYER_SESSION}`) {
+      throw new Error("golden harness: relayer request has no signed session");
+    }
+    delete headers.authorization;
+  }
   const record: Record<string, unknown> = {
     method: request.method,
     url: isAppLocal ? `${url.pathname}${url.search}` : url.toString(),
-    headers: request.headers,
+    headers,
     body: request.body,
   };
   if (url.pathname === RPC_PATH) {

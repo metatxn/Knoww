@@ -5,6 +5,10 @@ import { afterEach, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ensureAuthorized: vi.fn(),
+  getDiscoveredWallets: vi.fn(() => [
+    { uuid: "injected-metamask", name: "MetaMask", rdns: "io.metamask" },
+  ]),
+  getSelectedWalletUuid: vi.fn((): string | undefined => "walletconnect"),
   signTypedData: vi.fn(),
 }));
 
@@ -15,7 +19,10 @@ vi.mock("../../src/content/trading/extension-session", () => ({
 }));
 
 vi.mock("../../src/content/trading/bridge", () => ({
+  WALLETCONNECT_WALLET_UUID: "walletconnect",
   WalletBridge: {
+    getDiscoveredWallets: mocks.getDiscoveredWallets,
+    getSelectedWalletUuid: mocks.getSelectedWalletUuid,
     signTypedData: mocks.signTypedData,
   },
 }));
@@ -24,13 +31,18 @@ import { CredentialManager } from "../../src/content/trading/credentials";
 
 type SendMessageCallback = (response: unknown) => void;
 
-function installChromeRuntimeHarness() {
+function installChromeRuntimeHarness(onTrustedDerive?: () => void) {
   let deriveRequests = 0;
+  let trustedDeriveRequests = 0;
   let beginRequests = 0;
   let endRequests = 0;
+  const trustedMessages: Record<string, unknown>[] = [];
   const runtime = {
     lastError: undefined as { message?: string } | undefined,
-    sendMessage(message: { type?: string }, callback: SendMessageCallback) {
+    sendMessage(
+      message: { type?: string; [key: string]: unknown },
+      callback: SendMessageCallback
+    ) {
       runtime.lastError = undefined;
       if (message.type === "creds:has") {
         callback({ ok: true, data: { hasCredentials: false } });
@@ -54,6 +66,13 @@ function installChromeRuntimeHarness() {
         callback({ ok: true, data: { method: "derive" } });
         return;
       }
+      if (message.type === "trading:derive-credentials-trusted") {
+        trustedDeriveRequests += 1;
+        trustedMessages.push(message);
+        onTrustedDerive?.();
+        callback({ ok: true, data: { method: "derive" } });
+        return;
+      }
       callback({ ok: false, error: `Unexpected message: ${message.type}` });
     },
   };
@@ -63,8 +82,12 @@ function installChromeRuntimeHarness() {
   };
 
   return {
+    trustedMessages,
     get deriveRequests() {
       return deriveRequests;
+    },
+    get trustedDeriveRequests() {
+      return trustedDeriveRequests;
     },
     get beginRequests() {
       return beginRequests;
@@ -79,6 +102,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  mocks.getSelectedWalletUuid.mockReset().mockReturnValue("walletconnect");
   delete (globalThis as { chrome?: unknown }).chrome;
 });
 
@@ -100,6 +124,124 @@ test("concurrent credential derivations share one ClobAuth signature request", a
   assert.equal(chromeHarness.beginRequests, 1);
   assert.equal(chromeHarness.deriveRequests, 1);
   assert.equal(chromeHarness.endRequests, 1);
+});
+
+test("injected wallet derives through the trusted tab without signing on the source page", async () => {
+  const chromeHarness = installChromeRuntimeHarness();
+  mocks.ensureAuthorized.mockResolvedValue(undefined);
+  mocks.signTypedData.mockResolvedValue("0xpage-visible-signature");
+  mocks.getSelectedWalletUuid.mockReturnValue("injected-metamask");
+
+  const result = await CredentialManager.derive(
+    "0x000000000000000000000000000000000000cafe"
+  );
+  assert.deepEqual(result, { method: "derive" });
+  assert.equal(mocks.signTypedData.mock.calls.length, 0);
+  assert.equal(chromeHarness.deriveRequests, 0);
+  assert.equal(chromeHarness.trustedDeriveRequests, 1);
+  assert.equal(chromeHarness.endRequests, 1);
+  assert.equal(
+    chromeHarness.trustedMessages[0].onboardingSigningPermit,
+    undefined
+  );
+});
+
+test("onboarding forwards its background permit without signing through the page bridge", async () => {
+  const chromeHarness = installChromeRuntimeHarness();
+  mocks.ensureAuthorized.mockResolvedValue(undefined);
+  mocks.getSelectedWalletUuid.mockReturnValue("injected-metamask");
+  await CredentialManager.derive(
+    "0x000000000000000000000000000000000000cafe",
+    "background-issued-permit"
+  );
+  assert.equal(
+    chromeHarness.trustedMessages[0].onboardingSigningPermit,
+    "background-issued-permit"
+  );
+  assert.equal(mocks.signTypedData.mock.calls.length, 0);
+  assert.equal(chromeHarness.deriveRequests, 0);
+});
+
+test("WalletConnect remains the default after an injected-wallet test", async () => {
+  const harness = installChromeRuntimeHarness();
+  mocks.ensureAuthorized.mockResolvedValue(undefined);
+  mocks.signTypedData.mockResolvedValue("0xsig");
+  await CredentialManager.derive("0x000000000000000000000000000000000000bEEF");
+  assert.equal(harness.deriveRequests, 1);
+  assert.equal(harness.trustedDeriveRequests, 0);
+});
+
+test.each([false, true])(
+  "a sole discovered wallet derives safely with no initial selection (explicit selection after auth: %s)",
+  async (selectDuringAuth) => {
+    const harness = installChromeRuntimeHarness();
+    mocks.getSelectedWalletUuid.mockReturnValue(undefined);
+    mocks.ensureAuthorized.mockImplementationOnce(async () => {
+      if (selectDuringAuth)
+        mocks.getSelectedWalletUuid.mockReturnValue("injected-metamask");
+    });
+    await CredentialManager.derive(
+      "0x000000000000000000000000000000000000bEEF"
+    );
+    assert.equal(harness.trustedDeriveRequests, 1);
+    assert.deepEqual(harness.trustedMessages[0].wallet, {
+      name: "MetaMask",
+      rdns: "io.metamask",
+    });
+    assert.equal(mocks.signTypedData.mock.calls.length, 0);
+    assert.equal(harness.deriveRequests, 0);
+    assert.equal(harness.endRequests, 1);
+  }
+);
+
+test("a sole wallet fallback rejects a wallet switch during authorization", async () => {
+  const harness = installChromeRuntimeHarness();
+  mocks.getSelectedWalletUuid.mockReturnValue(undefined);
+  mocks.ensureAuthorized.mockImplementationOnce(async () => {
+    mocks.getSelectedWalletUuid.mockReturnValue("walletconnect");
+  });
+  await assert.rejects(
+    CredentialManager.derive("0x000000000000000000000000000000000000bEEF"),
+    /selected wallet changed/
+  );
+  assert.equal(harness.trustedDeriveRequests, 0);
+  assert.equal(harness.deriveRequests, 0);
+  assert.equal(harness.endRequests, 1);
+});
+
+test("unselected multiple wallets and unavailable explicit wallets still require a selection", async () => {
+  const harness = installChromeRuntimeHarness();
+  mocks.getDiscoveredWallets.mockReturnValueOnce([
+    { uuid: "injected-metamask", name: "MetaMask", rdns: "io.metamask" },
+    { uuid: "injected-phantom", name: "Phantom", rdns: "app.phantom" },
+  ]);
+  mocks.getSelectedWalletUuid.mockReturnValue(undefined);
+  await assert.rejects(
+    CredentialManager.derive("0x000000000000000000000000000000000000bEEF"),
+    /Choose a wallet/
+  );
+  mocks.getSelectedWalletUuid.mockReturnValue("missing-wallet");
+  await assert.rejects(
+    CredentialManager.derive("0x000000000000000000000000000000000000bEEF"),
+    /Choose a wallet/
+  );
+  assert.equal(harness.trustedDeriveRequests, 0);
+  assert.equal(harness.deriveRequests, 0);
+});
+
+test("a sole wallet fallback rejects a wallet switch during trusted derivation", async () => {
+  const harness = installChromeRuntimeHarness(() => {
+    mocks.getSelectedWalletUuid.mockReturnValue("walletconnect");
+  });
+  mocks.getSelectedWalletUuid.mockReturnValue(undefined);
+  mocks.ensureAuthorized.mockResolvedValue(undefined);
+  await assert.rejects(
+    CredentialManager.derive("0x000000000000000000000000000000000000bEEF"),
+    /selected wallet changed/
+  );
+  assert.equal(harness.trustedDeriveRequests, 1);
+  assert.equal(harness.deriveRequests, 0);
+  assert.equal(harness.endRequests, 1);
 });
 
 test("waiting credential derivation survives a transient idle status after worker restart", async () => {

@@ -115,6 +115,22 @@ function securityHeaderValue(
   value: string,
   pathname: string
 ): string {
+  if (
+    key === "Content-Security-Policy" &&
+    pathname === "/extension-credentials.html"
+  ) {
+    return [
+      "default-src 'none'",
+      "script-src chrome-extension:",
+      "script-src-attr 'none'",
+      "style-src 'unsafe-inline'",
+      "frame-src chrome-extension:",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      "form-action 'none'",
+    ].join("; ");
+  }
   if (key === "Content-Security-Policy" && pathname === "/extension/connect") {
     return value.replace(
       "frame-src 'self'",

@@ -1,5 +1,8 @@
 # https://developers.cloudflare.com/workers/static-assets/headers
 
+/extension-credentials.html
+  Content-Security-Policy: default-src 'none'; script-src chrome-extension:; script-src-attr 'none'; style-src 'unsafe-inline'; frame-src chrome-extension:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+
 # Next.js build assets - immutable, cache forever
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable

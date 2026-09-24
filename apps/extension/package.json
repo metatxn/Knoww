@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm run build:prod",
-    "build:dev": "webpack --config webpack.config.cjs --mode development",
-    "build:prod": "webpack --config webpack.config.cjs --mode production && node scripts/assert-production-bundle.mjs && node scripts/smoke-esm-modules.mjs",
+    "build:dev": "webpack --config webpack.config.cjs --mode development && node scripts/assert-wallet-runtime-import.mjs",
+    "build:prod": "webpack --config webpack.config.cjs --mode production && node scripts/assert-wallet-runtime-import.mjs && node scripts/assert-production-bundle.mjs && node scripts/smoke-esm-modules.mjs",
     "build:store": "STORE_BUILD=true pnpm run build:prod",
     "dev": "webpack --config webpack.config.cjs --mode development --watch",
     "clean": "rm -rf dist",

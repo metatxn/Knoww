@@ -12,6 +12,7 @@ import type { QuoteResponse } from "@knoww/shared-types/bridge";
 // The order-book route below dynamic-imports it inside an `!__STORE_BUILD__`
 // branch. See docs/chrome-prediction-market-ban-assessment.md.
 import {
+  buildClobAuthRpcTypedData,
   POLYMARKET_API,
   RELAYER_API_HOST,
 } from "@knoww/shared-types/polymarket";
@@ -26,6 +27,7 @@ import {
   clearClobCredentialDerivationsForTab,
   endClobCredentialDerivation,
   getClobCredentialDerivationStatus,
+  ownsClobCredentialDerivation,
   resolveClobCredentialDerivationBegin,
 } from "./background/clob-credential-derivation-lock";
 import {
@@ -54,6 +56,10 @@ import {
   isKnowwApiUrl,
   setExtensionAccessToken,
 } from "./background/extension-session";
+import {
+  clearOnboardingClobSigningPermitsForTab,
+  issueOnboardingClobSigningPermit,
+} from "./background/onboarding-clob-signing";
 import { createPortfolioFundAttemptStore } from "./background/portfolio-fund-attempts";
 import { createPortfolioFundIdempotencyCoordinator } from "./background/portfolio-fund-idempotency";
 import { handleRelevanceAggregateMessage } from "./background/relevance-aggregate-messages";
@@ -80,6 +86,10 @@ import {
   tradingOpNeedsCredentials,
 } from "./background/trading-credential-mediation";
 import {
+  assertClobAuthSigner,
+  signClobAuthInTrustedTab,
+} from "./background/trusted-clob-signing";
+import {
   readSetupComplete,
   readSetupMilestones,
 } from "./content/trading/setup-flow-storage";
@@ -97,7 +107,10 @@ import {
   isSearchQueueDeadlineError,
   runSearchWithRetry,
 } from "./search-request-policy";
-import { SESSION_SIGN_IN_HASH } from "./session-sign-in";
+import {
+  parseSessionSignInRequest,
+  SESSION_SIGN_IN_HASH,
+} from "./session-sign-in";
 import {
   getUnsupportedSiteHostname,
   normalizeSiteSupportHostname,
@@ -160,6 +173,13 @@ const portfolioFundAttempts = createPortfolioFundAttemptStore(
 const relevanceAggregateStore = createRelevanceAggregateStore(
   chrome.storage.local
 );
+const pendingTrustedDerivations = new Map<
+  string,
+  {
+    sourceTabId: number;
+    replies: Array<(response: BackgroundResponse) => void>;
+  }
+>();
 
 type SidePanelView = "markets" | "portfolio";
 
@@ -889,6 +909,12 @@ void flushAnalyticsQueue();
 initBridgeWallet();
 chrome.tabs.onRemoved.addListener((tabId) => {
   clearClobCredentialDerivationsForTab(tabId);
+  clearOnboardingClobSigningPermitsForTab(tabId);
+});
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status === "loading" || change.url) {
+    clearOnboardingClobSigningPermitsForTab(tabId);
+  }
 });
 
 // ── Build mode (injected by webpack DefinePlugin, typed in env.d.ts) ──
@@ -1330,7 +1356,8 @@ if (!__STORE_BUILD__) {
 function forwardToOffscreen(
   message: unknown,
   sender: chrome.runtime.MessageSender,
-  sendResponse: (response: BackgroundResponse) => void
+  sendResponse: (response: BackgroundResponse) => void,
+  canAcceptCredentials?: () => Promise<boolean>
 ): void {
   const tabId = sender.tab?.id;
   const msg = message as { type?: string; address?: string };
@@ -1402,12 +1429,26 @@ function forwardToOffscreen(
       ) {
         const extracted = extractDerivedCredentials(result);
         if (extracted) {
+          if (canAcceptCredentials && !(await canAcceptCredentials())) {
+            sendResponse({
+              ok: false,
+              error: "Trading credential setup expired. Try again.",
+            });
+            return;
+          }
           await storeClobCredentials(msg.address, extracted.credentials);
           await chrome.storage.local
             .set({ [TRADING_WARM_ELIGIBLE_STORAGE_KEY]: true })
             .catch(() => {});
           broadcastTradingCredentialsUpdated(msg.address);
           sendResponse(extracted.response);
+          return;
+        }
+        if (result?.ok) {
+          sendResponse({
+            ok: false,
+            error: "Invalid trading credential response. Try again.",
+          });
           return;
         }
       }
@@ -1521,6 +1562,9 @@ chrome.runtime.onMessage.addListener(
       action?: string;
       attemptId?: string;
       outcome?: string;
+      claimToken?: string;
+      onboardingSigningPermit?: string;
+      wallet?: unknown;
     };
 
     const relevanceAggregateResponse = handleRelevanceAggregateMessage(
@@ -1992,6 +2036,22 @@ chrome.runtime.onMessage.addListener(
     ) {
       if (__STORE_BUILD__) {
         sendResponse(STORE_TRADING_DISABLED_RESPONSE);
+        return true;
+      }
+      const onboardingSigningPermit = issueOnboardingClobSigningPermit(
+        sender,
+        msg.address
+      );
+      if (onboardingSigningPermit && typeof sender.tab?.id === "number") {
+        sendMessageToContentTab(
+          sender.tab.id,
+          {
+            type: "KNOWW_ENABLE_PORTFOLIO_TRADING",
+            address: msg.address,
+            onboardingSigningPermit,
+          },
+          sendResponse
+        );
         return true;
       }
       forwardToPortfolioSigningTab(msg, sender, sendResponse, {
@@ -2913,6 +2973,150 @@ chrome.runtime.onMessage.addListener(
         .catch(() =>
           sendResponse({ ok: true, data: null } as BackgroundResponse)
         );
+      return true;
+    }
+
+    if (msg?.type === "trading:derive-credentials-trusted") {
+      if (__STORE_BUILD__) {
+        sendResponse(STORE_TRADING_DISABLED_RESPONSE);
+        return true;
+      }
+      const senderReject = checkAuthorizedSender(sender.id, chrome.runtime.id);
+      const request = parseSessionSignInRequest(msg);
+      const sourceTabId = sender.tab?.id;
+      const claimToken = msg.claimToken;
+      if (
+        senderReject ||
+        sourceTabId === undefined ||
+        sender.frameId !== 0 ||
+        !request ||
+        typeof claimToken !== "string" ||
+        !ownsClobCredentialDerivation(request.address, claimToken, sourceTabId)
+      ) {
+        sendResponse({ ok: false, error: "Invalid credential setup request." });
+        return true;
+      }
+
+      const pendingKey = `${request.address.toLowerCase()}:${claimToken}`;
+      const existingAttempt = pendingTrustedDerivations.get(pendingKey);
+      if (existingAttempt) {
+        if (existingAttempt.sourceTabId !== sourceTabId) {
+          sendResponse({
+            ok: false,
+            error: "Invalid credential setup request.",
+          });
+        } else {
+          existingAttempt.replies.push(sendResponse);
+        }
+        return true;
+      }
+      const attempt = { sourceTabId, replies: [sendResponse] };
+      pendingTrustedDerivations.set(pendingKey, attempt);
+      let completed = false;
+      const finish = (response: BackgroundResponse) => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timeout);
+        pendingTrustedDerivations.delete(pendingKey);
+        endClobCredentialDerivation(request.address, claimToken);
+        for (const reply of attempt.replies) reply(response);
+      };
+      const timeout = setTimeout(
+        () =>
+          finish({
+            ok: false,
+            error: "Trading credential setup timed out. Try again.",
+          }),
+        230_000
+      );
+
+      void (async () => {
+        try {
+          const session = await getExtensionSessionInfo();
+          if (
+            !session.loggedIn ||
+            !session.address ||
+            getAddress(session.address) !== getAddress(request.address)
+          ) {
+            throw new Error("Sign in with the selected wallet and retry.");
+          }
+          if (await hasClobCredentials(request.address)) {
+            finish({ ok: true, data: { method: "derive" } });
+            return;
+          }
+
+          const auth = buildClobAuthRpcTypedData({
+            address: request.address,
+          });
+          const signature = await signClobAuthInTrustedTab({
+            address: request.address,
+            sourceTabId,
+            sourceDocumentId: sender.documentId,
+            onboardingSigningPermit:
+              typeof msg.onboardingSigningPermit === "string"
+                ? msg.onboardingSigningPermit
+                : undefined,
+            typedData: JSON.stringify(auth.typedData),
+            wallet: request.wallet,
+          });
+          if (
+            !ownsClobCredentialDerivation(
+              request.address,
+              claimToken,
+              sourceTabId
+            )
+          ) {
+            throw new Error("Trading credential setup expired. Try again.");
+          }
+          await assertClobAuthSigner(
+            auth,
+            signature as `0x${string}`,
+            request.address
+          );
+          const currentSession = await getExtensionSessionInfo();
+          if (
+            !currentSession.loggedIn ||
+            !currentSession.address ||
+            getAddress(currentSession.address) !== getAddress(request.address)
+          ) {
+            throw new Error("Knoww sign-in expired. Sign in and retry.");
+          }
+
+          forwardToOffscreen(
+            {
+              type: "trading:derive-credentials",
+              address: request.address,
+              signature,
+              timestamp: auth.timestamp,
+              nonce: auth.nonce,
+            },
+            sender,
+            finish,
+            async () => {
+              const session = await getExtensionSessionInfo();
+              return (
+                !completed &&
+                ownsClobCredentialDerivation(
+                  request.address,
+                  claimToken,
+                  sourceTabId
+                ) &&
+                session.loggedIn &&
+                !!session.address &&
+                getAddress(session.address) === getAddress(request.address)
+              );
+            }
+          );
+        } catch (error) {
+          finish({
+            ok: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Could not complete wallet signing.",
+          });
+        }
+      })();
       return true;
     }
 

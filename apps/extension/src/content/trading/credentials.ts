@@ -2,27 +2,30 @@
  * CredentialManager — orchestrates CLOB API credential derivation
  * for the extension.
  *
- * Step 1: Sign an EIP-712 ClobAuth message via WalletBridge (MetaMask)
+ * Step 1: Sign ClobAuth in a trusted Knoww tab for injected wallets, or
+ * through WalletConnect for a WalletConnect wallet.
  * Step 2: Send the signature to background which calls the CLOB API
  * Step 3: Cache credentials via background service worker (session storage)
  */
 
 import { buildClobAuthRpcTypedData } from "@knoww/shared-types/polymarket";
 
-import { WalletBridge } from "./bridge";
+import { WALLETCONNECT_WALLET_UUID, WalletBridge } from "./bridge";
 import { ExtensionSession } from "./extension-session";
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
 const MESSAGE_TIMEOUT_MS = 20_000;
+const TRUSTED_DERIVATION_TIMEOUT_MS = 240_000;
 const DERIVATION_WAIT_POLL_MS = 500;
-const DERIVATION_WAIT_TIMEOUT_MS = 120_000;
+const DERIVATION_WAIT_TIMEOUT_MS = TRUSTED_DERIVATION_TIMEOUT_MS + 10_000;
 const ACTIVE_DERIVATION_MESSAGE =
   "A trading request is already open in your wallet. Check it before trying again.";
 
 function sendTradingMsg<T>(
   message: Record<string, unknown>,
-  errorLabel: string
+  errorLabel: string,
+  timeoutMs = MESSAGE_TIMEOUT_MS
 ): Promise<T> {
   let attempt = 0;
 
@@ -33,7 +36,7 @@ function sendTradingMsg<T>(
         if (settled) return;
         settled = true;
         reject(new Error(`${errorLabel} timed out`));
-      }, MESSAGE_TIMEOUT_MS);
+      }, timeoutMs);
 
       chrome.runtime.sendMessage(
         message,
@@ -160,8 +163,16 @@ async function waitForActiveCredentialDerivation(
   throw new Error(ACTIVE_DERIVATION_MESSAGE);
 }
 
+function resolveWalletUuid(): string | null {
+  const selected = WalletBridge.getSelectedWalletUuid();
+  if (selected) return selected;
+  const wallets = WalletBridge.getDiscoveredWallets();
+  return wallets.length === 1 ? wallets[0].uuid : null;
+}
+
 async function deriveCredentialsWithClaim(
-  address: string
+  address: string,
+  onboardingSigningPermit?: string
 ): Promise<DerivedApiKeyResult> {
   if (await hasStoredCredentials(address)) {
     return { method: "derive" };
@@ -174,10 +185,46 @@ async function deriveCredentialsWithClaim(
   }
 
   try {
+    const selectedWalletUuid = resolveWalletUuid();
+    const isWalletConnect = selectedWalletUuid === WALLETCONNECT_WALLET_UUID;
+    const selectedWallet = isWalletConnect
+      ? null
+      : WalletBridge.getDiscoveredWallets().find(
+          (wallet) => wallet.uuid === selectedWalletUuid
+        );
+    if (!isWalletConnect && !selectedWallet) {
+      throw new Error("Choose a wallet before generating API keys.");
+    }
+
     await ExtensionSession.ensureAuthorized(address);
+
+    if (resolveWalletUuid() !== selectedWalletUuid) {
+      throw new Error("Your selected wallet changed. Try again.");
+    }
 
     if (await hasStoredCredentials(address)) {
       return { method: "derive" };
+    }
+
+    if (selectedWallet) {
+      const result = await sendTradingMsg<DerivedApiKeyResult>(
+        {
+          type: "trading:derive-credentials-trusted",
+          address,
+          claimToken: claim.token,
+          ...(onboardingSigningPermit ? { onboardingSigningPermit } : {}),
+          wallet: {
+            name: selectedWallet.name,
+            rdns: selectedWallet.rdns,
+          },
+        },
+        "Failed to generate trading credentials",
+        TRUSTED_DERIVATION_TIMEOUT_MS
+      );
+      if (resolveWalletUuid() !== selectedWalletUuid) {
+        throw new Error("Your selected wallet changed. Try again.");
+      }
+      return result;
     }
 
     const auth = buildClobAuthRpcTypedData({
@@ -233,12 +280,18 @@ export const CredentialManager = {
    * 2. Sends the signature to the background which calls the CLOB API
    * 3. Caches the resulting credentials
    */
-  async derive(address: string): Promise<DerivedApiKeyResult> {
+  async derive(
+    address: string,
+    onboardingSigningPermit?: string
+  ): Promise<DerivedApiKeyResult> {
     const key = address.toLowerCase();
     const existing = credentialDerivationPromises.get(key);
     if (existing) return existing;
 
-    const derivation = deriveCredentialsWithClaim(address).finally(() => {
+    const derivation = deriveCredentialsWithClaim(
+      address,
+      onboardingSigningPermit
+    ).finally(() => {
       credentialDerivationPromises.delete(key);
     });
     credentialDerivationPromises.set(key, derivation);

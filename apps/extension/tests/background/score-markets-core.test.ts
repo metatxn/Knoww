@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
-import { rerankSupersededError } from "../../src/background/rerank-work-queue";
+import { afterEach, test, vi } from "vitest";
+import {
+  createRerankWorkQueue,
+  rerankQueueCapacityError,
+  rerankSupersededError,
+} from "../../src/background/rerank-work-queue";
 import {
   createScoreMarkets,
   type ScoreMarketsDeps,
 } from "../../src/background/score-markets-core";
 import type { ContextGateResult } from "../../src/types/chrome-messages";
+
+afterEach(() => vi.useRealTimers());
 
 function createGate(
   overrides: Partial<ContextGateResult> = {}
@@ -22,17 +28,25 @@ function createGate(
 
 function createDeps(
   overrides: Partial<ScoreMarketsDeps> = {}
-): ScoreMarketsDeps & { warnEvents: string[] } {
+): ScoreMarketsDeps & {
+  warnEvents: string[];
+  debugEvents: { event: string; payload: unknown }[];
+} {
   const warnEvents: string[] = [];
+  const debugEvents: { event: string; payload: unknown }[] = [];
 
   return {
     warnEvents,
+    debugEvents,
     computeSimilarities: async () => [0.91, 0.37],
     bm25Score: () => [0.22, 0.11],
     stableLexicalScore: () => [0.24, 0.12],
     nlpContextGateBatch: () => [createGate(), createGate()],
     logWarn: (event) => {
       warnEvents.push(event);
+    },
+    logDebug: (event, payload) => {
+      debugEvents.push({ event, payload });
     },
     ...overrides,
   };
@@ -213,24 +227,101 @@ test("score-markets core forwards the rerank request identity", async () => {
   assert.equal(result.usedRerank, true);
 });
 
-test("score-markets core records superseded rerank work as skipped", async () => {
+test.each([
+  ["superseded", rerankSupersededError],
+  ["capacity", rerankQueueCapacityError],
+] as const)(
+  "score-markets core records %s rerank work as debug diagnostics",
+  async (reason, createError) => {
+    const deps = createDeps({
+      rerankMarketPairs: async () => {
+        throw createError(12);
+      },
+    });
+    const scoreMarkets = createScoreMarkets(deps);
+
+    const result = await scoreMarkets({
+      type: "score-markets",
+      postText: "AI update",
+      marketTexts: ["AI market"],
+      includeRerank: true,
+      rerankRequestKey: "linkedin:post-123",
+    });
+
+    assert.deepEqual(result.rerankScores, [0]);
+    assert.equal(result.usedRerank, false);
+    assert.deepEqual(deps.warnEvents, []);
+    assert.deepEqual(deps.debugEvents, [
+      {
+        event: "scoring.rerank-skipped",
+        payload: { prefix: "[XENCODER-AB]", reason, queueWaitMs: 12 },
+      },
+    ]);
+  }
+);
+
+test("a rerank queue deadline preserves base scores without an extension warning", async () => {
+  vi.useFakeTimers();
+  const queue = createRerankWorkQueue();
+  let release = () => {};
+  const running = queue.enqueue(
+    "busy",
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  const inference = vi.fn();
+  const deps = createDeps({
+    rerankMarketPairs: (_post, _markets, { requestKey }) =>
+      queue.enqueue(requestKey, inference),
+  });
+  const pending = createScoreMarkets(deps)({
+    type: "score-markets",
+    postText: "AI update",
+    marketTexts: ["AI market", "Another market"],
+    includeRerank: true,
+    includeContextGate: true,
+    rerankRequestKey: "post:expired",
+  });
+  await vi.advanceTimersByTimeAsync(5_363);
+  assert.equal(queue.snapshot().pending, 1);
+  release();
+  await running;
+  const result = await pending;
+
+  assert.equal(inference.mock.calls.length, 0);
+  assert.deepEqual(result.similarities, [0.91, 0.37]);
+  assert.deepEqual(result.bm25Scores, [0.22, 0.11]);
+  assert.equal(result.contextGateResults[0].pass, true);
+  assert.equal(result.usedEmbeddings, true);
+  assert.equal(result.usedRerank, false);
+  assert.deepEqual(deps.warnEvents, []);
+  assert.deepEqual(deps.debugEvents, [
+    {
+      event: "scoring.rerank-skipped",
+      payload: {
+        prefix: "[XENCODER-AB]",
+        reason: "deadline",
+        queueWaitMs: 5_363,
+      },
+    },
+  ]);
+});
+
+test("unexpected rerank failures still produce a warning", async () => {
   const deps = createDeps({
     rerankMarketPairs: async () => {
-      throw rerankSupersededError();
+      throw new Error("inference failed");
     },
   });
-  const scoreMarkets = createScoreMarkets(deps);
-
-  const result = await scoreMarkets({
+  const result = await createScoreMarkets(deps)({
     type: "score-markets",
     postText: "AI update",
     marketTexts: ["AI market"],
     includeRerank: true,
-    rerankRequestKey: "linkedin:post-123",
   });
-
-  assert.deepEqual(result.rerankScores, [0]);
   assert.equal(result.usedRerank, false);
-  assert.ok(deps.warnEvents.includes("scoring.rerank-skipped"));
-  assert.equal(deps.warnEvents.includes("scoring.rerank-failed"), false);
+  assert.deepEqual(deps.warnEvents, ["scoring.rerank-failed"]);
+  assert.deepEqual(deps.debugEvents, []);
 });

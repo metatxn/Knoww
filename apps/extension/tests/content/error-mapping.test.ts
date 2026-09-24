@@ -22,3 +22,34 @@ test("relayer infrastructure rejections are not mapped as user cancellations", (
 
   assert.notEqual(mapped.title, "Signing cancelled");
 });
+
+test("account connection mismatch explains how to continue without reporting an order rejection", () => {
+  const message =
+    "Select 0x000000000000000000000000000000000000cafe in MetaMask's connection prompt for https://knoww.app, then retry.";
+  const mapped = mapTradingError(message);
+  assert.equal(mapped.title, "Connect the same account");
+  assert.equal(
+    mapped.body,
+    "In your wallet's connection prompt, select the same account as in the trading panel, then retry."
+  );
+});
+
+test.each([
+  ["Unexpected provider failure: diagnostic-marker", "Request failed"],
+  ["clob rejected order: diagnostic-marker", "Order rejected by exchange"],
+  ['Relayer 500: {"error":"diagnostic-marker"}', "Relayer error"],
+  [
+    "User rejected the request. Details: diagnostic-marker",
+    "Signing cancelled",
+  ],
+  [
+    "Select 0x000000000000000000000000000000000000cafe in MetaMask. diagnostic-marker",
+    "Connect the same account",
+  ],
+])("does not expose raw diagnostics for %s", (message, title) => {
+  const mapped = mapTradingError(message);
+  assert.doesNotMatch(JSON.stringify(mapped), /diagnostic-marker/);
+  assert.equal(Object.hasOwn(mapped, "raw"), false);
+  assert.equal(mapped.title, title);
+  assert.ok(mapped.body.length > 0);
+});

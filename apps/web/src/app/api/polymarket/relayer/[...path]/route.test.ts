@@ -7,7 +7,10 @@ vi.mock("@/lib/api-rate-limit", () => ({
 }));
 
 vi.mock("@/lib/auth/extension-session", () => ({
-  requireExtensionSession: vi.fn(async () => ({ response: null })),
+  requireExtensionSession: vi.fn(async () => ({
+    response: null,
+    session: { sub: "0x0000000000000000000000000000000000000002" },
+  })),
 }));
 
 vi.mock("@/lib/origin-guard", () => ({
@@ -25,6 +28,35 @@ afterEach(() => {
 });
 
 describe("POST /api/polymarket/relayer/[...path]", () => {
+  it("rejects forged browser headers without a signed caller session", async () => {
+    process.env.POLY_RELAYER_API_KEY = "relayer-key";
+    process.env.POLY_RELAYER_API_KEY_ADDRESS =
+      "0x0000000000000000000000000000000000000001";
+    const upstreamFetch = vi.fn(async () =>
+      Response.json({ transactionID: "tx-1" })
+    );
+    vi.stubGlobal("fetch", upstreamFetch);
+
+    const req = new NextRequest(
+      "https://knoww.app/api/polymarket/relayer/submit",
+      {
+        method: "POST",
+        headers: {
+          origin: "https://knoww.app",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify({ type: "SAFE", transactions: [] }),
+      }
+    );
+
+    const res = await POST(req, {
+      params: Promise.resolve({ path: ["submit"] }),
+    });
+
+    expect(res.status).toBe(401);
+    expect(upstreamFetch).not.toHaveBeenCalled();
+  });
+
   it("rejects extra path segments before attaching relayer credentials", async () => {
     process.env.POLY_RELAYER_API_KEY = "relayer-key";
     process.env.POLY_RELAYER_API_KEY_ADDRESS =
@@ -42,8 +74,10 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit/anything",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "SAFE",
+          from: "0x0000000000000000000000000000000000000002",
           transactions: [],
         }),
       }
@@ -78,8 +112,10 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "SAFE",
+          from: "0x0000000000000000000000000000000000000002",
           transactions: [],
         }),
       }
@@ -120,6 +156,7 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "WALLET-CREATE",
           from: "0x0000000000000000000000000000000000000002",
@@ -178,6 +215,7 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "SAFE-CREATE",
           from: "0x0000000000000000000000000000000000000002",
@@ -249,8 +287,10 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "SAFE",
+          from: "0x0000000000000000000000000000000000000002",
           transactions: [],
         }),
       }
@@ -317,8 +357,10 @@ describe("POST /api/polymarket/relayer/[...path]", () => {
       "https://knoww.app/api/polymarket/relayer/submit",
       {
         method: "POST",
+        headers: { authorization: "Bearer test-session" },
         body: JSON.stringify({
           type: "SAFE",
+          from: "0x0000000000000000000000000000000000000002",
           transactions: [],
         }),
       }

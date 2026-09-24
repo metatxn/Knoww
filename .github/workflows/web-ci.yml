@@ -60,6 +60,9 @@ jobs:
           pnpm --filter @knoww/web test
           pnpm --filter @knoww/extension test
 
+      - name: Check credential security coverage
+        run: pnpm --filter @knoww/web test:credential-security
+
       - name: Build production web app
         run: pnpm --filter @knoww/web build
 

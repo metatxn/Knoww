@@ -76,6 +76,15 @@ export function getClobCredentialDerivationStatus(
   return getActiveDerivation(address) ? { status: "busy" } : { status: "idle" };
 }
 
+export function ownsClobCredentialDerivation(
+  address: string,
+  token: string,
+  ownerTabId: number
+): boolean {
+  const active = getActiveDerivation(address);
+  return active?.token === token && active.ownerTabId === ownerTabId;
+}
+
 export function endClobCredentialDerivation(
   address: string,
   token: string
