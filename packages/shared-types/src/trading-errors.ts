@@ -85,7 +85,7 @@ export function isEip1193UnsupportedMethodError(error: unknown): boolean {
     code === 4200 ||
     code === -32601 ||
     /unsupported|not supported|does not exist|method not available|method not found|method not allowed|unrecognized/i.test(
-      message,
+      message
     )
   );
 }
@@ -99,7 +99,7 @@ export function isEip1193PendingRequestError(error: unknown): boolean {
   return (
     code === -32002 ||
     /already pending|already processing|resource not available|resource unavailable/i.test(
-      message,
+      message
     )
   );
 }
@@ -120,7 +120,7 @@ export function isWalletRejectionError(error: unknown): boolean {
 }
 
 export function mapTradingError(
-  message: string | null | undefined,
+  message: string | null | undefined
 ): MappedTradingError {
   const raw = (message ?? "").trim();
   if (!raw) {
@@ -206,7 +206,7 @@ export function mapTradingError(
 }
 
 export function formatTradingErrorLine(
-  message: string | null | undefined,
+  message: string | null | undefined
 ): string {
   const mapped = mapTradingError(message);
   return `${mapped.title}. ${mapped.body}`;
@@ -214,7 +214,7 @@ export function formatTradingErrorLine(
 
 export function formatCtfOperationError(
   error: unknown,
-  fallback = "Operation failed",
+  fallback = "Operation failed"
 ): string {
   const message = getErrorMessage(error, fallback);
   const lower = message.toLowerCase();
@@ -254,7 +254,7 @@ export function formatTradingFormError(message: string): string {
 
   const stripped = message.replace(
     /^order\s+0x[a-f0-9]+(\.\.\.)?\s+is invalid\.\s*/i,
-    "",
+    ""
   );
   const reason = stripped || message;
   return reason.charAt(0).toUpperCase() + reason.slice(1);
@@ -262,7 +262,7 @@ export function formatTradingFormError(message: string): string {
 
 export function formatTradingOnboardingError(
   error: unknown,
-  fallback: string,
+  fallback: string
 ): string {
   const message = getErrorMessage(error);
   const lower = message.toLowerCase();
