@@ -113,9 +113,36 @@ function hiddenInputValue(html: string, name: string): string {
   return match[1];
 }
 
+function browserCookie(response: Response): string {
+  const cookie = response.headers.get("set-cookie")?.split(";")[0];
+  if (!cookie) throw new Error("Missing consent session cookie");
+  return cookie;
+}
+
+async function approveGoogle(
+  transactionId: string,
+  cookie: string
+): Promise<Response> {
+  return dispatchGoogleFlow(
+    oauthRequest("/authorize", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie,
+        origin: ORIGIN,
+      },
+      body: new URLSearchParams({
+        decision: "allow",
+        transaction: transactionId,
+      }),
+    })
+  );
+}
+
 async function beginAuthorization(scope = MARKETS_READ_SCOPE): Promise<{
   clientId: string;
   consentResponse: Response;
+  cookie: string;
   transactionId: string;
 }> {
   const clientId = await registerClient();
@@ -134,6 +161,7 @@ async function beginAuthorization(scope = MARKETS_READ_SCOPE): Promise<{
   return {
     clientId,
     consentResponse,
+    cookie: browserCookie(consentResponse),
     transactionId: hiddenInputValue(html, "transaction"),
   };
 }
@@ -168,9 +196,12 @@ async function authorizeClient(clientId: string) {
   );
   expect(consent.status).toBe(200);
   const transactionId = hiddenInputValue(await consent.text(), "transaction");
+  const cookie = browserCookie(consent);
+  expect((await approveGoogle(transactionId, cookie)).status).toBe(302);
   const callback = await dispatchGoogleFlow(
     oauthRequest(
-      `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`
+      `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`,
+      { headers: { cookie } }
     )
   );
   expect(callback.status).toBe(302);
@@ -258,9 +289,71 @@ describe("MCP Google OAuth flow", () => {
     googleAuthenticator.mockClear();
   });
 
+  it("rejects approval detached from the browser that viewed consent", async () => {
+    const { transactionId } = await beginAuthorization();
+    const approval = await dispatchGoogleFlow(
+      oauthRequest("/authorize", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          origin: ORIGIN,
+        },
+        body: new URLSearchParams({
+          decision: "allow",
+          transaction: transactionId,
+        }),
+      })
+    );
+
+    expect(approval.status).toBe(403);
+    expect(approval.headers.get("location")).toBeNull();
+  });
+
+  it("rejects a Google callback without browser approval for that transaction", async () => {
+    const { transactionId } = await beginAuthorization();
+    const callback = await dispatchGoogleFlow(
+      oauthRequest(
+        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`
+      )
+    );
+
+    expect(callback.status).toBe(403);
+    expect(googleAuthenticator).not.toHaveBeenCalled();
+  });
+
+  it("rejects a callback opened in another browser after consent approval", async () => {
+    const { consentResponse, transactionId } = await beginAuthorization();
+    const cookie = consentResponse.headers.get("set-cookie")?.split(";")[0];
+    expect(cookie).toBeTruthy();
+
+    const approval = await dispatchGoogleFlow(
+      oauthRequest("/authorize", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: cookie ?? "",
+          origin: ORIGIN,
+        },
+        body: new URLSearchParams({
+          decision: "allow",
+          transaction: transactionId,
+        }),
+      })
+    );
+    expect(approval.status).toBe(302);
+
+    const callback = await dispatchGoogleFlow(
+      oauthRequest(
+        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`
+      )
+    );
+    expect(callback.status).toBe(403);
+    expect(googleAuthenticator).not.toHaveBeenCalled();
+  });
+
   it("exchanges Google sign-in for a scoped MCP access token", async () => {
     const verifier = "oauth-test-verifier-0123456789abcdefghijklmnopqrstuvwxyz";
-    const { clientId, consentResponse, transactionId } =
+    const { clientId, consentResponse, cookie, transactionId } =
       await beginAuthorization();
 
     expect(consentResponse.status).toBe(200);
@@ -282,6 +375,7 @@ describe("MCP Google OAuth flow", () => {
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",
+          cookie,
           origin: ORIGIN,
         },
         body: new URLSearchParams({
@@ -308,7 +402,8 @@ describe("MCP Google OAuth flow", () => {
 
     const callbackResponse = await dispatchGoogleFlow(
       oauthRequest(
-        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`
+        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`,
+        { headers: { cookie } }
       )
     );
     expect(callbackResponse.status).toBe(302);
@@ -572,10 +667,12 @@ describe("MCP Google OAuth flow", () => {
   });
 
   it("returns access_denied when Google sign-in is canceled", async () => {
-    const { transactionId } = await beginAuthorization();
+    const { cookie, transactionId } = await beginAuthorization();
+    expect((await approveGoogle(transactionId, cookie)).status).toBe(302);
     const response = await dispatchGoogleFlow(
       oauthRequest(
-        `/auth/google/callback?${new URLSearchParams({ error: "access_denied", state: transactionId })}`
+        `/auth/google/callback?${new URLSearchParams({ error: "access_denied", state: transactionId })}`,
+        { headers: { cookie } }
       )
     );
 
@@ -588,10 +685,12 @@ describe("MCP Google OAuth flow", () => {
 
   it("rejects an invalid subject returned by the identity boundary", async () => {
     googleAuthenticator.mockResolvedValueOnce({ subject: "invalid subject" });
-    const { transactionId } = await beginAuthorization();
+    const { cookie, transactionId } = await beginAuthorization();
+    expect((await approveGoogle(transactionId, cookie)).status).toBe(302);
     const response = await dispatchGoogleFlow(
       oauthRequest(
-        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`
+        `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`,
+        { headers: { cookie } }
       )
     );
 
@@ -607,7 +706,7 @@ describe("MCP Google OAuth flow", () => {
     );
     expect(missingState.status).toBe(401);
 
-    const { transactionId } = await beginAuthorization();
+    const { cookie, transactionId } = await beginAuthorization();
     const crossOrigin = await dispatchGoogleFlow(
       oauthRequest("/authorize", {
         method: "POST",
@@ -622,11 +721,16 @@ describe("MCP Google OAuth flow", () => {
       })
     );
     expect(crossOrigin.status).toBe(403);
+    expect((await approveGoogle(transactionId, cookie)).status).toBe(302);
 
     const callbackPath = `/auth/google/callback?${new URLSearchParams({ code: "google-code", state: transactionId })}`;
-    const first = await dispatchGoogleFlow(oauthRequest(callbackPath));
+    const first = await dispatchGoogleFlow(
+      oauthRequest(callbackPath, { headers: { cookie } })
+    );
     expect(first.status).toBe(302);
-    const replay = await dispatchGoogleFlow(oauthRequest(callbackPath));
+    const replay = await dispatchGoogleFlow(
+      oauthRequest(callbackPath, { headers: { cookie } })
+    );
     expect(replay.status).toBe(401);
     expect(await replay.text()).not.toContain("stack");
     expect(googleAuthenticator).toHaveBeenCalledOnce();

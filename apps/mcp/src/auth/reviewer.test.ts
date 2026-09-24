@@ -83,18 +83,24 @@ async function begin(testEnv: Env, scope = "markets:read") {
     response,
     html,
     clientId,
+    cookie: response.headers.get("set-cookie")?.split(";")[0] ?? "",
     transaction: html.match(/name="transaction" value="([^"]+)"/)?.[1] ?? "",
   };
 }
 
 function approve(
   transaction: string,
+  cookie: string,
   code = CODE,
   origin = ORIGIN
 ): RequestInit {
   return {
     method: "POST",
-    headers: { origin, "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      origin,
+      cookie,
+      "content-type": "application/x-www-form-urlencoded",
+    },
     body: new URLSearchParams({
       transaction,
       decision: "reviewer",
@@ -117,7 +123,7 @@ describe("Reviewer authorization", () => {
     const response = await dispatch(
       "/authorize",
       env,
-      approve(flow.transaction)
+      approve(flow.transaction, flow.cookie)
     );
     expect(response.status).toBe(401);
   });
@@ -131,7 +137,7 @@ describe("Reviewer authorization", () => {
     const approval = await dispatch(
       "/authorize",
       configured,
-      approve(flow.transaction)
+      approve(flow.transaction, flow.cookie)
     );
     expect(approval.status).toBe(302);
     const redirect = new URL(approval.headers.get("location") ?? "");
@@ -201,8 +207,13 @@ describe("Reviewer authorization", () => {
       ).status
     ).toBe(401);
     expect(
-      (await dispatch("/authorize", configured, approve(flow.transaction)))
-        .status
+      (
+        await dispatch(
+          "/authorize",
+          configured,
+          approve(flow.transaction, flow.cookie)
+        )
+      ).status
     ).toBe(401);
   });
 
@@ -214,7 +225,7 @@ describe("Reviewer authorization", () => {
         await dispatch(
           "/authorize",
           configured,
-          approve(flow.transaction, CODE, "https://evil.example")
+          approve(flow.transaction, flow.cookie, CODE, "https://evil.example")
         )
       ).status
     ).toBe(403);
@@ -223,13 +234,18 @@ describe("Reviewer authorization", () => {
         await dispatch(
           "/authorize",
           configured,
-          approve(flow.transaction, "cd".repeat(32))
+          approve(flow.transaction, flow.cookie, "cd".repeat(32))
         )
       ).status
     ).toBe(401);
     expect(
-      (await dispatch("/authorize", configured, approve(flow.transaction)))
-        .status
+      (
+        await dispatch(
+          "/authorize",
+          configured,
+          approve(flow.transaction, flow.cookie)
+        )
+      ).status
     ).toBe(401);
   });
 
@@ -275,7 +291,7 @@ describe("Reviewer authorization", () => {
     const response = await dispatch(
       "/authorize",
       { ...configured, MCP_AUTH_RATE_LIMITER: { limit } },
-      approve(flow.transaction)
+      approve(flow.transaction, flow.cookie)
     );
     expect(response.status).toBe(429);
     expect(limit).toHaveBeenCalled();

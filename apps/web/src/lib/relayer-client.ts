@@ -29,6 +29,7 @@ import {
   type RelayerTxStatus,
 } from "@knoww/shared-types/relayer";
 import type { Address, WalletClient } from "viem";
+import { authenticatedRelayerFetch } from "./relayer-auth";
 
 const PROXY_BASE = "/api/polymarket/relayer";
 
@@ -36,6 +37,7 @@ export {
   derivePolymarketDepositWallet,
   derivePolymarketSafe,
 } from "@knoww/shared-types/relayer";
+export { registerRelayerWallet } from "./relayer-auth";
 
 // ── HTTP helpers (always go through /api/polymarket/relayer/[...path]) ──
 
@@ -53,7 +55,9 @@ async function proxyGet<T>(
   path: string,
   params: Record<string, string>
 ): Promise<T> {
-  const res = await fetch(buildProxyUrl(path, params), { method: "GET" });
+  const res = await authenticatedRelayerFetch(buildProxyUrl(path, params), {
+    method: "GET",
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`relayer GET /${path} failed: ${res.status} ${text}`);
@@ -62,7 +66,7 @@ async function proxyGet<T>(
 }
 
 async function proxyPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(buildProxyUrl(path), {
+  const res = await authenticatedRelayerFetch(buildProxyUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -25,7 +25,7 @@
 
 import { readFileSync } from "node:fs";
 import { act, renderHook } from "@testing-library/react";
-import { createWalletClient, custom } from "viem";
+import { createWalletClient, custom, type WalletClient } from "viem";
 import {
   afterEach,
   beforeAll,
@@ -54,6 +54,7 @@ import {
   createFakeProvider,
   harnessErrors,
   PERSONALITIES,
+  prepareRelayerSession,
   RPC_PATH,
   relayerProxyRoutes,
   rpcRoutes,
@@ -238,6 +239,8 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+const relayerRegistrations: Array<() => void> = [];
+
 /** A request in fixture form, as `toFixtureRequest` records it. */
 interface FixtureRequest {
   method: string;
@@ -349,6 +352,7 @@ describe("M3 golden: usePlaceOrder.createOrder", () => {
   });
 
   afterEach(() => {
+    for (const unregister of relayerRegistrations.splice(0)) unregister();
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -402,6 +406,13 @@ describe("M3 golden: usePlaceOrder.createOrder", () => {
         }
         return response;
       }, window.location.origin);
+      relayerRegistrations.push(
+        await prepareRelayerSession(
+          harness.walletClient as WalletClient,
+          calls,
+          walletLog
+        )
+      );
       const { result } = renderHook(() => usePlaceOrder());
 
       if (balancesUpdated) {
@@ -481,6 +492,13 @@ describe("M3 golden: usePlaceOrder.createOrder", () => {
         ]),
         window.location.origin
       );
+      relayerRegistrations.push(
+        await prepareRelayerSession(
+          harness.walletClient as WalletClient,
+          calls,
+          walletLog
+        )
+      );
       const { result } = renderHook(() => usePlaceOrder());
 
       await act(async () => {
@@ -521,6 +539,13 @@ describe("M3 golden: usePlaceOrder.createOrder", () => {
       const calls = installFetchCapture(
         routes(personality),
         window.location.origin
+      );
+      relayerRegistrations.push(
+        await prepareRelayerSession(
+          harness.walletClient as WalletClient,
+          calls,
+          walletLog
+        )
       );
       const { result } = renderHook(() => usePlaceOrder());
       expect(result.current.canTrade).toBe(true);

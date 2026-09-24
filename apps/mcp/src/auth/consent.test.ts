@@ -111,6 +111,14 @@ describe("Legacy consent grant cleanup", () => {
     "preserves the revocation boundary for $name",
     async ({ clientId, redirectUri, revoke }) => {
       const id = crypto.randomUUID().replaceAll("-", "");
+      const browserSession = "a".repeat(64);
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(browserSession)
+      );
+      const browserSessionHash = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, "0")
+      ).join("");
       const oauthRequest = {
         clientId,
         redirectUri: REDIRECT_URI,
@@ -122,6 +130,8 @@ describe("Legacy consent grant cleanup", () => {
         codeChallengeMethod: "S256",
       };
       await createAuthorizationTransaction(env.MCP_AUTH_CHALLENGES, {
+        approved: true,
+        browserSessionHash,
         id,
         clientName: "Test client",
         codeChallenge: "google-challenge",
@@ -163,7 +173,8 @@ describe("Legacy consent grant cleanup", () => {
       if (!handler.fetch) throw new Error("Consent handler is missing fetch");
       const response = await handler.fetch(
         new Request(
-          `https://mcp.knoww.app/auth/google/callback?code=test-code&state=${id}`
+          `https://mcp.knoww.app/auth/google/callback?code=test-code&state=${id}`,
+          { headers: { cookie: `__Host-knoww-mcp-consent=${browserSession}` } }
         ),
         { ...env, OAUTH_PROVIDER: provider } as McpOAuthEnv,
         {} as ExecutionContext

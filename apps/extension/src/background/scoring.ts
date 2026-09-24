@@ -1,4 +1,4 @@
-import { logWarn } from "@knoww/logger";
+import { logDebug, logWarn } from "@knoww/logger";
 import { computeSimilarities, rerankMarketPairs } from "./embeddings";
 import { bm25Score, nlpContextGateBatch, stableLexicalScore } from "./nlp";
 import { createScoreMarkets } from "./score-markets-core";
@@ -11,5 +11,6 @@ export const scoreMarkets = createScoreMarkets({
   stableLexicalScore,
   nlpContextGateBatch,
   rerankMarketPairs,
+  logDebug,
   logWarn,
 });

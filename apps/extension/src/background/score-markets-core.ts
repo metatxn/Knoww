@@ -63,6 +63,7 @@ export interface ScoreMarketsDeps {
       device: "webgpu" | "wasm";
     };
   }>;
+  logDebug: (event: string, payload?: unknown) => void;
   logWarn: (event: string, payload?: unknown) => void;
 }
 
@@ -116,6 +117,7 @@ export function createScoreMarkets({
   stableLexicalScore,
   nlpContextGateBatch,
   rerankMarketPairs,
+  logDebug,
   logWarn,
 }: ScoreMarketsDeps) {
   return async function scoreMarkets(
@@ -206,7 +208,8 @@ export function createScoreMarkets({
       } catch (error) {
         const skipped = getRerankQueueSkipDetails(error);
         if (skipped) {
-          logWarn("scoring.rerank-skipped", {
+          // Queue limits intentionally shed optional work; base scores survive.
+          logDebug("scoring.rerank-skipped", {
             prefix: "[XENCODER-AB]",
             reason: skipped.reason,
             queueWaitMs: skipped.queueWaitMs,

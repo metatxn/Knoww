@@ -48,6 +48,7 @@ import {
   isUnresolvedLiveOrder,
   toFilledFill,
 } from "./live-accounting.ts";
+import { evaluateRisk } from "./paper-execution.ts";
 import type {
   AgentAction,
   AgentClobCredentialRecord,
@@ -477,6 +478,11 @@ export interface LiveExecutionAdapterDeps {
     key: string
   ) => Promise<LiveOrderRecord | null>;
   listLiveOrders?: () => Promise<LiveOrderRecord[]>;
+  listDailyLiveOrders?: () => Promise<LiveOrderRecord[]>;
+  getPortfolioPnl?: () => Promise<{
+    realizedPnlUsd: string;
+    openEntryNotionalUsd: string;
+  }>;
   hasUnresolvedLiveOrder?: () => Promise<boolean>;
   /**
    * Overlay the ACTUAL settled fee onto the run-item fill persisted for this
@@ -845,10 +851,47 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
       return blockedFill(request, "live execution skipped: action is HOLD");
     }
 
-    // Step 6 — cap the size against the per-trade live cap. This is on
-    // top of the regular risk gate; the live cap is a stricter floor so
-    // even a misconfigured paper portfolio can't oversize a real order.
-    const requested = new Decimal(request.requestedSizeUsd);
+    // Opening buys share the paper risk checks, using durable position state
+    // in real mode so earlier fills and losses affect this order's budget.
+    // Reduce-only sells can still close after the drawdown stop.
+    let risk: ReturnType<typeof evaluateRisk> | null = null;
+    if (request.action === TRADING_SIDES.BUY) {
+      let riskRequest = request;
+      if (!config.dryRun) {
+        if (!this.deps.getPortfolioPnl) {
+          return blockedFill(request, "live portfolio state is unavailable");
+        }
+        const pnl = await this.deps.getPortfolioPnl();
+        const bankroll = new Decimal(request.portfolio.bankrollUsd);
+        const durableRealized = new Decimal(pnl.realizedPnlUsd);
+        const durableCash = bankroll
+          .add(durableRealized)
+          .sub(pnl.openEntryNotionalUsd);
+        riskRequest = {
+          ...request,
+          portfolio: {
+            ...request.portfolio,
+            cashUsd: Decimal.min(
+              request.portfolio.cashUsd,
+              durableCash
+            ).toString(),
+            realizedPnlUsd: Decimal.min(
+              request.portfolio.realizedPnlUsd,
+              durableRealized
+            ).toString(),
+          },
+        };
+      }
+      risk = evaluateRisk(riskRequest);
+    }
+    if (risk && !risk.approved) {
+      return blockedFill(request, `live execution blocked: ${risk.reason}`);
+    }
+
+    // Apply the live cap after the portfolio cap so the tighter limit wins.
+    const requested = new Decimal(
+      risk?.cappedSizeUsd ?? request.requestedSizeUsd
+    );
     const liveCap = new Decimal(config.maxLiveNotionalUsd);
     if (requested.lte(0) || liveCap.lte(0)) {
       return blockedFill(
@@ -1454,7 +1497,10 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
       return "live execution blocked: condition is not in AGENT_LIVE_ALLOWLIST_CONDITION_IDS";
     }
 
-    if (input.config.dryRun || !this.deps.listLiveOrders) return null;
+    if (input.config.dryRun) return null;
+    if (!this.deps.listLiveOrders || !this.deps.listDailyLiveOrders) {
+      return "live execution blocked: complete order history is unavailable";
+    }
 
     // Self-healing pass before the gate reads: a filled real BUY whose
     // settlement debit was never observed inline blocks all live submissions
@@ -1479,7 +1525,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
     ];
     if (!dailyOrderCap && !dailyNotionalCap) return null;
 
-    const orders = allLiveOrders.filter(
+    const orders = (await this.deps.listDailyLiveOrders()).filter(
       (order) =>
         !order.dryRun &&
         isTodayIso(order.submittedAt ?? order.createdAt) &&

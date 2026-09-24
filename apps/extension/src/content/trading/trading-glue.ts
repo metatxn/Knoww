@@ -439,6 +439,7 @@ export interface PortfolioUiMessage {
   address?: string;
   walletUuid?: string;
   approvalAmount?: unknown;
+  onboardingSigningPermit?: string;
 }
 
 export function handlePortfolioMessage(
@@ -609,7 +610,11 @@ export function handlePortfolioMessage(
         throw new Error("Connected wallet does not match portfolio wallet");
       }
 
-      await TradingService.deriveCredentials();
+      await TradingService.deriveCredentials(
+        typeof message.onboardingSigningPermit === "string"
+          ? message.onboardingSigningPermit
+          : undefined
+      );
     })().catch(() => {});
     return false;
   }

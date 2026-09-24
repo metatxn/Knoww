@@ -7,6 +7,7 @@ import type { WorkerConfig } from "../config";
 import { currentRequestId } from "../context";
 import {
   type AuthorizationTransaction,
+  approveAuthorizationTransaction,
   consumeAuthorizationTransaction,
   createAuthorizationTransaction,
   getOAuthUserId,
@@ -31,6 +32,8 @@ import type { McpOAuthEnv } from "./types";
 const TRANSACTION_TTL_MS = 5 * 60 * 1000;
 const MAX_FORM_BYTES = 16 * 1024;
 const TRANSACTION_ID_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
+const CONSENT_SESSION_PATTERN = /^[a-f0-9]{64}$/;
+const CONSENT_COOKIE_LIFETIME_SECONDS = TRANSACTION_TTL_MS / 1000;
 const MAX_GOOGLE_CODE_LENGTH = 4096;
 const log = createLogger("mcp.oauth.google");
 
@@ -185,6 +188,62 @@ function isSameOriginPost(request: Request): boolean {
   }
 }
 
+function consentCookieName(config: WorkerConfig): string {
+  return new URL(config.canonicalResource).protocol === "https:"
+    ? "__Host-knoww-mcp-consent"
+    : "knoww-mcp-consent";
+}
+
+function readConsentSession(
+  request: Request,
+  config: WorkerConfig
+): string | null {
+  const prefix = `${consentCookieName(config)}=`;
+  const values = (request.headers.get("cookie") ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith(prefix))
+    .map((part) => part.slice(prefix.length));
+  return values.length === 1 && CONSENT_SESSION_PATTERN.test(values[0])
+    ? values[0]
+    : null;
+}
+
+async function sessionHash(session: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(session)
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
+async function matchesConsentSession(
+  request: Request,
+  config: WorkerConfig,
+  transaction: AuthorizationTransaction
+): Promise<boolean> {
+  const session = readConsentSession(request, config);
+  return Boolean(
+    session &&
+      transaction.browserSessionHash &&
+      (await sessionHash(session)) === transaction.browserSessionHash
+  );
+}
+
+function consentCookie(config: WorkerConfig, session: string): string {
+  const secure = new URL(config.canonicalResource).protocol === "https:";
+  return [
+    `${consentCookieName(config)}=${session}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${CONSENT_COOKIE_LIFETIME_SECONDS}`,
+    ...(secure ? ["Secure"] : []),
+  ].join("; ");
+}
+
 function oauthRedirectOrigin(redirectUri: string): string {
   const origin = new URL(redirectUri).origin;
   if (origin === "null") throw new Error("Unsupported OAuth redirect URI.");
@@ -211,7 +270,8 @@ function consentHeaders(nonce: string, redirectUri: string): HeadersInit {
 
 function consentPage(
   transaction: AuthorizationTransaction,
-  reviewerEnabled: boolean
+  reviewerEnabled: boolean,
+  cookie: string
 ): Response {
   const nonce = randomId();
   const scopes = transaction.scopes.join(" ");
@@ -226,7 +286,10 @@ ${reviewerEnabled ? `<details><summary>Reviewer demo access</summary><p>Use the 
 </main></body></html>`;
   return new Response(body, {
     status: 200,
-    headers: consentHeaders(nonce, transaction.oauthRequest.redirectUri),
+    headers: {
+      ...consentHeaders(nonce, transaction.oauthRequest.redirectUri),
+      "set-cookie": cookie,
+    },
   });
 }
 
@@ -284,7 +347,9 @@ async function handleConsentGet(
   if (!client) return localError("Unknown OAuth client.", 400);
 
   const pkce = await createGooglePkce();
+  const browserSession = readConsentSession(request, config) ?? randomId();
   const transaction: AuthorizationTransaction = {
+    browserSessionHash: await sessionHash(browserSession),
     codeChallenge: pkce.challenge,
     codeVerifier: pkce.verifier,
     id: randomId(),
@@ -296,7 +361,11 @@ async function handleConsentGet(
     oauthRequest,
   };
   await createAuthorizationTransaction(env.MCP_AUTH_CHALLENGES, transaction);
-  return consentPage(transaction, reviewerCodeHash(env) !== null);
+  return consentPage(
+    transaction,
+    reviewerCodeHash(env) !== null,
+    consentCookie(config, browserSession)
+  );
 }
 
 async function handleConsentPost(
@@ -310,34 +379,44 @@ async function handleConsentPost(
   if (!TRANSACTION_ID_PATTERN.test(transactionId)) {
     return localError("Invalid or expired authorization request.", 401);
   }
+  const transaction = await readAuthorizationTransaction(
+    env.MCP_AUTH_CHALLENGES,
+    transactionId
+  );
+  if (!transaction || transaction.resource !== config.canonicalResource) {
+    return localError("Invalid or expired authorization request.", 401);
+  }
+  if (!(await matchesConsentSession(request, config, transaction))) {
+    return localError("Forbidden.", 403);
+  }
 
   if (form.get("decision") === "deny") {
-    const transaction = await consumeAuthorizationTransaction(
+    const consumed = await consumeAuthorizationTransaction(
       env.MCP_AUTH_CHALLENGES,
       transactionId
     );
-    if (!transaction || transaction.resource !== config.canonicalResource) {
+    if (!consumed || consumed.resource !== config.canonicalResource) {
       return localError("Invalid or expired authorization request.", 401);
     }
     return oauthErrorRedirect(
-      transaction.oauthRequest,
+      consumed.oauthRequest,
       "access_denied",
       "The user denied the authorization request."
     );
   }
   if (form.get("decision") === "reviewer") {
     // Consume even a failed attempt so the consent transaction cannot be replayed.
-    const transaction = await consumeAuthorizationTransaction(
+    const consumed = await consumeAuthorizationTransaction(
       env.MCP_AUTH_CHALLENGES,
       transactionId
     );
-    if (!transaction || transaction.resource !== config.canonicalResource) {
+    if (!consumed || consumed.resource !== config.canonicalResource) {
       return localError("Invalid or expired authorization request.", 401);
     }
     const hash = await verifyReviewerCode(form.get("reviewer_code") ?? "", env);
     if (
       !hash ||
-      transaction.scopes.some((scope) => scope !== MARKETS_READ_SCOPE)
+      consumed.scopes.some((scope) => scope !== MARKETS_READ_SCOPE)
     ) {
       return localError(
         "Reviewer sign-in failed. Start the connection again and check the access code.",
@@ -345,15 +424,15 @@ async function handleConsentPost(
       );
     }
     const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-      request: transaction.oauthRequest,
+      request: consumed.oauthRequest,
       userId: await getOAuthUserId(
         env.MCP_AUTH_CHALLENGES,
         `reviewer:${hash}`,
-        transaction.oauthRequest.clientId
+        consumed.oauthRequest.clientId
       ),
       metadata: {
         authMethod: "reviewer-code",
-        clientName: transaction.clientName,
+        clientName: consumed.clientName,
       },
       scope: [MARKETS_READ_SCOPE],
       props: {
@@ -371,11 +450,12 @@ async function handleConsentPost(
   }
 
   assertGoogleConfiguration(env);
-  const transaction = await readAuthorizationTransaction(
+  const approved = await approveAuthorizationTransaction(
     env.MCP_AUTH_CHALLENGES,
-    transactionId
+    transactionId,
+    transaction.browserSessionHash ?? ""
   );
-  if (!transaction || transaction.resource !== config.canonicalResource) {
+  if (!approved) {
     return localError("Invalid or expired authorization request.", 401);
   }
   return redirectResponse(
@@ -428,11 +508,29 @@ async function handleGoogleCallback(
   if (!TRANSACTION_ID_PATTERN.test(state)) {
     return localError("Invalid or expired authorization request.", 401);
   }
+  const pending = await readAuthorizationTransaction(
+    env.MCP_AUTH_CHALLENGES,
+    state
+  );
+  if (!pending || pending.resource !== config.canonicalResource) {
+    return localError("Invalid or expired authorization request.", 401);
+  }
+  if (
+    !pending.approved ||
+    !(await matchesConsentSession(request, config, pending))
+  ) {
+    return localError("Forbidden.", 403);
+  }
   const transaction = await consumeAuthorizationTransaction(
     env.MCP_AUTH_CHALLENGES,
     state
   );
-  if (!transaction || transaction.resource !== config.canonicalResource) {
+  if (
+    !transaction ||
+    transaction.resource !== config.canonicalResource ||
+    !transaction.approved ||
+    transaction.browserSessionHash !== pending.browserSessionHash
+  ) {
     return localError("Invalid or expired authorization request.", 401);
   }
   if (url.searchParams.has("error")) {

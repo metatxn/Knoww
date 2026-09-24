@@ -36,6 +36,7 @@ import {
   executeViaDepositWallet,
   executeViaRelayer,
   getDeployed,
+  registerRelayerWallet,
   deployDepositWallet as relayerDeployDepositWallet,
   deploySafe as relayerDeploySafe,
 } from "@/lib/relayer-client";
@@ -78,6 +79,12 @@ const CHECK_DEPLOYMENT_DEBOUNCE_MS = 2000;
 export function useRelayerClient() {
   const { address, isConnected } = useConnection();
   const { data: walletClient } = useWalletClient();
+
+  useEffect(() => {
+    if (!isConnected || !address || !walletClient) return;
+    return registerRelayerWallet(walletClient, address);
+  }, [address, isConnected, walletClient]);
+
   const { mode, isEoaMode } = useTradingWalletMode();
   const isDepositMode = mode === "deposit";
 

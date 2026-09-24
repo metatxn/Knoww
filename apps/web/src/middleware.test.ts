@@ -7,6 +7,19 @@ afterEach(() => {
 });
 
 describe("middleware security headers", () => {
+  it("keeps the extension signing page free of site scripts and network access", () => {
+    const response = middleware(
+      new NextRequest("https://knoww.app/extension-credentials.html")
+    );
+    const policy = response.headers.get("Content-Security-Policy");
+    expect(policy).toContain("default-src 'none'");
+    expect(policy).toContain("script-src chrome-extension:");
+    expect(policy).toContain("script-src-attr 'none'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).not.toContain("script-src 'self'");
+    expect(policy).not.toContain("connect-src");
+  });
+
   it("allows packaged extension frames only on the extension setup page", () => {
     const setup = middleware(
       new NextRequest("https://knoww.app/extension/connect")
@@ -21,8 +34,7 @@ describe("middleware security headers", () => {
   });
   it("allows managed PostHog proxy scripts and event requests", () => {
     const response = middleware(new NextRequest("https://knoww.app/"));
-    const directives = response.headers
-      .get("Content-Security-Policy")!
+    const directives = (response.headers.get("Content-Security-Policy") ?? "")
       .split(";")
       .map((directive) => directive.trim().split(/\s+/));
 

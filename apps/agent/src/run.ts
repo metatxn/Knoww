@@ -242,6 +242,8 @@ function selectExecutionAdapter(
       getLiveOrderByIdempotencyKey: (key) =>
         repository.getLiveOrderByIdempotencyKey(key),
       listLiveOrders: () => repository.listLiveOrders(),
+      listDailyLiveOrders: () => repository.listDailyLiveOrders(),
+      getPortfolioPnl: () => repository.getPortfolioPnl(),
       hasUnresolvedLiveOrder: () => repository.hasUnresolvedLiveOrder(),
       applySettledFeeToRunFill: (input) =>
         repository.applySettledFeeToRunFill(input),

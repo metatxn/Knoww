@@ -6,7 +6,12 @@ import {
   readBoundedText,
 } from "@knoww/shared-types/bounded-json";
 import { RELAYER_API_ORIGIN } from "@knoww/shared-types/polymarket";
+import {
+  derivePolymarketDepositWallet,
+  derivePolymarketSafe,
+} from "@knoww/shared-types/relayer";
 import { type NextRequest, NextResponse } from "next/server";
+import type { Address } from "viem";
 import { jsonError } from "@/lib/api-error";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { requireExtensionSession } from "@/lib/auth/extension-session";
@@ -33,8 +38,8 @@ const log = createLogger("api.relayer");
  *     RELAYER_API_KEY_ADDRESS headers.
  *
  * Security layers (mirror /api/sign):
- *   1. Origin + Sec-Fetch-Site validation for first-party web requests
- *      — OR — signed extension bearer session for extension requests
+ *   1. Signed wallet bearer session with relayer scope for both browser and
+ *      extension requests; browser-only headers never authorize the proxy
  *   2. Per-IP rate limiting (60 req/min — relayer flows are chattier than signing)
  *   3. Body size limit (16 KB — multiSend payloads can be larger than HMAC asks)
  *   4. Request timeout (30 s — relayer can be slower than signing server)
@@ -169,16 +174,25 @@ async function readBodyWithLimit(
   return new TextDecoder().decode(merged);
 }
 
-async function authorize(request: NextRequest): Promise<NextResponse | null> {
+async function authorize(request: NextRequest): Promise<{
+  error: NextResponse | null;
+  walletAddress: string | null;
+}> {
   const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const { response } = await requireExtensionSession(
-      request,
-      "relayer:submit"
-    );
-    return response ?? null;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return {
+      error: checkOriginAndFetchSite(request) ?? jsonError("Unauthorized", 401),
+      walletAddress: null,
+    };
   }
-  return checkOriginAndFetchSite(request) ?? null;
+  const { response, session } = await requireExtensionSession(
+    request,
+    "relayer:submit"
+  );
+  return {
+    error: response ?? (session ? null : jsonError("Unauthorized", 401)),
+    walletAddress: session?.sub ?? null,
+  };
 }
 
 async function proxy(
@@ -187,8 +201,8 @@ async function proxy(
   method: "GET" | "POST"
 ): Promise<NextResponse> {
   // Layer 1: caller identity
-  const authError = await authorize(request);
-  if (authError) return authError;
+  const auth = await authorize(request);
+  if (auth.error) return auth.error;
 
   // Layer 2: rate limit (60/min/IP)
   const rateLimitResponse = checkRateLimit(request, {
@@ -200,6 +214,30 @@ async function proxy(
   const head = pathSegments[0] ?? "";
   if (pathSegments.length !== 1 || !ALLOWED_PATHS.has(head)) {
     return jsonError("Path not allowed", 400);
+  }
+  if ((method === "POST") !== (head === "submit")) {
+    return jsonError("Method not allowed", 405);
+  }
+
+  if (method === "GET" && (head === "nonce" || head === "deployed")) {
+    const requestedAddress = request.nextUrl.searchParams.get("address");
+    const owner = auth.walletAddress as Address;
+    const allowedAddresses =
+      head === "nonce"
+        ? [owner]
+        : [
+            owner,
+            derivePolymarketSafe(owner),
+            derivePolymarketDepositWallet(owner),
+          ];
+    if (
+      !requestedAddress ||
+      !allowedAddresses.some(
+        (address) => address.toLowerCase() === requestedAddress.toLowerCase()
+      )
+    ) {
+      return jsonError("Forbidden", 403);
+    }
   }
 
   // Layer 3b: oversize body fast-reject
@@ -224,6 +262,14 @@ async function proxy(
       return jsonError("Invalid JSON payload", 400);
     }
     body = rawBody;
+  }
+
+  if (
+    method === "POST" &&
+    (typeof parsedBody?.from !== "string" ||
+      parsedBody.from.toLowerCase() !== auth.walletAddress)
+  ) {
+    return jsonError("Forbidden", 403);
   }
 
   const upstreamUrl = `${UPSTREAM_BASE}/${pathSegments.join("/")}${request.nextUrl.search}`;

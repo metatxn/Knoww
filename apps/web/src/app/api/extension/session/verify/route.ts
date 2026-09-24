@@ -16,6 +16,7 @@ const log = createLogger("api.extension.session.verify");
 const MAX_REQUEST_BODY_BYTES = 8 * 1024;
 
 const verifyInputSchema = z.object({
+  scope: z.literal("relayer:submit").optional(),
   challengeToken: z.string().min(1, "challengeToken is required"),
   chainId: z
     .number()
@@ -66,6 +67,10 @@ const verifyInputSchema = z.object({
  *                 type: string
  *               walletAddress:
  *                 type: string
+ *               scope:
+ *                 type: string
+ *                 enum: [relayer:submit]
+ *                 description: Issue a relayer-only session for browser wallet flows.
  *             required:
  *               - challengeToken
  *               - chainId
@@ -124,6 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
+      scope,
       challengeToken,
       chainId,
       message,
@@ -157,6 +163,7 @@ export async function POST(request: NextRequest) {
       const { token, claims } = await issueExtensionSessionToken({
         address: walletAddress,
         chainId,
+        ...(scope ? { scope: [scope] } : {}),
       });
 
       return NextResponse.json(

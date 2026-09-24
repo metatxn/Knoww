@@ -179,6 +179,7 @@ export interface AgentRepository {
   upsertLiveOrder(record: LiveOrderUpsert): Promise<LiveOrderRecord>;
   getLiveOrderByIdempotencyKey(key: string): Promise<LiveOrderRecord | null>;
   listLiveOrders(): Promise<LiveOrderRecord[]>;
+  listDailyLiveOrders(): Promise<LiveOrderRecord[]>;
   hasUnresolvedLiveOrder(): Promise<boolean>;
   updateLiveOrderStatus(
     idempotencyKey: string,
@@ -697,6 +698,17 @@ class MemoryAgentRepository implements AgentRepository {
   async listLiveOrders(): Promise<LiveOrderRecord[]> {
     return [...memory.liveOrders.values()].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt)
+    );
+  }
+
+  async listDailyLiveOrders(): Promise<LiveOrderRecord[]> {
+    const today = new Date().toISOString().slice(0, 10);
+    return [...memory.liveOrders.values()].filter(
+      (order) =>
+        !order.dryRun &&
+        order.status !== "FAILED" &&
+        order.status !== "CANCELED" &&
+        (order.submittedAt ?? order.createdAt).startsWith(today)
     );
   }
 
@@ -1391,6 +1403,29 @@ class D1AgentRepository extends MemoryAgentRepository {
       )
       .all<Record<string, unknown>>();
     return result.results.map(rowToLiveOrder);
+  }
+
+  async listDailyLiveOrders(): Promise<LiveOrderRecord[]> {
+    const start = `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+    const end = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+    const orders: LiveOrderRecord[] = [];
+    const pageSize = 200;
+    for (let offset = 0; ; offset += pageSize) {
+      const result = await this.db
+        .prepare(
+          `SELECT * FROM agent_live_orders
+           WHERE dry_run = 0
+             AND status NOT IN ('FAILED', 'CANCELED')
+             AND COALESCE(submitted_at, created_at) >= ?
+             AND COALESCE(submitted_at, created_at) < ?
+           ORDER BY created_at DESC, idempotency_key DESC
+           LIMIT ? OFFSET ?`
+        )
+        .bind(start, end, pageSize, offset)
+        .all<Record<string, unknown>>();
+      orders.push(...result.results.map(rowToLiveOrder));
+      if (result.results.length < pageSize) return orders;
+    }
   }
 
   async hasUnresolvedLiveOrder(): Promise<boolean> {

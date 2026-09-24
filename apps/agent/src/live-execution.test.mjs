@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
   isSettlementPendingLiveOrder,
@@ -10,6 +11,7 @@ import {
   getLiveExecutionConfig,
   LiveExecutionAdapter,
 } from "./live-execution.ts";
+import { createAgentRepository } from "./repository.ts";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -89,6 +91,14 @@ function createDeps(runtimeOverrides = {}, options = {}) {
       },
       getLiveOrderByIdempotencyKey: async (key) => records.get(key) ?? null,
       listLiveOrders: async () => [...records.values()],
+      listDailyLiveOrders: async () => [...records.values()],
+      getPortfolioPnl: async () =>
+        options.portfolioPnl ?? {
+          openPositionCount: 0,
+          closedPositionCount: 0,
+          realizedPnlUsd: "0",
+          openEntryNotionalUsd: "0",
+        },
       getClobCredential: async (key) => credentialRecords.get(key) ?? null,
       upsertClobCredential: async (record) => {
         credentialRecords.set(record.credentialKey, record);
@@ -232,6 +242,109 @@ test("posts a live order when real mode is explicitly enabled", async () => {
   assert.equal(calls.deriveApiCreds, 1);
   assert.equal(calls.syncBalanceAllowance > 0, true);
   assert.equal(calls.sendTransactions, 0);
+});
+
+test("blocks a live BUY when the portfolio drawdown stop is active", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY =
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  const { deps, calls } = createDeps();
+  const adapter = new LiveExecutionAdapter(deps);
+  const request = baseRequest({
+    portfolio: {
+      ...baseRequest().portfolio,
+      realizedPnlUsd: "-200",
+    },
+  });
+
+  const fill = await adapter.execute(request);
+
+  assert.equal(fill.status, "BLOCKED");
+  assert.match(fill.reason ?? "", /drawdown/i);
+  assert.equal(calls.postOrder, 0);
+});
+
+test("caps a live BUY at the portfolio trade limit", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY =
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  const { deps, calls } = createDeps();
+  const adapter = new LiveExecutionAdapter(deps);
+  const request = baseRequest({
+    portfolio: { ...baseRequest().portfolio, maxTradeUsd: "2" },
+  });
+
+  const fill = await adapter.execute(request);
+  const submitted =
+    await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY");
+
+  assert.equal(fill.status, "FILLED");
+  assert.equal(submitted?.requestedSizeUsd, "2");
+  assert.equal(calls.postOrder, 1);
+});
+
+test("caps a live BUY against durable exposure from earlier runs", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY =
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  process.env.AGENT_MAX_LIVE_NOTIONAL_USD = "25";
+
+  const { deps } = createDeps(
+    {},
+    {
+      portfolioPnl: {
+        openPositionCount: 2,
+        closedPositionCount: 0,
+        realizedPnlUsd: "0",
+        openEntryNotionalUsd: "995",
+      },
+    }
+  );
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(baseRequest({ requestedSizeUsd: "20" }));
+  const submitted =
+    await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY");
+
+  assert.equal(fill.status, "FILLED");
+  assert.equal(submitted?.requestedSizeUsd, "5");
+});
+
+test("blocks a live BUY after durable realized losses cross the drawdown stop", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY =
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  const { deps, calls } = createDeps(
+    {},
+    {
+      portfolioPnl: {
+        openPositionCount: 0,
+        closedPositionCount: 3,
+        realizedPnlUsd: "-210",
+        openEntryNotionalUsd: "0",
+      },
+    }
+  );
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(baseRequest());
+
+  assert.equal(fill.status, "BLOCKED");
+  assert.match(fill.reason ?? "", /drawdown/i);
+  assert.equal(calls.postOrder, 0);
 });
 
 test("adds SELL proceeds when replaying an idempotent filled order", async () => {
@@ -795,6 +908,80 @@ test("blocks real live execution when daily order cap is reached", async () => {
   assert.equal(fill.status, "BLOCKED");
   assert.match(fill.reason ?? "", /daily order cap/i);
   assert.equal(calls.postOrder, 0);
+});
+
+test("counts all same-day D1 orders beyond the recent-order window", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY =
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  process.env.AGENT_LIVE_DAILY_MAX_ORDER_COUNT = "201";
+
+  const sqlite = new DatabaseSync(":memory:");
+  try {
+    sqlite.exec(`CREATE TABLE agent_live_orders (
+      idempotency_key TEXT PRIMARY KEY, run_id TEXT, watchlist_item_id TEXT,
+      token_id TEXT, side TEXT, requested_size_usd TEXT, price TEXT,
+      signed_order_hash TEXT, order_id TEXT, status TEXT, submitted_at TEXT,
+      filled_at TEXT, created_at TEXT, dry_run INTEGER, error TEXT,
+      filled_notional_usd TEXT, filled_shares TEXT, average_fill_price TEXT,
+      last_synced_at TEXT, balance_snapshot_json TEXT, fee_estimate_usd TEXT,
+      settled_fee_usd TEXT
+    )`);
+    const insert = sqlite.prepare(`INSERT INTO agent_live_orders
+      (idempotency_key, run_id, watchlist_item_id, token_id, side,
+       requested_size_usd, price, status, submitted_at, created_at, dry_run,
+       settled_fee_usd)
+      VALUES (?, ?, ?, ?, 'BUY', '1', '0.5', 'FILLED', ?, ?, 0, '0')`);
+    const today = new Date().toISOString();
+    for (let index = 0; index < 201; index++) {
+      insert.run(
+        `old-${index}`,
+        `run-${index}`,
+        `watch-${index}`,
+        `token-${index}`,
+        today,
+        today
+      );
+    }
+    const db = {
+      prepare(sql) {
+        const statement = sqlite.prepare(sql);
+        let values = [];
+        return {
+          bind(...args) {
+            values = args;
+            return this;
+          },
+          async all() {
+            return { results: statement.all(...values) };
+          },
+          async first() {
+            return statement.get(...values) ?? null;
+          },
+          async run() {
+            return statement.run(...values);
+          },
+        };
+      },
+    };
+    const repository = createAgentRepository(db);
+    const { deps, calls } = createDeps();
+    deps.listLiveOrders = () => repository.listLiveOrders();
+    deps.listDailyLiveOrders = () => repository.listDailyLiveOrders();
+    deps.hasUnresolvedLiveOrder = () => repository.hasUnresolvedLiveOrder();
+    const adapter = new LiveExecutionAdapter(deps);
+
+    const fill = await adapter.execute(baseRequest());
+
+    assert.equal(fill.status, "BLOCKED");
+    assert.match(fill.reason ?? "", /daily order cap/i);
+    assert.equal(calls.postOrder, 0);
+  } finally {
+    sqlite.close();
+  }
 });
 
 test("derives the settled BUY fee from the observed balance debit", async () => {

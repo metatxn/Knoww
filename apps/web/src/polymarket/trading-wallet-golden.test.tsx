@@ -15,7 +15,7 @@
 
 import type { ClobOrderApprovalRequirement } from "@knoww/shared-types/approvals";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { createWalletClient, custom } from "viem";
+import { createWalletClient, custom, type WalletClient } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CTF_ADDRESS } from "@/constants/contracts";
 import { polygon } from "@/lib/chains";
@@ -34,6 +34,7 @@ import {
   harnessErrors,
   PERSONALITIES,
   type Personality,
+  prepareRelayerSession,
   relayerProxyRoutes,
   rpcRoutes,
   toFixtureRequest,
@@ -203,6 +204,8 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+const relayerRegistrations: Array<() => void> = [];
+
 describe("M3 golden: useRelayerClient approvals and wallet creation", () => {
   beforeEach(() => {
     pinEntropy();
@@ -212,6 +215,7 @@ describe("M3 golden: useRelayerClient approvals and wallet creation", () => {
   });
 
   afterEach(() => {
+    for (const unregister of relayerRegistrations.splice(0)) unregister();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -240,6 +244,15 @@ describe("M3 golden: useRelayerClient approvals and wallet creation", () => {
         ]),
         window.location.origin
       );
+      if (scenario.mode !== "eoa") {
+        relayerRegistrations.push(
+          await prepareRelayerSession(
+            harness.walletClient as WalletClient,
+            calls,
+            walletLog
+          )
+        );
+      }
 
       // Mount: the hook checks whether the trading wallet exists on chain.
       const { result } = renderHook(() => useRelayerClient());

@@ -215,6 +215,13 @@ function createTypeScriptRule() {
         allowTsInNodeModules: false,
         configFile: path.resolve(__dirname, "tsconfig.json"),
         transpileOnly: true,
+        // Webpack resolves .ts imports itself. TypeScript's rewrite helper
+        // wraps dynamic import URLs and hides webpackIgnore from webpack,
+        // which breaks the wallet runtime import in Chromium.
+        compilerOptions: {
+          allowImportingTsExtensions: false,
+          rewriteRelativeImportExtensions: false,
+        },
       },
     },
     exclude: [/node_modules/, /__tests__/, /\.test\.ts$/, /\.spec\.ts$/],
