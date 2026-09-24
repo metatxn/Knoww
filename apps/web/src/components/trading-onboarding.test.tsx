@@ -192,7 +192,9 @@ describe("TradingOnboarding", () => {
         /User rejected|Request cancelled/
       );
       expect(message).toBeVisible();
-      expect(message).toHaveTextContent(/^User rejected the request\.$/);
+      expect(message).toHaveTextContent(
+        /^Request cancelled\. No changes were made\. You can try again when you're ready\.$/
+      );
       expect(
         screen.queryByText(/Details:|Version:|viem@/)
       ).not.toBeInTheDocument();

@@ -201,6 +201,24 @@ async function getStoredSubjectRecord(
   return record;
 }
 
+async function cleanupExpiredSession(
+  claims: ExtensionSessionClaims
+): Promise<void> {
+  if (claims.scope.length !== 1 || claims.scope[0] !== "relayer:submit") {
+    return;
+  }
+  try {
+    // Relayer keys belong to one session; extension subject keys can be replaced concurrently.
+    await Promise.all([
+      getStoredSessionRecord(claims.jti),
+      getStoredSubjectRecord(claims.sub, claims.scope, claims.jti),
+    ]);
+  } catch {
+    // Storage failures must not prevent expired tokens from being rejected.
+    log.warn("storage.expired_session_cleanup_failed");
+  }
+}
+
 async function registerExtensionSession(
   claims: ExtensionSessionClaims
 ): Promise<void> {
@@ -282,6 +300,10 @@ export async function revokeExtensionSession(
   claims: ExtensionSessionClaims
 ): Promise<void> {
   const now = Date.now();
+  if (claims.exp <= now) {
+    await cleanupExpiredSession(claims);
+    return;
+  }
   const existingRecord = await getStoredSessionRecord(claims.jti);
 
   const revokedRecord: ExtensionSessionRecord = existingRecord
@@ -503,10 +525,15 @@ export async function verifyExtensionSessionToken(
   if (claims.aud !== TOKEN_AUDIENCE || claims.iss !== TOKEN_ISSUER) {
     return null;
   }
-  if (claims.exp <= Date.now()) {
+  if (
+    !Array.isArray(claims.scope) ||
+    typeof claims.sub !== "string" ||
+    typeof claims.jti !== "string"
+  ) {
     return null;
   }
-  if (!Array.isArray(claims.scope) || typeof claims.sub !== "string") {
+  if (claims.exp <= Date.now()) {
+    await cleanupExpiredSession(claims);
     return null;
   }
   if (!(await isPersistedSessionActive(claims))) {
