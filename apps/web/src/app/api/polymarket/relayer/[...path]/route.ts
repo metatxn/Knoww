@@ -16,6 +16,10 @@ import { jsonError } from "@/lib/api-error";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { requireExtensionSession } from "@/lib/auth/extension-session";
 import { checkOriginAndFetchSite } from "@/lib/origin-guard";
+import {
+  RELAYER_AUTH_FAILURE_HEADER,
+  RELAYER_AUTH_FAILURE_VALUE,
+} from "@/lib/relayer-auth-protocol";
 
 const log = createLogger("api.relayer");
 
@@ -202,7 +206,15 @@ async function proxy(
 ): Promise<NextResponse> {
   // Layer 1: caller identity
   const auth = await authorize(request);
-  if (auth.error) return auth.error;
+  if (auth.error) {
+    if (auth.error.status === 401) {
+      auth.error.headers.set(
+        RELAYER_AUTH_FAILURE_HEADER,
+        RELAYER_AUTH_FAILURE_VALUE
+      );
+    }
+    return auth.error;
+  }
 
   // Layer 2: rate limit (60/min/IP)
   const rateLimitResponse = checkRateLimit(request, {

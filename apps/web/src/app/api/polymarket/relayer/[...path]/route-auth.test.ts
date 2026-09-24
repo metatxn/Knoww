@@ -50,6 +50,7 @@ it("denies forged first-party headers and accepts a signed relayer session", asy
     params: Promise.resolve({ path: ["submit"] }),
   });
   expect(forged.status).toBe(401);
+  expect(forged.headers.get("X-Knoww-Relayer-Auth")).toBe("required");
   expect(upstreamFetch).not.toHaveBeenCalled();
 
   const { token } = await issueExtensionSessionToken({
@@ -61,6 +62,34 @@ it("denies forged first-party headers and accepts a signed relayer session", asy
     params: Promise.resolve({ path: ["submit"] }),
   });
   expect(authorized.status).toBe(200);
+  expect(upstreamFetch).toHaveBeenCalledOnce();
+});
+
+it("does not mark an upstream 401 as a proxy authentication failure", async () => {
+  process.env.EXTENSION_SESSION_SECRET = "test-relayer-session-secret";
+  process.env.POLY_RELAYER_API_KEY = "test-relayer-key";
+  process.env.POLY_RELAYER_API_KEY_ADDRESS =
+    "0x0000000000000000000000000000000000000001";
+  const upstreamFetch = vi.fn(async () =>
+    Response.json(
+      { error: "Upstream credential rejected" },
+      { status: 401, headers: { "X-Knoww-Relayer-Auth": "required" } }
+    )
+  );
+  vi.stubGlobal("fetch", upstreamFetch);
+  const { token } = await issueExtensionSessionToken({
+    address: "0x0000000000000000000000000000000000000002",
+    chainId: 137,
+    scope: ["relayer:submit"],
+  });
+  const response = await POST(submitRequest(token), {
+    params: Promise.resolve({ path: ["submit"] }),
+  });
+  expect(response.status).toBe(401);
+  expect(response.headers.has("X-Knoww-Relayer-Auth")).toBe(false);
+  expect(await response.json()).toEqual({
+    error: "Upstream credential rejected",
+  });
   expect(upstreamFetch).toHaveBeenCalledOnce();
 });
 

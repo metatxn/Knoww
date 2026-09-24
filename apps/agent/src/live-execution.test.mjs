@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
@@ -346,6 +347,282 @@ test("blocks a live BUY after durable realized losses cross the drawdown stop", 
   assert.match(fill.reason ?? "", /drawdown/i);
   assert.equal(calls.postOrder, 0);
 });
+
+test("subtracts paid BUY fees from durable cash without changing realized P&L", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"a".repeat(64)}`;
+  const { deps } = createDeps(
+    {},
+    {
+      portfolioPnl: {
+        realizedPnlUsd: "0",
+        openEntryNotionalUsd: "995",
+        buyFeesUsd: "2",
+      },
+    }
+  );
+  await new LiveExecutionAdapter(deps).execute(
+    baseRequest({ requestedSizeUsd: "20" })
+  );
+  const order = await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY");
+  assert.equal(order?.requestedSizeUsd, "3");
+});
+
+test("refreshes the cash cap after a pending BUY fee settles in the safety gate", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"a".repeat(64)}`;
+  const { deps, calls } = createDeps(
+    {
+      readTradingWalletBalance: async () => walletBalance("94750000"),
+      readConditionalBalanceRaw: async () => BigInt("110000000"),
+    },
+    { liveOrders: [pendingSettlementOrder()] }
+  );
+  deps.getPortfolioPnl = async () => ({
+    realizedPnlUsd: "0",
+    openEntryNotionalUsd: "995",
+    buyFeesUsd:
+      (await deps.getLiveOrderByIdempotencyKey("run-0:watch-0:BUY"))
+        .settledFeeUsd ?? "0.15",
+  });
+  const fill = await new LiveExecutionAdapter(deps).execute(
+    baseRequest({ requestedSizeUsd: "20" })
+  );
+  assert.equal(fill.status, "FILLED");
+  assert.equal(calls.postOrder, 1);
+  assert.equal(
+    (await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY"))
+      ?.requestedSizeUsd,
+    "4.75"
+  );
+});
+
+function createPortfolioD1() {
+  const sqlite = new DatabaseSync(":memory:");
+  for (const file of readdirSync(new URL("../migrations/", import.meta.url))
+    .filter((name) => name.endsWith(".sql"))
+    .sort()) {
+    sqlite.exec(
+      readFileSync(new URL(`../migrations/${file}`, import.meta.url), "utf8")
+    );
+  }
+  return {
+    sqlite,
+    prepare(sql) {
+      const statement = sqlite.prepare(sql);
+      let values = [];
+      return {
+        bind(...args) {
+          values = args;
+          return this;
+        },
+        async all() {
+          return { results: statement.all(...values) };
+        },
+        async first() {
+          return statement.get(...values) ?? null;
+        },
+        async run() {
+          return statement.run(...values);
+        },
+      };
+    },
+  };
+}
+
+test("D1 reserves all filled orders missing positions, beyond the recent-order window", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"a".repeat(64)}`;
+  const db = createPortfolioD1();
+  const repo = createAgentRepository(db);
+  try {
+    for (let index = 0; index < 201; index++) {
+      await repo.upsertLiveOrder({
+        ...pendingSettlementOrder(),
+        idempotencyKey: `missing-${index}`,
+        runId: `missing-${index}`,
+        settledFeeUsd: "0",
+        balanceSnapshotJson: null,
+      });
+    }
+    await repo.upsertLiveOrder({
+      ...pendingSettlementOrder(),
+      idempotencyKey: "dry-run",
+      dryRun: true,
+      settledFeeUsd: "100",
+    });
+    const { deps, calls } = createDeps();
+    deps.getPortfolioPnl = () => repo.getPortfolioPnl("live");
+    const fill = await new LiveExecutionAdapter(deps).execute(baseRequest());
+    assert.equal(
+      fill.status,
+      "BLOCKED",
+      "durable fills must exhaust the bankroll even with no position rows"
+    );
+    assert.match(fill.reason, /cash/i);
+    assert.equal(calls.postOrder, 0);
+    const pnl = await repo.getPortfolioPnl("live");
+    assert.equal(pnl.openEntryNotionalUsd, "1005");
+    assert.equal(pnl.buyFeesUsd, "0");
+  } finally {
+    db.sqlite.close();
+    restoreEnv();
+  }
+});
+
+for (const backend of ["memory", "D1"]) {
+  test(`${backend}: live risk accounts for unrecorded positions and excludes paper losses`, async () => {
+    restoreEnv();
+    process.env.AGENT_LIVE_ENABLED = "true";
+    process.env.AGENT_LIVE_DRY_RUN = "false";
+    process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+    process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"a".repeat(64)}`;
+    const db = backend === "D1" ? createPortfolioD1() : undefined;
+    const repo = createAgentRepository(db);
+    try {
+      const item = await repo.upsertWatchlistItem({
+        question: "Test market",
+        tokenId: `ledger-${backend}`,
+        side: "YES",
+        newsUrls: [],
+        socialNotes: [],
+        active: true,
+      });
+      const positionInput = {
+        watchlistItemId: item.id,
+        tokenId: item.tokenId,
+        entryPrice: "0.5",
+        shares: "1800",
+        entryNotionalUsd: "900",
+        openedRunId: "paper-open",
+      };
+      const paper = await repo.openPosition(positionInput);
+      const paperLoss = await repo.openPosition({
+        ...positionInput,
+        shares: "600",
+        entryNotionalUsd: "300",
+        openedRunId: "paper-loss",
+      });
+      await repo.closePosition(paperLoss.id, {
+        exitPrice: "0",
+        closeReason: "resolution",
+        closedRunId: null,
+      });
+      const liveBefore = await repo.getPortfolioPnl("live");
+      assert.equal(
+        liveBefore.realizedPnlUsd,
+        "0",
+        "paper losses must not trip live drawdown"
+      );
+      assert.equal(
+        liveBefore.openEntryNotionalUsd,
+        "0",
+        "paper exposure must not reduce live cash"
+      );
+      const paperBefore = await repo.getPortfolioPnl("paper");
+      assert.equal(paperBefore.realizedPnlUsd, "-300");
+      assert.equal(paperBefore.openEntryNotionalUsd, "900");
+
+      const orderInput = {
+        ...pendingSettlementOrder(),
+        runId: `live-${backend}`,
+        watchlistItemId: item.id,
+        tokenId: item.tokenId,
+        idempotencyKey: `live-${backend}:${item.id}:BUY`,
+        requestedSizeUsd: "1000",
+        filledNotionalUsd: "995",
+        filledShares: "1990",
+        status: "PARTIALLY_FILLED",
+        settledFeeUsd: "2",
+        balanceSnapshotJson: null,
+      };
+      await repo.upsertLiveOrder(orderInput);
+      const missing = await repo.getPortfolioPnl("live");
+      assert.equal(
+        missing.openEntryNotionalUsd,
+        "995",
+        "a filled order reserves cash even if opening its position failed"
+      );
+      assert.equal(missing.buyFeesUsd, "2");
+
+      const { deps } = createDeps();
+      deps.getPortfolioPnl = () => repo.getPortfolioPnl("live");
+      const fill = await new LiveExecutionAdapter(deps).execute(
+        baseRequest({ requestedSizeUsd: "20" })
+      );
+      assert.equal(
+        fill.status,
+        "FILLED",
+        "paper losses must not block the live order"
+      );
+      assert.equal(
+        (await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY"))
+          ?.requestedSizeUsd,
+        "3"
+      );
+
+      const live = await repo.openPosition({
+        ...positionInput,
+        shares: "1990",
+        entryNotionalUsd: "995",
+        openedRunId: orderInput.runId,
+      });
+      assert.equal(
+        (await repo.getPortfolioPnl("live")).openEntryNotionalUsd,
+        "995",
+        "the recovered position must not double count the fill"
+      );
+      assert.equal(
+        (await repo.getOpenPositionByWatchlistItem(item.id, "live"))?.id,
+        live.id
+      );
+      assert.equal(
+        (await repo.getOpenPositionByWatchlistItem(item.id, "paper"))?.id,
+        paper.id
+      );
+      await repo.reducePosition(live.id, {
+        soldShares: "990",
+        exitPrice: "0.4",
+        closeReason: "manual",
+        closedRunId: "live-sell",
+      });
+      const reduced = await repo.getPortfolioPnl("live");
+      assert.equal(reduced.openEntryNotionalUsd, "500");
+      assert.equal(reduced.realizedPnlUsd, "-99");
+      assert.equal(reduced.buyFeesUsd, "2");
+      await repo.closePosition(live.id, {
+        exitPrice: "0.5",
+        closeReason: "resolution",
+        closedRunId: null,
+      });
+      const closed = await repo.getPortfolioPnl("live");
+      assert.equal(
+        closed.openEntryNotionalUsd,
+        "0",
+        "closed positions must not resurrect as missing fills"
+      );
+      assert.equal(closed.realizedPnlUsd, "-99");
+      assert.equal(
+        closed.buyFeesUsd,
+        "2",
+        "closing a position must not refund its paid fee"
+      );
+      assert.deepEqual(await repo.getPortfolioPnl("paper"), paperBefore);
+    } finally {
+      db?.sqlite.close();
+      restoreEnv();
+    }
+  });
+}
 
 test("adds SELL proceeds when replaying an idempotent filled order", async () => {
   restoreEnv();

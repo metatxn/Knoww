@@ -31,6 +31,8 @@
     "test:node": "node --experimental-strip-types --test $(find src -name '*.test.mjs')",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:credential-security": "node scripts/test-credential-security.mjs",
+    "test:credential-security:browser": "playwright test --config playwright.security.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

@@ -1205,13 +1205,7 @@ function showToast(
   setTimeout(() => toast?.remove(), type === "success" ? 3500 : 6000);
 }
 
-/**
- * Rich error toast for state-listener driven errors (order rejections,
- * relayer/network failures, session drops). Maps the raw error to a human
- * title + body via the error-mapping module, renders a dismissible toast,
- * and — for unmapped errors — exposes a "Copy details" button so users can
- * forward the raw text to support.
- */
+/** Display a dismissible error with a friendly title and recovery message. */
 function showRichErrorToast(panel: HTMLElement, rawError: string): void {
   const mapped = mapTradingError(rawError);
 
@@ -1222,10 +1216,6 @@ function showRichErrorToast(panel: HTMLElement, rawError: string): void {
   }
   toast.className = "knoww-tp-toast knoww-tp-toast-error knoww-tp-toast-rich";
 
-  const copyBtnHtml = mapped.code
-    ? `<button type="button" class="knoww-tp-toast-action" data-knoww-copy-error>Copy details</button>`
-    : "";
-
   toast.innerHTML = `
     <span class="knoww-tp-toast-icon">${I.error}</span>
     <div class="knoww-tp-toast-body">
@@ -1233,7 +1223,6 @@ function showRichErrorToast(panel: HTMLElement, rawError: string): void {
       <div class="knoww-tp-toast-msg">${escapeHtml(mapped.body)}</div>
     </div>
     <div class="knoww-tp-toast-tail">
-      ${copyBtnHtml}
       <button type="button" class="knoww-tp-toast-close" aria-label="Dismiss" data-knoww-dismiss>${I.close}</button>
     </div>
   `;
@@ -1250,28 +1239,7 @@ function showRichErrorToast(panel: HTMLElement, rawError: string): void {
     .querySelector<HTMLButtonElement>("[data-knoww-dismiss]")
     ?.addEventListener("click", dismiss);
 
-  const copyBtn = toast.querySelector<HTMLButtonElement>(
-    "[data-knoww-copy-error]"
-  );
-  if (copyBtn) {
-    copyBtn.addEventListener("click", async () => {
-      const payload = mapped.code
-        ? `[${mapped.code}] ${mapped.raw}`
-        : mapped.raw;
-      try {
-        await navigator.clipboard.writeText(payload);
-        copyBtn.textContent = "Copied";
-        copyBtn.disabled = true;
-      } catch {
-        copyBtn.textContent = "Copy failed";
-      }
-    });
-  }
-
-  // Unmapped errors linger (10s) so users have time to copy; mapped errors
-  // auto-dismiss at 8s. Users can always hit × to close immediately.
-  const duration = mapped.code ? 10_000 : 8_000;
-  setTimeout(dismiss, duration);
+  setTimeout(dismiss, 8_000);
 }
 
 // ── Public API ──

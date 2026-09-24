@@ -5533,27 +5533,6 @@
   gap: 6px !important;
   margin-left: 4px !important;
 }
-.knoww-tp-toast-action {
-  padding: 4px 8px !important;
-  font-family: inherit !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  color: inherit !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid currentColor !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
-  transition:
-    background 0.15s,
-    opacity 0.15s !important;
-}
-.knoww-tp-toast-action:hover {
-  background: rgba(255, 255, 255, 0.14) !important;
-}
-.knoww-tp-toast-action:disabled {
-  opacity: 0.6 !important;
-  cursor: default !important;
-}
 .knoww-tp-toast-close {
   display: inline-flex !important;
   align-items: center !important;

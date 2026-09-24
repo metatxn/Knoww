@@ -163,6 +163,13 @@ async function waitForActiveCredentialDerivation(
   throw new Error(ACTIVE_DERIVATION_MESSAGE);
 }
 
+function resolveWalletUuid(): string | null {
+  const selected = WalletBridge.getSelectedWalletUuid();
+  if (selected) return selected;
+  const wallets = WalletBridge.getDiscoveredWallets();
+  return wallets.length === 1 ? wallets[0].uuid : null;
+}
+
 async function deriveCredentialsWithClaim(
   address: string,
   onboardingSigningPermit?: string
@@ -178,7 +185,7 @@ async function deriveCredentialsWithClaim(
   }
 
   try {
-    const selectedWalletUuid = WalletBridge.getSelectedWalletUuid();
+    const selectedWalletUuid = resolveWalletUuid();
     const isWalletConnect = selectedWalletUuid === WALLETCONNECT_WALLET_UUID;
     const selectedWallet = isWalletConnect
       ? null
@@ -191,7 +198,7 @@ async function deriveCredentialsWithClaim(
 
     await ExtensionSession.ensureAuthorized(address);
 
-    if (WalletBridge.getSelectedWalletUuid() !== selectedWalletUuid) {
+    if (resolveWalletUuid() !== selectedWalletUuid) {
       throw new Error("Your selected wallet changed. Try again.");
     }
 
@@ -214,7 +221,7 @@ async function deriveCredentialsWithClaim(
         "Failed to generate trading credentials",
         TRUSTED_DERIVATION_TIMEOUT_MS
       );
-      if (WalletBridge.getSelectedWalletUuid() !== selectedWalletUuid) {
+      if (resolveWalletUuid() !== selectedWalletUuid) {
         throw new Error("Your selected wallet changed. Try again.");
       }
       return result;

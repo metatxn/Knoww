@@ -78,7 +78,11 @@ export interface PortfolioPnl {
   closedPositionCount: number;
   realizedPnlUsd: string;
   openEntryNotionalUsd: string;
+  /** Live BUY fees, kept separate from position P&L. */
+  buyFeesUsd?: string;
 }
+
+type PositionExecutionMode = "paper" | "live";
 
 export interface AgentSchedulerLock {
   lockKey: string;
@@ -171,11 +175,12 @@ export interface AgentRepository {
     input: ReducePositionInput
   ): Promise<AgentPosition | null>;
   getOpenPositionByWatchlistItem(
-    watchlistItemId: string
+    watchlistItemId: string,
+    mode?: PositionExecutionMode
   ): Promise<AgentPosition | null>;
   listOpenPositionsByToken(tokenId: string): Promise<AgentPosition[]>;
   listPositions(): Promise<AgentPosition[]>;
-  getPortfolioPnl(): Promise<PortfolioPnl>;
+  getPortfolioPnl(mode?: PositionExecutionMode): Promise<PortfolioPnl>;
   upsertLiveOrder(record: LiveOrderUpsert): Promise<LiveOrderRecord>;
   getLiveOrderByIdempotencyKey(key: string): Promise<LiveOrderRecord | null>;
   listLiveOrders(): Promise<LiveOrderRecord[]>;
@@ -249,6 +254,76 @@ function aggregatePortfolio(positions: AgentPosition[]): PortfolioPnl {
     closedPositionCount: closedCount,
     realizedPnlUsd: realized.toDecimalPlaces(6).toString(),
     openEntryNotionalUsd: openEntry.toDecimalPlaces(6).toString(),
+  };
+}
+
+function isFilledLiveBuy(order: LiveOrderRecord): boolean {
+  return (
+    !order.dryRun &&
+    order.side === "BUY" &&
+    (order.status === "FILLED" || order.status === "PARTIALLY_FILLED")
+  );
+}
+
+function entryKey(
+  runId: string | null,
+  watchlistItemId: string,
+  tokenId: string
+): string {
+  return JSON.stringify([runId, watchlistItemId, tokenId]);
+}
+
+function positionEntryKey(position: AgentPosition): string {
+  return entryKey(
+    position.openedRunId,
+    position.watchlistItemId,
+    position.tokenId
+  );
+}
+
+function liveBuyEntryKey(order: LiveOrderRecord): string {
+  return entryKey(order.runId, order.watchlistItemId, order.tokenId);
+}
+
+function positionsForMode(
+  positions: AgentPosition[],
+  liveBuys: LiveOrderRecord[],
+  mode: PositionExecutionMode
+): AgentPosition[] {
+  const liveEntries = new Set(liveBuys.map(liveBuyEntryKey));
+  return positions.filter(
+    (position) =>
+      liveEntries.has(positionEntryKey(position)) === (mode === "live")
+  );
+}
+
+function aggregateModePortfolio(
+  positions: AgentPosition[],
+  liveBuys: LiveOrderRecord[],
+  mode: PositionExecutionMode
+): PortfolioPnl {
+  const selectedPositions = positionsForMode(positions, liveBuys, mode);
+  const pnl = aggregatePortfolio(selectedPositions);
+  if (mode === "paper") return pnl;
+
+  // The live ledger is persisted before the position. Reserve orphaned fills
+  // even after a crash, and match closed positions too so they are not reopened.
+  const recordedEntries = new Set(selectedPositions.map(positionEntryKey));
+  let openEntry = new Decimal(pnl.openEntryNotionalUsd);
+  let buyFees = new Decimal(0);
+  for (const order of liveBuys) {
+    buyFees = buyFees.add(order.settledFeeUsd ?? order.feeEstimateUsd);
+    if (!recordedEntries.has(liveBuyEntryKey(order))) {
+      pnl.openPositionCount += 1;
+      // Legacy fills without actual amounts reserve the full requested size.
+      const filled = new Decimal(order.filledNotionalUsd);
+      openEntry = openEntry.add(filled.gt(0) ? filled : order.requestedSizeUsd);
+    }
+  }
+  return {
+    ...pnl,
+    openEntryNotionalUsd: openEntry.toDecimalPlaces(6).toString(),
+    buyFeesUsd: buyFees.toDecimalPlaces(6).toString(),
   };
 }
 
@@ -630,9 +705,18 @@ class MemoryAgentRepository implements AgentRepository {
   }
 
   async getOpenPositionByWatchlistItem(
-    watchlistItemId: string
+    watchlistItemId: string,
+    mode?: PositionExecutionMode
   ): Promise<AgentPosition | null> {
-    for (const position of memory.positions.values()) {
+    const positions = [...memory.positions.values()];
+    const selected = mode
+      ? positionsForMode(
+          positions,
+          [...memory.liveOrders.values()].filter(isFilledLiveBuy),
+          mode
+        )
+      : positions;
+    for (const position of selected) {
       if (
         position.watchlistItemId === watchlistItemId &&
         position.status === "OPEN"
@@ -655,8 +739,15 @@ class MemoryAgentRepository implements AgentRepository {
     );
   }
 
-  async getPortfolioPnl(): Promise<PortfolioPnl> {
-    return aggregatePortfolio([...memory.positions.values()]);
+  async getPortfolioPnl(mode?: PositionExecutionMode): Promise<PortfolioPnl> {
+    const positions = [...memory.positions.values()];
+    return mode
+      ? aggregateModePortfolio(
+          positions,
+          [...memory.liveOrders.values()].filter(isFilledLiveBuy),
+          mode
+        )
+      : aggregatePortfolio(positions);
   }
 
   async upsertLiveOrder(input: LiveOrderUpsert): Promise<LiveOrderRecord> {
@@ -1279,15 +1370,21 @@ class D1AgentRepository extends MemoryAgentRepository {
   }
 
   async getOpenPositionByWatchlistItem(
-    watchlistItemId: string
+    watchlistItemId: string,
+    mode?: PositionExecutionMode
   ): Promise<AgentPosition | null> {
-    const row = await this.db
+    const result = await this.db
       .prepare(
-        "SELECT * FROM agent_positions WHERE watchlist_item_id = ? AND status = 'OPEN' ORDER BY opened_at DESC LIMIT 1"
+        "SELECT * FROM agent_positions WHERE watchlist_item_id = ? AND status = 'OPEN' ORDER BY opened_at DESC"
       )
       .bind(watchlistItemId)
-      .first<Record<string, unknown>>();
-    return row ? rowToPosition(row) : null;
+      .all<Record<string, unknown>>();
+    const positions = result.results.map(rowToPosition);
+    return (
+      (mode
+        ? positionsForMode(positions, await this.listFilledLiveBuys(), mode)
+        : positions)[0] ?? null
+    );
   }
 
   async listOpenPositionsByToken(tokenId: string): Promise<AgentPosition[]> {
@@ -1309,11 +1406,24 @@ class D1AgentRepository extends MemoryAgentRepository {
     return result.results.map(rowToPosition);
   }
 
-  async getPortfolioPnl(): Promise<PortfolioPnl> {
+  private async listFilledLiveBuys(): Promise<LiveOrderRecord[]> {
+    // Risk accounting must include all fills, not the paginated audit view.
+    const result = await this.db
+      .prepare(
+        "SELECT * FROM agent_live_orders WHERE dry_run = 0 AND side = 'BUY' AND status IN ('FILLED', 'PARTIALLY_FILLED')"
+      )
+      .all<Record<string, unknown>>();
+    return result.results.map(rowToLiveOrder);
+  }
+
+  async getPortfolioPnl(mode?: PositionExecutionMode): Promise<PortfolioPnl> {
     const result = await this.db
       .prepare("SELECT * FROM agent_positions")
       .all<Record<string, unknown>>();
-    return aggregatePortfolio(result.results.map(rowToPosition));
+    const positions = result.results.map(rowToPosition);
+    return mode
+      ? aggregateModePortfolio(positions, await this.listFilledLiveBuys(), mode)
+      : aggregatePortfolio(positions);
   }
 
   async upsertLiveOrder(input: LiveOrderUpsert): Promise<LiveOrderRecord> {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { middleware } from "./middleware";
@@ -7,6 +9,27 @@ afterEach(() => {
 });
 
 describe("middleware security headers", () => {
+  it("applies the same signing policy when credentials HTML is served as a static asset", () => {
+    const headers = readFileSync(
+      resolve(process.cwd(), "public/_headers"),
+      "utf8"
+    );
+    const block =
+      headers
+        .match(
+          /^\/extension-credentials\.html\r?\n((?:[ \t]+[^\n]*\r?\n?)*)/m
+        )?.[1]
+        ?.split("\n") ?? [];
+    const staticPolicy = block
+      .find((line) => line.trim().startsWith("Content-Security-Policy:"))
+      ?.trim()
+      .slice("Content-Security-Policy:".length)
+      .trim();
+    const response = middleware(
+      new NextRequest("https://knoww.app/extension-credentials.html")
+    );
+    expect(staticPolicy).toBe(response.headers.get("Content-Security-Policy"));
+  });
   it("keeps the extension signing page free of site scripts and network access", () => {
     const response = middleware(
       new NextRequest("https://knoww.app/extension-credentials.html")

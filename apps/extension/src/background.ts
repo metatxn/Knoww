@@ -1356,7 +1356,8 @@ if (!__STORE_BUILD__) {
 function forwardToOffscreen(
   message: unknown,
   sender: chrome.runtime.MessageSender,
-  sendResponse: (response: BackgroundResponse) => void
+  sendResponse: (response: BackgroundResponse) => void,
+  canAcceptCredentials?: () => Promise<boolean>
 ): void {
   const tabId = sender.tab?.id;
   const msg = message as { type?: string; address?: string };
@@ -1428,12 +1429,26 @@ function forwardToOffscreen(
       ) {
         const extracted = extractDerivedCredentials(result);
         if (extracted) {
+          if (canAcceptCredentials && !(await canAcceptCredentials())) {
+            sendResponse({
+              ok: false,
+              error: "Trading credential setup expired. Try again.",
+            });
+            return;
+          }
           await storeClobCredentials(msg.address, extracted.credentials);
           await chrome.storage.local
             .set({ [TRADING_WARM_ELIGIBLE_STORAGE_KEY]: true })
             .catch(() => {});
           broadcastTradingCredentialsUpdated(msg.address);
           sendResponse(extracted.response);
+          return;
+        }
+        if (result?.ok) {
+          sendResponse({
+            ok: false,
+            error: "Invalid trading credential response. Try again.",
+          });
           return;
         }
       }
@@ -3076,7 +3091,21 @@ chrome.runtime.onMessage.addListener(
               nonce: auth.nonce,
             },
             sender,
-            finish
+            finish,
+            async () => {
+              const session = await getExtensionSessionInfo();
+              return (
+                !completed &&
+                ownsClobCredentialDerivation(
+                  request.address,
+                  claimToken,
+                  sourceTabId
+                ) &&
+                session.loggedIn &&
+                !!session.address &&
+                getAddress(session.address) === getAddress(request.address)
+              );
+            }
           );
         } catch (error) {
           finish({

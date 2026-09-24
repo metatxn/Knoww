@@ -1,4 +1,8 @@
 import type { Address, WalletClient } from "viem";
+import {
+  RELAYER_AUTH_FAILURE_HEADER,
+  RELAYER_AUTH_FAILURE_VALUE,
+} from "./relayer-auth-protocol";
 
 type RelayerWallet = { address: Address; client: WalletClient };
 
@@ -112,7 +116,12 @@ export async function authenticatedRelayerFetch(
       ...init,
       headers: { ...init.headers, Authorization: `Bearer ${token}` },
     });
-    if (response.status !== 401) return response;
+    if (
+      response.status !== 401 ||
+      response.headers.get(RELAYER_AUTH_FAILURE_HEADER) !==
+        RELAYER_AUTH_FAILURE_VALUE
+    )
+      return response;
     session = null;
   }
   throw new Error("Wallet sign-in for relayer access expired.");

@@ -21,6 +21,13 @@ import {
 const address = "0x000000000000000000000000000000000000cafe";
 const wallet = { name: "MetaMask", rdns: "io.metamask" };
 const trustedUrl = `https://knoww.app${TRUSTED_CLOB_SIGNING_PATH}`;
+const otherAddress = "0x000000000000000000000000000000000000dead";
+const accountPermissions = (accounts: string[]) => [
+  {
+    parentCapability: "eth_accounts",
+    caveats: [{ type: "restrictReturnedAccounts", value: accounts }],
+  },
+];
 type TabUpdateListener = (
   tabId: number,
   change: { url?: string; status?: string }
@@ -54,6 +61,29 @@ function installSigningPage(
     pathname: TRUSTED_CLOB_SIGNING_PATH,
   });
   return page;
+}
+
+async function expectPageFailure(
+  result: ReturnType<typeof signClobAuthInPage>,
+  message: RegExp
+) {
+  const response = await result;
+  assert.equal(typeof response, "object");
+  assert.match((response as { error: string }).error, message);
+}
+
+async function signWithProvider(request: ReturnType<typeof vi.fn>) {
+  vi.useFakeTimers();
+  installSigningPage([{ info: wallet, provider: { request } }]);
+  const signing = signClobAuthInPage({
+    address,
+    expectedOrigin: "https://knoww.app",
+    expectedPath: TRUSTED_CLOB_SIGNING_PATH,
+    typedData: "typed-data",
+    wallet,
+  });
+  await vi.advanceTimersByTimeAsync(1_500);
+  return signing;
 }
 
 afterEach(() => {
@@ -274,7 +304,7 @@ test("a route change during account checks stops before the wallet signature req
     }),
   };
   installSigningPage([{ info: wallet, provider }]);
-  const rejected = assert.rejects(
+  const rejected = expectPageFailure(
     signClobAuthInPage({
       address,
       expectedOrigin: "https://knoww.app",
@@ -318,38 +348,47 @@ test("background rejects a valid ClobAuth signature from a different wallet", as
   );
 });
 
-test("trusted page signs with the selected account without posting the signature to the page", async () => {
-  vi.useFakeTimers();
-  const selected = {
-    request: vi.fn(async ({ method }: { method: string }) => {
-      if (method === "eth_accounts") return [address];
-      if (method === "eth_chainId") return "0x89";
-      if (method === "eth_signTypedData_v4") return `0x${"a".repeat(130)}`;
-      throw new Error(`Unexpected wallet request: ${method}`);
-    }),
-  };
-  const other = { request: vi.fn() };
-  const page = installSigningPage([
-    { info: { name: "Phantom", rdns: "app.phantom" }, provider: other },
-    { info: wallet, provider: selected },
-  ]);
+test.each([wallet, { name: "Phantom", rdns: "app.phantom" }])(
+  "trusted page selects $name without posting the signature to the page",
+  async (selectedWallet) => {
+    vi.useFakeTimers();
+    const selected = {
+      request: vi.fn(async ({ method }: { method: string }) => {
+        if (method === "eth_accounts") return [address];
+        if (method === "eth_chainId") return "0x89";
+        if (method === "eth_signTypedData_v4") return `0x${"a".repeat(130)}`;
+        throw new Error(`Unexpected wallet request: ${method}`);
+      }),
+    };
+    const other = { request: vi.fn() };
+    const page = installSigningPage([
+      {
+        info:
+          selectedWallet.rdns === "io.metamask"
+            ? { name: "Phantom", rdns: "app.phantom" }
+            : wallet,
+        provider: other,
+      },
+      { info: selectedWallet, provider: selected },
+    ]);
 
-  const signing = signClobAuthInPage({
-    address,
-    expectedOrigin: "https://knoww.app",
-    expectedPath: TRUSTED_CLOB_SIGNING_PATH,
-    typedData: "typed-data",
-    wallet,
-  });
-  await vi.advanceTimersByTimeAsync(1_500);
-  assert.equal(await signing, `0x${"a".repeat(130)}`);
-  assert.equal(other.request.mock.calls.length, 0);
-  assert.equal(page.postMessage.mock.calls.length, 0);
-  assert.deepEqual(selected.request.mock.calls.at(-2)?.[0], {
-    method: "eth_signTypedData_v4",
-    params: [address, "typed-data"],
-  });
-});
+    const signing = signClobAuthInPage({
+      address,
+      expectedOrigin: "https://knoww.app",
+      expectedPath: TRUSTED_CLOB_SIGNING_PATH,
+      typedData: "typed-data",
+      wallet: selectedWallet,
+    });
+    await vi.advanceTimersByTimeAsync(1_500);
+    assert.equal(await signing, `0x${"a".repeat(130)}`);
+    assert.equal(other.request.mock.calls.length, 0);
+    assert.equal(page.postMessage.mock.calls.length, 0);
+    assert.deepEqual(selected.request.mock.calls.at(-2)?.[0], {
+      method: "eth_signTypedData_v4",
+      params: [address, "typed-data"],
+    });
+  }
+);
 
 test("legacy MetaMask without an announced name can sign on the trusted page", async () => {
   vi.useFakeTimers();
@@ -380,6 +419,248 @@ test("legacy MetaMask without an announced name can sign on the trusted page", a
   assert.equal(page.postMessage.mock.calls.length, 0);
 });
 
+test.each([true, false])(
+  "signs with the requested MetaMask account while another is active (already permitted: %s)",
+  async (alreadyPermitted) => {
+    vi.useFakeTimers();
+    let permitted = alreadyPermitted;
+    const provider = {
+      request: vi.fn(async ({ method }: { method: string }) => {
+        if (method === "eth_accounts" || method === "eth_requestAccounts")
+          return [otherAddress];
+        if (method === "wallet_getPermissions")
+          return accountPermissions(
+            permitted ? [address, otherAddress] : [otherAddress]
+          );
+        if (method === "wallet_requestPermissions") {
+          permitted = true;
+          return accountPermissions([address]);
+        }
+        if (method === "eth_chainId") return "0x89";
+        if (method === "eth_signTypedData_v4") return `0x${"a".repeat(130)}`;
+        throw new Error(`Unexpected wallet request: ${method}`);
+      }),
+    };
+    const page = installSigningPage([{ info: wallet, provider }]);
+    const signing = signClobAuthInPage({
+      address,
+      expectedOrigin: "https://knoww.app",
+      expectedPath: TRUSTED_CLOB_SIGNING_PATH,
+      typedData: "typed-data",
+      wallet,
+    });
+    await vi.advanceTimersByTimeAsync(1_500);
+    assert.equal(await signing, `0x${"a".repeat(130)}`);
+    const requests = provider.request.mock.calls.map(([request]) => request);
+    assert.deepEqual(
+      requests.filter(({ method }) => method === "wallet_requestPermissions"),
+      alreadyPermitted
+        ? []
+        : [
+            {
+              method: "wallet_requestPermissions",
+              params: [{ eth_accounts: {} }],
+            },
+          ]
+    );
+    assert.deepEqual(
+      requests.filter(({ method }) => method === "eth_signTypedData_v4"),
+      [{ method: "eth_signTypedData_v4", params: [address, "typed-data"] }]
+    );
+    assert.equal(
+      requests.some(({ method }) => method === "eth_requestAccounts"),
+      false
+    );
+    assert.equal(page.postMessage.mock.calls.length, 0);
+  }
+);
+
+test.each([
+  ["wallet_getPermissions", 4200],
+  ["wallet_getPermissions", -32601],
+  ["wallet_requestPermissions", 4200],
+  ["wallet_requestPermissions", -32601],
+])("connects once when %s is unsupported (%s)", async (unsupported, code) => {
+  let connected = false;
+  const request = vi.fn(async ({ method }: { method: string }) => {
+    if (method === unsupported) throw { code };
+    if (method === "eth_accounts") return connected ? [address] : [];
+    if (method === "wallet_getPermissions") return [];
+    if (method === "eth_requestAccounts") {
+      connected = true;
+      return [address];
+    }
+    if (method === "eth_chainId") return "0x89";
+    if (method === "eth_signTypedData_v4") return `0x${"a".repeat(130)}`;
+    throw new Error(`Unexpected wallet request: ${method}`);
+  });
+  assert.equal(await signWithProvider(request), `0x${"a".repeat(130)}`);
+  assert.equal(
+    request.mock.calls.filter(([call]) => call.method === "eth_requestAccounts")
+      .length,
+    1
+  );
+});
+
+test.each([
+  [4001, "User rejected the request."],
+  [-32002, "A wallet request is already pending. Open MetaMask to continue."],
+  [-32603, "Could not connect to your wallet. Open MetaMask and try again."],
+])(
+  "does not open a second prompt after a permission request fails (%s)",
+  async (code, error) => {
+    const request = vi.fn(async ({ method }: { method: string }) => {
+      if (method === "eth_accounts") return [otherAddress];
+      if (method === "wallet_getPermissions") return [];
+      if (method === "wallet_requestPermissions")
+        throw { code, message: "Private provider diagnostics" };
+      throw new Error(`Unexpected wallet request: ${method}`);
+    });
+    assert.deepEqual(await signWithProvider(request), { error });
+    assert.deepEqual(
+      request.mock.calls.map(([call]) => call.method),
+      ["eth_accounts", "wallet_getPermissions", "wallet_requestPermissions"]
+    );
+  }
+);
+
+test.each([
+  { name: "missing caveats", grant: [{ parentCapability: "eth_accounts" }] },
+  {
+    name: "missing account restriction",
+    grant: [{ parentCapability: "eth_accounts", caveats: [] }],
+  },
+  {
+    name: "wrong capability",
+    grant: [
+      { ...accountPermissions([address])[0], parentCapability: "eth_sign" },
+    ],
+  },
+  {
+    name: "conflicting restrictions",
+    grant: [
+      {
+        parentCapability: "eth_accounts",
+        caveats: [
+          ...accountPermissions([address])[0].caveats,
+          ...accountPermissions([otherAddress])[0].caveats,
+        ],
+      },
+    ],
+  },
+])("rejects an account grant with $name before signing", async ({ grant }) => {
+  const request = vi.fn(async ({ method }: { method: string }) => {
+    if (method === "eth_accounts") return [otherAddress];
+    if (
+      method === "wallet_getPermissions" ||
+      method === "wallet_requestPermissions"
+    )
+      return grant;
+    throw new Error(`Unexpected wallet request: ${method}`);
+  });
+  assert.deepEqual(await signWithProvider(request), {
+    error: `Select ${address} in MetaMask's connection prompt for https://knoww.app, then retry.`,
+  });
+  assert.equal(
+    request.mock.calls.some(([call]) => call.method === "eth_signTypedData_v4"),
+    false
+  );
+});
+
+test.each(["eth_chainId", "eth_signTypedData_v4"])(
+  "rejects a permission revoked during %s without prompting again",
+  async (revokeDuring) => {
+    let permitted = true;
+    const request = vi.fn(async ({ method }: { method: string }) => {
+      if (method === revokeDuring) permitted = false;
+      if (method === "eth_accounts") return [otherAddress];
+      if (method === "wallet_getPermissions")
+        return accountPermissions(permitted ? [address] : [otherAddress]);
+      if (method === "eth_chainId") return "0x89";
+      if (method === "eth_signTypedData_v4") return `0x${"a".repeat(130)}`;
+      throw new Error(`Unexpected wallet request: ${method}`);
+    });
+    const result = await signWithProvider(request);
+    assert.equal(typeof result, "object");
+    assert.match((result as { error: string }).error, /account changed/);
+    assert.equal(
+      request.mock.calls.filter(
+        ([call]) => call.method === "eth_signTypedData_v4"
+      ).length,
+      revokeDuring === "eth_chainId" ? 0 : 1
+    );
+    assert.equal(
+      request.mock.calls.some(
+        ([call]) =>
+          call.method === "wallet_requestPermissions" ||
+          call.method === "eth_requestAccounts"
+      ),
+      false
+    );
+  }
+);
+
+test("navigation while reading permissions stops before a wallet prompt", async () => {
+  const request = vi.fn(async ({ method }: { method: string }) => {
+    if (method === "eth_accounts") return [];
+    if (method === "wallet_getPermissions") {
+      vi.stubGlobal("location", {
+        origin: "https://knoww.app",
+        pathname: "/different-route",
+      });
+      return [];
+    }
+    throw new Error(`Unexpected wallet request: ${method}`);
+  });
+  assert.deepEqual(await signWithProvider(request), {
+    error: "The Knoww signing page changed. Try again.",
+  });
+  assert.deepEqual(
+    request.mock.calls.map(([call]) => call.method),
+    ["eth_accounts", "wallet_getPermissions"]
+  );
+});
+
+test.each([
+  [4001, "User rejected the request."],
+  [-32002, "A wallet request is already pending. Open MetaMask to continue."],
+  [4902, "Add the Polygon network in MetaMask, then try again."],
+  [-32603, "Could not connect to your wallet. Open MetaMask and try again."],
+])(
+  "preserves a safe wallet failure through Chrome's injection result: %s",
+  async (code, message) => {
+    vi.useFakeTimers();
+    const provider = {
+      request: vi.fn(async () => {
+        throw Object.assign(
+          new Error("Private provider diagnostics that must not reach the UI"),
+          { code }
+        );
+      }),
+    };
+    installSigningPage([{ info: wallet, provider }]);
+    const { executeScript } = installOnboardingTabs();
+    // Chrome resolves an injected-function rejection with a null result.
+    // The injected function must return its safe failure as serializable data.
+    executeScript.mockImplementation(async (invocation) => [
+      {
+        frameId: 0,
+        documentId: "signing-document",
+        result: await invocation.func(invocation.args[0]).catch(() => null),
+      },
+    ]);
+    const signing = signClobAuthInTrustedTab({
+      address,
+      sourceTabId: 11,
+      typedData: "typed-data",
+      wallet,
+    });
+    const rejected = assert.rejects(signing, { message });
+    await vi.advanceTimersByTimeAsync(1_500);
+    await rejected;
+  }
+);
+
 test("page origin mismatch stops before contacting an injected wallet", async () => {
   const provider = { request: vi.fn() };
   installSigningPage([{ info: wallet, provider }]);
@@ -387,7 +668,7 @@ test("page origin mismatch stops before contacting an injected wallet", async ()
     origin: "https://untrusted.example",
     pathname: TRUSTED_CLOB_SIGNING_PATH,
   });
-  await assert.rejects(
+  await expectPageFailure(
     signClobAuthInPage({
       address,
       expectedOrigin: "https://knoww.app",
@@ -407,6 +688,11 @@ test("account mismatch stops before requesting a ClobAuth signature", async () =
       if (method === "eth_accounts" || method === "eth_requestAccounts") {
         return ["0x000000000000000000000000000000000000dead"];
       }
+      if (
+        method === "wallet_getPermissions" ||
+        method === "wallet_requestPermissions"
+      )
+        return accountPermissions([otherAddress]);
       throw new Error(`Unexpected wallet request: ${method}`);
     }),
   };
@@ -418,7 +704,7 @@ test("account mismatch stops before requesting a ClobAuth signature", async () =
     typedData: "typed-data",
     wallet,
   });
-  const rejected = assert.rejects(signing, /Select/);
+  const rejected = expectPageFailure(signing, /Select/);
   await vi.advanceTimersByTimeAsync(1_500);
   await rejected;
   assert.equal(
@@ -444,7 +730,7 @@ test("ambiguous wallet identity stops before requesting a ClobAuth signature", a
     typedData: "typed-data",
     wallet,
   });
-  const rejected = assert.rejects(signing, /Could not identify/);
+  const rejected = expectPageFailure(signing, /Could not identify/);
   await vi.advanceTimersByTimeAsync(1_500);
   await rejected;
   assert.equal(first.request.mock.calls.length, 0);

@@ -243,7 +243,7 @@ function selectExecutionAdapter(
         repository.getLiveOrderByIdempotencyKey(key),
       listLiveOrders: () => repository.listLiveOrders(),
       listDailyLiveOrders: () => repository.listDailyLiveOrders(),
-      getPortfolioPnl: () => repository.getPortfolioPnl(),
+      getPortfolioPnl: () => repository.getPortfolioPnl("live"),
       hasUnresolvedLiveOrder: () => repository.hasUnresolvedLiveOrder(),
       applySettledFeeToRunFill: (input) =>
         repository.applySettledFeeToRunFill(input),
@@ -295,7 +295,8 @@ export async function runPaperAgent(
       // vote. The agent should never miss the close window because it was busy
       // re-evaluating the market.
       let openPosition = await repository.getOpenPositionByWatchlistItem(
-        item.id
+        item.id,
+        executionMode
       );
       if (openPosition && shouldTimeExit(item)) {
         let exitFill: PaperFill;
