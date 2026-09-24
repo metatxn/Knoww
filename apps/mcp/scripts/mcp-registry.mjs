@@ -1,11 +1,45 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 const registryUrl = "https://registry.modelcontextprotocol.io";
 const publisherMetadataKey =
   "io.modelcontextprotocol.registry/publisher-provided";
+const retryDelays = [2_000, 4_000, 8_000, 16_000];
+const retryStatuses = new Set([408, 429, 500, 502, 503, 504]);
+
+async function requestRegistry(
+  url,
+  request,
+  { retryNotFound = false, sleep: wait = sleep } = {}
+) {
+  for (let attempt = 0; ; attempt++) {
+    let response;
+    try {
+      response = await request(url, { signal: AbortSignal.timeout(30_000) });
+    } catch (error) {
+      if (
+        attempt === retryDelays.length ||
+        !(error instanceof TypeError || error?.name === "TimeoutError")
+      ) {
+        throw error;
+      }
+    }
+    if (response) {
+      if (
+        attempt === retryDelays.length ||
+        (!retryStatuses.has(response.status) &&
+          !(retryNotFound && response.status === 404))
+      ) {
+        return response;
+      }
+      await response.body?.cancel().catch(() => {});
+    }
+    await wait(retryDelays[attempt]);
+  }
+}
 
 function stableVersion(version) {
   return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)
@@ -73,7 +107,7 @@ export function prepareManifest(source, versions, runId, commitSha) {
   };
 }
 
-export async function listVersions(name, request = fetch) {
+export async function listVersions(name, request = fetch, options = {}) {
   const url = new URL(
     `${registryUrl}/v0.1/servers/${encodeURIComponent(name)}/versions`
   );
@@ -82,9 +116,7 @@ export async function listVersions(name, request = fetch) {
   const versions = [];
   const cursors = new Set();
   while (true) {
-    const response = await request(url.toString(), {
-      signal: AbortSignal.timeout(30_000),
-    });
+    const response = await requestRegistry(url.toString(), request, options);
     if (!response.ok)
       throw new Error(
         `Registry history lookup failed with HTTP ${response.status}.`
@@ -120,11 +152,9 @@ function assertPublished(published, manifest) {
   }
 }
 
-export async function isPublished(manifest, request = fetch) {
+export async function isPublished(manifest, request = fetch, options = {}) {
   const url = `${registryUrl}/v0.1/servers/${encodeURIComponent(manifest.name)}/versions/${encodeURIComponent(manifest.version)}`;
-  const response = await request(url, {
-    signal: AbortSignal.timeout(30_000),
-  });
+  const response = await requestRegistry(url, request, options);
   if (response.status === 404) return false;
   if (!response.ok) {
     throw new Error(`Registry lookup failed with HTTP ${response.status}.`);
@@ -153,7 +183,7 @@ async function main() {
     return;
   }
   if (mode !== "verify") throw new Error("Expected prepare or verify.");
-  if (!(await isPublished(source))) {
+  if (!(await isPublished(source, fetch, { retryNotFound: true }))) {
     throw new Error("The published version was not found in the registry.");
   }
   appendFileSync(
