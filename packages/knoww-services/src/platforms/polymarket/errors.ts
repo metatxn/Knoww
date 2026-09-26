@@ -19,6 +19,7 @@ export type UpstreamErrorName = (typeof UPSTREAM_ERROR_NAMES)[number];
 
 export interface UpstreamError extends Error {
   readonly name: UpstreamErrorName;
+  cause?: unknown;
   /** HTTP status of the upstream answer; absent when no usable response came back. */
   readonly status?: number;
 }
@@ -109,9 +110,12 @@ export function isUpstreamPriceHistoryError(
 
 export function upstreamPublicDataError(
   message: string,
-  status?: number
+  status?: number,
+  cause?: unknown
 ): UpstreamError {
-  return createUpstreamError("UpstreamPublicDataError", message, status);
+  const error = createUpstreamError("UpstreamPublicDataError", message, status);
+  if (cause !== undefined) error.cause = cause;
+  return error;
 }
 
 export function isUpstreamPublicDataError(

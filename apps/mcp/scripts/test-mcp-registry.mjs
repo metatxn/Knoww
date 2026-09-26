@@ -19,6 +19,20 @@ const response = (server = manifest, status = "active") =>
     server,
     _meta: { "io.modelcontextprotocol.registry/official": { status } },
   });
+const noWait = { sleep: async () => {} };
+const failedBodyResponse = (error) =>
+  new Response(
+    new ReadableStream({
+      pull(controller) {
+        controller.error(error);
+      },
+    })
+  );
+const bodyFailures = [
+  new TypeError("Connection terminated while reading body"),
+  new DOMException("Request timed out", "TimeoutError"),
+  new DOMException("Body reading aborted", "AbortError"),
+];
 
 test("patch releases continue from 0.2.1 despite an accidental calendar version", () => {
   const versions = [
@@ -179,7 +193,11 @@ for (const [label, metadata] of [
 test("history lookup fails closed on API errors, malformed data, and repeated cursors", async () => {
   for (const status of [404, 429, 500]) {
     await assert.rejects(
-      listVersions(source.name, async () => new Response(null, { status })),
+      listVersions(
+        source.name,
+        async () => new Response(null, { status }),
+        noWait
+      ),
       /history lookup failed/
     );
   }
@@ -196,8 +214,10 @@ test("history lookup fails closed on API errors, malformed data, and repeated cu
 });
 
 test("a missing version permits publication", async () => {
+  let calls = 0;
   assert.equal(
     await isPublished(manifest, async (url) => {
+      calls++;
       assert.equal(
         url,
         "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.metatxn%2Fknoww/versions/0.2.2"
@@ -206,6 +226,252 @@ test("a missing version permits publication", async () => {
     }),
     false
   );
+  assert.equal(calls, 1);
+});
+
+test("registry reads recover from transient HTTP and network failures", async () => {
+  const failures = [
+    408,
+    429,
+    500,
+    502,
+    503,
+    504,
+    new TypeError("fetch failed"),
+    new DOMException("Request timed out", "TimeoutError"),
+  ];
+  for (const failure of failures) {
+    let calls = 0;
+    const delays = [];
+    assert.equal(
+      await isPublished(
+        manifest,
+        async (_url, options) => {
+          assert.ok(options.signal instanceof AbortSignal);
+          if (calls++ === 0) {
+            if (failure instanceof Error) throw failure;
+            return new Response(null, { status: failure });
+          }
+          return response();
+        },
+        {
+          sleep: async (delay) => {
+            delays.push(delay);
+          },
+        }
+      ),
+      true
+    );
+    assert.equal(calls, 2);
+    assert.deepEqual(delays, [2_000]);
+  }
+});
+
+test("history retries the failed page without skipping or duplicating versions", async () => {
+  const cursors = [];
+  let calls = 0;
+  const versions = await listVersions(
+    source.name,
+    async (value) => {
+      cursors.push(new URL(value).searchParams.get("cursor"));
+      calls++;
+      if (calls === 1)
+        return Response.json({
+          servers: [versionEntry("0.2.0")],
+          metadata: { nextCursor: "next/page" },
+        });
+      if (calls === 2) return new Response(null, { status: 500 });
+      return Response.json({ servers: [versionEntry("0.2.1")], metadata: {} });
+    },
+    noWait
+  );
+  assert.deepEqual(cursors, [null, "next/page", "next/page"]);
+  assert.deepEqual(versions, [versionEntry("0.2.0"), versionEntry("0.2.1")]);
+});
+
+test("publication checks retry transient response-body failures", async () => {
+  for (const failure of bodyFailures) {
+    let calls = 0;
+    assert.equal(
+      await isPublished(
+        manifest,
+        async () => (calls++ === 0 ? failedBodyResponse(failure) : response()),
+        noWait
+      ),
+      true
+    );
+    assert.equal(calls, 2);
+  }
+});
+
+test("history retries body failures at the same cursor without losing versions", async () => {
+  for (const failure of bodyFailures) {
+    const cursors = [];
+    const versions = await listVersions(
+      source.name,
+      async (value) => {
+        cursors.push(new URL(value).searchParams.get("cursor"));
+        if (cursors.length === 1)
+          return Response.json({
+            servers: [versionEntry("0.2.0")],
+            metadata: { nextCursor: "next/page" },
+          });
+        if (cursors.length === 2) return failedBodyResponse(failure);
+        return Response.json({
+          servers: [versionEntry("0.2.1")],
+          metadata: {},
+        });
+      },
+      noWait
+    );
+    assert.deepEqual(cursors, [null, "next/page", "next/page"]);
+    assert.deepEqual(versions, [versionEntry("0.2.0"), versionEntry("0.2.1")]);
+  }
+});
+
+test("persistent response-body failures exhaust the bounded backoff", async () => {
+  for (const [read, input] of [
+    [isPublished, manifest],
+    [listVersions, source.name],
+  ]) {
+    for (const failure of bodyFailures) {
+      let calls = 0;
+      const delays = [];
+      await assert.rejects(
+        read(
+          input,
+          async () => {
+            calls++;
+            return failedBodyResponse(failure);
+          },
+          { sleep: async (delay) => delays.push(delay) }
+        ),
+        (error) => error === failure
+      );
+      assert.equal(calls, 5);
+      assert.deepEqual(delays, [2_000, 4_000, 8_000, 16_000]);
+    }
+  }
+});
+
+test("history syntax and validation failures are not retried", async () => {
+  for (const body of [
+    "invalid JSON",
+    "null",
+    "{}",
+    '{"servers":[],"metadata":[]}',
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      listVersions(
+        source.name,
+        async () => {
+          calls++;
+          return new Response(body);
+        },
+        noWait
+      )
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+test("post-publication verification waits for a newly published version", async () => {
+  let calls = 0;
+  assert.equal(
+    await isPublished(
+      manifest,
+      async () => {
+        return calls++ === 0 ? new Response(null, { status: 404 }) : response();
+      },
+      { ...noWait, retryNotFound: true }
+    ),
+    true
+  );
+  assert.equal(calls, 2);
+});
+
+test("persistent failures exhaust a bounded backoff and never permit publication", async () => {
+  for (const failure of [500, new TypeError("fetch failed")]) {
+    let calls = 0;
+    const delays = [];
+    await assert.rejects(
+      isPublished(
+        manifest,
+        async () => {
+          calls++;
+          if (failure instanceof Error) throw failure;
+          return new Response(null, { status: failure });
+        },
+        {
+          sleep: async (delay) => {
+            delays.push(delay);
+          },
+        }
+      ),
+      failure instanceof Error ? /fetch failed/ : /HTTP 500/
+    );
+    assert.equal(calls, 5);
+    assert.deepEqual(delays, [2_000, 4_000, 8_000, 16_000]);
+  }
+});
+
+test("post-publication verification remains unsuccessful after repeated 404s", async () => {
+  let calls = 0;
+  assert.equal(
+    await isPublished(
+      manifest,
+      async () => {
+        calls++;
+        return new Response(null, { status: 404 });
+      },
+      { ...noWait, retryNotFound: true }
+    ),
+    false
+  );
+  assert.equal(calls, 5);
+});
+
+test("permanent errors and invalid listings fail immediately", async () => {
+  for (const result of [
+    () => new Response(null, { status: 400 }),
+    () => new Response(null, { status: 401 }),
+    () => new Response(null, { status: 403 }),
+    () => new Response("invalid JSON"),
+    () => new Response("null"),
+    () => response({ ...manifest, title: "Changed" }),
+    () => response(manifest, "deleted"),
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      isPublished(
+        manifest,
+        async () => {
+          calls++;
+          return result();
+        },
+        noWait
+      )
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+test("a successful retry still requires the exact active listing", async () => {
+  let calls = 0;
+  await assert.rejects(
+    isPublished(
+      manifest,
+      async () => {
+        return calls++ === 0
+          ? new Response(null, { status: 500 })
+          : response(manifest, "deleted");
+      },
+      noWait
+    ),
+    /differs/
+  );
+  assert.equal(calls, 2);
 });
 
 test("an identical active version makes a rerun safe", async () => {
@@ -228,7 +494,7 @@ test("an existing version with different metadata or inactive status fails", asy
 test("registry failures cannot be mistaken for an unpublished version", async () => {
   for (const status of [401, 429, 500]) {
     await assert.rejects(
-      isPublished(manifest, async () => new Response(null, { status })),
+      isPublished(manifest, async () => new Response(null, { status }), noWait),
       /Registry lookup failed/
     );
   }

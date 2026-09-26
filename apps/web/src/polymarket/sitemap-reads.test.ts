@@ -27,6 +27,60 @@ afterEach(() => {
 });
 
 describe("sitemap platform reads", () => {
+  it.each(["declared", "streamed"])(
+    "retries a %s oversized page at the same cursor without losing earlier or later events",
+    async (sizeSource) => {
+      const oversizedCursors: Array<string | null> = [];
+      fetchMock.mockImplementation(async (input) => {
+        const url = new URL(String(input));
+        if (url.searchParams.get("order") !== "volume") return jsonResponse([]);
+        const cursor = url.searchParams.get("after_cursor");
+        const limit = Number(url.searchParams.get("limit"));
+        if (cursor === "second" && limit > 2) {
+          oversizedCursors.push(cursor);
+          return sizeSource === "declared"
+            ? new Response("", {
+                headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+              })
+            : new Response("x".repeat(4 * 1024 * 1024 + 1));
+        }
+        if (!cursor) return jsonResponse([{ id: "1" }, { id: "2" }], "second");
+        if (cursor === "second") {
+          return jsonResponse([{ id: "3" }, { id: "4" }], "third");
+        }
+        return jsonResponse([{ id: "5" }]);
+      });
+
+      const events = await readSitemapEventPages("evergreen", (page) => page);
+
+      expect(events).toEqual([1, 2, 3, 4, 5].map((id) => ({ id: String(id) })));
+      expect(oversizedCursors.length).toBeGreaterThan(0);
+      expect(new Set(oversizedCursors)).toEqual(new Set(["second"]));
+    }
+  );
+
+  it("fails instead of returning a partial sitemap when one event exceeds the byte limit", async () => {
+    const attemptedLimits: number[] = [];
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.searchParams.get("order") !== "volume") return jsonResponse([]);
+      if (!url.searchParams.has("after_cursor")) {
+        return jsonResponse([{ id: "1" }], "oversized-event");
+      }
+      attemptedLimits.push(Number(url.searchParams.get("limit")));
+      return new Response("", {
+        headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+      });
+    });
+
+    await expect(
+      readSitemapEventPages("evergreen", (page) => page)
+    ).rejects.toThrow("Public data response exceeded its size limit");
+    expect(attemptedLimits.at(-1)).toBe(1);
+    expect(attemptedLimits.length).toBeLessThanOrEqual(8);
+    expect(new Set(attemptedLimits).size).toBe(attemptedLimits.length);
+  });
+
   it("uses the registry host, follows cursors, and preserves filters without caching raw pages", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -54,9 +108,36 @@ describe("sitemap platform reads", () => {
       expect(url.searchParams.get("closed")).toBe("true");
       expect(url.searchParams.get("archived")).toBe("false");
       expect(url.searchParams.get("ascending")).toBe("false");
-      expect(url.searchParams.get("limit")).toBe("100");
+      expect(url.searchParams.get("limit")).toBe(
+        url.searchParams.has("after_cursor") ? "20" : "10"
+      );
       expect(init?.cache).toBe("no-store");
     }
+  });
+
+  it("grows small successful pages so a full catalog scan does not need hundreds of requests", async () => {
+    const limits: number[] = [];
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.searchParams.get("order") !== "volume24hr")
+        return jsonResponse([]);
+      const offset = Number(url.searchParams.get("after_cursor") ?? 0);
+      const limit = Number(url.searchParams.get("limit"));
+      limits.push(limit);
+      return jsonResponse(
+        Array.from({ length: limit }, (_, index) => ({
+          id: String(offset + index),
+        })),
+        String(offset + limit)
+      );
+    });
+
+    const events = await readSitemapEventPages("active", (page) => page);
+
+    expect(events).toHaveLength(1000);
+    expect(limits.slice(0, 5)).toEqual([10, 20, 40, 80, 100]);
+    expect(limits).toHaveLength(13);
+    expect(limits.at(-1)).toBe(50);
   });
 
   it("bounds each catalog pass by source records even when all pages are filtered out", async () => {
@@ -119,6 +200,31 @@ describe("sitemap platform reads", () => {
     ]);
   });
 
+  it("builds historical routes despite obsolete quote fields that sitemap policy does not use", async () => {
+    fetchMock.mockImplementation(async () =>
+      jsonResponse([
+        {
+          id: "1",
+          slug: "historical-result",
+          title: "Historical result",
+          closed: true,
+          markets: [
+            {
+              id: "1",
+              closed: true,
+              umaResolutionStatus: "resolved",
+              outcomePrices: '["1", "0"]',
+              bestAsk: 1.01,
+            },
+          ],
+        },
+      ])
+    );
+    expect(await fetchSitemapEventRoutes("evergreen")).toEqual([
+      { url: "https://knoww.app/events/detail/historical-result" },
+    ]);
+  });
+
   it("rejects invalid upstream records instead of caching a partial sitemap", async () => {
     fetchMock.mockImplementation(async () =>
       jsonResponse([{ slug: "missing-id" }])
@@ -127,5 +233,17 @@ describe("sitemap platform reads", () => {
     await expect(fetchSitemapEventRoutes("active")).rejects.toThrow(
       "Public data request returned an invalid response"
     );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it.each([403, 429, 503])(
+    "does not retry HTTP %s errors as oversized pages",
+    async (status) => {
+      fetchMock.mockImplementation(async () => new Response("", { status }));
+      await expect(
+        readSitemapEventPages("active", (page) => page)
+      ).rejects.toThrow(`Public data request failed with ${status}`);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    }
+  );
 });

@@ -8,7 +8,10 @@ import {
   type ServiceFetchOptions,
   withUpstreamTimeout,
 } from "../../fetch-options";
-import { decimalValueSchema } from "../../validation";
+import {
+  decimalValueSchema,
+  gammaProbabilityArraySchema,
+} from "../../validation";
 import type { PolymarketClientContext } from "./context";
 import { camelCaseDataRow, createDataApi } from "./data-api";
 import { upstreamPublicDataError } from "./errors";
@@ -65,6 +68,45 @@ const eventPageSchema = z.object({
   next_cursor: z.string().nullish(),
   // Informational only, so a bad value must not fail the whole page.
   total_results: z.number().nullish().catch(undefined),
+});
+
+// Catalog summaries need identity, content and settlement state. Old quote
+// fields such as bestAsk can be invalid on closed markets; they are omitted
+// here while full event and trading reads retain their stricter validation.
+const eventSummarySchema = z.object({
+  ...eventSchema.pick({
+    id: true,
+    slug: true,
+    title: true,
+    description: true,
+    active: true,
+    closed: true,
+    volume: true,
+  }).shape,
+  archived: z.boolean().optional(),
+  ended: z.boolean().optional(),
+  parentEventId: z.union([z.string(), z.number()]).nullish(),
+  marketCount: z.number().int().nonnegative().optional(),
+  markets: z
+    .array(
+      z.object({
+        id: z.union([z.string(), z.number()]).transform(String),
+        active: z.boolean().optional(),
+        closed: z.boolean().optional(),
+        outcomePrices: gammaProbabilityArraySchema
+          .nullish()
+          .transform((value) =>
+            Array.isArray(value) ? JSON.stringify(value) : value
+          ),
+        umaResolutionStatus: z.string().nullish(),
+        umaResolutionStatuses: z.string().nullish(),
+      })
+    )
+    .optional(),
+});
+
+const eventSummaryPageSchema = eventPageSchema.extend({
+  events: z.array(eventSummarySchema),
 });
 
 const marketPageSchema = z.object({
@@ -264,7 +306,9 @@ export function createPublicData(ctx: PolymarketClientContext) {
             error.reason === "too_large"
           ) {
             throw upstreamPublicDataError(
-              "Public data response exceeded its size limit"
+              "Public data response exceeded its size limit",
+              undefined,
+              error
             );
           }
           throw upstreamPublicDataError(
@@ -274,7 +318,9 @@ export function createPublicData(ctx: PolymarketClientContext) {
         const parsed = schema.safeParse(payload);
         if (!parsed.success) {
           throw upstreamPublicDataError(
-            "Public data request returned an invalid response"
+            "Public data request returned an invalid response",
+            undefined,
+            parsed.error
           );
         }
         return { payload, data: parsed.data };
@@ -292,10 +338,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
     return data;
   }
 
-  async function fetchEventPage(
-    input: EventPageParams,
-    options?: PublicFetchOptions
-  ) {
+  function buildEventPageUrl(input: EventPageParams) {
     const url = new URL("/events/keyset", GAMMA_API_BASE);
     addIfDefined(url.searchParams, "limit", input.limit);
     addIfDefined(url.searchParams, "after_cursor", input.cursor);
@@ -313,8 +356,27 @@ export function createPublicData(ctx: PolymarketClientContext) {
     addIfDefined(url.searchParams, "end_date_max", input.endDateMax);
     addIfDefined(url.searchParams, "order", input.order);
     addIfDefined(url.searchParams, "ascending", input.ascending);
+    return url;
+  }
+
+  async function fetchEventSummaryPage(
+    input: EventPageParams,
+    options?: PublicFetchOptions
+  ) {
+    const { data } = await fetchValidated(
+      buildEventPageUrl(input),
+      eventSummaryPageSchema,
+      options
+    );
+    return { events: data.events, nextCursor: data.next_cursor ?? null };
+  }
+
+  async function fetchEventPage(
+    input: EventPageParams,
+    options?: PublicFetchOptions
+  ) {
     const { payload, data } = await fetchValidated(
-      url,
+      buildEventPageUrl(input),
       eventPageSchema,
       options
     );
@@ -674,6 +736,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
 
   return {
     fetchEventPage,
+    fetchEventSummaryPage,
     fetchMarketTrades,
     fetchMarketQuotes,
     fetchMarketHolders,

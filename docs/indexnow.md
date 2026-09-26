@@ -50,6 +50,24 @@ not backfilling unchanged historical URLs. A failed sitemap fetch or IndexNow
 submission does not advance the snapshot, so the change is retried on the next
 hourly run.
 
+Market sitemap generation starts with 10 Gamma events per page. If a page
+exceeds the shared 4 MiB JSON limit, it halves the page size and retries the
+same cursor. After successful pages, the size doubles up to Gamma's 100-event
+limit so small records can be fetched in fewer requests. If one event
+still exceeds the limit, generation fails without publishing a partial
+sitemap. HTTP and validation failures also fail the run.
+
+The sitemap reads validated event summaries. It keeps the content and
+settlement fields used by the indexing policy and excludes quote fields such
+as `bestAsk`, which can be invalid on historical markets. Full event reads
+keep their existing validation.
+
+Each Gamma page has a 30-second deadline. The cron allows up to 120 seconds per
+sitemap request, including the response body, for cold-cache pagination.
+IndexNow submissions retain their 15-second
+request timeout. Sitemap errors include the failing URL, and timeout errors
+are identified separately.
+
 `wrangler.jsonc` declares the KV binding without an ID. On the first CLI
 deployment, Wrangler automatically provisions the namespace and writes its ID
 back into the configuration. Keep that generated ID in source control. The
