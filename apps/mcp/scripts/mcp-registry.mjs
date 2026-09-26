@@ -16,26 +16,29 @@ async function requestRegistry(
   { retryNotFound = false, sleep: wait = sleep } = {}
 ) {
   for (let attempt = 0; ; attempt++) {
-    let response;
     try {
-      response = await request(url, { signal: AbortSignal.timeout(30_000) });
-    } catch (error) {
-      if (
-        attempt === retryDelays.length ||
-        !(error instanceof TypeError || error?.name === "TimeoutError")
-      ) {
-        throw error;
-      }
-    }
-    if (response) {
+      const response = await request(url, {
+        signal: AbortSignal.timeout(30_000),
+      });
       if (
         attempt === retryDelays.length ||
         (!retryStatuses.has(response.status) &&
           !(retryNotFound && response.status === 404))
       ) {
-        return response;
+        return { response, body: response.ok ? await response.text() : null };
       }
       await response.body?.cancel().catch(() => {});
+    } catch (error) {
+      if (
+        attempt === retryDelays.length ||
+        !(
+          error instanceof TypeError ||
+          error?.name === "TimeoutError" ||
+          error?.name === "AbortError"
+        )
+      ) {
+        throw error;
+      }
     }
     await wait(retryDelays[attempt]);
   }
@@ -116,12 +119,16 @@ export async function listVersions(name, request = fetch, options = {}) {
   const versions = [];
   const cursors = new Set();
   while (true) {
-    const response = await requestRegistry(url.toString(), request, options);
+    const { response, body } = await requestRegistry(
+      url.toString(),
+      request,
+      options
+    );
     if (!response.ok)
       throw new Error(
         `Registry history lookup failed with HTTP ${response.status}.`
       );
-    const page = await response.json();
+    const page = JSON.parse(body);
     if (
       !Array.isArray(page.servers) ||
       page.metadata === null ||
@@ -154,12 +161,12 @@ function assertPublished(published, manifest) {
 
 export async function isPublished(manifest, request = fetch, options = {}) {
   const url = `${registryUrl}/v0.1/servers/${encodeURIComponent(manifest.name)}/versions/${encodeURIComponent(manifest.version)}`;
-  const response = await requestRegistry(url, request, options);
+  const { response, body } = await requestRegistry(url, request, options);
   if (response.status === 404) return false;
   if (!response.ok) {
     throw new Error(`Registry lookup failed with HTTP ${response.status}.`);
   }
-  const published = await response.json();
+  const published = JSON.parse(body);
   assertPublished(published, manifest);
   return true;
 }

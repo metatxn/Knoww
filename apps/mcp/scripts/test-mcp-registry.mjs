@@ -20,6 +20,19 @@ const response = (server = manifest, status = "active") =>
     _meta: { "io.modelcontextprotocol.registry/official": { status } },
   });
 const noWait = { sleep: async () => {} };
+const failedBodyResponse = (error) =>
+  new Response(
+    new ReadableStream({
+      pull(controller) {
+        controller.error(error);
+      },
+    })
+  );
+const bodyFailures = [
+  new TypeError("Connection terminated while reading body"),
+  new DOMException("Request timed out", "TimeoutError"),
+  new DOMException("Body reading aborted", "AbortError"),
+];
 
 test("patch releases continue from 0.2.1 despite an accidental calendar version", () => {
   const versions = [
@@ -276,6 +289,93 @@ test("history retries the failed page without skipping or duplicating versions",
   assert.deepEqual(versions, [versionEntry("0.2.0"), versionEntry("0.2.1")]);
 });
 
+test("publication checks retry transient response-body failures", async () => {
+  for (const failure of bodyFailures) {
+    let calls = 0;
+    assert.equal(
+      await isPublished(
+        manifest,
+        async () => (calls++ === 0 ? failedBodyResponse(failure) : response()),
+        noWait
+      ),
+      true
+    );
+    assert.equal(calls, 2);
+  }
+});
+
+test("history retries body failures at the same cursor without losing versions", async () => {
+  for (const failure of bodyFailures) {
+    const cursors = [];
+    const versions = await listVersions(
+      source.name,
+      async (value) => {
+        cursors.push(new URL(value).searchParams.get("cursor"));
+        if (cursors.length === 1)
+          return Response.json({
+            servers: [versionEntry("0.2.0")],
+            metadata: { nextCursor: "next/page" },
+          });
+        if (cursors.length === 2) return failedBodyResponse(failure);
+        return Response.json({
+          servers: [versionEntry("0.2.1")],
+          metadata: {},
+        });
+      },
+      noWait
+    );
+    assert.deepEqual(cursors, [null, "next/page", "next/page"]);
+    assert.deepEqual(versions, [versionEntry("0.2.0"), versionEntry("0.2.1")]);
+  }
+});
+
+test("persistent response-body failures exhaust the bounded backoff", async () => {
+  for (const [read, input] of [
+    [isPublished, manifest],
+    [listVersions, source.name],
+  ]) {
+    for (const failure of bodyFailures) {
+      let calls = 0;
+      const delays = [];
+      await assert.rejects(
+        read(
+          input,
+          async () => {
+            calls++;
+            return failedBodyResponse(failure);
+          },
+          { sleep: async (delay) => delays.push(delay) }
+        ),
+        (error) => error === failure
+      );
+      assert.equal(calls, 5);
+      assert.deepEqual(delays, [2_000, 4_000, 8_000, 16_000]);
+    }
+  }
+});
+
+test("history syntax and validation failures are not retried", async () => {
+  for (const body of [
+    "invalid JSON",
+    "null",
+    "{}",
+    '{"servers":[],"metadata":[]}',
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      listVersions(
+        source.name,
+        async () => {
+          calls++;
+          return new Response(body);
+        },
+        noWait
+      )
+    );
+    assert.equal(calls, 1);
+  }
+});
+
 test("post-publication verification waits for a newly published version", async () => {
   let calls = 0;
   assert.equal(
@@ -338,6 +438,7 @@ test("permanent errors and invalid listings fail immediately", async () => {
     () => new Response(null, { status: 401 }),
     () => new Response(null, { status: 403 }),
     () => new Response("invalid JSON"),
+    () => new Response("null"),
     () => response({ ...manifest, title: "Changed" }),
     () => response(manifest, "deleted"),
   ]) {
