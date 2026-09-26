@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { indexNowSubmissionError } from "./indexnow";
 import {
   diffIndexNowSitemapSnapshots,
@@ -12,6 +12,8 @@ import {
 const SNAPSHOT_KEY = "indexnow:sitemap-snapshot:v2";
 const LEGACY_SNAPSHOT_KEY = "indexnow:sitemap-snapshot:v1";
 const RATE_LIMIT_KEY = "indexnow:rate-limit:v1";
+
+afterEach(() => vi.useRealTimers());
 
 const INDEX_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -128,6 +130,98 @@ describe("diffIndexNowSitemapSnapshots", () => {
 });
 
 describe("runIndexNowSitemapCron", () => {
+  it("identifies a failed segment and preserves the previous snapshot without submitting removals", async () => {
+    const previous = JSON.stringify(
+      snapshot([{ url: "https://knoww.app/about" }])
+    );
+    const { state, values } = createStateStore(previous);
+    const submit = vi.fn();
+    const cancel = vi.fn();
+    const fetcher = vi.fn<typeof fetch>(async (input) =>
+      String(input) === "https://knoww.app/sitemap.xml"
+        ? new Response(INDEX_XML)
+        : new Response(new ReadableStream({ cancel }), { status: 503 })
+    );
+
+    await expect(
+      runIndexNowSitemapCron({ state, key: "Abcd1234-key", fetcher, submit })
+    ).rejects.toThrow(
+      "Sitemap request failed (503): https://knoww.app/sitemaps/static.xml"
+    );
+    expect(submit).not.toHaveBeenCalled();
+    expect(state.put).not.toHaveBeenCalled();
+    expect(values.get(SNAPSHOT_KEY)).toBe(previous);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("allows a sitemap body to finish after the submission timeout", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      if (String(input) === "https://knoww.app/sitemap.xml")
+        return new Response(INDEX_XML);
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            const timeout = setTimeout(() => {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  urlSetXml([{ url: "https://knoww.app/about" }])
+                )
+              );
+              controller.close();
+            }, 20_000);
+            init?.signal?.addEventListener(
+              "abort",
+              () => {
+                clearTimeout(timeout);
+                controller.error(new Error("aborted"));
+              },
+              { once: true }
+            );
+          },
+        })
+      );
+    });
+    const result = runIndexNowSitemapCron({
+      state: createStateStore().state,
+      key: "Abcd1234-key",
+      fetcher,
+      submit: vi.fn(),
+    });
+    const assertion = expect(result).resolves.toMatchObject({
+      outcome: "baseline",
+      discovered: 1,
+    });
+    await Promise.all([assertion, vi.advanceTimersByTimeAsync(20_001)]);
+  });
+
+  it("aborts a stalled sitemap with its URL and leaves the snapshot intact", async () => {
+    vi.useFakeTimers();
+    const { state } = createStateStore();
+    const fetcher = vi.fn<typeof fetch>(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new Error("aborted")),
+            { once: true }
+          );
+        })
+    );
+    const assertion = expect(
+      runIndexNowSitemapCron({
+        state,
+        key: "Abcd1234-key",
+        fetcher,
+        submit: vi.fn(),
+      })
+    ).rejects.toThrow(
+      "Sitemap request timed out: https://knoww.app/sitemap.xml"
+    );
+    await Promise.all([assertion, vi.advanceTimersByTimeAsync(120_001)]);
+    expect(state.put).not.toHaveBeenCalled();
+  });
+
   it("stores a baseline without submitting historical URLs", async () => {
     const { state, values } = createStateStore();
     const submit = vi.fn();

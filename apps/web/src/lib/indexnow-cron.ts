@@ -27,6 +27,9 @@ const MAX_SNAPSHOT_BYTES = 10 * 1024 * 1024;
 const MAX_URL_LENGTH = 2048;
 const MAX_LAST_MODIFIED_LENGTH = 128;
 const REQUEST_TIMEOUT_MS = 15_000;
+// Sitemap generation walks several bounded upstream pages on a cold cache.
+// IndexNow submissions retain the shorter request timeout above.
+const SITEMAP_REQUEST_TIMEOUT_MS = 120_000;
 
 type Fetcher = (
   input: string | URL | Request,
@@ -357,7 +360,10 @@ async function fetchCurrentSitemapSnapshot(
 
 async function fetchXml(fetcher: Fetcher, url: string): Promise<string> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    SITEMAP_REQUEST_TIMEOUT_MS
+  );
 
   try {
     const response = await fetcher(url, {
@@ -366,6 +372,7 @@ async function fetchXml(fetcher: Fetcher, url: string): Promise<string> {
       signal: controller.signal,
     });
     if (response.status !== 200) {
+      await response.body?.cancel();
       throw new Error(`Sitemap request failed (${response.status})`);
     }
 
@@ -375,10 +382,18 @@ async function fetchXml(fetcher: Fetcher, url: string): Promise<string> {
       Number.isFinite(Number(contentLength)) &&
       Number(contentLength) > MAX_SITEMAP_BYTES
     ) {
+      await response.body?.cancel();
       throw new Error("Sitemap response size limit exceeded");
     }
 
     return await readBoundedText(response);
+  } catch (error) {
+    const message = controller.signal.aborted
+      ? "Sitemap request timed out"
+      : error instanceof Error
+        ? error.message
+        : "Sitemap request failed";
+    throw new Error(`${message}: ${url}`, { cause: error });
   } finally {
     clearTimeout(timeout);
   }

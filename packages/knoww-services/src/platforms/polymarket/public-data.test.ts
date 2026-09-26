@@ -130,6 +130,7 @@ describe("fetchTagBySlug", () => {
     await expect(client.fetchTagBySlug("nba")).rejects.toMatchObject({
       name: "UpstreamPublicDataError",
       message: "Public data response exceeded its size limit",
+      cause: { name: "BoundedJsonError", reason: "too_large" },
     });
   });
 });
@@ -165,6 +166,74 @@ describe("fetchEventPage", () => {
       liquidity_min: "50.5",
     });
   });
+});
+
+describe("fetchEventSummaryPage", () => {
+  it("keeps catalog and settlement fields without relaxing full event quote validation", async () => {
+    const market = {
+      id: "2",
+      closed: true,
+      umaResolutionStatus: "resolved",
+      outcomePrices: '["1","0"]',
+    };
+    const event = {
+      id: "1",
+      slug: "result",
+      title: "Result",
+      closed: true,
+      ended: true,
+      parentEventId: null,
+      markets: [
+        { ...market, bestAsk: 1.01, description: "Unused market description" },
+      ],
+    };
+    const { client, calls } = createClient(() =>
+      jsonResponse({ events: [event], next_cursor: "next" })
+    );
+
+    expect(
+      await client.fetchEventSummaryPage({
+        limit: 10,
+        closed: true,
+        cursor: "previous",
+      })
+    ).toEqual({
+      events: [{ ...event, markets: [market] }],
+      nextCursor: "next",
+    });
+    expect(calls[0].searchParams.get("after_cursor")).toBe("previous");
+    expect(calls[0].searchParams.get("limit")).toBe("10");
+    await expect(
+      client.fetchEventPage({ limit: 10, closed: true })
+    ).rejects.toThrow("Public data request returned an invalid response");
+  });
+
+  it("preserves omitted market details and normalizes valid array prices for summaries", async () => {
+    const { client } = createClient(() =>
+      jsonResponse({
+        events: [
+          { id: "1", title: "Slim", marketCount: 1 },
+          { id: "2", markets: [{ id: "3", outcomePrices: ["1", "0"] }] },
+        ],
+      })
+    );
+    const page = await client.fetchEventSummaryPage({ limit: 10 });
+    expect(page.events[0]).not.toHaveProperty("markets");
+    expect(page.events[1].markets?.[0].outcomePrices).toBe('["1","0"]');
+  });
+
+  it.each([
+    { slug: "missing-id" },
+    { id: "1", markets: [{ id: "2", outcomePrices: '["2","0"]' }] },
+  ])(
+    "rejects malformed fields used by catalog consumers: %j",
+    async (event) => {
+      const { client } = createClient(() => jsonResponse({ events: [event] }));
+      await expect(client.fetchEventSummaryPage({ limit: 10 })).rejects.toThrow(
+        "Public data request returned an invalid response"
+      );
+    }
+  );
 });
 
 describe("invalid leaderboard responses", () => {
