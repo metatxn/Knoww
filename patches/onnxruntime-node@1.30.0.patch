@@ -1,0 +1,44 @@
+--- a/script/install-utils.js
++++ b/script/install-utils.js
+@@ -140,8 +140,7 @@
+         }
+ 
+         // Create a temporary directory
+-        const tempDir = path.join(os.tmpdir(), `onnxruntime-node-pkgs_${Date.now()}`);
+-        fs.mkdirSync(tempDir, { recursive: true });
++        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'onnxruntime-node-pkgs_'));
+ 
+         try {
+           const packageFilePath = path.join(tempDir, packageFileName);
+@@ -176,14 +175,29 @@
+               throw new Error(`Failed to find ${pathInPackage} in NuGet package`);
+             }
+ 
++            if (zipEntry.isDirectory || ((zipEntry.header.attr >>> 16) & 0xf000) === 0xa000) {
++              throw new Error(`Expected a regular file for ${pathInPackage}`);
++            }
++            if (fs.lstatSync(filepath, { throwIfNoEntry: false })?.isSymbolicLink()) {
++              throw new Error(`Refusing to overwrite symbolic link: ${filepath}`);
++            }
++
+             console.log(`Extracting ${pathInPackage} to ${filepath}`);
+ 
+             // Extract just this entry to a temporary location
+             const extractedFilePath = path.join(extractDir, path.basename(pathInPackage));
+             zip.extractEntryTo(zipEntry, extractDir, false, true);
+ 
+-            // Copy to the final destination
+-            fs.copyFileSync(extractedFilePath, filepath);
++            // Stage on the destination filesystem so rename stays atomic.
++            const stagingDir = fs.mkdtempSync(path.join(targetDir, '.onnxruntime-'));
++            try {
++              const stagedFile = path.join(stagingDir, 'binary');
++              fs.copyFileSync(extractedFilePath, stagedFile, fs.constants.COPYFILE_EXCL);
++              // Rename replaces the directory entry without following destination symlinks.
++              fs.renameSync(stagedFile, filepath);
++            } finally {
++              fs.rmSync(stagingDir, { recursive: true, force: true });
++            }
+           }
+         } finally {
+           // Clean up the temporary directory - always runs even if an error occurs

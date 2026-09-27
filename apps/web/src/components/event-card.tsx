@@ -1,9 +1,5 @@
 "use client";
 
-import {
-  parseGammaNumberArray,
-  parseGammaStringArray,
-} from "@knoww/shared-types/polymarket";
 import { m } from "framer-motion";
 import { Flame } from "lucide-react";
 import Image from "next/image";
@@ -21,11 +17,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { LiveGameState } from "@/hooks/use-sports-websocket";
+import {
+  type EventCardSummary,
+  extractCardOutcomes,
+} from "@/lib/event-card-model";
 import { formatVolume } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 interface EventCardProps {
-  event: {
+  event: EventCardSummary & {
     id: string;
     slug?: string;
     title: string;
@@ -73,7 +73,7 @@ export function EventCard({
     : event.id
       ? `/events/detail/${event.id}`
       : "#";
-  const marketCount = event.markets?.length || 0;
+  const marketCount = event.marketCount ?? event.markets?.length ?? 0;
   const hasLiveGame = liveGame
     ? isGameLive(liveGame.status)
     : event.live === true;
@@ -119,72 +119,7 @@ export function EventCard({
   // candidate — use its `groupItemTitle` + YES price. For single-market
   // events (binary Yes/No or head-to-head), parse `outcomes` and
   // `outcomePrices` to show both sides.
-  const displayOutcomes = (() => {
-    const markets = event.markets || [];
-    if (markets.length === 0) return [];
-
-    if (markets.length > 1) {
-      // Use groupItemTitle when available (clean candidate name, e.g.
-      // "Brazil", "Gavin Newsom"). When absent, fall back to `question`
-      // but strip any common prefix across markets so rows don't all
-      // read as near-identical strings.
-      const rawNames = markets.map((m) => m.groupItemTitle || m.question || "");
-      const hasGroupTitles = markets.every((m) => Boolean(m.groupItemTitle));
-
-      let names = rawNames;
-      if (!hasGroupTitles && rawNames.length > 1) {
-        // Longest common prefix across all names.
-        let prefix = rawNames[0];
-        for (const n of rawNames.slice(1)) {
-          while (prefix && !n.startsWith(prefix)) {
-            prefix = prefix.slice(0, -1);
-          }
-          if (!prefix) break;
-        }
-        if (prefix.length >= 4) {
-          // Strip the prefix plus any leading separator junk (" - ",
-          // ": ", etc.) that would otherwise render as " — ? 50%".
-          // If stripping leaves the name empty (happens when one
-          // market's full question IS the shared prefix), fall back
-          // to the original — truncate will handle overflow.
-          names = rawNames.map((n) => {
-            const remainder = n
-              .slice(prefix.length)
-              .replace(/^[\s\-:–—|,/]+/, "")
-              .trim();
-            return remainder || n;
-          });
-        }
-      }
-
-      return markets
-        .map((m, i) => {
-          const prices = parseGammaNumberArray(m.outcomePrices);
-          const price = prices[0] ?? 0;
-          return {
-            name: names[i] || rawNames[i],
-            price: Number.isFinite(price) ? price : 0,
-          };
-        })
-        .filter((o) => o.name && o.price > 0)
-        .sort((a, b) => b.price - a.price)
-        .slice(0, 3);
-    }
-
-    const m = markets[0];
-    const names = parseGammaStringArray(m.outcomes);
-    const prices = parseGammaNumberArray(m.outcomePrices);
-    return names
-      .map((name, i) => {
-        const price = prices[i] ?? 0;
-        return {
-          name,
-          price: Number.isFinite(price) ? price : 0,
-        };
-      })
-      .filter((o) => o.name)
-      .slice(0, 3);
-  })();
+  const displayOutcomes = extractCardOutcomes(event);
 
   // Parse liquidity - prefer liquidityClob (CLOB liquidity) over liquidity (AMM)
   const liquidity =

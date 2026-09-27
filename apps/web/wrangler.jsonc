@@ -12,6 +12,14 @@
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "keep_names": false,
+  "durable_objects": {
+    "bindings": [
+      { "name": "MARKET_FEED_CACHE", "class_name": "MarketFeedCache" }
+    ]
+  },
+  "migrations": [
+    { "tag": "market-feed-v1", "new_sqlite_classes": ["MarketFeedCache"] }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".open-next/assets"

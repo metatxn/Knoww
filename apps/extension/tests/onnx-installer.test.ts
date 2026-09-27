@@ -22,7 +22,8 @@ const { installPackages } = transformersRequire(
 // Build tiny archives directly so the fixture needs no ZIP dependency.
 function zipFixture(
   entries: Record<string, string>,
-  compressed = false
+  compressed = false,
+  externalAttributes = 0
 ): Buffer {
   const localFiles: Buffer[] = [];
   const directory: Buffer[] = [];
@@ -50,6 +51,7 @@ function zipFixture(
     central.writeUInt32LE(payload.length, 20);
     central.writeUInt32LE(data.length, 24);
     central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(externalAttributes, 38);
     central.writeUInt32LE(offset, 42);
     directory.push(central, name);
     offset += local.length + name.length + payload.length;
@@ -212,6 +214,57 @@ describe("ONNX native package installer", () => {
     expect(fs.readFileSync(destination, "utf8")).toBe(
       "selected native library"
     );
+    expect(fs.readdirSync(downloads)).toEqual([]);
+  });
+
+  it("rejects a manifest entry marked as a symlink in the archive", async () => {
+    archive = zipFixture({ [selectedEntry]: "outside.so" }, false, 0xa1ff0000);
+
+    await expect(install()).rejects.toThrow(/regular file/i);
+
+    expect(fs.existsSync(destination)).toBe(false);
+    expect(fs.readdirSync(downloads)).toEqual([]);
+  });
+
+  it("cleans up a failed staged copy without replacing the library", async () => {
+    fs.mkdirSync(path.dirname(destination));
+    fs.writeFileSync(destination, "previous native library");
+    const copyFile = fs.copyFileSync.bind(fs);
+    vi.spyOn(fs, "copyFileSync").mockImplementation((source, target, mode) => {
+      copyFile(source, target, mode);
+      throw new Error("Simulated staged copy failure");
+    });
+
+    await expect(install()).rejects.toThrow("Simulated staged copy failure");
+
+    expect(fs.readFileSync(destination, "utf8")).toBe(
+      "previous native library"
+    );
+    expect(fs.readdirSync(path.dirname(destination))).toEqual([
+      "libonnxruntime.so",
+    ]);
+    expect(fs.readdirSync(downloads)).toEqual([]);
+  });
+
+  it("does not follow a destination symlink created after the initial check", async () => {
+    const outside = path.join(sandbox, "outside.so");
+    fs.writeFileSync(outside, originalContents);
+    const copyFile = fs.copyFileSync.bind(fs);
+    vi.spyOn(fs, "copyFileSync").mockImplementation((source, target, mode) => {
+      fs.symlinkSync(outside, destination);
+      copyFile(source, target, mode);
+    });
+
+    await install();
+
+    expect(fs.readFileSync(outside, "utf8")).toBe(originalContents);
+    expect(fs.lstatSync(destination).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(destination, "utf8")).toBe(
+      "selected native library"
+    );
+    expect(fs.readdirSync(path.dirname(destination))).toEqual([
+      "libonnxruntime.so",
+    ]);
     expect(fs.readdirSync(downloads)).toEqual([]);
   });
 

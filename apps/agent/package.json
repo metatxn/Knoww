@@ -22,14 +22,14 @@
     "@knoww/logger": "workspace:*",
     "@knoww/shared-types": "workspace:*",
     "@openrouter/ai-sdk-provider": "3.0.0",
-    "ai": "7.0.97",
+    "ai": "7.0.107",
     "decimal.js": "catalog:",
     "viem": "catalog:",
-    "zod": "4.6.1"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@types/node": "24.13.4",
+    "@types/node": "24.13.6",
     "typescript": "catalog:"
   }
 }

@@ -10,6 +10,9 @@ import { createLogger } from "@knoww/logger";
 import { default as openNextWorker } from "./.open-next/worker.js";
 import { shouldRunAgentCron } from "./src/lib/agent-cron-schedule";
 import { withTrustedClientIp } from "./src/lib/client-ip";
+
+export { MarketFeedCache } from "./src/polymarket/market-feed-cache";
+
 import {
   runIndexNowSitemapCron,
   shouldRunIndexNowCron,

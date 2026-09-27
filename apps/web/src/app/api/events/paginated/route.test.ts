@@ -52,6 +52,52 @@ afterEach(() => {
 });
 
 describe("GET /api/events/paginated", () => {
+  it("assembles the complete page without skipping events on inclusive cursors", async () => {
+    const events = [event("1"), event("2"), event("3"), event("4")];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        const limit = Number(url.searchParams.get("limit"));
+        if (limit > 2) {
+          return new Response("", {
+            headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+          });
+        }
+        const cursor = url.searchParams.get("after_cursor");
+        const start = cursor
+          ? events.findIndex((event) => cursorFor(event.id) === cursor)
+          : 0;
+        const page = events.slice(start, start + limit);
+        return Response.json({
+          events: page,
+          next_cursor:
+            start + limit < events.length
+              ? cursorFor(page[page.length - 1].id)
+              : null,
+        });
+      })
+    );
+
+    const response = await GET(
+      new NextRequest(
+        "https://knoww.app/api/events/paginated?limit=20&markets=full"
+      )
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      data: Array<{ id: string }>;
+      pagination: unknown;
+    };
+    expect(body.data.map((event: { id: string }) => event.id)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(body.pagination).toEqual({ nextCursor: null, hasMore: false });
+  });
+
   it("asks Gamma for one extra row after a cursor and drops the cursor's row", async () => {
     const cursor = cursorFor("1");
     const calls = stubGamma({
