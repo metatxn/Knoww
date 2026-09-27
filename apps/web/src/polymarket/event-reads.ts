@@ -10,12 +10,14 @@ import type {
 import { logger } from "@/lib/logger";
 import { getPlatformRegistry } from "@/lib/platform-registry";
 import type { GammaEventFull, InitialHomeData } from "@/lib/server-cache";
+import { readFullEventFeed } from "./event-feed";
 import {
   mergeChildMarkets,
   toGammaEventFull,
   toInitialHomeData,
   toInitialHomeDataFromGamma,
 } from "./event-view-model";
+import { withProjectedFeedCache } from "./projected-feed-cache";
 
 /**
  * Polymarket event reads for apps/web, served in the Gamma shapes the pages
@@ -84,7 +86,7 @@ export async function fetchSeriesEventPage(
 
 /** One Gamma keyset page, as the platform client returns it. */
 export interface KeysetEventPage {
-  rawEvents: readonly GammaEventLike[];
+  rawEvents: Awaited<ReturnType<typeof readFullEventFeed>>["events"];
   nextCursor: string | null;
 }
 
@@ -96,9 +98,39 @@ export async function fetchKeysetEventPage(
   params: EventPageParams,
   cache: ServiceCacheHint
 ): Promise<KeysetEventPage> {
-  const { client } = getPlatformRegistry().getPlatformAdapter("polymarket");
-  const page = await client.fetchEventPage(params, { cache });
-  return { rawEvents: page.rawEvents, nextCursor: page.nextCursor };
+  let previousId: string | undefined;
+  if (params.cursor) {
+    try {
+      const tuple = JSON.parse(
+        Buffer.from(params.cursor, "base64url").subarray(32).toString("utf8")
+      ) as { keys?: { v?: unknown }[] };
+      const id = tuple.keys?.at(-1)?.v;
+      if (typeof id === "string" || typeof id === "number")
+        previousId = String(id);
+    } catch {
+      /* Unknown cursor formats must not cause an unseen row to be dropped. */
+    }
+  }
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify(params))
+  );
+  const key = `full-v1:${Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  const response = await withProjectedFeedCache(
+    key,
+    async () => {
+      const page = await readFullEventFeed(
+        { ...params, limit: params.limit - (params.cursor ? 1 : 0) },
+        previousId
+      );
+      return Response.json({
+        rawEvents: page.events,
+        nextCursor: page.nextCursor,
+      });
+    },
+    cache.revalidateSeconds ?? 60
+  );
+  return response.json();
 }
 
 export interface EventDetailInput {

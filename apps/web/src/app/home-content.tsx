@@ -50,11 +50,8 @@ import {
   useEventFilters,
   VOLUME_WINDOW_OPTIONS,
 } from "@/context/event-filter-context";
-import { useBreakingEvents } from "@/hooks/use-breaking-events";
-import { useNewEvents } from "@/hooks/use-new-events";
-import { usePaginatedEvents } from "@/hooks/use-paginated-events";
+import { useEventCards } from "@/hooks/use-event-cards";
 import { fetchSearchResults } from "@/hooks/use-search";
-import { useTrendingEvents } from "@/hooks/use-trending-events";
 import { PRIORITY_EVENT_CARD_COUNT } from "@/lib/lcp-images";
 import type {
   MarketsEndWithin,
@@ -286,6 +283,7 @@ interface MarketsWebMcpEventSource extends EventWithDates {
   volume24hr?: string | number;
   liquidity?: string | number;
   markets?: unknown[];
+  marketCount?: number;
 }
 
 function toMarketsWebMcpEvent(
@@ -302,7 +300,7 @@ function toMarketsWebMcpEvent(
     ...(event.volume !== undefined ? { volume: event.volume } : {}),
     ...(event.volume24hr !== undefined ? { volume24hr: event.volume24hr } : {}),
     ...(event.liquidity !== undefined ? { liquidity: event.liquidity } : {}),
-    marketCount: event.markets?.length ?? 0,
+    marketCount: event.marketCount ?? event.markets?.length ?? 0,
   };
 }
 
@@ -449,7 +447,9 @@ export function HomeContent({ initialData }: HomeContentProps) {
     hasNextPage: hasNextAllPaginated,
     isFetchingNextPage: isFetchingNextAllPaginated,
     dataUpdatedAt: updatedAtAll,
-  } = usePaginatedEvents({
+    feedStale: allFeedStale,
+  } = useEventCards({
+    feed: "categories",
     limit: 20,
     order: volumeOrderField,
     ascending: false,
@@ -457,10 +457,6 @@ export function HomeContent({ initialData }: HomeContentProps) {
     tagSlug: apiQueryParams.tagSlug,
     filters: serverFilterParams,
     enabled: viewMode === "categories",
-    // Both terminal and mobile card views need sub-market details on first
-    // paint; if SSR strips outcomePrices, card outcome rows appear after the
-    // client fetch and cause a mobile layout shift.
-    fullMarkets: true,
   });
 
   const {
@@ -471,7 +467,12 @@ export function HomeContent({ initialData }: HomeContentProps) {
     fetchNextPage: fetchNextTrending,
     isFetchingNextPage: isFetchingNextTrending,
     dataUpdatedAt: updatedAtTrending,
-  } = useTrendingEvents(20, serverFilterParams, viewMode === "trending", true);
+    feedStale: trendingFeedStale,
+  } = useEventCards({
+    feed: "trending",
+    filters: serverFilterParams,
+    enabled: viewMode === "trending",
+  });
 
   const {
     data: newPaginatedData,
@@ -481,7 +482,12 @@ export function HomeContent({ initialData }: HomeContentProps) {
     fetchNextPage: fetchNextNew,
     isFetchingNextPage: isFetchingNextNew,
     dataUpdatedAt: updatedAtNew,
-  } = useNewEvents(20, serverFilterParams, viewMode === "new", true);
+    feedStale: newFeedStale,
+  } = useEventCards({
+    feed: "new",
+    filters: serverFilterParams,
+    enabled: viewMode === "new",
+  });
 
   const {
     data: breakingPaginatedData,
@@ -491,7 +497,12 @@ export function HomeContent({ initialData }: HomeContentProps) {
     fetchNextPage: fetchNextBreaking,
     isFetchingNextPage: isFetchingNextBreaking,
     dataUpdatedAt: updatedAtBreaking,
-  } = useBreakingEvents(20, serverFilterParams, viewMode === "breaking", true);
+    feedStale: breakingFeedStale,
+  } = useEventCards({
+    feed: "breaking",
+    filters: serverFilterParams,
+    enabled: viewMode === "breaking",
+  });
 
   // Wrap view mode changes in startTransition for non-blocking UI updates
   const handleQuickCategoryClick = useCallback((mode: ViewMode) => {
@@ -520,7 +531,7 @@ export function HomeContent({ initialData }: HomeContentProps) {
           hasMore: hasNextAllPaginated ?? initialData?.hasMore ?? false,
           fetchMore: fetchNextAllPaginated,
           isFetchingMore: isFetchingNextAllPaginated,
-          dataUpdatedAt: updatedAtAll,
+          dataUpdatedAt: updatedAtAll || initialData?.freshness?.generatedAt,
         };
       }
       case "trending": {
@@ -594,6 +605,13 @@ export function HomeContent({ initialData }: HomeContentProps) {
   };
 
   const currentData = getCurrentEvents();
+  const feedStale = {
+    categories:
+      allFeedStale || (!allPaginatedData && initialData?.freshness?.stale),
+    trending: trendingFeedStale,
+    new: newFeedStale,
+    breaking: breakingFeedStale,
+  }[viewMode];
   const lastDesktopEventsRef = useRef<EventWithDates[]>(
     (initialData?.events as EventWithDates[]) || []
   );
@@ -900,6 +918,11 @@ export function HomeContent({ initialData }: HomeContentProps) {
         >
           {/* Error State — data-nosnippet: "Feed Error" must never become the
               page's search snippet (SEO §9.1 acceptance criterion) */}
+          {feedStale && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Showing the last available markets. Refresh is delayed.
+            </p>
+          )}
           {currentData.error && (
             <div
               data-nosnippet

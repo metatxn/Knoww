@@ -1,4 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { MarketsView, type MarketViewEvent } from "./markets-view";
 
@@ -8,7 +10,7 @@ vi.mock("next/image", () => ({
     src,
     ...props
   }: React.ImgHTMLAttributes<HTMLImageElement>) => (
-    // eslint-disable-next-line @next/next/no-img-element
+    // biome-ignore lint/performance/noImgElement: This mock tests rendered image props without Next optimization.
     <img alt={alt ?? ""} src={String(src ?? "")} {...props} />
   ),
 }));
@@ -84,6 +86,36 @@ const worldCupConcedeEvent: MarketViewEvent = {
     },
   ],
 };
+
+it("hydrates an SSR freshness timestamp without a relative-clock mismatch", async () => {
+  const now = vi.spyOn(Date, "now");
+  const stamp = Date.parse("2026-09-27T07:00:00Z");
+  const container = document.createElement("div");
+  const view = (
+    <MarketsView
+      events={[worldCupConcedeEvent]}
+      dataUpdatedAt={stamp}
+      viewMode="categories"
+      onViewChange={() => {}}
+    />
+  );
+  now.mockReturnValue(stamp + 1_000);
+  container.innerHTML = renderToString(view);
+  expect(container.textContent).toContain("07:00:00 UTC");
+  now.mockReturnValue(stamp + 8_000);
+  const onRecoverableError = vi.fn();
+  let root: ReturnType<typeof hydrateRoot> | undefined;
+  try {
+    await act(async () => {
+      root = hydrateRoot(container, view, { onRecoverableError });
+    });
+    expect(onRecoverableError).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("8s ago");
+  } finally {
+    act(() => root?.unmount());
+    now.mockRestore();
+  }
+});
 
 function makeMultiOutcomeEvent(
   id: string,

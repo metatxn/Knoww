@@ -17,6 +17,14 @@ describe("getInitialEvents", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps the page shell renderable when the initial feed is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("down", { status: 503 }))
+    );
+    await expect(getInitialEvents()).resolves.toBeNull();
+  });
+
   it("keeps market outcome fields in initial events for stable card SSR", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
@@ -37,7 +45,7 @@ describe("getInitialEvents", () => {
             ],
           },
         ],
-        next_cursor: "next",
+        next_cursor: null,
         total_results: "1",
       })
     );
@@ -45,15 +53,25 @@ describe("getInitialEvents", () => {
 
     const result = await getInitialEvents();
 
-    expect(result?.events[0]?.markets?.[0]).toMatchObject({
-      id: "market-1",
-      question: "Will it happen?",
-      outcomes: JSON.stringify(["Yes", "No"]),
-      outcomePrices: JSON.stringify(["0.61", "0.39"]),
-      groupItemTitle: "Yes",
+    expect(result?.events[0]).toMatchObject({
+      marketCount: 1,
+      cardTopMarkets: [
+        {
+          id: "market-1",
+          title: "Yes",
+          yes: 0.61,
+          no: 0.39,
+          tokenId: "token-yes",
+        },
+      ],
+      cardOutcomes: [
+        { name: "Yes", price: 0.61 },
+        { name: "No", price: 0.39 },
+      ],
     });
+    expect(result?.events[0]).not.toHaveProperty("markets");
     const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
-    expect(requestUrl.searchParams.get("limit")).toBe("6");
+    expect(requestUrl.searchParams.get("limit")).toBe("5");
   });
 });
 

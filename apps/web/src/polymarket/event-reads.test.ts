@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toSlimGammaEvent } from "@/lib/gamma-keyset";
+import { getInitialEvents } from "@/lib/server-cache";
 import type { GammaEvent } from "@/types/gamma-api";
 import gammaEventFixture from "../../../../packages/knoww-services/src/fixtures/polymarket/gamma-event.json";
+import { toEventCard } from "./event-card-projection";
 import { fetchSeriesEventPage } from "./event-reads";
 
 const fedRecord = gammaEventFixture as unknown as GammaEvent;
 
-describe("fetchSeriesEventPage", () => {
+describe("event page reads", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -43,5 +45,25 @@ describe("fetchSeriesEventPage", () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       next: { revalidate: 60 },
     });
+  });
+
+  it("projects initial cards before they reach SSR and bypasses raw caching", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({ events: [gammaEventFixture], next_cursor: null })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await getInitialEvents();
+    expect(result).toEqual({
+      freshness: { generatedAt: expect.any(Number), stale: false },
+      events: [toEventCard(fedRecord)],
+      totalResults: 1,
+      hasMore: false,
+    });
+    expect(
+      new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("limit")
+    ).toBe("5");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: "no-store" });
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("next");
   });
 });

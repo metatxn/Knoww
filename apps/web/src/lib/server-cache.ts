@@ -3,6 +3,7 @@ import { cache } from "react";
 import { CACHE_DURATION } from "@/constants/polymarket";
 import type { Event } from "@/hooks/use-event-detail";
 import type { LeaderboardTrader } from "@/hooks/use-leaderboard";
+import type { EventCardSummary } from "@/lib/event-card-model";
 import { logger } from "@/lib/logger";
 import {
   formatTagLabel,
@@ -10,6 +11,8 @@ import {
   normalizeTagRecord,
   normalizeTagSlug,
 } from "@/lib/tag-slugs";
+import { getCardFeedResponse } from "@/polymarket/card-feed-cache";
+import { cardFeedQuerySchema } from "@/polymarket/card-feed-query";
 import {
   fetchEventDetail,
   fetchSeriesEventPage,
@@ -53,7 +56,7 @@ export interface InitialMarket {
   parentEventTitle?: string;
 }
 
-export interface InitialEvent {
+export interface InitialEvent extends EventCardSummary {
   id: string;
   slug: string;
   title: string;
@@ -82,6 +85,7 @@ export interface InitialHomeData {
   events: InitialEvent[];
   totalResults: number;
   hasMore: boolean;
+  freshness?: { generatedAt: number; stale: boolean };
 }
 
 export interface InitialLeaderboardData {
@@ -141,11 +145,22 @@ async function fetchInitialEventPage(
 export const getInitialEvents = cache(
   async (): Promise<InitialHomeData | null> => {
     try {
-      return await fetchInitialEventPage(
-        undefined,
-        undefined,
-        INITIAL_HOME_EVENT_LIMIT
-      );
+      // SSR and the first browser page share the same 20-card snapshot.
+      const response = await getCardFeedResponse(cardFeedQuerySchema.parse({}));
+      if (!response.ok) throw new Error("Initial card feed is unavailable");
+      const page = (await response.json()) as {
+        data: InitialEvent[];
+        pagination: { hasMore: boolean; totalResults?: number };
+        freshness: { generatedAt: number; stale: boolean };
+      };
+      return {
+        freshness: page.freshness,
+        events: page.data.slice(0, INITIAL_HOME_EVENT_LIMIT),
+        totalResults: page.pagination.totalResults ?? page.data.length,
+        hasMore:
+          page.data.length > INITIAL_HOME_EVENT_LIMIT ||
+          page.pagination.hasMore,
+      };
     } catch (error) {
       logger.error("server_cache.events.fetch_failed", {
         error: error instanceof Error ? error.message : String(error),

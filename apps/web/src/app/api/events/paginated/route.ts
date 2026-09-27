@@ -206,7 +206,7 @@ function parseDateParam(
  *         description: Resource not found.
  *       429:
  *         description: Rate limit exceeded.
- *       500:
+ *       503:
  *         description: Request failed.
  */
 export async function GET(request: NextRequest) {
@@ -331,7 +331,10 @@ export async function GET(request: NextRequest) {
         success: false,
         error: "Failed to fetch paginated events",
       },
-      { status: 500 }
+      {
+        status: 503,
+        headers: { "Retry-After": "15", "Cache-Control": "no-store" },
+      }
     );
   }
 }

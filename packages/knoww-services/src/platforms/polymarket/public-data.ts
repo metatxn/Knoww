@@ -232,6 +232,7 @@ export interface EventPageParams {
   archived?: boolean;
   live?: boolean;
   tagSlug?: string;
+  excludeTagIds?: number[];
   seriesIds?: number[];
   /** Gamma's `active` filter; the sports series lists pair it with `seriesIds`. */
   active?: boolean;
@@ -346,6 +347,9 @@ export function createPublicData(ctx: PolymarketClientContext) {
     addIfDefined(url.searchParams, "archived", input.archived);
     addIfDefined(url.searchParams, "live", input.live);
     addIfDefined(url.searchParams, "tag_slug", input.tagSlug);
+    for (const id of input.excludeTagIds ?? []) {
+      url.searchParams.append("exclude_tag_id", String(id));
+    }
     addIfDefined(url.searchParams, "series_id", input.seriesIds?.join(","));
     addIfDefined(url.searchParams, "active", input.active);
     addIfDefined(url.searchParams, "volume_min", input.volumeMin);

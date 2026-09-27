@@ -1,17 +1,18 @@
 "use client";
 
-import {
-  parseGammaNumberArray,
-  parseGammaStringArray,
-} from "@knoww/shared-types/polymarket";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { useNow } from "@/hooks/use-now";
 import {
   type PriceHistoryPoint,
   useBatchPriceHistory,
 } from "@/hooks/use-price-history-batch";
+import {
+  type CardTopMarket,
+  type EventCardSummary,
+  extractTopMarkets,
+} from "@/lib/event-card-model";
 import { formatCents, formatVolume, relativeTime } from "@/lib/formatters";
 
 /**
@@ -39,7 +40,7 @@ import { formatCents, formatVolume, relativeTime } from "@/lib/formatters";
 // Public contract — kept identical to the previous export so
 // home-content.tsx doesn't need to change.
 // ============================================================
-export interface MarketViewEvent {
+export interface MarketViewEvent extends EventCardSummary {
   id: string;
   slug?: string;
   title: string;
@@ -66,13 +67,7 @@ export interface MarketViewEvent {
   }>;
 }
 
-interface SubMarket {
-  id: string;
-  title: string;
-  yes: number;
-  no: number;
-  tokenId?: string;
-}
+type SubMarket = CardTopMarket;
 
 type MarketViewTab = "categories" | "trending" | "breaking" | "new";
 
@@ -117,43 +112,11 @@ function toNumber(v: number | string | undefined): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-function isGenericPlaceholderCandidate(title: string): boolean {
-  return /^(?:team|app|car|player|candidate|option|choice)\s+[a-z]$/i.test(
-    title.trim()
-  );
-}
-
-function extractTopMarkets(event: MarketViewEvent, limit = 3): SubMarket[] {
-  const markets = event.markets ?? [];
-  const parsed: SubMarket[] = [];
-  for (const m of markets) {
-    const prices = parseGammaNumberArray(m.outcomePrices);
-    if (prices.length < 2) continue;
-    const yes = prices[0];
-    const no = prices[1];
-    if (Number.isNaN(yes) || Number.isNaN(no)) continue;
-    const title = m.groupItemTitle || m.question || "Outcome";
-    parsed.push({
-      id: m.id,
-      title,
-      yes,
-      no,
-      tokenId: parseGammaStringArray(m.clobTokenIds)[0],
-    });
-  }
-  const namedCandidates = parsed.filter(
-    (market) => !isGenericPlaceholderCandidate(market.title)
-  );
-  const candidates = namedCandidates.length > 0 ? namedCandidates : parsed;
-  candidates.sort((a, b) => b.yes - a.yes);
-  return candidates.slice(0, limit);
-}
-
 function summarizeEvent(event: MarketViewEvent): {
   outcomes: number;
   leader: SubMarket | null;
 } {
-  const count = event.markets?.length || 0;
+  const count = event.marketCount ?? event.markets?.length ?? 0;
   const [leader] = extractTopMarkets(event, 1);
   return { outcomes: count, leader: leader ?? null };
 }
@@ -286,15 +249,24 @@ function compactAgo(now: number, timestamp: number): string {
 
 /** Relative-time indicator that re-renders every 5s so the displayed
  *  value stays fresh ("1s" → "6s" → "11s" → "1m"). */
+const subscribeToHydration = () => () => {};
+
 function UpdatedAgo({ timestamp }: { timestamp: number }) {
   const now = useNow(5_000);
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false
+  );
   return (
     <span className="text-[11px]" style={{ color: "var(--kwm-ink-3)" }}>
       Updated{" "}
       <span className="tabular-nums" style={{ color: "var(--kwm-ink-2)" }}>
-        {compactAgo(now, timestamp)}
-      </span>{" "}
-      ago
+        {hydrated
+          ? compactAgo(now, timestamp)
+          : `${new Date(timestamp).toISOString().slice(11, 19)} UTC`}
+      </span>
+      {hydrated ? " ago" : ""}
     </span>
   );
 }
@@ -454,7 +426,7 @@ function FeaturedCard({
   isHistoryLoading: boolean;
 }) {
   const topMarkets = extractTopMarkets(event, 4);
-  const outcomeCount = event.markets?.length || 0;
+  const outcomeCount = event.marketCount ?? event.markets?.length ?? 0;
   const isBinary = outcomeCount === 1;
   const href = event.slug ? `/events/detail/${event.slug}` : "#";
   // Spark tint tracks the leader's direction (≥50% YES = up).
@@ -1066,7 +1038,9 @@ export function MarketsView({
   // single sparse row next to neighbors with four, breaking the strip's
   // visual rhythm. Binaries only backfill when the current view has
   // fewer than three multi-outcome events, so the hero never collapses.
-  const featured = sorted.filter((e) => (e.markets?.length || 0) > 1);
+  const featured = sorted.filter(
+    (e) => (e.marketCount ?? e.markets?.length ?? 0) > 1
+  );
   featured.splice(3);
   for (const event of sorted) {
     if (featured.length >= 3) break;
