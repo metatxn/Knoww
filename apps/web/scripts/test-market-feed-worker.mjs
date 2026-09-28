@@ -34,8 +34,25 @@ const events = fixturePath
       })),
     }));
 assert.equal(events.length, 20, "Use a captured 20-event page");
-const expectedEvents = events.slice(0, pageSize);
-const expectedColdCalls = pageSize === 10 ? 3 : 5;
+let expectedBatchSize = pageSize;
+let expectedColdCalls = 1;
+while (
+  Buffer.byteLength(
+    JSON.stringify({
+      events: events.slice(0, expectedBatchSize),
+      next_cursor:
+        expectedBatchSize < events.length
+          ? String(expectedBatchSize - 1)
+          : null,
+    })
+  ) >
+    5 * 1024 * 1024 &&
+  expectedBatchSize > 1
+) {
+  expectedBatchSize = Math.floor(expectedBatchSize / 2);
+  expectedColdCalls++;
+}
+const expectedEvents = events.slice(0, expectedBatchSize);
 const storage = mkdtempSync(join(tmpdir(), "knoww-feed-test-"));
 let fail = false;
 const upstream = [];
@@ -151,7 +168,7 @@ try {
   assert.equal(
     upstream.length,
     expectedColdCalls,
-    "Concurrent misses must share one complete refresh"
+    "Concurrent misses must share one bounded refresh"
   );
   for (const body of bodies) {
     assert.deepEqual(
@@ -168,7 +185,8 @@ try {
     assert(body.data.every((event) => !Object.hasOwn(event, "markets")));
   }
   const coldCalls = upstream.slice();
-  assert(coldCalls.every((call) => call.bytes <= 5 * 1024 * 1024));
+  assert(coldCalls.at(-1).bytes <= 5 * 1024 * 1024);
+  assert(coldCalls.slice(0, -1).every((call) => call.bytes > 5 * 1024 * 1024));
   if (!fixturePath)
     assert(coldCalls.some((call) => call.bytes > 4 * 1024 * 1024));
   const responseBytes = Buffer.byteLength(JSON.stringify(bodies[0]));
@@ -247,6 +265,33 @@ try {
     200,
     "An expired object must be reusable after deleteAll"
   );
+  const ids = bodies[0].data.map((event) => event.id);
+  let cursor = bodies[0].pagination.nextCursor;
+  while (cursor) {
+    const before = upstream.length;
+    const response = await mf.dispatchFetch(
+      `http://test/next?after_cursor=${encodeURIComponent(cursor)}`
+    );
+    assert.equal(response.status, 200);
+    const page = await response.json();
+    assert.equal(
+      upstream.length - before,
+      1,
+      "Continuation reuses the known batch size"
+    );
+    assert(page.data.length > 0, "Every nonterminal fixture page advances");
+    ids.push(...page.data.map((event) => event.id));
+    assert(
+      ids.length <= events.length,
+      "Pagination must terminate without duplicates"
+    );
+    cursor = page.pagination.nextCursor;
+  }
+  assert.deepEqual(
+    ids,
+    events.map((event) => event.id),
+    "Short cached pages preserve every event through their cursor"
+  );
   const idleIds = new Set(
     profile.nodes
       .filter((n) => n.callFrame.functionName === "(idle)")
@@ -263,6 +308,7 @@ try {
       {
         result: "PASS",
         pageSize,
+        returnedCards: bodies[0].data.length,
         checks: [
           "8 concurrent misses share one refresh",
           "20 warm reads make zero Gamma calls",
@@ -272,6 +318,7 @@ try {
           "expired page returns 503",
           "failed cold reads back off",
           "idle cleanup removes state and alarm",
+          "short-page continuations preserve every event",
         ],
         responseBytes,
         coldCalls,

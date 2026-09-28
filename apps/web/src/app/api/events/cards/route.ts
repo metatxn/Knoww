@@ -14,10 +14,11 @@ const log = createLogger("api.events.cards");
  * /api/events/cards:
  *   get:
  *     summary: Fetch bounded event cards with versioned pagination and freshness metadata.
+ *     description: Pages may contain fewer cards than the requested limit when upstream responses are large. Follow pagination.nextCursor until it is absent; page length does not indicate the end of the feed.
  *     tags: [Events]
  *     responses:
  *       200:
- *         description: A complete card page, optionally served from a recent stale snapshot.
+ *         description: A card batch with its continuation cursor, optionally served from a recent stale snapshot.
  *       400:
  *         description: Invalid filters or card cursor.
  *       429:

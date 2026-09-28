@@ -54,13 +54,31 @@ const cursorSchema = z
   })
   .strict();
 
-export function decodeCardCursor(value?: string) {
+const batchCursorSchema = cursorSchema.extend({
+  batchSize: z.number().int().min(1).max(20),
+});
+
+interface CardCursor {
+  cursor: string;
+  lastId: string;
+  batchSize?: number;
+}
+
+export function decodeCardCursor(value?: string): CardCursor | undefined {
   if (!value) return undefined;
+  if (value.startsWith("cards-v2."))
+    return batchCursorSchema.parse(JSON.parse(atob(value.slice(9))));
   if (!value.startsWith("cards-v1.")) throw new Error("Invalid card cursor");
   return cursorSchema.parse(JSON.parse(atob(value.slice(9))));
 }
 
-export function encodeCardCursor(cursor: string, lastId: string) {
+export function encodeCardCursor(
+  cursor: string,
+  lastId: string,
+  batchSize?: number
+) {
+  if (batchSize !== undefined)
+    return `cards-v2.${btoa(JSON.stringify(batchCursorSchema.parse({ cursor, lastId, batchSize })))}`;
   return `cards-v1.${btoa(JSON.stringify({ cursor, lastId }))}`;
 }
 
