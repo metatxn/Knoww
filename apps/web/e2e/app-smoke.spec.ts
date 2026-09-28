@@ -12,7 +12,7 @@ test("home page loads without legacy CLOB SDK browser errors", async ({
   });
 
   const response = await page.goto("/", { waitUntil: "domcontentloaded" });
-  expect(response?.status()).toBeLessThan(500);
+  expect(response?.status()).toBe(200);
   await expect(page.locator("body")).toBeAttached();
 
   expect(
