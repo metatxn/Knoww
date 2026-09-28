@@ -51,7 +51,10 @@ export class TestMarketFeedCache extends MarketFeedCache {
 export default {
   async fetch(
     request: Request,
-    env: { MARKET_FEED_CACHE: DurableObjectNamespace<TestMarketFeedCache> }
+    env: {
+      MARKET_FEED_CACHE: DurableObjectNamespace<TestMarketFeedCache>;
+      FIXTURE_PAGE_SIZE: number;
+    }
   ) {
     const url = new URL(request.url);
     const stub = env.MARKET_FEED_CACHE.getByName(
@@ -66,6 +69,8 @@ export default {
       return new Response("ok");
     }
     if (url.pathname === "/inspect") return Response.json(await stub.inspect());
-    return stub.getPage(cardFeedQuerySchema.parse({}));
+    return stub.getPage(
+      cardFeedQuerySchema.parse({ limit: env.FIXTURE_PAGE_SIZE })
+    );
   },
 };

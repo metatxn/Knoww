@@ -450,7 +450,6 @@ export function HomeContent({ initialData }: HomeContentProps) {
     feedStale: allFeedStale,
   } = useEventCards({
     feed: "categories",
-    limit: 20,
     order: volumeOrderField,
     ascending: false,
     closed: apiQueryParams.closed,

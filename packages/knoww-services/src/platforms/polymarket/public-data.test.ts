@@ -136,6 +136,53 @@ describe("fetchTagBySlug", () => {
 });
 
 describe("fetchEventPage", () => {
+  it("scopes an explicit five MiB budget to one event-page read", async () => {
+    const { client } = createClient(() =>
+      jsonResponse({
+        events: [
+          { id: "1", description: "x".repeat(4.5 * 1024 * 1024), markets: [] },
+        ],
+        next_cursor: null,
+      })
+    );
+    const tooLarge = { cause: { reason: "too_large" } };
+    await expect(client.fetchEventPage({ limit: 1 })).rejects.toMatchObject(
+      tooLarge
+    );
+    await expect(
+      client.fetchEventPage({ limit: 1 }, { maxResponseBytes: 5 * 1024 * 1024 })
+    ).resolves.toMatchObject({ events: [{ id: "1" }] });
+    await expect(client.fetchEventPage({ limit: 1 })).rejects.toMatchObject(
+      tooLarge
+    );
+    await expect(
+      client.fetchEventSummaryPage({ limit: 1 })
+    ).rejects.toMatchObject(tooLarge);
+  });
+
+  it.each([false, true])(
+    "rejects event pages above the explicit budget, with content-length=%s",
+    async (withLength) => {
+      const body = JSON.stringify({
+        events: [{ id: "1", description: "x".repeat(5 * 1024 * 1024) }],
+      });
+      const { client } = createClient(
+        () =>
+          new Response(body, {
+            headers: withLength
+              ? { "content-length": String(body.length) }
+              : {},
+          })
+      );
+      await expect(
+        client.fetchEventPage(
+          { limit: 1 },
+          { maxResponseBytes: 5 * 1024 * 1024 }
+        )
+      ).rejects.toMatchObject({ cause: { reason: "too_large" } });
+    }
+  );
+
   it("preserves the archived filter used by sitemap queries", async () => {
     const { client, calls } = createClient(() =>
       jsonResponse({ events: [], next_cursor: null })

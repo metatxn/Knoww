@@ -145,7 +145,7 @@ async function fetchInitialEventPage(
 export const getInitialEvents = cache(
   async (): Promise<InitialHomeData | null> => {
     try {
-      // SSR and the first browser page share the same 20-card snapshot.
+      // SSR and the first browser page share the same default card snapshot.
       const response = await getCardFeedResponse(cardFeedQuerySchema.parse({}));
       if (!response.ok) throw new Error("Initial card feed is unavailable");
       const page = (await response.json()) as {

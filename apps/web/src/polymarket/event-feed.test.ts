@@ -17,7 +17,7 @@ function gammaSource(count: number, maxRows = 100) {
       const limit = Number(url.searchParams.get("limit"));
       if (limit > maxRows)
         return new Response("", {
-          headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+          headers: { "content-length": String(6 * 1024 * 1024) },
         });
       const cursor = url.searchParams.get("after_cursor");
       const start = cursor ? Number(cursor.slice(6)) - 1 : 0;
@@ -34,7 +34,10 @@ function gammaSource(count: number, maxRows = 100) {
 describe("bounded event feed", () => {
   it("returns two complete 20-card pages with no gaps, duplicate boundaries, or raw caching", async () => {
     const source = gammaSource(40);
-    const first = await readCardFeed(cardFeedQuerySchema.parse({}), source);
+    const first = await readCardFeed(
+      cardFeedQuerySchema.parse({ limit: 20 }),
+      source
+    );
     expect(first.events.map((e) => e.id)).toEqual(
       Array.from({ length: 20 }, (_, i) => String(i + 1))
     );
@@ -44,7 +47,7 @@ describe("bounded event feed", () => {
     });
     expect(source.calls).toHaveLength(5);
     const second = await readCardFeed(
-      cardFeedQuerySchema.parse({ after_cursor: first.nextCursor }),
+      cardFeedQuerySchema.parse({ limit: 20, after_cursor: first.nextCursor }),
       source
     );
     expect(second.events.map((e) => e.id)).toEqual(
@@ -172,12 +175,57 @@ describe("bounded event feed", () => {
     expect(ids).toEqual(Array.from({ length: 45 }, (_, i) => String(i + 1)));
   });
 
-  it("fails explicitly when the request budget cannot fill the page", async () => {
-    const source = gammaSource(40, 2);
+  it.each([10, 20])(
+    "fills consecutive %i-card pages after shrinking to two-event batches",
+    async (limit) => {
+      const source = gammaSource(limit * 2, 2);
+      const first = await readCardFeed(
+        cardFeedQuerySchema.parse({ limit }),
+        source
+      );
+      const second = await readCardFeed(
+        cardFeedQuerySchema.parse({ limit, after_cursor: first.nextCursor }),
+        source
+      );
+      expect(first.events).toHaveLength(limit);
+      expect(second.events).toHaveLength(limit);
+      expect(
+        [...first.events, ...second.events].map((event) => event.id)
+      ).toEqual(Array.from({ length: limit * 2 }, (_, i) => String(i + 1)));
+      expect(second.nextCursor).toBeNull();
+    }
+  );
+
+  it("accepts a card-source response between four and five MiB while returning a small projection", async () => {
+    const page = await readCardFeed(cardFeedQuerySchema.parse({ limit: 1 }), {
+      fetchImpl: async () =>
+        Response.json({
+          events: [
+            {
+              id: "1",
+              description: "x".repeat(4.5 * 1024 * 1024),
+              markets: [],
+            },
+          ],
+          next_cursor: null,
+        }),
+    });
+    expect(page.events).toHaveLength(1);
+    expect(JSON.stringify(page)).not.toContain("description");
+    expect(
+      new TextEncoder().encode(JSON.stringify(page)).byteLength
+    ).toBeLessThan(1024);
+  });
+
+  it("still rejects a single event above the five MiB source limit", async () => {
     await expect(
-      readCardFeed(cardFeedQuerySchema.parse({}), source)
-    ).rejects.toThrow("budget exceeded");
-    expect(source.calls).toHaveLength(6);
+      readCardFeed(cardFeedQuerySchema.parse({ limit: 1 }), {
+        fetchImpl: async () =>
+          new Response("", {
+            headers: { "content-length": String(5 * 1024 * 1024 + 1) },
+          }),
+      })
+    ).rejects.toMatchObject({ cause: { reason: "too_large" } });
   });
 
   it("rejects a stalled cursor instead of publishing a short complete page", async () => {

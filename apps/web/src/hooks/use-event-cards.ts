@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { EVENT_CARD_PAGE_SIZE } from "@/lib/event-feed-config";
 import { fetchJson } from "@/lib/fetch-json";
 import type { CardFeedQuery } from "@/polymarket/card-feed-query";
 import type { EventCardData } from "@/polymarket/event-card-projection";
@@ -13,7 +14,7 @@ interface CardFeedResponse {
 export function useEventCards({
   feed,
   tagSlug,
-  limit = 20,
+  limit = EVENT_CARD_PAGE_SIZE,
   closed = false,
   order = "volume24hr",
   ascending = false,

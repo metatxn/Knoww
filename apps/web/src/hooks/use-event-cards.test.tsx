@@ -36,6 +36,11 @@ it("polls a stale snapshot until it recovers, then stops polling", async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(result.current.feedStale).toBe(true);
+    expect(
+      new URL(fetchJson.mock.calls[0][0], "https://knoww.app").searchParams.get(
+        "limit"
+      )
+    ).toBe("10");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_001);
     });

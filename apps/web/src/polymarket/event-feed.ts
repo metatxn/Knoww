@@ -4,7 +4,10 @@ import {
   type EventPageParams,
   isUpstreamPublicDataError,
 } from "@knoww/services/platforms/polymarket";
-import { BoundedJsonError } from "@knoww/shared-types/bounded-json";
+import {
+  BoundedJsonError,
+  DEFAULT_UPSTREAM_JSON_MAX_BYTES,
+} from "@knoww/shared-types/bounded-json";
 import { toSlimGammaEvent } from "@/lib/gamma-keyset";
 import type { GammaEvent } from "@/types/gamma-api";
 import {
@@ -16,6 +19,8 @@ import { toEventCard } from "./event-card-projection";
 
 const log = createLogger("event-feed");
 export const CARD_PAGE_MAX_BYTES = 512 * 1024;
+const CARD_UPSTREAM_MAX_BYTES = 5 * 1024 * 1024;
+const CARD_INITIAL_BATCH_SIZE = 5;
 export const FEED_TIMEOUT_MS = 8500;
 
 interface ReadOptions {
@@ -31,7 +36,8 @@ async function assemblePage<T>(
   initialBatchSize: number,
   maxAttempts: number,
   maxBytes: number,
-  options: ReadOptions
+  options: ReadOptions,
+  upstreamMaxBytes = DEFAULT_UPSTREAM_JSON_MAX_BYTES
 ) {
   const client = createPolymarketClient({ fetchImpl: options.fetchImpl });
   const controller = new AbortController();
@@ -67,6 +73,7 @@ async function assemblePage<T>(
           {
             signal: controller.signal,
             cache: { revalidateSeconds: 0 },
+            maxResponseBytes: upstreamMaxBytes,
           }
         );
       } catch (error) {
@@ -153,10 +160,13 @@ export async function readCardFeed(
     },
     toEventCard,
     continuation?.lastId,
-    5,
-    6,
+    CARD_INITIAL_BATCH_SIZE,
+    // At the smallest cursor batch, each read may add only one new event.
+    // Allow the finite size-halving attempts in addition to those reads.
+    query.limit + Math.ceil(Math.log2(CARD_INITIAL_BATCH_SIZE)),
     CARD_PAGE_MAX_BYTES,
-    options
+    options,
+    CARD_UPSTREAM_MAX_BYTES
   );
   return {
     events: page.events,

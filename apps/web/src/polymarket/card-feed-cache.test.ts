@@ -10,7 +10,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
 }));
 vi.mock("./event-feed", () => ({ readCardFeed: mock.read }));
 
-import { getCardFeedResponse } from "./card-feed-cache";
+import { cardFeedCacheKey, getCardFeedResponse } from "./card-feed-cache";
 import { cardFeedQuerySchema, encodeCardCursor } from "./card-feed-query";
 
 beforeEach(() => {
@@ -25,18 +25,41 @@ afterEach(() => {
 });
 
 describe("card feed cache routing", () => {
-  it("coordinates a fixed first page", async () => {
-    const response = await getCardFeedResponse(cardFeedQuerySchema.parse({}));
-    expect(await response.json()).toEqual({ coordinated: true });
-    expect(mock.getByName).toHaveBeenCalledOnce();
-    expect(mock.read).not.toHaveBeenCalled();
+  it("preserves the deployed twenty-event cache key", async () => {
+    expect(
+      await cardFeedCacheKey(cardFeedQuerySchema.parse({ limit: 20 }))
+    ).toBe(
+      "cards-v1:857272c90f69c57af15cfef0aa96e1ae54ed288e8cde5fb513451a6aa7d493c4"
+    );
+  });
+  it.each([10, 20])(
+    "coordinates a fixed %i-event first page",
+    async (limit) => {
+      const response = await getCardFeedResponse(
+        cardFeedQuerySchema.parse({ limit })
+      );
+      expect(await response.json()).toEqual({ coordinated: true });
+      expect(mock.getByName).toHaveBeenCalledOnce();
+      expect(mock.read).not.toHaveBeenCalled();
+    }
+  );
+
+  it("uses ten events by default and isolates the old twenty-event cache", async () => {
+    const query = cardFeedQuerySchema.parse({});
+    expect(query.limit).toBe(10);
+    await getCardFeedResponse(query);
+    await getCardFeedResponse(cardFeedQuerySchema.parse({ limit: 20 }));
+    expect(mock.getByName).toHaveBeenCalledTimes(2);
+    expect(mock.getByName.mock.calls[0][0]).not.toBe(
+      mock.getByName.mock.calls[1][0]
+    );
   });
 
   it.each([
     { after_cursor: encodeCardCursor("arbitrary-unique-cursor", "1") },
     { tag_slug: "politics" },
     { end_date_min: "2026-09-27" },
-    { limit: 10 },
+    { limit: 9 },
   ])("does not allocate durable state for %j", async (input) => {
     const query = cardFeedQuerySchema.parse(input);
     const entries = new Map<string, Response>();
