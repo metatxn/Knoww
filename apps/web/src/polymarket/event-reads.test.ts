@@ -62,7 +62,8 @@ describe("event page reads", () => {
     });
     expect(
       new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("limit")
-    ).toBe("5");
+    ).toBe("10");
+    expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: "no-store" });
     expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("next");
   });

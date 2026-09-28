@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EVENT_CARD_PAGE_SIZE } from "@/lib/event-feed-config";
 
 const optionalNumber = z
   .string()
@@ -13,7 +14,7 @@ export const cardFeedQuerySchema = z
     feed: z
       .enum(["categories", "trending", "new", "breaking"])
       .default("categories"),
-    limit: z.coerce.number().int().min(1).max(20).default(20),
+    limit: z.coerce.number().int().min(1).max(20).default(EVENT_CARD_PAGE_SIZE),
     closed: z.enum(["true", "false"]).default("false"),
     ascending: z.enum(["true", "false"]).default("false"),
     order: z
@@ -53,20 +54,39 @@ const cursorSchema = z
   })
   .strict();
 
-export function decodeCardCursor(value?: string) {
+const batchCursorSchema = cursorSchema.extend({
+  batchSize: z.number().int().min(1).max(20),
+});
+
+interface CardCursor {
+  cursor: string;
+  lastId: string;
+  batchSize?: number;
+}
+
+export function decodeCardCursor(value?: string): CardCursor | undefined {
   if (!value) return undefined;
+  if (value.startsWith("cards-v2."))
+    return batchCursorSchema.parse(JSON.parse(atob(value.slice(9))));
   if (!value.startsWith("cards-v1.")) throw new Error("Invalid card cursor");
   return cursorSchema.parse(JSON.parse(atob(value.slice(9))));
 }
 
-export function encodeCardCursor(cursor: string, lastId: string) {
+export function encodeCardCursor(
+  cursor: string,
+  lastId: string,
+  batchSize?: number
+) {
+  if (batchSize !== undefined)
+    return `cards-v2.${btoa(JSON.stringify(batchCursorSchema.parse({ cursor, lastId, batchSize })))}`;
   return `cards-v1.${btoa(JSON.stringify({ cursor, lastId }))}`;
 }
 
 /** Only a small fixed set of first pages may schedule periodic refreshes. */
 export function canRefreshCardFeed(query: CardFeedQuery): boolean {
   return (
-    query.limit === 20 &&
+    // Keep existing twenty-event clients on their original coordinator.
+    (query.limit === EVENT_CARD_PAGE_SIZE || query.limit === 20) &&
     query.closed === "false" &&
     query.ascending === "false" &&
     ["volume24hr", "volume1wk", "volume1mo", "volume1yr"].includes(

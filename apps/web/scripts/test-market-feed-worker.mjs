@@ -14,7 +14,9 @@ const require = createRequire(
 const { build } = require("esbuild");
 const { Miniflare, convertV4MiniflareOptions } = require("miniflare");
 const WebSocket = require("ws");
-const fixturePath = process.argv[2];
+const fixturePath = process.argv[2] === "-" ? undefined : process.argv[2];
+const pageSize = Number(process.argv[3] ?? 10);
+assert([10, 20].includes(pageSize), "Use a ten- or twenty-event page");
 const events = fixturePath
   ? JSON.parse(readFileSync(fixturePath, "utf8")).events
   : Array.from({ length: 20 }, (_, i) => ({
@@ -25,13 +27,32 @@ const events = fixturePath
         id: `${i}-${j}`,
         question: `Candidate ${j}`,
         groupItemTitle: `Candidate ${j}`,
-        description: "x".repeat(3200),
+        description: "x".repeat(5000),
         outcomes: '["Yes","No"]',
         outcomePrices: '["0.6","0.4"]',
         clobTokenIds: '["1","2"]',
       })),
     }));
 assert.equal(events.length, 20, "Use a captured 20-event page");
+let expectedBatchSize = pageSize;
+let expectedColdCalls = 1;
+while (
+  Buffer.byteLength(
+    JSON.stringify({
+      events: events.slice(0, expectedBatchSize),
+      next_cursor:
+        expectedBatchSize < events.length
+          ? String(expectedBatchSize - 1)
+          : null,
+    })
+  ) >
+    5 * 1024 * 1024 &&
+  expectedBatchSize > 1
+) {
+  expectedBatchSize = Math.floor(expectedBatchSize / 2);
+  expectedColdCalls++;
+}
+const expectedEvents = events.slice(0, expectedBatchSize);
 const storage = mkdtempSync(join(tmpdir(), "knoww-feed-test-"));
 let fail = false;
 const upstream = [];
@@ -78,7 +99,10 @@ const options = convertV4MiniflareOptions({
       script: bundle.outputFiles[0].text,
       compatibilityDate: "2025-03-25",
       compatibilityFlags: ["nodejs_compat"],
-      bindings: { FIXTURE_ORIGIN: `http://127.0.0.1:${server.address().port}` },
+      bindings: {
+        FIXTURE_ORIGIN: `http://127.0.0.1:${server.address().port}`,
+        FIXTURE_PAGE_SIZE: pageSize,
+      },
       durableObjects: {
         MARKET_FEED_CACHE: {
           className: "TestMarketFeedCache",
@@ -143,21 +167,28 @@ try {
   const profile = (await command("Profiler.stop")).profile;
   assert.equal(
     upstream.length,
-    5,
-    "Concurrent misses must share exactly one five-batch refresh"
+    expectedColdCalls,
+    "Concurrent misses must share one bounded refresh"
   );
   for (const body of bodies) {
     assert.deepEqual(
       body.data.map((event) => event.id),
-      events.map((event) => event.id)
+      expectedEvents.map((event) => event.id)
     );
     assert.equal(
       body.data.reduce((sum, event) => sum + event.marketCount, 0),
-      events.reduce((sum, event) => sum + (event.markets?.length ?? 0), 0)
+      expectedEvents.reduce(
+        (sum, event) => sum + (event.markets?.length ?? 0),
+        0
+      )
     );
     assert(body.data.every((event) => !Object.hasOwn(event, "markets")));
   }
   const coldCalls = upstream.slice();
+  assert(coldCalls.at(-1).bytes <= 5 * 1024 * 1024);
+  assert(coldCalls.slice(0, -1).every((call) => call.bytes > 5 * 1024 * 1024));
+  if (!fixturePath)
+    assert(coldCalls.some((call) => call.bytes > 4 * 1024 * 1024));
   const responseBytes = Buffer.byteLength(JSON.stringify(bodies[0]));
   assert(responseBytes <= 512 * 1024);
   const warmStart = performance.now();
@@ -167,7 +198,11 @@ try {
   for (let i = 0; i < 20; i++)
     assert.equal((await mf.dispatchFetch("http://test/page")).status, 200);
   const warm20Ms = performance.now() - warmStart;
-  assert.equal(upstream.length, 5, "Warm reads must do no Gamma work");
+  assert.equal(
+    upstream.length,
+    expectedColdCalls,
+    "Warm reads must do no Gamma work"
+  );
   const afterWarm = await (
     await mf.dispatchFetch("http://test/inspect")
   ).json();
@@ -184,7 +219,11 @@ try {
   const retained = await (await mf.dispatchFetch("http://test/page")).json();
   assert.deepEqual(retained.data, bodies[0].data);
   assert.equal(retained.freshness.generatedAt, bodies[0].freshness.generatedAt);
-  assert.equal(upstream.length, 6, "A failed refresh is attempted once");
+  assert.equal(
+    upstream.length,
+    expectedColdCalls + 1,
+    "A failed refresh is attempted once"
+  );
   clearInterval(sampleTimer);
   heapSamples.push(await command("Runtime.getHeapUsage"));
   socket.close();
@@ -197,7 +236,11 @@ try {
     JSON.stringify(recovered.data) === JSON.stringify(bodies[0].data),
     "Restart must recover the persisted page"
   );
-  assert.equal(upstream.length, 6, "Recovery must not fetch Gamma");
+  assert.equal(
+    upstream.length,
+    expectedColdCalls + 1,
+    "Recovery must not fetch Gamma"
+  );
   await mf.dispatchFetch(`http://test/clock?time=${startTime + 400000}`);
   assert.equal(
     (await mf.dispatchFetch("http://test/page")).status,
@@ -222,6 +265,33 @@ try {
     200,
     "An expired object must be reusable after deleteAll"
   );
+  const ids = bodies[0].data.map((event) => event.id);
+  let cursor = bodies[0].pagination.nextCursor;
+  while (cursor) {
+    const before = upstream.length;
+    const response = await mf.dispatchFetch(
+      `http://test/next?after_cursor=${encodeURIComponent(cursor)}`
+    );
+    assert.equal(response.status, 200);
+    const page = await response.json();
+    assert.equal(
+      upstream.length - before,
+      1,
+      "Continuation reuses the known batch size"
+    );
+    assert(page.data.length > 0, "Every nonterminal fixture page advances");
+    ids.push(...page.data.map((event) => event.id));
+    assert(
+      ids.length <= events.length,
+      "Pagination must terminate without duplicates"
+    );
+    cursor = page.pagination.nextCursor;
+  }
+  assert.deepEqual(
+    ids,
+    events.map((event) => event.id),
+    "Short cached pages preserve every event through their cursor"
+  );
   const idleIds = new Set(
     profile.nodes
       .filter((n) => n.callFrame.functionName === "(idle)")
@@ -237,6 +307,8 @@ try {
     `${JSON.stringify(
       {
         result: "PASS",
+        pageSize,
+        returnedCards: bodies[0].data.length,
         checks: [
           "8 concurrent misses share one refresh",
           "20 warm reads make zero Gamma calls",
@@ -246,6 +318,7 @@ try {
           "expired page returns 503",
           "failed cold reads back off",
           "idle cleanup removes state and alarm",
+          "short-page continuations preserve every event",
         ],
         responseBytes,
         coldCalls,

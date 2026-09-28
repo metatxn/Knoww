@@ -71,7 +71,8 @@ describe("getInitialEvents", () => {
     });
     expect(result?.events[0]).not.toHaveProperty("markets");
     const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
-    expect(requestUrl.searchParams.get("limit")).toBe("5");
+    expect(requestUrl.searchParams.get("limit")).toBe("10");
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
 

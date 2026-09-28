@@ -5,6 +5,16 @@ import {
 import { readCardFeed } from "../src/polymarket/event-feed";
 import { MarketFeedCache } from "../src/polymarket/market-feed-cache";
 
+function fixtureFetch(origin: string): typeof fetch {
+  return (input, init) => {
+    const url = new URL(String(input));
+    const target = new URL(origin);
+    url.protocol = target.protocol;
+    url.host = target.host;
+    return fetch(url, init);
+  };
+}
+
 // Test entrypoint only. Production exports MarketFeedCache directly.
 export class TestMarketFeedCache extends MarketFeedCache {
   private testTime?: number;
@@ -13,15 +23,9 @@ export class TestMarketFeedCache extends MarketFeedCache {
   }
   protected loadPage(query: CardFeedQuery) {
     return readCardFeed(query, {
-      fetchImpl: (input, init) => {
-        const url = new URL(String(input));
-        const origin = new URL(
-          (this.env as unknown as { FIXTURE_ORIGIN: string }).FIXTURE_ORIGIN
-        );
-        url.protocol = origin.protocol;
-        url.host = origin.host;
-        return fetch(url, init);
-      },
+      fetchImpl: fixtureFetch(
+        (this.env as unknown as { FIXTURE_ORIGIN: string }).FIXTURE_ORIGIN
+      ),
     });
   }
   setTime(time: number) {
@@ -51,9 +55,26 @@ export class TestMarketFeedCache extends MarketFeedCache {
 export default {
   async fetch(
     request: Request,
-    env: { MARKET_FEED_CACHE: DurableObjectNamespace<TestMarketFeedCache> }
+    env: {
+      MARKET_FEED_CACHE: DurableObjectNamespace<TestMarketFeedCache>;
+      FIXTURE_PAGE_SIZE: number;
+      FIXTURE_ORIGIN: string;
+    }
   ) {
     const url = new URL(request.url);
+    if (url.pathname === "/next") {
+      const page = await readCardFeed(
+        cardFeedQuerySchema.parse({
+          limit: env.FIXTURE_PAGE_SIZE,
+          after_cursor: url.searchParams.get("after_cursor") ?? undefined,
+        }),
+        { fetchImpl: fixtureFetch(env.FIXTURE_ORIGIN) }
+      );
+      return Response.json({
+        data: page.events,
+        pagination: { nextCursor: page.nextCursor },
+      });
+    }
     const stub = env.MARKET_FEED_CACHE.getByName(
       url.searchParams.get("key") ?? "shared"
     );
@@ -66,6 +87,8 @@ export default {
       return new Response("ok");
     }
     if (url.pathname === "/inspect") return Response.json(await stub.inspect());
-    return stub.getPage(cardFeedQuerySchema.parse({}));
+    return stub.getPage(
+      cardFeedQuerySchema.parse({ limit: env.FIXTURE_PAGE_SIZE })
+    );
   },
 };

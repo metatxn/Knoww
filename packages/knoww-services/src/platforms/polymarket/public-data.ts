@@ -273,7 +273,8 @@ export function createPublicData(ctx: PolymarketClientContext) {
     url: URL,
     schema: z.ZodType<Output>,
     options?: PublicFetchOptions,
-    init?: RequestInit
+    init?: RequestInit,
+    maxResponseBytes = DEFAULT_UPSTREAM_JSON_MAX_BYTES
   ): Promise<{ payload: unknown; data: Output }> {
     return withUpstreamTimeout(
       ctx.fetchOptions(options),
@@ -297,10 +298,7 @@ export function createPublicData(ctx: PolymarketClientContext) {
 
         let payload: unknown;
         try {
-          payload = await readBoundedJson(
-            response,
-            DEFAULT_UPSTREAM_JSON_MAX_BYTES
-          );
+          payload = await readBoundedJson(response, maxResponseBytes);
         } catch (error) {
           if (
             error instanceof BoundedJsonError &&
@@ -377,12 +375,14 @@ export function createPublicData(ctx: PolymarketClientContext) {
 
   async function fetchEventPage(
     input: EventPageParams,
-    options?: PublicFetchOptions
+    options?: PublicFetchOptions & { maxResponseBytes?: number }
   ) {
     const { payload, data } = await fetchValidated(
       buildEventPageUrl(input),
       eventPageSchema,
-      options
+      options,
+      undefined,
+      options?.maxResponseBytes
     );
     // The schema validated the shape and its transforms only stringify ids
     // and amounts, so the untouched records already satisfy GammaEventLike.

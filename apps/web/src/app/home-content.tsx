@@ -450,7 +450,6 @@ export function HomeContent({ initialData }: HomeContentProps) {
     feedStale: allFeedStale,
   } = useEventCards({
     feed: "categories",
-    limit: 20,
     order: volumeOrderField,
     ascending: false,
     closed: apiQueryParams.closed,
@@ -538,17 +537,12 @@ export function HomeContent({ initialData }: HomeContentProps) {
         const trendingEvents =
           trendingPaginatedData?.pages.flatMap((page) => page.events) || [];
         const filteredEvents = applyDateFilter(trendingEvents);
-        const totalTrending =
-          trendingPaginatedData?.pages[0]?.totalResults ?? 0;
-        const hasMoreTrending =
-          (hasNextTrending ?? false) ||
-          (totalTrending > 0 && trendingEvents.length < totalTrending);
 
         return {
           events: filteredEvents,
           isLoading: loadingTrending,
           error: trendingError,
-          hasMore: hasMoreTrending,
+          hasMore: hasNextTrending ?? false,
           fetchMore: fetchNextTrending,
           isFetchingMore: isFetchingNextTrending,
           dataUpdatedAt: updatedAtTrending,
@@ -558,15 +552,11 @@ export function HomeContent({ initialData }: HomeContentProps) {
         const newEvents =
           newPaginatedData?.pages.flatMap((page) => page.events) || [];
         const filteredEvents = applyDateFilter(newEvents);
-        const totalNew = newPaginatedData?.pages[0]?.totalResults ?? 0;
-        const hasMoreNew =
-          (hasNextNew ?? false) ||
-          (totalNew > 0 && newEvents.length < totalNew);
         return {
           events: filteredEvents,
           isLoading: loadingNew,
           error: newError,
-          hasMore: hasMoreNew,
+          hasMore: hasNextNew ?? false,
           fetchMore: fetchNextNew,
           isFetchingMore: isFetchingNextNew,
           dataUpdatedAt: updatedAtNew,
@@ -576,16 +566,11 @@ export function HomeContent({ initialData }: HomeContentProps) {
         const breakingEvents =
           breakingPaginatedData?.pages.flatMap((page) => page.events) || [];
         const filteredEvents = applyDateFilter(breakingEvents);
-        const totalBreaking =
-          breakingPaginatedData?.pages[0]?.totalResults ?? 0;
-        const hasMoreBreaking =
-          (hasNextBreaking ?? false) ||
-          (totalBreaking > 0 && breakingEvents.length < totalBreaking);
         return {
           events: filteredEvents,
           isLoading: loadingBreaking,
           error: breakingError,
-          hasMore: hasMoreBreaking,
+          hasMore: hasNextBreaking ?? false,
           fetchMore: fetchNextBreaking,
           isFetchingMore: isFetchingNextBreaking,
           dataUpdatedAt: updatedAtBreaking,
