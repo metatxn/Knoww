@@ -17,6 +17,7 @@ export interface Position {
   redeemable?: boolean;
   /** Token ID (asset) for the position */
   asset?: string;
+  outcomeIndex?: number;
   /** Condition ID for the market */
   conditionId?: string;
   /** Whether this is a negative risk market */
@@ -63,6 +64,7 @@ export interface Trade {
   outcome: string;
   transactionHash: string;
   isLostPosition?: boolean;
+  asset?: string;
   market: {
     conditionId?: string;
     title: string;

@@ -1,9 +1,17 @@
+import { createLogger } from "@knoww/logger";
 import { buildCanonicalId } from "@knoww/services/core";
 import {
   type GammaMarketDetail,
   POLYMARKET_PLATFORM,
 } from "@knoww/services/platforms/polymarket";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import { normalizeProtocolConditionId } from "@knoww/shared-types/ctf";
+import {
+  decodePolymarketV2AssetId,
+  getGammaTokenIdForOutcome,
+  parseGammaStringArray,
+} from "@knoww/shared-types/polymarket";
+import type { UnifiedPolymarketResolution } from "@knoww/shared-types/polymarket-unified";
+import Decimal from "decimal.js";
 import { z } from "zod";
 import { toDecimalString } from "./decimal";
 
@@ -68,6 +76,24 @@ export const marketStatusSchema = z.enum([
 
 export type MarketStatus = z.output<typeof marketStatusSchema>;
 
+const resolutionLog = createLogger("mcp.market-resolution");
+
+export async function readMarketResolutions(
+  detail: GammaMarketDetail,
+  read: (conditionIds: string[]) => Promise<UnifiedPolymarketResolution[]>
+): Promise<UnifiedPolymarketResolution[] | undefined> {
+  if (detail.version !== "v2" || !detail.conditionId) return undefined;
+  try {
+    return await read([detail.conditionId]);
+  } catch (error) {
+    resolutionLog.warn("resolution.read.unavailable", {
+      conditionId: detail.conditionId,
+      error,
+    });
+    return undefined;
+  }
+}
+
 /**
  * Gamma keeps `active: true` on settled markets, so lifecycle derives from
  * `closed` plus `umaResolutionStatus` alone. Legacy markets omit
@@ -77,7 +103,54 @@ export type MarketStatus = z.output<typeof marketStatusSchema>;
 export function deriveMarketStatus(detail: GammaMarketDetail): MarketStatus {
   if (typeof detail.closed !== "boolean") return "unknown";
   if (!detail.closed) return "active";
+  if (detail.version === "v2") return "closed";
   return detail.umaResolutionStatus === "resolved" ? "resolved" : "closed";
+}
+
+export function projectMarketResolution(
+  detail: GammaMarketDetail,
+  resolutions: UnifiedPolymarketResolution[] = []
+): { status: MarketStatus; payouts?: string[] } {
+  const status = deriveMarketStatus(detail);
+  if (detail.version !== "v2" || !detail.conditionId) return { status };
+  const condition = normalizeProtocolConditionId(
+    detail.conditionId,
+    "v2"
+  ).toLowerCase();
+  const resolution = resolutions.find((row) => {
+    if (!row.conditionId) return false;
+    try {
+      return (
+        normalizeProtocolConditionId(row.conditionId, "v2").toLowerCase() ===
+        condition
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (resolution?.status !== "resolved") return { status };
+  const payouts = resolution.payouts;
+  if (payouts?.length !== 2) return { status: "resolved" };
+  const valid = payouts.every((payout) => {
+    try {
+      const value = new Decimal(payout);
+      return value.isFinite() && value.gte(0) && value.lte(1);
+    } catch {
+      return false;
+    }
+  });
+  if (!valid) return { status: "resolved" };
+  return {
+    status: "resolved",
+    payouts: parseGammaStringArray(detail.outcomes).map((_, index) => {
+      const position = decodePolymarketV2AssetId(
+        getGammaTokenIdForOutcome(detail, index)
+      );
+      if (position.conditionId.toLowerCase() !== condition)
+        throw new Error("V2 position does not match its market condition");
+      return payouts[position.outcomeIndex];
+    }),
+  };
 }
 
 export const marketOutcomeSchema = z.object({
@@ -86,7 +159,18 @@ export const marketOutcomeSchema = z.object({
     .string()
     .optional()
     .describe("Decimal string probability between 0 and 1."),
-  tokenId: z.string().optional().describe("CLOB token id for this outcome."),
+  tokenId: z
+    .string()
+    .optional()
+    .describe(
+      "Trading asset id for this outcome, a CTF token id or V2 position id."
+    ),
+  payout: z
+    .string()
+    .optional()
+    .describe(
+      "Confirmed resolved payout per share. Zero is a valid losing payout."
+    ),
 });
 
 export type MarketOutcome = z.output<typeof marketOutcomeSchema>;
@@ -107,18 +191,17 @@ export function projectMarketOutcomes(
 ): MarketOutcomeProjection {
   const names = parseGammaStringArray(detail.outcomes);
   const prices = parseGammaStringArray(detail.outcomePrices);
-  const tokenIds = parseGammaStringArray(detail.clobTokenIds, {
-    fallbackCsv: true,
-  });
   const outcomes: MarketOutcome[] = [];
   const count = Math.min(names.length, MAX_OUTCOMES_PER_MARKET);
   for (let index = 0; index < count; index++) {
     const price = toDecimalString(prices[index]);
-    const tokenId = tokenIds[index];
+    const tokenId = getGammaTokenIdForOutcome(detail, index, {
+      fallbackCsv: true,
+    });
     outcomes.push({
       name: names[index],
       ...(price !== undefined ? { price } : {}),
-      ...(tokenId !== undefined ? { tokenId } : {}),
+      ...(tokenId ? { tokenId } : {}),
     });
   }
   return {

@@ -203,6 +203,8 @@ export interface NestedMarket {
   volume?: string | number;
   volume24hr?: number;
   clobTokenIds?: string;
+  positionIds?: string | string[];
+  version?: "v1" | "v2";
   conditionId?: string;
   ticker?: string;
   slug?: string;

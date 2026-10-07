@@ -11,12 +11,16 @@ import {
   CTF_ADDRESS,
   CTF_COLLATERAL_ADAPTER_ADDRESS,
   CTF_EXCHANGE_ADDRESS,
+  EXCHANGE_V3_ADDRESS,
   NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS,
   NEG_RISK_CTF_EXCHANGE_ADDRESS,
+  POSITION_MANAGER_ADDRESS,
   PUSD_ADDRESS,
   PUSD_CTF_APPROVAL_TARGET,
+  ROUTER_ADDRESS,
   USDC_E_ADDRESS,
 } from "./contracts.ts";
+import type { PolymarketProtocolVersion } from "./polymarket.ts";
 
 export const APPROVAL_THRESHOLD_RAW = BigInt(1);
 
@@ -41,6 +45,12 @@ export interface ReadErc1155ApprovalOptions {
 }
 
 export interface TradingApprovalStatus {
+  pusdExchangeV3?: boolean;
+  positionExchangeApproval?: boolean;
+  pusdRouter?: boolean;
+  positionRouterApproval?: boolean;
+  v2TradingApproved?: boolean;
+  v2OperationsApproved?: boolean;
   /** pUSD direct CTF approval, listed by Polymarket docs for split/mint flows. */
   pusdCtf: boolean;
   /** pUSD approvals for CLOB V2 BUY collateral settlement. */
@@ -74,6 +84,7 @@ export interface TradingApprovalStatus {
 }
 
 export interface ClobOrderApprovalRequirement {
+  protocolVersion?: PolymarketProtocolVersion;
   side: "BUY" | "SELL";
   negRisk?: boolean;
 }
@@ -102,23 +113,33 @@ const ERC1155_APPROVAL_ABI = [
 ] as const;
 
 function allowanceResultOk(
-  result: { status: "success"; result: unknown } | { status: "failure" },
+  result:
+    | { status: "success"; result: unknown }
+    | { status: "failure" }
+    | undefined,
   approvalAmountRaw: bigint
 ): boolean {
   return (
-    result.status === "success" &&
+    result?.status === "success" &&
     typeof result.result === "bigint" &&
     result.result >= approvalAmountRaw
   );
 }
 
 function approvalResultOk(
-  result: { status: "success"; result: unknown } | { status: "failure" }
+  result:
+    | { status: "success"; result: unknown }
+    | { status: "failure" }
+    | undefined
 ): boolean {
-  return result.status === "success" && result.result === true;
+  return result?.status === "success" && result.result === true;
 }
 
-export function getPusdExchangeApprovalSpender(negRisk?: boolean): Address {
+export function getPusdExchangeApprovalSpender(
+  negRisk?: boolean,
+  protocolVersion?: PolymarketProtocolVersion
+): Address {
+  if (protocolVersion === "v2") return EXCHANGE_V3_ADDRESS;
   return (
     negRisk ? NEG_RISK_CTF_EXCHANGE_ADDRESS : CTF_EXCHANGE_ADDRESS
   ) as Address;
@@ -128,6 +149,13 @@ export function isClobOrderApproved(
   status: TradingApprovalStatus,
   requirement: ClobOrderApprovalRequirement
 ): boolean {
+  if (requirement.protocolVersion === "v2") {
+    return Boolean(
+      requirement.side === "SELL"
+        ? status.positionExchangeApproval
+        : status.pusdExchangeV3
+    );
+  }
   if (requirement.side === "SELL") {
     // Neg-risk settlement moves outcome tokens through the adapter as well as
     // the exchange — same operator pair clobTradingApproved requires. The
@@ -153,6 +181,23 @@ export function buildClobOrderApprovalTransactions(
   requirement: ClobOrderApprovalRequirement
 ): ApprovalTransaction[] {
   const txns: ApprovalTransaction[] = [];
+  if (requirement.protocolVersion === "v2") {
+    if (!isClobOrderApproved(status, requirement)) {
+      txns.push(
+        requirement.side === "SELL"
+          ? buildErc1155ApprovalTransaction(
+              EXCHANGE_V3_ADDRESS,
+              POSITION_MANAGER_ADDRESS
+            )
+          : buildErc20ApprovalTransaction(
+              PUSD_ADDRESS,
+              EXCHANGE_V3_ADDRESS,
+              maxUint256
+            )
+      );
+    }
+    return txns;
+  }
 
   if (requirement.side === "SELL") {
     const operatorTargets: Array<[boolean, Address]> = requirement.negRisk
@@ -246,8 +291,13 @@ export async function readClobOrderPusdAllowance(
   client: PublicClient,
   owner: Address,
   negRisk?: boolean,
-  options: Omit<ReadErc20AllowanceOptions, "token"> = {}
+  options: Omit<ReadErc20AllowanceOptions, "token"> & {
+    protocolVersion?: PolymarketProtocolVersion;
+  } = {}
 ): Promise<bigint> {
+  if (options.protocolVersion === "v2") {
+    return readErc20Allowance(client, owner, EXCHANGE_V3_ADDRESS, options);
+  }
   const [exchangeAllowance, adapterAllowance] = await Promise.all([
     readPusdExchangeAllowance(client, owner, negRisk, options),
     negRisk
@@ -292,92 +342,133 @@ export async function readTradingApprovalStatus(
   owner: Address,
   options: {
     approvalAmountRaw?: bigint;
+    protocolVersion?: PolymarketProtocolVersion;
   } = {}
 ): Promise<TradingApprovalStatus> {
   const approvalAmountRaw = options.approvalAmountRaw ?? APPROVAL_THRESHOLD_RAW;
 
   const results = await client.multicall({
     allowFailure: true,
-    contracts: [
-      {
-        address: PUSD_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, PUSD_CTF_APPROVAL_TARGET],
-      },
-      {
-        address: PUSD_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, CTF_EXCHANGE_ADDRESS],
-      },
-      {
-        address: PUSD_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, NEG_RISK_CTF_EXCHANGE_ADDRESS],
-      },
-      {
-        address: PUSD_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, CTF_COLLATERAL_ADAPTER_ADDRESS],
-      },
-      {
-        address: PUSD_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS],
-      },
-      {
-        address: USDC_E_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [owner, COLLATERAL_ONRAMP_ADDRESS],
-      },
-      {
-        address: CTF_ADDRESS,
-        abi: ERC1155_APPROVAL_ABI,
-        functionName: "isApprovedForAll",
-        args: [owner, CTF_EXCHANGE_ADDRESS],
-      },
-      {
-        address: CTF_ADDRESS,
-        abi: ERC1155_APPROVAL_ABI,
-        functionName: "isApprovedForAll",
-        args: [owner, NEG_RISK_CTF_EXCHANGE_ADDRESS],
-      },
-      {
-        address: CTF_ADDRESS,
-        abi: ERC1155_APPROVAL_ABI,
-        functionName: "isApprovedForAll",
-        args: [owner, CTF_COLLATERAL_ADAPTER_ADDRESS],
-      },
-      {
-        address: CTF_ADDRESS,
-        abi: ERC1155_APPROVAL_ABI,
-        functionName: "isApprovedForAll",
-        args: [owner, NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS],
-      },
-    ],
+    contracts: (
+      [
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, PUSD_CTF_APPROVAL_TARGET],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, CTF_EXCHANGE_ADDRESS],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, NEG_RISK_CTF_EXCHANGE_ADDRESS],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, CTF_COLLATERAL_ADAPTER_ADDRESS],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS],
+        },
+        {
+          address: USDC_E_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, COLLATERAL_ONRAMP_ADDRESS],
+        },
+        {
+          address: CTF_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, CTF_EXCHANGE_ADDRESS],
+        },
+        {
+          address: CTF_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, NEG_RISK_CTF_EXCHANGE_ADDRESS],
+        },
+        {
+          address: CTF_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, CTF_COLLATERAL_ADAPTER_ADDRESS],
+        },
+        {
+          address: CTF_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, EXCHANGE_V3_ADDRESS],
+        },
+        {
+          address: POSITION_MANAGER_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, EXCHANGE_V3_ADDRESS],
+        },
+        {
+          address: PUSD_ADDRESS,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [owner, ROUTER_ADDRESS],
+        },
+        {
+          address: POSITION_MANAGER_ADDRESS,
+          abi: ERC1155_APPROVAL_ABI,
+          functionName: "isApprovedForAll",
+          args: [owner, ROUTER_ADDRESS],
+        },
+      ] as const
+    ).slice(
+      options.protocolVersion === "v2" ? 10 : 0,
+      options.protocolVersion === "v2" ? 14 : 10
+    ),
   });
 
-  const pusdCtf = allowanceResultOk(results[0], approvalAmountRaw);
-  const pusdCtfExchange = allowanceResultOk(results[1], approvalAmountRaw);
-  const pusdNegRiskExchange = allowanceResultOk(results[2], approvalAmountRaw);
+  const legacyResults = options.protocolVersion === "v2" ? [] : results;
+  const v2Results = options.protocolVersion === "v2" ? results : [];
+
+  const pusdCtf = allowanceResultOk(legacyResults[0], approvalAmountRaw);
+  const pusdCtfExchange = allowanceResultOk(
+    legacyResults[1],
+    approvalAmountRaw
+  );
+  const pusdNegRiskExchange = allowanceResultOk(
+    legacyResults[2],
+    approvalAmountRaw
+  );
   const pusdCtfCollateralAdapter = allowanceResultOk(
-    results[3],
+    legacyResults[3],
     approvalAmountRaw
   );
   const pusdNegRiskCtfCollateralAdapter = allowanceResultOk(
-    results[4],
+    legacyResults[4],
     approvalAmountRaw
   );
-  const usdcOnramp = allowanceResultOk(results[5], approvalAmountRaw);
-  const ctfExchangeApproval = approvalResultOk(results[6]);
-  const ctfNegRiskExchangeApproval = approvalResultOk(results[7]);
-  const ctfCollateralAdapterApproval = approvalResultOk(results[8]);
-  const ctfNegRiskCollateralAdapterApproval = approvalResultOk(results[9]);
+  const usdcOnramp = allowanceResultOk(legacyResults[5], approvalAmountRaw);
+  const ctfExchangeApproval = approvalResultOk(legacyResults[6]);
+  const ctfNegRiskExchangeApproval = approvalResultOk(legacyResults[7]);
+  const ctfCollateralAdapterApproval = approvalResultOk(legacyResults[8]);
+  const ctfNegRiskCollateralAdapterApproval = approvalResultOk(
+    legacyResults[9]
+  );
 
   const clobTradingApproved =
     pusdCtf &&
@@ -400,9 +491,22 @@ export async function readTradingApprovalStatus(
   // standing onramp allowance (exact self-approve, fully consumed), so
   // including it would flip "all approved" back to false after the first
   // wrap-funded BUY and re-trigger setup/approval prompts forever.
-  const allApproved = clobTradingApproved;
+  const pusdExchangeV3 = allowanceResultOk(v2Results[0], approvalAmountRaw);
+  const positionExchangeApproval = approvalResultOk(v2Results[1]);
+  const pusdRouter = allowanceResultOk(v2Results[2], approvalAmountRaw);
+  const positionRouterApproval = approvalResultOk(v2Results[3]);
+  const v2TradingApproved = pusdExchangeV3 && positionExchangeApproval;
+  const v2OperationsApproved = pusdRouter && positionRouterApproval;
+  const allApproved =
+    options.protocolVersion === "v2" ? v2TradingApproved : clobTradingApproved;
 
   return {
+    pusdExchangeV3,
+    positionExchangeApproval,
+    pusdRouter,
+    positionRouterApproval,
+    v2TradingApproved,
+    v2OperationsApproved,
     pusdCtf,
     pusdCtfExchange,
     pusdNegRiskExchange,
@@ -438,10 +542,11 @@ export function buildErc20ApprovalTransaction(
 }
 
 export function buildErc1155ApprovalTransaction(
-  operator: Address
+  operator: Address,
+  token: Address = CTF_ADDRESS
 ): ApprovalTransaction {
   return {
-    to: CTF_ADDRESS as Address,
+    to: token,
     data: encodeFunctionData({
       abi: ERC1155_APPROVAL_ABI,
       functionName: "setApprovalForAll",
@@ -481,8 +586,21 @@ function appendMissingPusdApprovalTransactions(
 
 export function buildTradingApprovalTransactions(
   status: TradingApprovalStatus,
-  approvalAmountRaw: bigint
+  approvalAmountRaw: bigint,
+  protocolVersion?: PolymarketProtocolVersion
 ): ApprovalTransaction[] {
+  if (protocolVersion === "v2") {
+    return [
+      ...buildClobOrderApprovalTransactions(status, {
+        side: "BUY",
+        protocolVersion,
+      }),
+      ...buildClobOrderApprovalTransactions(status, {
+        side: "SELL",
+        protocolVersion,
+      }),
+    ];
+  }
   const txns: ApprovalTransaction[] = [];
 
   const pusdTargets: Array<[boolean, Address, bigint]> = [
@@ -535,8 +653,28 @@ export function buildTradingApprovalTransactions(
 
 export function buildCtfOperationApprovalTransactions(
   status: TradingApprovalStatus,
-  approvalAmountRaw: bigint
+  approvalAmountRaw: bigint,
+  protocolVersion?: PolymarketProtocolVersion
 ): ApprovalTransaction[] {
+  if (protocolVersion === "v2") {
+    const transactions: ApprovalTransaction[] = [];
+    if (!status.pusdRouter)
+      transactions.push(
+        buildErc20ApprovalTransaction(
+          PUSD_ADDRESS,
+          ROUTER_ADDRESS,
+          approvalAmountRaw
+        )
+      );
+    if (!status.positionRouterApproval)
+      transactions.push(
+        buildErc1155ApprovalTransaction(
+          ROUTER_ADDRESS,
+          POSITION_MANAGER_ADDRESS
+        )
+      );
+    return transactions;
+  }
   const txns: ApprovalTransaction[] = [];
 
   const pusdTargets: Array<[boolean, Address]> = [

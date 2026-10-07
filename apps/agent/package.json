@@ -21,15 +21,15 @@
   "dependencies": {
     "@knoww/logger": "workspace:*",
     "@knoww/shared-types": "workspace:*",
-    "@openrouter/ai-sdk-provider": "3.0.0",
-    "ai": "7.0.107",
+    "@openrouter/ai-sdk-provider": "3.1.0",
+    "ai": "7.0.123",
     "decimal.js": "catalog:",
     "viem": "catalog:",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.0",
     "typescript": "catalog:"
   }
 }

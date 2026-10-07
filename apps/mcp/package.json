@@ -22,7 +22,7 @@
     "cf-typegen": "node ./scripts/generate-worker-types.mjs"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@cloudflare/workers-oauth-provider": "0.10.4",
     "@knoww/logger": "workspace:*",
     "@knoww/services": "workspace:*",
     "@knoww/shared-types": "workspace:*",
@@ -35,10 +35,10 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@cloudflare/vitest-pool-workers": "0.22.0",
-    "@cloudflare/workers-types": "5.20260920.1",
-    "@types/node": "24.13.6",
+    "@cloudflare/workers-types": "5.20260930.1",
+    "@types/node": "24.19.0",
     "typescript": "catalog:",
     "vitest": "^4.1.11",
-    "wrangler": "4.135.0"
+    "wrangler": "4.144.0"
   }
 }

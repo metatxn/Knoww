@@ -1,3 +1,7 @@
+import {
+  decodePolymarketV2AssetId,
+  getGammaTokenIdForOutcome,
+} from "@knoww/shared-types/polymarket";
 import type {
   AgentEventType,
   AgentMarketType,
@@ -16,8 +20,10 @@ interface GammaMarketLike {
   question?: unknown;
   conditionId?: unknown;
   slug?: unknown;
-  outcomes?: unknown;
-  clobTokenIds?: unknown;
+  outcomes?: string | readonly unknown[] | null;
+  clobTokenIds?: string | readonly unknown[] | null;
+  positionIds?: string | readonly unknown[] | null;
+  version?: string | null;
   resolutionSource?: unknown;
   eventStartTime?: unknown;
   startDate?: unknown;
@@ -27,7 +33,7 @@ interface GammaMarketLike {
   closed?: unknown;
   acceptingOrders?: unknown;
   enableOrderBook?: unknown;
-  outcomePrices?: unknown;
+  outcomePrices?: string | readonly unknown[] | null;
 }
 
 interface GammaEventLike {
@@ -162,8 +168,7 @@ export function normalizeGammaEventToWatchlistItem(
   }
 
   const outcomes = parseStringArray(market.outcomes);
-  const tokenIds = parseStringArray(market.clobTokenIds);
-  if (outcomes.length === 0 || tokenIds.length === 0) {
+  if (outcomes.length === 0) {
     throw new Error("Gamma event market is missing outcomes or token ids.");
   }
 
@@ -175,10 +180,15 @@ export function normalizeGammaEventToWatchlistItem(
         )
       : 0;
   const selectedIndex = outcomeIndex >= 0 ? outcomeIndex : 0;
-  const tokenId = tokenIds[selectedIndex];
-  if (!tokenId) {
-    throw new Error("Gamma event market is missing the selected token id.");
-  }
+  const protocolVersion = market.version === "v2" ? "v2" : "v1";
+  const tokenId = getGammaTokenIdForOutcome(market, selectedIndex);
+  const tokenIds = outcomes.map((_, index) =>
+    getGammaTokenIdForOutcome(market, index)
+  );
+  const persistedOutcomeIndex =
+    protocolVersion === "v2"
+      ? decodePolymarketV2AssetId(tokenId).outcomeIndex
+      : selectedIndex;
   const marketType = classifyMarketType(outcomes);
   const eventType = classifyEventType(allMarkets);
   const oppositeIndex =
@@ -204,6 +214,8 @@ export function normalizeGammaEventToWatchlistItem(
       stringValue(event.title) ??
       `Polymarket event ${marketSlug}`,
     tokenId,
+    protocolVersion,
+    outcomeIndex: persistedOutcomeIndex,
     conditionId: stringValue(market.conditionId),
     marketSlug,
     side,

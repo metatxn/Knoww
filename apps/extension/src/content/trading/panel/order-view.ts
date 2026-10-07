@@ -1712,7 +1712,12 @@ function addSubmitButton(
     !noAmount &&
     marketSlippage?.canFill !== true &&
     !isPartialFill(marketSlippage);
-  const relevantAllowance = opts.negRisk ? usdcAllowanceNegRisk : usdcAllowance;
+  const relevantAllowance =
+    opts.protocolVersion === "v2"
+      ? (ctx.usdcAllowanceV2 ?? 0)
+      : opts.negRisk
+        ? usdcAllowanceNegRisk
+        : usdcAllowance;
   // Marketability gates which builder fee rate (taker vs maker) the gate sizes
   // against, so it is part of the preview cache key.
   const isMarketableBuy = getIsMarketableBuy(ctx, opts);
@@ -1731,10 +1736,13 @@ function addSubmitButton(
     Boolean(approvalPreviewKey) &&
     panelState.orderApprovalPreview?.key !== approvalPreviewKey;
   const needsApproval =
-    panelState.activeSide === "buy" &&
-    cost > 0 &&
-    !isCheckingApprovalRequirement &&
-    relevantAllowance < approvalRequirement;
+    (opts.protocolVersion === "v2" &&
+      panelState.activeSide === "sell" &&
+      !ctx.positionApprovalV2) ||
+    (panelState.activeSide === "buy" &&
+      cost > 0 &&
+      !isCheckingApprovalRequirement &&
+      relevantAllowance < approvalRequirement);
   // Signed without `maxSpend`, so `makerAmount` equals the amount we submit —
   // which is `cost`, the walked book notional on a partial (FAK) fill, not the
   // typed amount. The CLOB's $1 floor applies to that signed amount directly,
@@ -1884,7 +1892,11 @@ function addSubmitButton(
         marketId: opts.market.id,
       });
       try {
-        await TradingService.approveUsdc(!!opts.negRisk, approvalRequirement);
+        await TradingService.approveUsdc(
+          !!opts.negRisk,
+          approvalRequirement,
+          opts.protocolVersion
+        );
         trackPanelAnalytics("trading_usdc_approve_succeeded", {
           marketId: opts.market.id,
         });
@@ -2000,7 +2012,8 @@ function addSubmitButton(
         if (opts.yesTokenId && opts.noTokenId) {
           await TradingService.getOutcomeBalances(
             opts.yesTokenId,
-            opts.noTokenId
+            opts.noTokenId,
+            opts.protocolVersion
           )
             .then((b) => {
               panelState.outcomeBalances = b;
@@ -2057,7 +2070,8 @@ function addSubmitButton(
               const newBal = await withTimeout(
                 TradingService.getOutcomeBalances(
                   opts.yesTokenId,
-                  opts.noTokenId
+                  opts.noTokenId,
+                  opts.protocolVersion
                 ),
                 PER_POLL_TIMEOUT
               );

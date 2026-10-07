@@ -1,3 +1,4 @@
+import { getGammaTokenIdForOutcome } from "@knoww/shared-types/polymarket";
 import Decimal from "decimal.js";
 import type { EventMarket } from "./types";
 
@@ -61,5 +62,9 @@ export function tokenIdForOutcome(
   outcomeIndex: number
 ): string {
   if (!market) return "";
-  return market.clobTokenIds?.[outcomeIndex] || "";
+  try {
+    return getGammaTokenIdForOutcome(market, outcomeIndex) || "";
+  } catch {
+    return "";
+  }
 }

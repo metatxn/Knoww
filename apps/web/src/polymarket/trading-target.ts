@@ -10,6 +10,7 @@ import {
   POLYMARKET_CAPABILITIES,
   POLYMARKET_PLATFORM,
 } from "@knoww/services/platforms/polymarket";
+import { resolvePolymarketProtocolVersion } from "@knoww/shared-types/polymarket";
 
 /**
  * Platform details a Polymarket mount attaches to the trading quote. The
@@ -18,6 +19,7 @@ import {
  */
 export interface PolymarketTradingDetails extends PlatformDetails {
   platform: "polymarket";
+  protocolVersion: "v1" | "v2";
   conditionId: string;
   negRisk: boolean;
 }
@@ -49,6 +51,7 @@ export interface TradingTargetInput {
   outcomes: readonly TradingTargetOutcome[];
   selectedIndex: number;
   negRisk: boolean;
+  protocolVersion?: "v1" | "v2";
   /** Defaults to now; tests pin it. */
   fetchedAt?: string;
 }
@@ -72,6 +75,13 @@ export function toTradingTarget(
   if (!conditionId || input.outcomes.length === 0) {
     return null;
   }
+  const protocolVersion = resolvePolymarketProtocolVersion(
+    input.outcomes[0].tokenId,
+    input.protocolVersion
+  );
+  for (const outcome of input.outcomes) {
+    resolvePolymarketProtocolVersion(outcome.tokenId, protocolVersion);
+  }
   const outcomes: CanonicalOutcome[] = input.outcomes.map((outcome) => ({
     id: buildCanonicalId(POLYMARKET_PLATFORM, outcome.tokenId),
     sourceOutcomeId: outcome.tokenId,
@@ -83,6 +93,7 @@ export function toTradingTarget(
     platform: "polymarket",
     conditionId,
     negRisk: input.negRisk,
+    protocolVersion,
   };
   const market: CanonicalMarket = {
     schemaVersion: CANONICAL_SCHEMA_VERSION,

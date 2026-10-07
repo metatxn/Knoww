@@ -11,9 +11,10 @@ const pendingApprovalChecks = new Map<string, Promise<ApprovalStatus>>();
 
 export async function checkAllApprovals(
   safeAddress: string,
-  approvalAmountRaw?: bigint
+  approvalAmountRaw?: bigint,
+  protocolVersion: "v1" | "v2" = "v1"
 ): Promise<ApprovalStatus> {
-  const cacheKey = `${safeAddress.toLowerCase()}:${
+  const cacheKey = `${protocolVersion}:${safeAddress.toLowerCase()}:${
     approvalAmountRaw?.toString() ?? "default"
   }`;
   const pending = pendingApprovalChecks.get(cacheKey);
@@ -22,7 +23,7 @@ export async function checkAllApprovals(
   const check = readTradingApprovalStatus(
     getPublicClient(),
     safeAddress as Address,
-    approvalAmountRaw ? { approvalAmountRaw } : undefined
+    { approvalAmountRaw, protocolVersion }
   ).finally(() => {
     pendingApprovalChecks.delete(cacheKey);
   });

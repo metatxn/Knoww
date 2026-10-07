@@ -6,7 +6,14 @@ import {
   POLYMARKET_PLATFORM,
   type PolymarketClient,
 } from "@knoww/services/platforms/polymarket";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import {
+  POLYMARKET_API,
+  parseGammaStringArray,
+} from "@knoww/shared-types/polymarket";
+import {
+  fetchUnifiedPolymarketResolutions,
+  type UnifiedPolymarketResolution,
+} from "@knoww/shared-types/polymarket-unified";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
@@ -26,7 +33,6 @@ import { toDecimalString } from "./decimal";
 import {
   canonicalEventId,
   cleanDescription,
-  deriveMarketStatus,
   descriptionIsTruncated,
   isAbortLike,
   knowwEventUrl,
@@ -35,14 +41,16 @@ import {
   marketOutcomeSchema,
   marketStatusSchema,
   projectMarketOutcomes,
+  projectMarketResolution,
+  readMarketResolutions,
   SLUG_PATTERN,
 } from "./gamma";
 import { buildToolMeta, READ_ONLY_ANNOTATIONS, toolMetaSchema } from "./meta";
 
-const CONDITION_ID_PATTERN = /^0x[0-9a-f]{64}$/;
+const CONDITION_ID_PATTERN = /^0x(?:[0-9a-f]{62}|[0-9a-f]{64})$/;
 const TOKEN_ID_PATTERN = /^[0-9]{1,80}$/;
 const CANONICAL_ID_MESSAGE =
-  "id must be a canonical market id such as polymarket:0x<64 hex chars>.";
+  "id must be a canonical market id such as polymarket:0x<62 or 64 hex chars>.";
 
 const GET_MARKET_DESCRIPTION = [
   "Fetch one market by canonical id (for example polymarket:0x<conditionId>), slug, condition id, or CLOB token id.",
@@ -63,7 +71,7 @@ const getMarketInputSchema = z.object({
     .max(140)
     .optional()
     .describe(
-      "Canonical market id from another Knoww tool, e.g. polymarket:0x<64 hex chars>."
+      "Canonical market id from another Knoww tool, e.g. polymarket:0x<62 or 64 hex chars>."
     ),
   platform: platformInputSchema,
   slug: z
@@ -75,7 +83,9 @@ const getMarketInputSchema = z.object({
     .string()
     .max(80)
     .optional()
-    .describe("Condition id: 0x followed by 64 hex characters."),
+    .describe(
+      "Condition id: 0x followed by 62 hex characters for V2 or 64 for CTF or padded V2."
+    ),
   tokenId: z
     .string()
     .max(100)
@@ -182,7 +192,7 @@ function resolveIdentifier(args: GetMarketInput): MarketIdentifier {
   ) {
     throw knowwToolError(
       "VALIDATION_ERROR",
-      "conditionId must be 0x followed by 64 hex characters."
+      "conditionId must be 0x followed by 62 or 64 hex characters."
     );
   }
   if (
@@ -296,14 +306,24 @@ function summarizeParentEvent(
 
 export function buildMarketDetail(
   detail: GammaMarketDetail,
-  identity: MarketIdentity
+  identity: MarketIdentity,
+  resolutions?: UnifiedPolymarketResolution[]
 ): MarketDetail {
   const names = parseGammaStringArray(detail.outcomes);
   const prices = parseGammaStringArray(detail.outcomePrices);
-  const status = deriveMarketStatus(detail);
+  const { status, payouts } = projectMarketResolution(detail, resolutions);
   const resolvedOutcome =
-    status === "resolved" ? deriveResolvedOutcome(names, prices) : undefined;
+    status === "resolved"
+      ? deriveResolvedOutcome(
+          names,
+          detail.version === "v2" ? (payouts ?? []) : prices
+        )
+      : undefined;
   const outcomeProjection = projectMarketOutcomes(detail);
+  if (payouts)
+    outcomeProjection.outcomes.forEach((outcome, index) => {
+      outcome.payout = payouts[index];
+    });
 
   const description = cleanDescription(detail.description);
   const volume = toDecimalString(detail.volumeNum ?? detail.volume);
@@ -419,12 +439,21 @@ async function handleGetMarket(args: GetMarketInput, context: ServerContext) {
           : "That market has no condition id, so it has no canonical id."
       );
     }
-    const market = buildMarketDetail(detail, identity);
+    const resolutions = await readMarketResolutions(
+      detail,
+      fetchUnifiedPolymarketResolutions
+    );
+    const market = buildMarketDetail(detail, identity, resolutions);
     const truncated =
       market.outcomesTruncated === true || market.descriptionTruncated === true;
     const meta = buildToolMeta({
       requestId: currentRequestId(),
-      sources: [{ name: "polymarket-gamma", url: client.baseUrls.gamma }],
+      sources: [
+        { name: "polymarket-gamma", url: client.baseUrls.gamma },
+        ...(resolutions
+          ? [{ name: "polymarket-data", url: POLYMARKET_API.DATA.BASE }]
+          : []),
+      ],
       ...(truncated ? { truncated: true } : {}),
     });
     return {

@@ -48,6 +48,9 @@ export type MarketClobOrderType =
   | typeof CLOB_ORDER_TYPES.FOK;
 
 export interface UnifiedPolymarketPublicClient extends PriceHistoryClient {
+  fetchResolutions?(request: {
+    conditionIds: string[];
+  }): Promise<UnifiedPolymarketResolution[]>;
   fetchOrderBook(request: { tokenId: string }): Promise<unknown>;
   fetchOrderBooks?(request: Array<{ tokenId: string }>): Promise<unknown>;
   fetchMarketInfo?(request: { conditionId: string }): Promise<unknown>;
@@ -56,6 +59,22 @@ export interface UnifiedPolymarketPublicClient extends PriceHistoryClient {
     side: TradingSide;
   }): Promise<unknown>;
   fetchBuilderFeeRates?(request: { builderCode: string }): Promise<unknown>;
+}
+
+export interface UnifiedPolymarketResolution {
+  conditionId?: string;
+  status: string;
+  payouts?: string[];
+}
+
+export async function fetchUnifiedPolymarketResolutions(
+  conditionIds: string[],
+  options: UnifiedPolymarketPublicClientOptions = {}
+): Promise<UnifiedPolymarketResolution[]> {
+  const client = options.client ?? createUnifiedPolymarketPublicClient(options);
+  if (!client.fetchResolutions)
+    throw new Error("Polymarket client does not support resolution reads");
+  return client.fetchResolutions({ conditionIds });
 }
 
 export interface UnifiedPolymarketPublicClientOptions

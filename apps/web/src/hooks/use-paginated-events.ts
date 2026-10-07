@@ -32,6 +32,8 @@ interface PaginatedEvent {
     image?: string;
     icon?: string;
     clobTokenIds?: string[];
+    positionIds?: string[];
+    version?: "v1" | "v2";
     conditionId?: string;
     gameStartTime?: string;
     sportsMarketType?: string;

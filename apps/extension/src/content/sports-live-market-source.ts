@@ -1,5 +1,6 @@
 import {
   type GammaArrayField,
+  getGammaTokenIdForOutcome,
   parseGammaNumberArray,
   parseGammaStringArray,
 } from "@knoww/shared-types/polymarket";
@@ -35,6 +36,8 @@ interface GammaSportsMarket {
   outcomes?: GammaArrayField;
   outcomePrices?: GammaArrayField;
   clobTokenIds?: GammaArrayField;
+  positionIds?: GammaArrayField;
+  version?: "v1" | "v2";
   conditionId?: string;
   volume?: string | number;
   volume24hr?: string | number;
@@ -371,7 +374,14 @@ function isUsableSportsMarket(market: GammaSportsMarket): boolean {
   }
 
   const outcomes = parseGammaStringArray(market.outcomes);
-  const tokenIds = parseGammaStringArray(market.clobTokenIds);
+  let tokenIds: string[];
+  try {
+    tokenIds = outcomes.map((_, index) =>
+      getGammaTokenIdForOutcome(market, index)
+    );
+  } catch {
+    return false;
+  }
   if (outcomes.length === 0 || tokenIds.length === 0) return false;
 
   return hasUsablePrice(market);
@@ -423,6 +433,8 @@ function mapSportsMarket(market: GammaSportsMarket): NestedMarket {
     volume: market.volume,
     volume24hr: toNumber(market.volume24hr),
     clobTokenIds: normalizeJsonArrayString(market.clobTokenIds),
+    positionIds: normalizeJsonArrayString(market.positionIds),
+    version: market.version,
     conditionId: market.conditionId,
     slug: market.slug,
     active: market.active,

@@ -33,6 +33,7 @@ function lostPositionToTrade(
     outcome: position.outcome,
     transactionHash: "",
     isLostPosition: true,
+    asset: position.asset,
     market: {
       conditionId: position.conditionId,
       title: position.market.title,

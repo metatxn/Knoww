@@ -21,21 +21,27 @@ function matchTeam(
   teams: readonly EventTeam[] | undefined
 ): EventTeam | undefined {
   const normalized = normalizeText(rawValue ?? "");
-  if (!normalized || !teams) return undefined;
+  if (!normalized || !teams || normalized === "yes" || normalized === "no")
+    return undefined;
 
-  return teams.find((team) => {
-    const teamName = normalizeText(team.name);
-    const abbr = normalizeText(team.abbreviation ?? "");
-    const alias = normalizeText(team.alias ?? "");
+  const candidates = teams.map((team) => ({
+    team,
+    names: [team.name, team.abbreviation ?? "", team.alias ?? ""]
+      .map(normalizeText)
+      .filter(Boolean),
+  }));
+  const exactMatches = candidates.filter(({ names }) =>
+    names.includes(normalized)
+  );
+  if (exactMatches.length > 0)
+    return exactMatches.length === 1 ? exactMatches[0].team : undefined;
 
-    return [teamName, abbr, alias].some(
-      (candidate) =>
-        candidate &&
-        (normalized === candidate ||
-          normalized.includes(candidate) ||
-          candidate.includes(normalized))
-    );
-  });
+  // An abbreviation such as IND must not match inside Indies.
+  const phrase = ` ${normalized} `;
+  const phraseMatches = candidates.filter(({ names }) =>
+    names.some((name) => phrase.includes(` ${name} `))
+  );
+  return phraseMatches.length === 1 ? phraseMatches[0].team : undefined;
 }
 
 export function compactMatchupOutcomeName(

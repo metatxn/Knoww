@@ -440,7 +440,9 @@ class MemoryAgentRepository implements AgentRepository {
     const existing =
       (input.id ? memory.watchlist.get(input.id) : null) ??
       [...memory.watchlist.values()].find(
-        (item) => item.tokenId === input.tokenId
+        (item) =>
+          item.tokenId === input.tokenId &&
+          (item.protocolVersion ?? "v1") === (input.protocolVersion ?? "v1")
       ) ??
       null;
     const item: AgentWatchlistItem = {
@@ -927,9 +929,9 @@ class D1AgentRepository extends MemoryAgentRepository {
           .first<{ id: string; created_at: string }>()
       : await this.db
           .prepare(
-            "SELECT id, created_at FROM agent_watchlist WHERE token_id = ? ORDER BY created_at ASC LIMIT 1"
+            "SELECT id, created_at FROM agent_watchlist WHERE token_id = ? AND protocol_version = ? ORDER BY created_at ASC LIMIT 1"
           )
-          .bind(input.tokenId)
+          .bind(input.tokenId, input.protocolVersion ?? "v1")
           .first<{ id: string; created_at: string }>();
     const id = input.id ?? existing?.id ?? crypto.randomUUID();
     const createdAt = existing?.created_at ?? now();
@@ -937,8 +939,8 @@ class D1AgentRepository extends MemoryAgentRepository {
     await this.db
       .prepare(
         `INSERT OR REPLACE INTO agent_watchlist
-        (id, question, token_id, condition_id, market_slug, side, outcome_label, market_type, event_type, outcomes_json, opposite_outcome_label, opposite_token_id, event_market_count, event_start_time, event_end_time, resolution_source, news_urls_json, social_notes_json, active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, question, token_id, condition_id, market_slug, side, outcome_label, market_type, event_type, outcomes_json, opposite_outcome_label, opposite_token_id, event_market_count, event_start_time, event_end_time, resolution_source, news_urls_json, social_notes_json, active, created_at, updated_at, protocol_version, outcome_index)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -961,7 +963,9 @@ class D1AgentRepository extends MemoryAgentRepository {
         JSON.stringify(input.socialNotes),
         input.active ? 1 : 0,
         createdAt,
-        updatedAt
+        updatedAt,
+        input.protocolVersion ?? "v1",
+        input.outcomeIndex ?? null
       )
       .run();
     return { ...input, id, createdAt, updatedAt };
@@ -1465,8 +1469,8 @@ class D1AgentRepository extends MemoryAgentRepository {
            submitted_at, filled_at, created_at, filled_notional_usd,
            filled_shares, fee_estimate_usd, settled_fee_usd,
            average_fill_price, last_synced_at, balance_snapshot_json,
-           dry_run, error)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           dry_run, error, protocol_version)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         record.idempotencyKey,
@@ -1490,7 +1494,8 @@ class D1AgentRepository extends MemoryAgentRepository {
         record.lastSyncedAt,
         record.balanceSnapshotJson,
         record.dryRun ? 1 : 0,
-        record.error
+        record.error,
+        record.protocolVersion ?? "v1"
       )
       .run();
     return record;
@@ -1778,6 +1783,7 @@ function rowToLiveOrder(row: Record<string, unknown>): LiveOrderRecord {
     runId: String(row.run_id),
     watchlistItemId: String(row.watchlist_item_id),
     tokenId: String(row.token_id),
+    protocolVersion: row.protocol_version === "v2" ? "v2" : "v1",
     side,
     requestedSizeUsd: String(row.requested_size_usd),
     price: String(row.price),
@@ -1910,6 +1916,11 @@ function rowToWatchlistItem(row: Record<string, unknown>): AgentWatchlistItem {
     id: String(row.id),
     question: String(row.question),
     tokenId: String(row.token_id),
+    protocolVersion: row.protocol_version === "v2" ? "v2" : "v1",
+    outcomeIndex:
+      row.outcome_index === null || row.outcome_index === undefined
+        ? undefined
+        : Number(row.outcome_index),
     conditionId: row.condition_id ? String(row.condition_id) : undefined,
     marketSlug: row.market_slug ? String(row.market_slug) : undefined,
     side: row.side === "NO" ? "NO" : "YES",

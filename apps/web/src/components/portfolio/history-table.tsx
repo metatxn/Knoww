@@ -147,7 +147,11 @@ export function HistoryTable({
   trades: Trade[];
   isLoading: boolean;
   searchQuery: string;
-  onCloseLostPosition?: (conditionId: string, negRisk?: boolean) => void;
+  onCloseLostPosition?: (
+    conditionId: string,
+    negRisk?: boolean,
+    asset?: string
+  ) => void;
   closingPositionIds?: ReadonlySet<string>;
   /**
    * Conditions already redeemed this session. The synthetic lost row outlives
@@ -227,11 +231,11 @@ export function HistoryTable({
           const isLost = trade.isLostPosition === true;
           const isClosing = Boolean(
             trade.market.conditionId &&
-              closingPositionIds?.has(trade.market.conditionId)
+              closingPositionIds?.has(trade.asset ?? trade.market.conditionId)
           );
           const isClosed = Boolean(
             trade.market.conditionId &&
-              closedPositionIds?.has(trade.market.conditionId)
+              closedPositionIds?.has(trade.asset ?? trade.market.conditionId)
           );
           const outcomeColor =
             trade.outcome === "Yes"
@@ -309,7 +313,8 @@ export function HistoryTable({
                         onClick={() =>
                           onCloseLostPosition(
                             trade.market.conditionId as string,
-                            trade.market.negRisk ?? false
+                            trade.market.negRisk ?? false,
+                            ...(trade.asset ? [trade.asset] : [])
                           )
                         }
                         disabled={isClosing || isClosed}
@@ -357,11 +362,11 @@ export function HistoryTable({
           const isLost = trade.isLostPosition === true;
           const isClosing = Boolean(
             trade.market.conditionId &&
-              closingPositionIds?.has(trade.market.conditionId)
+              closingPositionIds?.has(trade.asset ?? trade.market.conditionId)
           );
           const isClosed = Boolean(
             trade.market.conditionId &&
-              closedPositionIds?.has(trade.market.conditionId)
+              closedPositionIds?.has(trade.asset ?? trade.market.conditionId)
           );
           const outcomeColor =
             trade.outcome === "Yes"
@@ -422,7 +427,8 @@ export function HistoryTable({
                     onClick={() =>
                       onCloseLostPosition(
                         trade.market.conditionId as string,
-                        trade.market.negRisk ?? false
+                        trade.market.negRisk ?? false,
+                        ...(trade.asset ? [trade.asset] : [])
                       )
                     }
                     disabled={isClosing || isClosed}

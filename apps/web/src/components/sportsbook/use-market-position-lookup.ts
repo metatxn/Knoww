@@ -1,8 +1,10 @@
 "use client";
 
+import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { useCallback, useMemo } from "react";
 import { useProxyWallet } from "@/hooks/use-proxy-wallet";
 import { type Position, useUserPositions } from "@/hooks/use-user-positions";
+import { tokenIdForOutcome } from "./format";
 import type { EventMarket } from "./types";
 
 export function useMarketPositionLookup(): {
@@ -52,7 +54,9 @@ export function useMarketPositionLookup(): {
       if (market.conditionId) {
         addPositions(positionsByConditionId.get(market.conditionId));
       }
-      for (const tokenId of market.clobTokenIds ?? []) {
+      for (const tokenId of parseGammaStringArray(market.outcomes).map(
+        (_, index) => tokenIdForOutcome(market, index)
+      )) {
         if (tokenId) addPositions(positionsByAsset.get(tokenId));
       }
 

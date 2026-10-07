@@ -1,6 +1,7 @@
 import { createLogger } from "@knoww/logger";
 import {
   type GammaArrayField,
+  getGammaTokenIdForOutcome,
   parseGammaStringArray,
 } from "@knoww/shared-types/polymarket";
 import type { MarketCapabilities } from "../../core/capabilities";
@@ -55,6 +56,8 @@ export interface GammaMarketLike {
   outcomes?: GammaArrayField;
   outcomePrices?: GammaArrayField;
   clobTokenIds?: GammaArrayField;
+  positionIds?: GammaArrayField;
+  version?: Maybe<string>;
   active?: Maybe<boolean>;
   closed?: Maybe<boolean>;
   archived?: Maybe<boolean>;
@@ -125,6 +128,7 @@ export interface MapContext {
  */
 export interface PolymarketMarketDetails extends PlatformDetails {
   platform: "polymarket";
+  protocolVersion: "v1" | "v2";
   gamma: GammaMarketLike;
   gammaMarketId?: string;
   gammaEventId?: string;
@@ -273,10 +277,24 @@ function compact<T extends PlatformDetails>(details: T): T {
 function mapOutcomes(market: GammaMarketLike): CanonicalOutcome[] {
   const labels = parseStrings(market.outcomes, "outcomes");
   const prices = parseStrings(market.outcomePrices, "outcomePrices");
-  const tokenIds = parseStrings(market.clobTokenIds, "clobTokenIds");
+  const tokenIds =
+    market.version === "v2"
+      ? parseStrings(market.positionIds, "positionIds")
+      : parseStrings(market.clobTokenIds, "clobTokenIds");
+  if (
+    market.version !== undefined &&
+    market.version !== "v1" &&
+    market.version !== "v2"
+  )
+    throw new Error("Unsupported Polymarket protocol version");
+  if (
+    market.version === "v2" ||
+    (market.positionIds !== undefined && market.version !== "v1")
+  )
+    getGammaTokenIdForOutcome(market, 0);
   const outcomes: CanonicalOutcome[] = [];
-  tokenIds.forEach((tokenId, index) => {
-    const sourceOutcomeId = text(tokenId);
+  tokenIds.forEach((_, index) => {
+    const sourceOutcomeId = text(getGammaTokenIdForOutcome(market, index));
     if (sourceOutcomeId === undefined) {
       return;
     }
@@ -356,6 +374,7 @@ export function mapGammaMarket(
     capabilities: ctx.capabilities,
     platformDetails: compact<PolymarketMarketDetails>({
       platform: "polymarket",
+      protocolVersion: market.version === "v2" ? "v2" : "v1",
       gamma: market,
       gammaMarketId: idText(market.id),
       gammaEventId: sourceEventId,

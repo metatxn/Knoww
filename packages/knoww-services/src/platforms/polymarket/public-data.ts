@@ -3,6 +3,7 @@ import {
   DEFAULT_UPSTREAM_JSON_MAX_BYTES,
   readBoundedJson,
 } from "@knoww/shared-types/bounded-json";
+import { isPolymarketV2AssetId } from "@knoww/shared-types/polymarket";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -519,7 +520,14 @@ export function createPublicData(ctx: PolymarketClientContext) {
     const page = await dataApi.page(
       "holders",
       {
-        condition: input.conditionIds.join(","),
+        condition: input.conditionIds
+          .map((condition) =>
+            /^0x[0-9a-fA-F]{62}$/.test(condition) &&
+            isPolymarketV2AssetId(BigInt(`${condition}00`))
+              ? `${condition}00`
+              : condition
+          )
+          .join(","),
         limit: input.limit,
         min_balance: input.minBalance,
       },

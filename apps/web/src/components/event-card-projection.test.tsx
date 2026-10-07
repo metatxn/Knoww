@@ -23,6 +23,7 @@ function event(count: number, grouped = true): GammaEvent {
     liquidity: 2500,
     markets: Array.from({ length: count }, (_, i) => ({
       id: `market-${i}`,
+      version: "v1",
       question:
         i === count - 1 ? "A different question" : `Will candidate ${i} win?`,
       groupItemTitle: grouped

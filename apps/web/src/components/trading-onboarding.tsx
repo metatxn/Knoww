@@ -208,7 +208,7 @@ export function TradingOnboarding({
       id: "approve",
       name: "Approve",
       title: "Approve Permissions",
-      description: "Set USDC and outcome-token allowances. One signature.",
+      description: "Approve collateral and outcome tokens.",
       tag: "FREE",
       icon: <Zap className="h-[18px] w-[18px]" strokeWidth={1.2} />,
       status: "pending",

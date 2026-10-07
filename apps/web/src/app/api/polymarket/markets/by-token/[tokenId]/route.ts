@@ -3,7 +3,12 @@ import {
   DEFAULT_UPSTREAM_JSON_MAX_BYTES,
   readBoundedJson,
 } from "@knoww/shared-types/bounded-json";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import {
+  decodePolymarketV2AssetId,
+  getGammaTokenIdForOutcome,
+  parseGammaStringArray,
+  resolvePolymarketProtocolVersion,
+} from "@knoww/shared-types/polymarket";
 import { type NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { getCacheHeaders } from "@/lib/cache-headers";
@@ -67,10 +72,10 @@ async function resolveEventSlug(
 
 /**
  * GET /api/polymarket/markets/by-token/:tokenId
- * Get market information by token ID (CLOB token ID)
+ * Get market information by an outcome asset ID
  *
- * The token ID is the outcome token ID from the CLOB API.
- * We use the Gamma API with clob_token_ids parameter to look up the market.
+ * V1 assets use Gamma clob_token_ids. V2 positions encode their condition ID
+ * and use Gamma condition_ids with exact outcome verification.
  */
 /**
  * @openapi
@@ -107,9 +112,31 @@ export async function GET(
   try {
     const { tokenId } = await params;
 
-    // Use Gamma API with clob_token_ids parameter
+    let protocolVersion: "v1" | "v2";
+    let position: ReturnType<typeof decodePolymarketV2AssetId> | null;
+    try {
+      if (
+        !/^[0-9]+$/.test(tokenId) ||
+        BigInt(tokenId) >= BigInt(2) ** BigInt(256)
+      )
+        throw new Error("Invalid token ID");
+      protocolVersion = resolvePolymarketProtocolVersion(tokenId);
+      position =
+        protocolVersion === "v2" ? decodePolymarketV2AssetId(tokenId) : null;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid token ID" },
+        { status: 400 }
+      );
+    }
+
+    const lookup = new URLSearchParams(
+      position
+        ? { condition_ids: position.conditionId }
+        : { clob_token_ids: tokenId }
+    );
     const gammaResponse = await fetch(
-      `${GAMMA_API}/markets?clob_token_ids=${encodeURIComponent(tokenId)}`,
+      `${GAMMA_API}/markets?${lookup.toString()}`,
       {
         headers: { Accept: "application/json" },
         next: { revalidate: 300 },
@@ -124,28 +151,24 @@ export async function GET(
 
       if (Array.isArray(gammaData) && gammaData.length > 0) {
         const market = gammaData[0];
+        if (
+          position &&
+          market.conditionId?.toLowerCase() !== position.conditionId &&
+          market.conditionId?.toLowerCase() !== `${position.conditionId}00`
+        )
+          throw new Error("Gamma condition does not match position");
 
-        // Gamma returns `clobTokenIds` and `outcomes` as JSON-stringified
-        // arrays (e.g. `'["<id1>", "<id2>"]'`, `'["Yes", "No"]'`), not CSV.
-        // The previous implementation used `.split(",")`, which produced
-        // `['["<id1>"', ' "<id2>"]']` and never matched the raw tokenId —
-        // so the outcome defaulted to "Yes" for every row, which is why
-        // portfolio's open-orders tab mislabelled NO orders as Yes.
-        let outcome = "Yes";
-        if (market.clobTokenIds && market.outcomes) {
-          const tokenIds = parseGammaStringArray(market.clobTokenIds, {
-            fallbackCsv: true,
-          });
-          const outcomes = parseGammaStringArray(market.outcomes, {
-            fallbackCsv: true,
-          });
-          const tokenIndex = tokenIds.findIndex(
-            (id: string) => id.trim() === tokenId
+        const outcomes = parseGammaStringArray(market.outcomes);
+        const tokenIndex = outcomes.findIndex(
+          (_: string, index: number) =>
+            getGammaTokenIdForOutcome(market, index) === tokenId
+        );
+        if (tokenIndex < 0)
+          return NextResponse.json(
+            { success: false, error: "Market not found for token ID" },
+            { status: 404 }
           );
-          if (tokenIndex !== -1 && outcomes[tokenIndex]) {
-            outcome = outcomes[tokenIndex].trim();
-          }
-        }
+        const outcome = outcomes[tokenIndex];
 
         const eventSlug = await resolveEventSlug(market);
 

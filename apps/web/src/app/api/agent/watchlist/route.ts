@@ -3,6 +3,10 @@ import {
   resolvePolymarketEventWatchlistItem,
 } from "@knoww/agent";
 import { createLogger } from "@knoww/logger";
+import {
+  decodePolymarketV2AssetId,
+  resolvePolymarketProtocolVersion,
+} from "@knoww/shared-types/polymarket";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -24,6 +28,8 @@ const WatchlistInputSchema = z
     question: z.string().trim().min(8).max(240).optional(),
     tokenId: z.string().trim().min(8).max(160).optional(),
     conditionId: z.string().trim().min(8).max(160).optional(),
+    protocolVersion: z.enum(["v1", "v2"]).optional(),
+    outcomeIndex: z.number().int().min(0).max(1).optional(),
     marketSlug: z.string().trim().min(1).max(180).optional(),
     side: z.enum(["YES", "NO"]).optional(),
     outcomeLabel: z.string().trim().min(1).max(80).optional(),
@@ -129,6 +135,13 @@ export async function GET(request: NextRequest) {
  *                 type: string
  *               tokenId:
  *                 type: string
+ *               protocolVersion:
+ *                 type: string
+ *                 enum: [v1, v2]
+ *               outcomeIndex:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 1
  *               conditionId:
  *                 type: string
  *               marketSlug:
@@ -220,6 +233,8 @@ export async function POST(request: NextRequest) {
       question: parsed.data.question ?? imported?.question,
       tokenId: parsed.data.tokenId ?? imported?.tokenId,
       conditionId: parsed.data.conditionId ?? imported?.conditionId,
+      protocolVersion: parsed.data.protocolVersion ?? imported?.protocolVersion,
+      outcomeIndex: parsed.data.outcomeIndex ?? imported?.outcomeIndex,
       marketSlug: parsed.data.marketSlug ?? imported?.marketSlug,
       side: parsed.data.side ?? imported?.side ?? "YES",
       outcomeLabel: parsed.data.outcomeLabel ?? imported?.outcomeLabel,
@@ -241,6 +256,36 @@ export async function POST(request: NextRequest) {
     };
     if (!itemInput.question || !itemInput.tokenId) {
       return jsonError("Invalid watchlist input", 400);
+    }
+    try {
+      if (
+        !/^[0-9]+$/.test(itemInput.tokenId) ||
+        BigInt(itemInput.tokenId) >= BigInt(2) ** BigInt(256)
+      )
+        throw new Error("Invalid token ID");
+      itemInput.protocolVersion = resolvePolymarketProtocolVersion(
+        itemInput.tokenId,
+        itemInput.protocolVersion
+      );
+      if (itemInput.protocolVersion === "v2") {
+        const decoded = decodePolymarketV2AssetId(itemInput.tokenId);
+        const condition = itemInput.conditionId?.toLowerCase();
+        if (
+          condition &&
+          condition !== decoded.conditionId &&
+          condition !== `${decoded.conditionId}00`
+        )
+          throw new Error("Condition does not match position");
+        if (
+          itemInput.outcomeIndex !== undefined &&
+          itemInput.outcomeIndex !== decoded.outcomeIndex
+        )
+          throw new Error("Outcome does not match position");
+        itemInput.conditionId = itemInput.conditionId ?? decoded.conditionId;
+        itemInput.outcomeIndex = decoded.outcomeIndex;
+      }
+    } catch {
+      return jsonError("Invalid watchlist protocol metadata", 400);
     }
     const repository = await getAgentRepository();
     const item = await repository.upsertWatchlistItem({

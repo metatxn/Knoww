@@ -101,3 +101,54 @@ test("refreshes a present Polymarket token before opening the trading panel", as
   assert.equal(runtime.fetchCalls, 1);
   assert.equal(runtime.shownOptions[0]?.tokenId, "live-england-yes");
 });
+
+test("uses V2 position IDs for the panel and paired balances", async () => {
+  const conditionId = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const positionIds = [0, 1].map((index) =>
+    BigInt(`${conditionId}0${index}`).toString()
+  );
+  const { openTradingPanel } = await import(
+    "../../src/content/trading/trading-glue"
+  );
+  const anchor = {
+    closest: () => null,
+    style: { opacity: "", pointerEvents: "" },
+  } as unknown as HTMLElement;
+  vi.stubGlobal("window", {
+    KNOWW_API: { fetchClobTokenIds: async () => positionIds[0] },
+    KNOWW_ANALYTICS: { track: async () => undefined },
+    KNOWW_UTILS: {
+      log: () => undefined,
+      safeSendMessage: async () => ({ ok: true }),
+    },
+  });
+
+  openTradingPanel({
+    market: {
+      id: "30616",
+      title: "V2 market",
+      slug: "v2-market",
+      source: "polymarket",
+      markets: [
+        {
+          conditionId,
+          outcomes: ["Yes", "No"],
+          version: "v2",
+          positionIds,
+          clobTokenIds: '["11","12"]',
+        },
+      ],
+    } as Parameters<typeof openTradingPanel>[0]["market"],
+    outcomeName: "Yes",
+    outcomeIndex: 0,
+    price: 0.5,
+    anchorElement: anchor,
+    isMultiOutcome: false,
+    marketIndex: 0,
+  });
+
+  await vi.waitFor(() => assert.equal(runtime.shownOptions.length, 1));
+  assert.equal(runtime.shownOptions[0]?.tokenId, positionIds[0]);
+  assert.equal(runtime.shownOptions[0]?.yesTokenId, positionIds[0]);
+  assert.equal(runtime.shownOptions[0]?.noTokenId, positionIds[1]);
+});

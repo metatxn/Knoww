@@ -289,7 +289,8 @@ export function useRelayerClient() {
         log.debug("approvals.checking");
         const approvalStatus = await checkAllApprovals(
           expectedSafe,
-          approvalAmountRaw
+          approvalAmountRaw,
+          options.approvalScope?.protocolVersion
         );
         log.debug("approvals.status", approvalStatus);
 

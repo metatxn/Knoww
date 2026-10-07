@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatPositionPercent, formatSignedUsd, formatUsd } from "./format";
+import {
+  formatPositionPercent,
+  formatSignedUsd,
+  formatUsd,
+  tokenIdForOutcome,
+} from "./format";
 
 describe("formatSignedUsd", () => {
   it("does not prefix gains with +", () => {
@@ -29,4 +34,21 @@ describe("formatPositionPercent", () => {
   it("treats zero as unsigned", () => {
     expect(formatPositionPercent(0)).toBe("0.0%");
   });
+});
+
+it("uses validated V2 asset IDs for display and chart outcomes", () => {
+  const conditionId = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const positionIds = [0, 1].map((index) =>
+    BigInt(`${conditionId}0${index}`).toString()
+  );
+  const market = {
+    id: "1",
+    conditionId,
+    version: "v2" as const,
+    outcomes: '["Yes", "No"]',
+    positionIds,
+    clobTokenIds: ["11", "22"],
+  };
+  expect(tokenIdForOutcome(market, 1)).toBe(positionIds[1]);
+  expect(tokenIdForOutcome({ ...market, version: undefined }, 1)).toBe("");
 });

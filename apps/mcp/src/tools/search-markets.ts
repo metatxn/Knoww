@@ -7,7 +7,10 @@ import {
   POLYMARKET_PLATFORM,
   type SearchEvent,
 } from "@knoww/services/platforms/polymarket";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import {
+  getGammaTokenIdForOutcome,
+  parseGammaStringArray,
+} from "@knoww/shared-types/polymarket";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import Decimal from "decimal.js";
 import { z } from "zod";
@@ -215,20 +218,19 @@ function marketOutcomes(market: Market): {
 } {
   const names = parseGammaStringArray(market.outcomes);
   const prices = parseGammaStringArray(market.outcomePrices);
-  const tokenIds = parseGammaStringArray(market.clobTokenIds, {
-    fallbackCsv: true,
-  });
   const totalOutcomes = Math.min(names.length, prices.length);
   const count = Math.min(totalOutcomes, MAX_OUTCOMES_PER_MARKET);
   const outcomes: OutcomeSummary[] = [];
   for (let index = 0; index < count; index++) {
     const price = toDecimalString(prices[index]);
     if (price === undefined) continue;
-    const tokenId = tokenIds[index];
+    const tokenId = getGammaTokenIdForOutcome(market, index, {
+      fallbackCsv: true,
+    });
     outcomes.push({
       name: names[index],
       price,
-      ...(tokenId !== undefined ? { tokenId } : {}),
+      ...(tokenId ? { tokenId } : {}),
     });
   }
   return {

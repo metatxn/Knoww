@@ -3,7 +3,7 @@
 // ============================================
 
 import { createLogger } from "@knoww/logger";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import { getGammaTokenIdForOutcome } from "@knoww/shared-types/polymarket";
 import {
   isSearchCacheEntryUsable,
   shouldCacheSearchResult,
@@ -1112,6 +1112,8 @@ interface RawPolymarketEvent {
     outcomes?: string[];
     conditionId?: string;
     clobTokenIds?: string;
+    positionIds?: string | string[];
+    version?: "v1" | "v2";
     slug?: string;
     active?: boolean;
     closed?: boolean;
@@ -2627,6 +2629,13 @@ async function fetchClobTokenIds(
           (localMarket as Record<string, unknown>).clobTokenIds =
             liveMarket.clobTokenIds;
         }
+        if (liveMarket?.positionIds) {
+          (localMarket as Record<string, unknown>).positionIds =
+            liveMarket.positionIds;
+        }
+        if (liveMarket?.version) {
+          (localMarket as Record<string, unknown>).version = liveMarket.version;
+        }
         if (liveMarket?.conditionId) {
           (localMarket as Record<string, unknown>).conditionId =
             liveMarket.conditionId;
@@ -2640,7 +2649,7 @@ async function fetchClobTokenIds(
       fullEvent.markets,
       idx
     );
-    if (!nestedMarket?.clobTokenIds) return null;
+    if (!nestedMarket) return null;
     if (
       nestedMarket.active === false ||
       nestedMarket.closed === true ||
@@ -2649,12 +2658,13 @@ async function fetchClobTokenIds(
       return null;
     }
 
-    const tokenIds = parseGammaStringArray(nestedMarket.clobTokenIds);
-
-    const tokenIndex = isMultiOutcome ? 0 : outcomeIndex;
-    if (tokenIds[tokenIndex]) {
-      log("Resolved clobTokenId:", tokenIds[tokenIndex]);
-      return tokenIds[tokenIndex];
+    const tokenId = getGammaTokenIdForOutcome(
+      nestedMarket,
+      isMultiOutcome ? 0 : outcomeIndex
+    );
+    if (tokenId) {
+      log("Resolved outcome asset ID:", tokenId);
+      return tokenId;
     }
   } catch (e) {
     log("Failed to fetch clobTokenIds:", e);

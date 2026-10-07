@@ -1,4 +1,5 @@
 import {
+  getGammaTokenIdForOutcome,
   parseGammaNumberArray,
   parseGammaStringArray,
   resolveNegRisk,
@@ -269,7 +270,9 @@ export function resolveOutcomeTokenIds(market: EventMarket): Array<{
 
   const outcomes = parseMarketOutcomes(market.outcomes);
   const prices = parseMarketPrices(market.outcomePrices);
-  const tokenIds = market.clobTokenIds || [];
+  const tokenIds = parseGammaStringArray(market.outcomes).map((_, index) =>
+    getGammaTokenIdForOutcome(market, index)
+  );
 
   return outcomes
     .map((name, i) => ({
@@ -592,6 +595,7 @@ export function buildSelectedMarket(
       })),
       conditionId: market.conditionId,
       negRisk: resolveNegRisk(market, event),
+      protocolVersion: market.version,
     },
     mapRawIndex: (raw: number) => rawToFiltered.get(raw) ?? 0,
   };

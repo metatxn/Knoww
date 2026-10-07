@@ -1,4 +1,5 @@
 import {
+  getGammaTokenIdForOutcome,
   parseGammaNumberArray,
   parseGammaStringArray,
 } from "@knoww/shared-types/polymarket";
@@ -27,6 +28,8 @@ export interface CardEventSource extends EventCardSummary {
     outcomes?: string;
     outcomePrices?: string;
     clobTokenIds?: string | string[];
+    positionIds?: string | string[];
+    version?: "v1" | "v2";
   }>;
 }
 
@@ -55,7 +58,13 @@ export function extractTopMarkets(
       title,
       yes,
       no,
-      tokenId: parseGammaStringArray(m.clobTokenIds)[0],
+      tokenId: (() => {
+        try {
+          return getGammaTokenIdForOutcome(m, 0) || undefined;
+        } catch {
+          return undefined;
+        }
+      })(),
     });
   }
   const namedCandidates = parsed.filter(

@@ -111,6 +111,7 @@ function PolymarketTradingExtras({ market, details }: TradingSlotProps) {
         conditionId={details.conditionId}
         marketTitle={market.title}
         negRisk={details.negRisk}
+        protocolVersion={details.protocolVersion}
       />
 
       <MergeSharesModal
@@ -121,6 +122,7 @@ function PolymarketTradingExtras({ market, details }: TradingSlotProps) {
         noTokenId={market.outcomes[1]?.sourceOutcomeId || ""}
         marketTitle={market.title}
         negRisk={details.negRisk}
+        protocolVersion={details.protocolVersion}
       />
     </>
   );

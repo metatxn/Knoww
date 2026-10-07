@@ -616,6 +616,7 @@ export default function EventDetailClient({
         yesPrice: yesPrice || "0",
         noPrice: noPrice || "0",
         yesTokenId: parsedMarket.yesTokenId,
+        version: market.version,
         noTokenId: parsedMarket.noTokenId,
         negRisk: resolveNegRisk(market),
         orderMinSize,
@@ -1198,6 +1199,7 @@ export default function EventDetailClient({
           yesPrice: yesPrice || "0",
           noPrice: noPrice || "0",
           yesTokenId: parsedMarket.yesTokenId,
+          version: market.version,
           noTokenId: parsedMarket.noTokenId,
           change: 0,
           volume: market.volume || "0",
@@ -1363,6 +1365,7 @@ export default function EventDetailClient({
             outcomes: tradingFormOutcomes,
             selectedIndex: tradingFormSelectedOutcomeIndex,
             negRisk: resolveNegRisk(selectedMarket, event ?? undefined),
+            protocolVersion: selectedMarket.version,
           })
         : null,
     [

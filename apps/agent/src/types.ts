@@ -97,6 +97,7 @@ export interface PaperOrderRequest extends RiskInput {
   runId: string;
   watchlistItemId: string;
   tokenId: string;
+  protocolVersion?: "v1" | "v2";
   conditionId?: string;
   negRisk?: boolean;
   requestedShares?: string;
@@ -170,6 +171,7 @@ export interface LiveOrderRecord {
   runId: string;
   watchlistItemId: string;
   tokenId: string;
+  protocolVersion?: "v1" | "v2";
   side: AgentAction;
   requestedSizeUsd: string;
   price: string;
@@ -302,6 +304,8 @@ export interface AgentWatchlistItem {
   id: string;
   question: string;
   tokenId: string;
+  protocolVersion?: "v1" | "v2";
+  outcomeIndex?: number;
   conditionId?: string;
   marketSlug?: string;
   side?: "YES" | "NO";

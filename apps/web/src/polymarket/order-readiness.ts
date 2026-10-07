@@ -51,6 +51,9 @@ export function usePolymarketOrderReadiness({
   } = useProxyWallet();
   const details = slot?.details;
   const negRisk = isPolymarketTradingDetails(details) && details.negRisk;
+  const protocolVersion = isPolymarketTradingDetails(details)
+    ? (details.protocolVersion ?? "v1")
+    : "v1";
 
   const [isPreparing, setIsPreparing] = useState(false);
   const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -66,10 +69,13 @@ export function usePolymarketOrderReadiness({
   const isWalletReady = enabled && hasProxyWallet && !!proxyAddress;
 
   const { data: onChainAllowance, refetch: refetchAllowance } = useQuery({
-    queryKey: qk.wallet.usdcAllowance(proxyAddress, hasProxyWallet, negRisk),
+    queryKey: [
+      ...qk.wallet.usdcAllowance(proxyAddress, hasProxyWallet, negRisk),
+      protocolVersion,
+    ],
     queryFn: () => {
       if (!proxyAddress) throw new Error("Trading wallet not found");
-      return readPusdAllowance(proxyAddress, negRisk);
+      return readPusdAllowance(proxyAddress, negRisk, protocolVersion);
     },
     enabled: isWalletReady,
     // Allowance only changes when we explicitly update it. Polling every
@@ -125,23 +131,30 @@ export function usePolymarketOrderReadiness({
     refetch: refetchApprovals,
     isLoading: isCheckingApprovals,
   } = useQuery({
-    queryKey: qk.wallet.tradingApprovals(
-      proxyAddress,
-      hasProxyWallet,
-      checkAmountRaw.toString()
-    ),
-    queryFn: () => checkAllApprovals(proxyAddress || "", checkAmountRaw),
+    queryKey: [
+      ...qk.wallet.tradingApprovals(
+        proxyAddress,
+        hasProxyWallet,
+        checkAmountRaw.toString()
+      ),
+      protocolVersion,
+    ],
+    queryFn: () =>
+      checkAllApprovals(proxyAddress || "", checkAmountRaw, protocolVersion),
     enabled: shouldCheckApprovals,
     // This query is the ticket's approval gate. Keep it fresh enough that the
     // button matches the order pre-flight, without polling every keystroke.
     staleTime: 30_000,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData,
   });
 
   const requiredStep = useMemo<OrderReadinessStep>(() => {
     if (shouldCheckApprovals && approvalStatus !== undefined) {
-      return isClobOrderApproved(approvalStatus, { side, negRisk })
+      return isClobOrderApproved(approvalStatus, {
+        side,
+        negRisk,
+        protocolVersion,
+      })
         ? "none"
         : "setup";
     }
@@ -156,6 +169,7 @@ export function usePolymarketOrderReadiness({
     approvalStatus,
     side,
     negRisk,
+    protocolVersion,
     hasNoAllowance,
     hasInsufficientAllowance,
   ]);
@@ -163,7 +177,7 @@ export function usePolymarketOrderReadiness({
   const prepare = useCallback(async () => {
     setIsPreparing(true);
     try {
-      await updateAllowance(approvalAmount, { side, negRisk });
+      await updateAllowance(approvalAmount, { side, negRisk, protocolVersion });
       await Promise.all([
         refreshProxyWallet(),
         refetchAllowance(),
@@ -197,6 +211,7 @@ export function usePolymarketOrderReadiness({
     approvalAmount,
     side,
     negRisk,
+    protocolVersion,
     refreshProxyWallet,
     refetchAllowance,
     refetchApprovals,
