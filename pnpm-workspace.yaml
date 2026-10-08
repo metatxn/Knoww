@@ -72,6 +72,15 @@ overrides:
   "typescript": "6.0.3"
   "@types/node": "24.19.0"
   "viem": "2.57.1"
+  # Security fixes for deserialization, proxy trust, source maps, and OAuth.
+  "seroval": "1.6.3"
+  "source-map-js": "1.2.2"
+  "proxy-addr": "2.0.8"
+  "@modelcontextprotocol/client": "2.2.0"
+  "@modelcontextprotocol/server": "2.2.0"
+  "@modelcontextprotocol/sdk": "1.31.0"
+  "postcss-selector-parser": "7.1.6"
+  "fast-copy": "4.1.0"
   # 1.55.0 statically imports optional x402 peer modules from its ESM graph,
   # which makes Next 16 Turbopack fail even though Knoww does not use x402.
   # Keep the last verified SDK until Coinbase restores optional bundling.

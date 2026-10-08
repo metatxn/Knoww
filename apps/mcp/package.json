@@ -26,7 +26,7 @@
     "@knoww/logger": "workspace:*",
     "@knoww/services": "workspace:*",
     "@knoww/shared-types": "workspace:*",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.2.0",
     "agents": "0.22.0",
     "decimal.js": "catalog:",
     "jose": "6.2.12",
