@@ -1,6 +1,8 @@
 import { AlertTriangle, CheckCircle2, ExternalLink, Info } from "lucide-react";
+import { packageManager } from "../../../../../package.json";
 
 const PRODUCTION_ENDPOINT = "https://mcp.knoww.app/mcp";
+const PACKAGE_MANAGER_LABEL = packageManager.replace("@", " ");
 
 const HOST_CONFIG = `{
   "mcpServers": {
@@ -42,7 +44,7 @@ const result = await client.callTool({
   arguments: { query: "bitcoin", limit: 3 },
 });`;
 
-const LOCAL_COMMANDS = `# Requires Node.js 24 and pnpm 10.25.0
+const LOCAL_COMMANDS = `# Requires Node.js 24 and ${PACKAGE_MANAGER_LABEL}
 node --version
 pnpm --version
 
@@ -292,7 +294,7 @@ export function McpIntegrationGuide() {
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Runtime" value="Node.js 24" mono />
-          <Fact label="Package manager" value="pnpm 10.25.0" mono />
+          <Fact label="Package manager" value={PACKAGE_MANAGER_LABEL} mono />
           <Fact label="Local Worker" value="localhost:8787" mono />
           <Fact label="Local auth" value="Google OAuth or dev bypass" />
         </div>

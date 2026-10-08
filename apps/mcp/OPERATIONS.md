@@ -160,7 +160,7 @@ After the first production version passes the one-hour observation period, conne
 | Non-production branch builds | Disabled |
 | Build caching | Enabled |
 | Build variable | `NODE_VERSION=24` |
-| Build variable | `PNPM_VERSION=10.25.0` |
+| Build variable | `PNPM_VERSION` matching the root `packageManager` version |
 | Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
 
 The root directory must contain `wrangler.jsonc`, and the Cloudflare Worker name must remain `knoww-mcp`, matching that file. The explicit build command installs from the repository's frozen pnpm lockfile so workspace packages resolve correctly; `SKIP_DEPENDENCY_INSTALL=1` prevents Cloudflare from running a second installer in `apps/mcp`. Use the same narrowly scoped Cloudflare build token for every deployment and confirm that it can edit Workers, KV, Durable Objects, custom-domain routes, and rate-limit bindings.
