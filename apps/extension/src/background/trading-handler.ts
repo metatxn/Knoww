@@ -6,7 +6,6 @@
 
 import { logInfo, logWarn } from "@knoww/logger";
 import {
-  buildFullTradingApprovalTransactions,
   buildTradingApprovalTransactions,
   readClobOrderPusdAllowance,
   readErc20Allowance,
@@ -26,6 +25,8 @@ import {
 import {
   COLLATERAL_ONRAMP_ADDRESS,
   CTF_APPROVAL_OPERATORS,
+  EXCHANGE_V3_ADDRESS,
+  POSITION_MANAGER_ADDRESS,
   PUSD_ADDRESS,
   PUSD_APPROVAL_TARGETS,
   PUSD_CTF_APPROVAL_TARGET,
@@ -42,6 +43,7 @@ import {
   getClobPostOrderError,
   POLYMARKET_API,
   postClobOrderWithRetry,
+  resolvePolymarketProtocolVersion,
   syncClobBalanceAllowance,
 } from "@knoww/shared-types/polymarket";
 import type { LegacyClobOrderRequest } from "@knoww/shared-types/polymarket-unified";
@@ -440,7 +442,14 @@ async function handlePlaceOrder(
       publicClient,
       funderAddress,
       msg.negRisk,
-      { fallbackRaw: 0n }
+      {
+        fallbackRaw: 0n,
+        protocolVersion:
+          msg.protocolVersion ??
+          ("tokenId" in msg
+            ? resolvePolymarketProtocolVersion(msg.tokenId)
+            : undefined),
+      }
     );
     if (orderAllowance < requiredCollateralPusd) {
       return fail(
@@ -607,7 +616,10 @@ async function handleGetAllowance(
     publicClient,
     owner,
     msg.negRisk,
-    { fallbackRaw: 0n }
+    {
+      fallbackRaw: 0n,
+      protocolVersion: msg.protocolVersion,
+    }
   );
   return ok({
     allowance: Number(formatUnits(allowance, 6)),
@@ -698,6 +710,20 @@ async function handleGetAllAllowances(
     allowances[`erc1155:${erc1155Operators[i]}`] = erc1155Results[i] ? 1 : 0;
   }
 
+  const v2Status = await readTradingApprovalStatus(publicClient, owner, {
+    protocolVersion: "v2",
+  }).catch(() => ({ positionExchangeApproval: false }));
+  const v2Allowance = await readClobOrderPusdAllowance(
+    publicClient,
+    owner,
+    false,
+    { protocolVersion: "v2", fallbackRaw: 0n }
+  );
+  allowances[`pusd:${EXCHANGE_V3_ADDRESS}`] = Number(
+    formatUnits(v2Allowance, 6)
+  );
+  allowances[`erc1155:${POSITION_MANAGER_ADDRESS}:${EXCHANGE_V3_ADDRESS}`] =
+    v2Status.positionExchangeApproval ? 1 : 0;
   return ok({
     allowances,
     degraded: degradedKeys.length > 0,
@@ -810,6 +836,7 @@ async function handleSplitPosition(
     conditionId: msg.conditionId,
     amount: msg.amount,
     negRisk: msg.negRisk,
+    protocolVersion: msg.protocolVersion,
     client: publicClient,
     collateralOwner: getAddress(proxyAddress) as Address,
     fallbackToApproval: true,
@@ -866,6 +893,7 @@ async function handleMergePositions(
     conditionId: msg.conditionId,
     amount: msg.amount,
     negRisk: msg.negRisk,
+    protocolVersion: msg.protocolVersion,
     client: publicClient,
     collateralOwner: getAddress(proxyAddress) as Address,
     fallbackToApproval: true,
@@ -986,10 +1014,17 @@ async function handleRelayerApprove(
   const txns = await readTradingApprovalStatus(
     publicClient,
     getAddress(proxyAddress) as Address,
-    { approvalAmountRaw: approvalAmount }
-  )
-    .then((status) => buildTradingApprovalTransactions(status, approvalAmount))
-    .catch(() => buildFullTradingApprovalTransactions(approvalAmount));
+    {
+      approvalAmountRaw: approvalAmount,
+      protocolVersion: msg.protocolVersion,
+    }
+  ).then((status) =>
+    buildTradingApprovalTransactions(
+      status,
+      approvalAmount,
+      msg.protocolVersion
+    )
+  );
 
   if (txns.length === 0) {
     return ok({ txHash: "", alreadyApproved: true });
@@ -1071,7 +1106,8 @@ async function handleGetOutcomeBalances(
     publicClient,
     owner,
     msg.yesTokenId,
-    msg.noTokenId
+    msg.noTokenId,
+    msg.protocolVersion
   );
 
   // Exact 6-decimal strings — Number() here would route share balances

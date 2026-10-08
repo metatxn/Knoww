@@ -11,6 +11,7 @@ export interface PanelOptions {
   price: number;
   side: "BUY" | "SELL";
   tokenId: string;
+  protocolVersion?: "v1" | "v2";
   negRisk?: boolean;
   isMultiOutcome?: boolean;
   anchorElement: HTMLElement;

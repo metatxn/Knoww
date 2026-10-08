@@ -361,38 +361,32 @@ export function EventCard({
 }
 
 /**
- * Loading skeleton that mirrors the EventCard layout: thumbnail + title
- * block, three outcome rows with mini bars, and the data footer. Kept
- * in this file so any structural change to the card naturally drags the
- * skeleton along with it.
- *
- * Accepts a className so grid renderers can stamp out extra skeletons
- * that only light up at wider breakpoints (keeps the skeleton row count
- * aligned with the visible grid column count).
+ * Complete the current card row and the next row at each breakpoint.
+ * Mobile keeps four placeholders. Render ten candidates in the same grid
+ * as the cards and pass the number of preceding cards when appending.
  */
-/**
- * Visibility class for the Nth skeleton in a loading grid, sized to
- * show ~2 rows at each breakpoint — matching the 1/2/3/4/5-col responsive
- * grid so we never load 5 skeletons into a 4-col layout (the original
- * bug that looked like a hanging orphan).
- *
- * Render 10 skeletons and pass the index here; indices beyond the
- * breakpoint's row budget are `hidden` until the viewport upgrades.
- */
-export function skeletonVisibilityClass(index: number): string {
-  // i 0-3: always (1 col × 4 rows, or 2 col × 2 rows)
-  if (index < 4) return "";
-  // i 4-5: revealed at lg (3 cols × 2 rows = 6)
-  if (index < 6) return "hidden lg:block";
-  // i 6-7: revealed at xl (4 cols × 2 rows = 8)
-  if (index < 8) return "hidden xl:block";
-  // i 8-9: revealed at 2xl (5 cols × 2 rows = 10)
-  return "hidden 2xl:block";
+export function skeletonVisibilityClass(
+  index: number,
+  precedingCards = 0
+): string {
+  return [
+    { columns: 1, budget: 4, visible: "flex", hidden: "hidden" },
+    { columns: 2, budget: 4, visible: "sm:flex", hidden: "sm:hidden" },
+    { columns: 3, budget: 6, visible: "lg:flex", hidden: "lg:hidden" },
+    { columns: 4, budget: 8, visible: "xl:flex", hidden: "xl:hidden" },
+    { columns: 5, budget: 10, visible: "2xl:flex", hidden: "2xl:hidden" },
+  ]
+    .map(({ columns, budget, visible, hidden }) =>
+      index < budget - (precedingCards % columns) ? visible : hidden
+    )
+    .join(" ");
 }
 
 export function EventCardSkeleton({ className }: { className?: string }) {
   return (
     <div
+      aria-hidden="true"
+      data-slot="event-card-skeleton"
       className={cn(
         "bg-card border border-border/60 p-3 sm:p-4 flex flex-col gap-3 h-full",
         className

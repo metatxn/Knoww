@@ -419,7 +419,7 @@ node --version # v24.x
 pnpm install
 ```
 
-Use Node.js 24. The workspace declares `pnpm@10.25.0` in the root `package.json`.
+Use Node.js 24 and the pnpm version declared by `packageManager` in the root `package.json`.
 
 ### 2. Start the Worker
 
@@ -935,7 +935,7 @@ Use the following Cloudflare Workers Builds settings:
 | Non-production branch builds | Disabled                                      |
 | Build caching                | Enabled                                       |
 | Build variable               | `NODE_VERSION=24`                             |
-| Build variable               | `PNPM_VERSION=10.25.0`                        |
+| Build variable               | `PNPM_VERSION` matching the root `packageManager` version |
 | Build variable               | `SKIP_DEPENDENCY_INSTALL=1`                   |
 
 Set the production build watch include paths to:

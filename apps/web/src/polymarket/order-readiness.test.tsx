@@ -134,6 +134,7 @@ describe("usePolymarketOrderReadiness", () => {
     expect(preflightState.updateAllowance).toHaveBeenCalledWith("4", {
       side: "BUY",
       negRisk: true,
+      protocolVersion: "v1",
     });
     expect(proxyWalletState.refresh).toHaveBeenCalled();
   });
@@ -145,7 +146,8 @@ describe("usePolymarketOrderReadiness", () => {
 
     expect(checkAllApprovalsMock).toHaveBeenCalledWith(
       "0x0000000000000000000000000000000000000002",
-      BigInt(4_000_000)
+      BigInt(4_000_000),
+      "v1"
     );
     expect(result.current.isChecking).toBe(false);
   });

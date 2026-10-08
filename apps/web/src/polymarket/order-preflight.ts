@@ -10,6 +10,7 @@ import {
   readClobOrderPusdAllowance,
   readTradingApprovalStatus,
 } from "@knoww/shared-types/approvals";
+import { resolvePolymarketProtocolVersion } from "@knoww/shared-types/polymarket";
 import {
   buildPusdAutoWrapTransactions,
   formatConditionalShares,
@@ -275,11 +276,19 @@ export function usePolymarketOrderPreflight() {
    */
   const ensureV2Approvals = useCallback(
     async (
-      required?: { requiredPusdRaw: bigint; negRisk?: boolean },
+      required?: {
+        requiredPusdRaw: bigint;
+        negRisk?: boolean;
+        protocolVersion?: "v1" | "v2";
+      },
       onApprovalStart?: () => void
     ) => {
       if (!proxyAddress) throw new Error("Proxy wallet not found");
-      const status = await checkAllApprovals(proxyAddress);
+      const status = await checkAllApprovals(
+        proxyAddress,
+        undefined,
+        required?.protocolVersion
+      );
 
       let hasRequiredPusdAllowance = true;
       if (required) {
@@ -292,13 +301,15 @@ export function usePolymarketOrderPreflight() {
         const orderAllowance = await readClobOrderPusdAllowance(
           client,
           proxyAddress as Address,
-          required.negRisk
+          required.negRisk,
+          { protocolVersion: required.protocolVersion }
         );
         hasRequiredPusdAllowance = orderAllowance >= required.requiredPusdRaw;
 
         const orderApproved = isClobOrderApproved(status, {
           side: "BUY",
           negRisk: required.negRisk,
+          protocolVersion: required.protocolVersion,
         });
 
         if (!(orderApproved && hasRequiredPusdAllowance)) {
@@ -308,7 +319,18 @@ export function usePolymarketOrderPreflight() {
               ? required.requiredPusdRaw
               : DEFAULT_TRADING_APPROVAL_RAW;
           const result = await approveUsdcForTrading(
-            formatUnits(approvalAmountRaw, PUSD_DECIMALS)
+            formatUnits(approvalAmountRaw, PUSD_DECIMALS),
+            ...(required.protocolVersion === "v2"
+              ? [
+                  {
+                    approvalScope: {
+                      side: "BUY" as const,
+                      negRisk: required.negRisk,
+                      protocolVersion: required.protocolVersion,
+                    },
+                  },
+                ]
+              : [])
           );
           if (!result.success) {
             throw new Error(
@@ -344,14 +366,23 @@ export function usePolymarketOrderPreflight() {
    * generic "not enough balance / allowance" rejection.
    */
   const ensureSellCtfApproval = useCallback(
-    async (negRisk?: boolean, onApprovalStart?: () => void) => {
+    async (
+      negRisk?: boolean,
+      onApprovalStart?: () => void,
+      protocolVersion?: "v1" | "v2"
+    ) => {
       if (!proxyAddress) throw new Error("Proxy wallet not found");
 
       const approvalScope: ClobOrderApprovalRequirement = {
         side: "SELL",
         negRisk,
+        ...(protocolVersion === "v2" ? { protocolVersion } : {}),
       };
-      const status = await checkAllApprovals(proxyAddress);
+      const status = await checkAllApprovals(
+        proxyAddress,
+        undefined,
+        protocolVersion
+      );
       if (isClobOrderApproved(status, approvalScope)) return;
 
       onApprovalStart?.();
@@ -408,7 +439,11 @@ export function usePolymarketOrderPreflight() {
       // SELL needs CTF.setApprovalForAll -> exchanges to transfer outcome
       // tokens; BUY needs sufficient pUSD -> exchange allowance for settlement.
       if (params.side === Side.SELL) {
-        await ensureSellCtfApproval(params.negRisk, () => setStep("approving"));
+        await ensureSellCtfApproval(
+          params.negRisk,
+          () => setStep("approving"),
+          resolvePolymarketProtocolVersion(params.tokenId)
+        );
       }
 
       if (needs.buy) {
@@ -416,6 +451,7 @@ export function usePolymarketOrderPreflight() {
           {
             requiredPusdRaw: needs.buy.requiredCollateralRaw,
             negRisk: params.negRisk,
+            protocolVersion: resolvePolymarketProtocolVersion(params.tokenId),
           },
           () => setStep("approving")
         );
@@ -572,6 +608,7 @@ export function usePolymarketOrderPreflight() {
                 address as Address,
                 {
                   approvalAmountRaw,
+                  protocolVersion: approvalScope.protocolVersion,
                 }
               ),
               approvalScope

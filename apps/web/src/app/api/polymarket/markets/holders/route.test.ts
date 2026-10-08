@@ -38,3 +38,20 @@ it("reads holders from v2 through the registry", async () => {
     "/v2/holders"
   );
 });
+
+it("passes native V2 conditions through the existing v2 holders endpoint", async () => {
+  const market = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const fetcher = vi.fn(async (_input: RequestInfo | URL) =>
+    Response.json({ data: [], pagination: { next_cursor: null } })
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const response = await GET(
+    new NextRequest(
+      `https://knoww.app/api/polymarket/markets/holders?market=${market}`
+    )
+  );
+  expect(response.status).toBe(200);
+  const upstream = new URL(String(fetcher.mock.calls[0]?.[0]));
+  expect(upstream.pathname).toBe("/v2/holders");
+  expect(upstream.searchParams.get("condition")).toBe(`${market}00`);
+});

@@ -58,6 +58,8 @@ export interface Market {
   outcomes?: string | string[];
   outcomePrices?: string | (string | number)[];
   clobTokenIds?: string | string[];
+  positionIds?: string | string[];
+  version?: string;
   groupItemTitle?: string;
 }
 
@@ -144,6 +146,8 @@ const marketSchema = z
     outcomes: gammaStringArraySchema.optional(),
     outcomePrices: gammaProbabilityArraySchema.optional(),
     clobTokenIds: gammaStringArraySchema.optional(),
+    positionIds: gammaStringArraySchema.optional(),
+    version: z.string().optional(),
     groupItemTitle: z.string().optional(),
   })
   .loose()

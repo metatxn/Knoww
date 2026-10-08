@@ -24,6 +24,7 @@ interface SplitSharesModalProps {
   marketTitle?: string;
   /** Whether this market uses the negative-risk CTF adapter */
   negRisk?: boolean;
+  protocolVersion?: "v1" | "v2";
   /** Callback after successful split */
   onSuccess?: () => void;
 }
@@ -34,6 +35,7 @@ export function SplitSharesModal({
   conditionId,
   marketTitle,
   negRisk = false,
+  protocolVersion = "v1",
   onSuccess,
 }: SplitSharesModalProps) {
   const { proxyAddress, refresh: refreshWallet } = useProxyWallet();
@@ -155,7 +157,8 @@ export function SplitSharesModal({
       conditionId,
       numericAmount,
       proxyAddress,
-      negRisk
+      negRisk,
+      protocolVersion
     );
 
     if (!result.success) {
@@ -184,6 +187,7 @@ export function SplitSharesModal({
     numericAmount,
     splitPosition,
     negRisk,
+    protocolVersion,
     marketTitle,
   ]);
 

@@ -74,6 +74,7 @@ describe("toTradingTarget", () => {
       platform: "polymarket",
       conditionId: ZVEREV_HALYS.conditionId,
       negRisk: false,
+      protocolVersion: "v1",
     });
     expect(target?.market.platformDetails).toBe(target?.platformDetails);
   });

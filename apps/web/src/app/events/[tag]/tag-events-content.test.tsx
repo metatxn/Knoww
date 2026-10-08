@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const useEventFiltersMock = vi.hoisted(() => vi.fn());
@@ -18,7 +18,9 @@ vi.mock("@/components/event-card", () => ({
   EventCard: ({ event }: { event: { title: string } }) => (
     <div>{event.title}</div>
   ),
-  EventCardSkeleton: () => null,
+  EventCardSkeleton: ({ className }: { className?: string }) => (
+    <div data-testid="loading-card" className={className} />
+  ),
   skeletonVisibilityClass: () => "",
 }));
 
@@ -111,4 +113,52 @@ describe("TagEventsContent", () => {
       })
     );
   });
+
+  it.each(["politics", "crypto"])(
+    "keeps %s pagination placeholders in the existing card grid",
+    (tagSlug) => {
+      usePaginatedEventsMock.mockReturnValue({
+        data: { pages: [{ events: [{ id: "1", title: "Existing market" }] }] },
+        isLoading: false,
+        error: null,
+        fetchNextPage: vi.fn(),
+        hasNextPage: true,
+        isFetchingNextPage: true,
+      });
+      const page = render(<TagEventsContent tagSlug={tagSlug} />);
+      const card = screen.getByText("Existing market");
+      const placeholders = screen.getAllByTestId("loading-card");
+
+      expect(page.container.querySelectorAll(".grid")).toHaveLength(1);
+      for (const placeholder of placeholders) {
+        expect(placeholder.parentElement).toBe(card.parentElement);
+      }
+      expect(card.parentElement).toHaveAttribute("aria-busy", "true");
+
+      usePaginatedEventsMock.mockReturnValue({
+        data: {
+          pages: [
+            {
+              events: [
+                { id: "1", title: "Existing market" },
+                { id: "2", title: "New market" },
+              ],
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+        fetchNextPage: vi.fn(),
+        hasNextPage: false,
+        isFetchingNextPage: false,
+      });
+      page.rerender(<TagEventsContent tagSlug={tagSlug} />);
+      expect(screen.getByText("Existing market")).toBe(card);
+      expect(screen.getByText("New market").parentElement).toBe(
+        card.parentElement
+      );
+      expect(screen.queryByTestId("loading-card")).toBeNull();
+      expect(card.parentElement).toHaveAttribute("aria-busy", "false");
+    }
+  );
 });

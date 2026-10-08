@@ -621,7 +621,8 @@ function addHeader(
           ) {
             return TradingService.getOutcomeBalances(
               panelState.panelOpts.yesTokenId,
-              panelState.panelOpts.noTokenId
+              panelState.panelOpts.noTokenId,
+              panelState.panelOpts.protocolVersion
             ).then((b) => {
               panelState.outcomeBalances = b;
               panelState.outcomeBalancesLoaded = true;
@@ -993,6 +994,12 @@ function render(
   opts: PanelOptions,
   ctx: TradingContext
 ): void {
+  if (opts.protocolVersion === "v2")
+    ctx = {
+      ...ctx,
+      hasTradingApproval:
+        (ctx.usdcAllowanceV2 ?? 0) > 0 && ctx.positionApprovalV2 === true,
+    };
   const { state, address, error } = ctx;
   unmountMobileQrRoot();
   panel.innerHTML = "";

@@ -98,6 +98,7 @@ export interface TradingDeriveProxyAddressMessage {
 }
 
 export interface TradingPlaceOrderMessage {
+  protocolVersion?: "v1" | "v2";
   type: "trading:place-order";
   tokenId: string;
   conditionId?: string;
@@ -122,6 +123,7 @@ export interface TradingPlaceOrderMessage {
 }
 
 export interface TradingGetAllowanceMessage {
+  protocolVersion?: "v1" | "v2";
   type: "trading:get-allowance";
   ownerAddress: string;
   negRisk?: boolean;
@@ -165,6 +167,7 @@ export interface TradingSplitPositionMessage {
   amount: string;
   address: string;
   negRisk?: boolean;
+  protocolVersion?: "v1" | "v2";
   proxyAddress?: string;
   walletMode?: TradingWalletMode;
   // Injected by the service worker before forwarding to offscreen.
@@ -179,6 +182,7 @@ export interface TradingMergePositionsMessage {
   amount: string;
   address: string;
   negRisk?: boolean;
+  protocolVersion?: "v1" | "v2";
   proxyAddress?: string;
   walletMode?: TradingWalletMode;
   // Injected by the service worker before forwarding to offscreen.
@@ -192,9 +196,11 @@ export interface TradingGetOutcomeBalancesMessage {
   yesTokenId: string;
   noTokenId: string;
   ownerAddress: string;
+  protocolVersion?: "v1" | "v2";
 }
 
 export interface TradingRelayerApproveMessage {
+  protocolVersion?: "v1" | "v2";
   type: "trading:relayer-approve";
   address: string;
   walletMode?: TradingWalletMode;

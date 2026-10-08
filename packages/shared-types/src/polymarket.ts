@@ -39,7 +39,54 @@ export const CLOB_ORDER_SIDES = {
 export const CLOB_ASSET_TYPES = {
   COLLATERAL: "COLLATERAL",
   CONDITIONAL: "CONDITIONAL",
+  CONDITIONAL_V2: "CONDITIONAL-V2",
 } as const;
+
+export type PolymarketProtocolVersion = "v1" | "v2";
+
+/** Recognize supported V2 positions using the SDK's reserved-bit namespace. */
+export function isPolymarketV2AssetId(assetId: string | bigint): boolean {
+  const text = String(assetId);
+  if (!/^\d+$/.test(text)) return false;
+  const value = BigInt(text);
+  if (value >= BigInt(1) << BigInt(256)) return false;
+  const moduleId = value >> BigInt(248);
+  const reservedMask = ((BigInt(1) << BigInt(64)) - BigInt(1)) << BigInt(40);
+  return (
+    moduleId >= BigInt(1) &&
+    moduleId <= BigInt(3) &&
+    (value & reservedMask) === BigInt(0)
+  );
+}
+
+/** Decode the condition and binary outcome encoded in a V2 position ID. */
+export function decodePolymarketV2AssetId(assetId: string | bigint): {
+  conditionId: `0x${string}`;
+  outcomeIndex: 0 | 1;
+} {
+  if (!isPolymarketV2AssetId(assetId))
+    throw new Error("Invalid Polymarket V2 position ID");
+  const hex = BigInt(assetId).toString(16).padStart(64, "0");
+  const outcomeIndex = Number.parseInt(hex.slice(-2), 16);
+  if (outcomeIndex !== 0 && outcomeIndex !== 1)
+    throw new Error("Invalid Polymarket V2 outcome index");
+  return { conditionId: `0x${hex.slice(0, -2)}`, outcomeIndex };
+}
+
+export function resolvePolymarketProtocolVersion(
+  assetId: string | bigint,
+  explicit?: PolymarketProtocolVersion
+): PolymarketProtocolVersion {
+  if (explicit !== undefined && explicit !== "v1" && explicit !== "v2") {
+    throw new Error("Unsupported Polymarket protocol version");
+  }
+  const inferred = isPolymarketV2AssetId(assetId) ? "v2" : "v1";
+  if (inferred === "v2") decodePolymarketV2AssetId(assetId);
+  if (explicit !== undefined && explicit !== inferred) {
+    throw new Error("Polymarket asset ID does not match its protocol version");
+  }
+  return explicit ?? inferred;
+}
 
 export const TRADING_WALLET_MODES = {
   DEPOSIT: "deposit",
@@ -71,6 +118,7 @@ export interface ClobBalanceAllowanceClient {
 }
 
 export interface ClobBalanceAllowanceSyncOptions {
+  protocolVersion?: PolymarketProtocolVersion;
   tokenId?: string;
   tokenIds?: ReadonlyArray<string | null | undefined>;
   includeCollateral?: boolean;
@@ -228,6 +276,8 @@ export interface GammaMarketTokenLike {
 }
 
 export interface GammaMarketPayloadLike extends NegRiskLike {
+  version?: string | null;
+  positionIds?: GammaArrayField;
   outcomes?: GammaArrayField;
   outcomePrices?: GammaArrayField;
   clobTokenIds?: GammaArrayField;
@@ -364,6 +414,41 @@ export function getGammaTokenIdForOutcome(
   options?: ParseGammaArrayOptions
 ): string {
   const parsed = parseGammaMarketPayload(market, options);
+  if (
+    market?.version != null &&
+    market.version !== "v1" &&
+    market.version !== "v2"
+  ) {
+    throw new Error("Unsupported Polymarket market version");
+  }
+  if (market?.version == null && market?.positionIds != null) {
+    throw new Error("Polymarket market version is required for position IDs");
+  }
+  if (market?.version === "v2") {
+    const ids = parseGammaStringArray(market.positionIds, options);
+    if (
+      ids.length !== parsed.outcomes.length ||
+      ids.length === 0 ||
+      !Number.isInteger(outcomeIndex) ||
+      outcomeIndex < 0 ||
+      outcomeIndex >= ids.length ||
+      ids.some((id) => !isPolymarketV2AssetId(id))
+    ) {
+      throw new Error(
+        "Polymarket V2 market has invalid or missing outcome position IDs"
+      );
+    }
+    const decoded = ids.map(decodePolymarketV2AssetId);
+    if (
+      new Set(ids).size !== ids.length ||
+      decoded.some((id) => id.conditionId !== decoded[0].conditionId)
+    ) {
+      throw new Error(
+        "Polymarket V2 outcome position IDs must be distinct and share a condition"
+      );
+    }
+    return ids[outcomeIndex];
+  }
   const outcomeName = parsed.outcomes[outcomeIndex]?.toLowerCase();
 
   if (outcomeName) {
@@ -384,12 +469,6 @@ export function getGammaYesNoMarketFields(
   const parsed = parseGammaMarketPayload(market, options);
   const yesIndex = findGammaOutcomeIndex(parsed.outcomes, "yes");
   const noIndex = findGammaOutcomeIndex(parsed.outcomes, "no");
-  const yesToken = parsed.tokens.find(
-    (token) => token.outcome?.toLowerCase() === "yes"
-  );
-  const noToken = parsed.tokens.find(
-    (token) => token.outcome?.toLowerCase() === "no"
-  );
 
   return {
     ...parsed,
@@ -401,18 +480,16 @@ export function getGammaYesNoMarketFields(
         : parsed.outcomePrices[0],
     noPrice:
       noIndex !== -1 ? parsed.outcomePrices[noIndex] : parsed.outcomePrices[1],
-    yesTokenId:
-      getGammaTokenIdFromToken(yesToken) ||
-      (yesIndex !== -1
-        ? parsed.clobTokenIds[yesIndex]
-        : parsed.clobTokenIds[0]) ||
-      "",
-    noTokenId:
-      getGammaTokenIdFromToken(noToken) ||
-      (noIndex !== -1
-        ? parsed.clobTokenIds[noIndex]
-        : parsed.clobTokenIds[1]) ||
-      "",
+    yesTokenId: getGammaTokenIdForOutcome(
+      market,
+      yesIndex !== -1 ? yesIndex : 0,
+      options
+    ),
+    noTokenId: getGammaTokenIdForOutcome(
+      market,
+      noIndex !== -1 ? noIndex : 1,
+      options
+    ),
   };
 }
 
@@ -574,7 +651,11 @@ export function buildClobBalanceAllowanceTargets(
 
     for (const tokenId of uniqueTokenIds) {
       targets.push({
-        assetType: CLOB_ASSET_TYPES.CONDITIONAL,
+        assetType:
+          resolvePolymarketProtocolVersion(tokenId, options.protocolVersion) ===
+          "v2"
+            ? CLOB_ASSET_TYPES.CONDITIONAL_V2
+            : CLOB_ASSET_TYPES.CONDITIONAL,
         tokenId,
       });
     }

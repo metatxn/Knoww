@@ -11,6 +11,7 @@ import { Decimal } from "decimal.js";
 import {
   type Address,
   encodeFunctionData,
+  erc1155Abi,
   type Hex,
   type PublicClient,
 } from "viem";
@@ -25,8 +26,14 @@ import {
   CTF_ADDRESS,
   CTF_COLLATERAL_ADAPTER_ADDRESS,
   NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS,
+  POSITION_MANAGER_ADDRESS,
   PUSD_ADDRESS,
+  ROUTER_ADDRESS,
 } from "./contracts.ts";
+import {
+  type PolymarketProtocolVersion,
+  resolvePolymarketProtocolVersion,
+} from "./polymarket.ts";
 import { parsePusdUnits } from "./trading.ts";
 
 /** Parent collection ID — always bytes32(0) for Polymarket */
@@ -145,6 +152,40 @@ export const ERC20_JSON_ABI = [
   },
 ] as const;
 
+export const ROUTER_JSON_ABI = [
+  {
+    name: "split",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "conditionId", type: "bytes31" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "merge",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "conditionId", type: "bytes31" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "redeem",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "conditionId", type: "bytes31" },
+      { name: "outcomeIndex", type: "uint256" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
 export type CtfOperationName =
   | "splitPosition"
   | "mergePositions"
@@ -190,7 +231,7 @@ export function isCtfPusdAmountOverBalance(
   return new Decimal(canonicalAmount).gt(balanceDecimal);
 }
 
-export type CtfOperationTransactionInput =
+export type CtfOperationTransactionInput = (
   | {
       operation: "splitPosition" | "mergePositions";
       conditionId: Hex;
@@ -201,7 +242,9 @@ export type CtfOperationTransactionInput =
       operation: "redeemPositions";
       conditionId: Hex;
       negRisk?: boolean;
-    };
+      amountRaw?: bigint;
+    }
+) & { protocolVersion?: PolymarketProtocolVersion; outcomeIndex?: 0 | 1 };
 
 export interface CtfOperationTransaction {
   to: Address;
@@ -215,7 +258,7 @@ export interface CtfOutcomeBalances {
   minBalance: bigint;
 }
 
-export type CtfOperationTransactionPlanInput =
+export type CtfOperationTransactionPlanInput = (
   | {
       operation: CtfAmountOperationName;
       conditionId: Hex | string;
@@ -227,7 +270,10 @@ export type CtfOperationTransactionPlanInput =
       operation: "redeemPositions";
       conditionId: Hex | string;
       negRisk?: boolean;
-    };
+      amount?: CtfPusdAmountInput;
+      amountRaw?: bigint;
+    }
+) & { protocolVersion?: PolymarketProtocolVersion; outcomeIndex?: 0 | 1 };
 
 export interface CtfCollateralApprovalRequirement {
   spender: Address;
@@ -235,6 +281,7 @@ export interface CtfCollateralApprovalRequirement {
 }
 
 export interface CtfOperationTransactionPlan {
+  protocolVersion?: PolymarketProtocolVersion;
   operation: CtfOperationName;
   conditionId: Hex;
   amountRaw?: bigint;
@@ -283,6 +330,30 @@ export function encodeCtfSplitPositionCalldata(
 export function buildCtfOperationTransaction(
   input: CtfOperationTransactionInput
 ): CtfOperationTransaction {
+  normalizeProtocolConditionId(input.conditionId, input.protocolVersion);
+  if (input.protocolVersion === "v2") {
+    const conditionId = normalizeProtocolConditionId(input.conditionId, "v2");
+    if (typeof input.amountRaw !== "bigint" || input.amountRaw <= BigInt(0))
+      throw new Error("V2 operation amount must be positive");
+    const amountRaw = input.amountRaw;
+    let data: Hex;
+    if (input.operation === "redeemPositions") {
+      if (input.outcomeIndex !== 0 && input.outcomeIndex !== 1)
+        throw new Error("V2 redemption requires outcome index 0 or 1");
+      data = encodeFunctionData({
+        abi: ROUTER_JSON_ABI,
+        functionName: "redeem",
+        args: [conditionId, BigInt(input.outcomeIndex), amountRaw],
+      });
+    } else {
+      data = encodeFunctionData({
+        abi: ROUTER_JSON_ABI,
+        functionName: input.operation === "splitPosition" ? "split" : "merge",
+        args: [conditionId, amountRaw],
+      });
+    }
+    return { to: ROUTER_ADDRESS, data, value: "0" };
+  }
   const to = getCtfOperationTarget(input.negRisk);
   switch (input.operation) {
     case "splitPosition":
@@ -312,7 +383,22 @@ export function buildCtfOperationTransaction(
   }
 }
 
-function normalizeCtfConditionId(conditionId: Hex | string): Hex {
+export function normalizeProtocolConditionId(
+  conditionId: Hex | string,
+  protocolVersion: PolymarketProtocolVersion = "v1"
+): Hex {
+  if (protocolVersion !== "v1" && protocolVersion !== "v2")
+    throw new Error("Unsupported Polymarket protocol version");
+  if (protocolVersion === "v2") {
+    if (/^0x[0-9a-f]{62}$/i.test(conditionId)) return conditionId as Hex;
+    if (/^0x[0-9a-f]{62}00$/i.test(conditionId))
+      return conditionId.slice(0, -2) as Hex;
+    throw new Error(
+      "V2 condition ID must be bytes31 or bytes32 with zero padding"
+    );
+  }
+  if (!/^0x[0-9a-f]{64}$/i.test(conditionId))
+    throw new Error("CTF condition ID must be bytes32");
   return conditionId as Hex;
 }
 
@@ -320,7 +406,11 @@ function resolveCtfAmountRaw(input: {
   amount?: CtfPusdAmountInput;
   amountRaw?: bigint;
 }): bigint {
-  if (input.amountRaw !== undefined) return input.amountRaw;
+  if (input.amountRaw !== undefined) {
+    if (typeof input.amountRaw !== "bigint" || input.amountRaw <= BigInt(0))
+      throw new Error("Position operation amount must be positive");
+    return input.amountRaw;
+  }
   if (input.amount !== undefined) {
     let amount: string;
     try {
@@ -341,7 +431,30 @@ function resolveCtfAmountRaw(input: {
 export function planCtfOperationTransaction(
   input: CtfOperationTransactionPlanInput
 ): CtfOperationTransactionPlan {
-  const conditionId = normalizeCtfConditionId(input.conditionId);
+  const conditionId = normalizeProtocolConditionId(
+    input.conditionId,
+    input.protocolVersion
+  );
+
+  if (input.protocolVersion === "v2") {
+    const amountRaw = resolveCtfAmountRaw(input);
+    const transaction = buildCtfOperationTransaction({
+      ...input,
+      conditionId,
+      amountRaw,
+    });
+    return {
+      operation: input.operation,
+      conditionId,
+      protocolVersion: "v2",
+      amountRaw,
+      transaction,
+      collateralApproval:
+        input.operation === "splitPosition"
+          ? { spender: ROUTER_ADDRESS, amountRaw }
+          : null,
+    };
+  }
 
   if (input.operation === "redeemPositions") {
     return {
@@ -379,6 +492,11 @@ export function planCtfOperationTransaction(
 export async function planCtfOperationTransactions(
   input: CtfOperationTransactionsPlanInput
 ): Promise<CtfOperationTransactionsPlan> {
+  if (Boolean(input.client) !== Boolean(input.collateralOwner)) {
+    throw new Error(
+      "Position approval planning requires both client and owner"
+    );
+  }
   const plan = planCtfOperationTransaction(input);
   let approvalTransaction: ApprovalTransaction | null = null;
 
@@ -410,11 +528,17 @@ export async function planCtfOperationTransactions(
       input.client,
       input.collateralOwner,
       plan.transaction.to,
-      input.fallbackToApproval ? { fallbackApproved: false } : {}
+      {
+        ...(input.protocolVersion === "v2"
+          ? { token: POSITION_MANAGER_ADDRESS }
+          : {}),
+        ...(input.fallbackToApproval ? { fallbackApproved: false } : {}),
+      }
     );
     if (!approved) {
       approvalTransaction = buildErc1155ApprovalTransaction(
-        plan.transaction.to
+        plan.transaction.to,
+        input.protocolVersion === "v2" ? POSITION_MANAGER_ADDRESS : CTF_ADDRESS
       );
     }
   }
@@ -432,10 +556,14 @@ export async function readCtfOutcomeBalances(
   client: PublicClient,
   owner: Address,
   yesTokenId: string | bigint,
-  noTokenId: string | bigint
+  noTokenId: string | bigint,
+  protocolVersion?: PolymarketProtocolVersion
 ): Promise<CtfOutcomeBalances> {
+  const version = resolvePolymarketProtocolVersion(yesTokenId, protocolVersion);
+  if (resolvePolymarketProtocolVersion(noTokenId, protocolVersion) !== version)
+    throw new Error("Outcome balances must use the same ledger");
   const balances = (await client.readContract({
-    address: CTF_ADDRESS as Address,
+    address: version === "v2" ? POSITION_MANAGER_ADDRESS : CTF_ADDRESS,
     abi: CTF_JSON_ABI,
     functionName: "balanceOfBatch",
     args: [
@@ -450,6 +578,21 @@ export async function readCtfOutcomeBalances(
     noBalance,
     minBalance: yesBalance < noBalance ? yesBalance : noBalance,
   };
+}
+
+export async function readPolymarketOutcomeBalance(
+  client: PublicClient,
+  owner: Address,
+  assetId: string | bigint,
+  protocolVersion?: PolymarketProtocolVersion
+): Promise<bigint> {
+  const version = resolvePolymarketProtocolVersion(assetId, protocolVersion);
+  return client.readContract({
+    address: version === "v2" ? POSITION_MANAGER_ADDRESS : CTF_ADDRESS,
+    abi: erc1155Abi,
+    functionName: "balanceOf",
+    args: [owner, BigInt(assetId)],
+  });
 }
 
 export async function readCtfCollateralAllowance(

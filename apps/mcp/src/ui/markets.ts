@@ -52,7 +52,7 @@ function safeUrl(raw) {
   try {
     const url = new URL(raw);
     const query = Array.from(url.searchParams);
-    const validQuery = !query.length || (query.length === 1 && query[0][0] === "conditionId" && /^0x[0-9a-f]{64}$/.test(query[0][1]));
+    const validQuery = !query.length || (query.length === 1 && query[0][0] === "conditionId" && /^0x(?:[0-9a-f]{62}|[0-9a-f]{64})$/.test(query[0][1]));
     return url.origin === "https://knoww.app" && /^\/events\/detail\/[a-z0-9-]+$/.test(url.pathname) && !url.username && !url.password && validQuery && !url.hash ? url.href : null;
   } catch { return null; }
 }

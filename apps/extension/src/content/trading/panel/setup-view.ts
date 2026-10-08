@@ -172,7 +172,8 @@ export function addSetupFlow(
           false,
           Number.isFinite(amount) && amount > 0
             ? amount
-            : Number(SETUP_APPROVAL_DEFAULT)
+            : Number(SETUP_APPROVAL_DEFAULT),
+          panelState.panelOpts?.protocolVersion
         ).catch(() => {
           // Error flows through ctx.error; the next render surfaces it here.
         });

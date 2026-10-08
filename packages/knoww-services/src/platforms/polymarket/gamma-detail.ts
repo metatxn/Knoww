@@ -2,7 +2,12 @@ import {
   DEFAULT_UPSTREAM_JSON_MAX_BYTES,
   readBoundedJson,
 } from "@knoww/shared-types/bounded-json";
-import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
+import {
+  decodePolymarketV2AssetId,
+  getGammaTokenIdForOutcome,
+  parseGammaStringArray,
+  resolvePolymarketProtocolVersion,
+} from "@knoww/shared-types/polymarket";
 import { z } from "zod";
 import {
   type ServiceFetchOptions,
@@ -52,6 +57,8 @@ export interface GammaMarketDetail {
   outcomes?: string | string[];
   outcomePrices?: string | (string | number)[];
   clobTokenIds?: string | string[];
+  positionIds?: string | string[];
+  version?: string;
   active?: boolean;
   closed?: boolean;
   archived?: boolean;
@@ -93,6 +100,8 @@ export const gammaMarketDetailSchema: z.ZodType<GammaMarketDetail> = z
     outcomes: gammaStringArraySchema.optional(),
     outcomePrices: gammaProbabilityArraySchema.optional(),
     clobTokenIds: gammaStringArraySchema.optional(),
+    positionIds: gammaStringArraySchema.optional(),
+    version: z.string().optional(),
     active: z.boolean().optional(),
     closed: z.boolean().optional(),
     archived: z.boolean().optional(),
@@ -154,7 +163,15 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
     options?: ServiceFetchOptions
   ): Promise<{ market: GammaMarketDetail; record: GammaMarketLike } | null> {
     const params = new URLSearchParams();
-    params.set(IDENTIFIER_QUERY_PARAM[identifier.kind], identifier.value);
+    const v2Asset =
+      identifier.kind === "tokenId" &&
+      resolvePolymarketProtocolVersion(identifier.value) === "v2"
+        ? decodePolymarketV2AssetId(identifier.value)
+        : null;
+    params.set(
+      v2Asset ? "condition_ids" : IDENTIFIER_QUERY_PARAM[identifier.kind],
+      v2Asset?.conditionId ?? identifier.value
+    );
     if (closed !== undefined) {
       params.set("closed", String(closed));
     }
@@ -192,6 +209,25 @@ export function createGammaDetail(ctx: PolymarketClientContext) {
         }
 
         const market = gammaMarketDetailSchema.safeParse(payload[0]);
+        if (
+          market.success &&
+          v2Asset &&
+          !parseGammaStringArray(market.data.outcomes).some(
+            (_, index) =>
+              getGammaTokenIdForOutcome(market.data, index) === identifier.value
+          )
+        ) {
+          throw upstreamMarketError(
+            "Gamma lookup returned a different position"
+          );
+        }
+        if (
+          market.success &&
+          v2Asset &&
+          market.data.conditionId?.toLowerCase() !== v2Asset.conditionId &&
+          market.data.conditionId?.toLowerCase() !== `${v2Asset.conditionId}00`
+        )
+          throw upstreamMarketError("Gamma condition does not match position");
         if (!market.success) {
           throw upstreamMarketError(
             "Gamma market lookup returned a malformed market"

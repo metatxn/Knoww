@@ -336,9 +336,11 @@ interface HomeContentProps {
 export function HomeContent({ initialData }: HomeContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const viewParam = searchParams.get("view") as ViewMode | null;
+  const viewParam = searchParams.get("view") ?? searchParams.get("sort");
 
-  const [viewMode, setViewMode] = useState<ViewMode>("categories");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    isValidViewMode(viewParam) ? viewParam : "categories"
+  );
   const [mounted, setMounted] = useState(false);
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(
     null

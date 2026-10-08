@@ -14,6 +14,8 @@ export interface EventMarket {
   image?: string;
   icon?: string;
   clobTokenIds?: string[];
+  positionIds?: string[];
+  version?: "v1" | "v2";
   conditionId?: string;
   gameStartTime?: string;
   sportsMarketType?: string;
@@ -84,4 +86,5 @@ export interface SelectedMarketInfo {
   }>;
   conditionId?: string;
   negRisk?: boolean;
+  protocolVersion?: "v1" | "v2";
 }

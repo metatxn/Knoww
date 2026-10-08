@@ -23,6 +23,12 @@ const item = {
   createdAt: "2026-05-09T00:00:00.000Z",
   updatedAt: "2026-05-09T00:00:00.000Z",
 };
+const relatedV2Condition = `0x01${"21".repeat(17)}${"00".repeat(13)}`;
+const relatedV2Positions = [0, 1].map((index) =>
+  BigInt(
+    `${relatedV2Condition}${index.toString(16).padStart(2, "0")}`
+  ).toString()
+);
 
 async function withMockedFetch(mockFetch, callback) {
   const previousFetch = globalThis.fetch;
@@ -295,8 +301,9 @@ test("adds top related markets from grouped Gamma events", async () => {
             question: "Will it happen by May 31, 2026?",
             conditionId: "condition_may",
             slug: "may-market",
+            version: "v2",
             outcomes: '["Yes", "No"]',
-            clobTokenIds: '["may_yes", "may_no"]',
+            positionIds: relatedV2Positions,
             outcomePrices: '["0.2", "0.8"]',
             endDate: "2026-05-31T00:00:00.000Z",
             active: true,
@@ -377,6 +384,12 @@ test("adds top related markets from grouped Gamma events", async () => {
           selected: false,
         },
       ]
+    );
+    assert.equal(
+      evidence.relatedMarkets.find(
+        (market) => market.marketSlug === "may-market"
+      )?.tokenId,
+      relatedV2Positions[0]
     );
   } finally {
     globalThis.fetch = previousFetch;

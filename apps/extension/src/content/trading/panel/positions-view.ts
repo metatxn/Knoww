@@ -77,7 +77,11 @@ export function refreshSplitMergeState(
   if (panelState.outcomeBalancesFetching) return;
 
   panelState.outcomeBalancesFetching = true;
-  TradingService.getOutcomeBalances(opts.yesTokenId, opts.noTokenId)
+  TradingService.getOutcomeBalances(
+    opts.yesTokenId,
+    opts.noTokenId,
+    opts.protocolVersion
+  )
     .then((balances) => {
       panelState.outcomeBalances = balances;
       panelState.outcomeBalancesLoaded = true;
@@ -304,7 +308,8 @@ export function renderSplitForm(
         canonicalAmount,
         opts.yesTokenId,
         opts.noTokenId,
-        !!opts.negRisk
+        !!opts.negRisk,
+        opts.protocolVersion
       );
       ui.trackAnalytics("position_split_succeeded", properties);
       ui.showToast(panel, "Split completed!", "success");
@@ -517,7 +522,8 @@ export function renderMergeForm(
         canonicalAmount,
         opts.yesTokenId,
         opts.noTokenId,
-        !!opts.negRisk
+        !!opts.negRisk,
+        opts.protocolVersion
       );
       ui.trackAnalytics("position_merge_succeeded", properties);
       ui.showToast(panel, "Merge completed!", "success");

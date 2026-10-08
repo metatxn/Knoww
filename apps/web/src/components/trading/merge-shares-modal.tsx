@@ -32,6 +32,7 @@ interface MergeSharesModalProps {
   marketTitle?: string;
   /** Whether this market uses the negative-risk CTF adapter */
   negRisk?: boolean;
+  protocolVersion?: "v1" | "v2";
   /** Callback after successful merge */
   onSuccess?: () => void;
 }
@@ -44,6 +45,7 @@ export function MergeSharesModal({
   noTokenId,
   marketTitle,
   negRisk = false,
+  protocolVersion = "v1",
   onSuccess,
 }: MergeSharesModalProps) {
   const { proxyAddress, refresh: refreshWallet } = useProxyWallet();
@@ -66,7 +68,7 @@ export function MergeSharesModal({
   useEffect(() => {
     if (open && proxyAddress && yesTokenId && noTokenId) {
       setIsLoadingBalances(true);
-      getOutcomeBalances(yesTokenId, noTokenId, proxyAddress)
+      getOutcomeBalances(yesTokenId, noTokenId, proxyAddress, protocolVersion)
         .then((balances) => {
           // Outcome token balances use the same 6-decimal scale as pUSD.
           const minBalanceDisplay =
@@ -81,7 +83,14 @@ export function MergeSharesModal({
           setIsLoadingBalances(false);
         });
     }
-  }, [open, proxyAddress, yesTokenId, noTokenId, getOutcomeBalances]);
+  }, [
+    open,
+    proxyAddress,
+    yesTokenId,
+    noTokenId,
+    protocolVersion,
+    getOutcomeBalances,
+  ]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -155,7 +164,8 @@ export function MergeSharesModal({
       conditionId,
       numericAmount,
       proxyAddress,
-      negRisk
+      negRisk,
+      protocolVersion
     );
 
     if (!result.success) {
@@ -184,6 +194,7 @@ export function MergeSharesModal({
     numericAmount,
     mergePositions,
     negRisk,
+    protocolVersion,
     marketTitle,
   ]);
 

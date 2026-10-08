@@ -1,4 +1,10 @@
 import { createLogger } from "@knoww/logger";
+import { normalizeProtocolConditionId } from "@knoww/shared-types/ctf";
+import {
+  decodePolymarketV2AssetId,
+  resolvePolymarketProtocolVersion,
+} from "@knoww/shared-types/polymarket";
+import { createUnifiedPolymarketPublicClient } from "@knoww/shared-types/polymarket-unified";
 import Decimal from "decimal.js";
 import type { AgentWatchlistItem } from "./types.ts";
 
@@ -8,24 +14,43 @@ const GAMMA_TIMEOUT_MS = 5000;
 
 export interface AgentResolution {
   tokenId: string;
+  protocolVersion?: "v1" | "v2";
   conditionId?: string;
   marketSlug?: string;
   /** 0 if our token expired worthless, 1 if it paid out. */
   outcomeYes: 0 | 1;
-  /** Raw settlement price for our token (decimal string from gamma). */
+  /** Raw settled payout for our position (decimal string from the SDK). */
   settlementPrice: string;
   /** ISO timestamp when the resolution row was written. */
   resolvedAt: string;
 }
 
 interface GammaMarketShape {
-  closed?: boolean;
-  outcomes?: unknown;
-  outcomePrices?: unknown;
+  conditionId?: unknown;
   clobTokenIds?: unknown;
-  endDate?: string;
-  umaResolutionStatus?: string;
 }
+
+interface ProtocolResolutionShape {
+  conditionId?: string;
+  status?: string;
+  payouts?: unknown;
+}
+
+interface ResolutionClient {
+  fetchResolutions(input: {
+    conditionIds: string[];
+  }): Promise<ProtocolResolutionShape[]>;
+}
+
+interface FetchResponseLike {
+  ok: boolean;
+  json(): Promise<unknown>;
+}
+
+type FetchLike = (
+  url: string,
+  init?: RequestInit
+) => Promise<FetchResponseLike>;
 
 // Gamma sometimes serializes array columns as JSON-encoded strings instead
 // of native arrays — normalize both forms.
@@ -43,41 +68,114 @@ function parseStringList(value: unknown): string[] | null {
 }
 
 export async function fetchMarketResolution(
-  item: Pick<AgentWatchlistItem, "tokenId" | "conditionId" | "marketSlug">
+  item: Pick<
+    AgentWatchlistItem,
+    | "tokenId"
+    | "conditionId"
+    | "marketSlug"
+    | "protocolVersion"
+    | "outcomeIndex"
+  >,
+  resolutionClient?: ResolutionClient,
+  fetcher: FetchLike = fetch as FetchLike
 ): Promise<AgentResolution | null> {
-  if (!item.conditionId) return null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GAMMA_TIMEOUT_MS);
   try {
-    // closed=true is required: gamma's default filter excludes resolved
-    // markets, so we'd get an empty array without it.
-    const url = `${GAMMA_MARKETS_BASE}?condition_ids=${encodeURIComponent(item.conditionId)}&closed=true`;
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    const data = (await response.json()) as GammaMarketShape[];
-    const market = Array.isArray(data) ? data[0] : null;
-    if (!market || market.closed !== true) return null;
+    const protocolVersion = resolvePolymarketProtocolVersion(
+      item.tokenId,
+      item.protocolVersion
+    );
+    let conditionId = item.conditionId
+      ? normalizeProtocolConditionId(item.conditionId, protocolVersion)
+      : undefined;
+    let index = item.outcomeIndex;
 
-    const tokens = parseStringList(market.clobTokenIds);
-    const prices = parseStringList(market.outcomePrices);
-    if (!tokens || !prices || tokens.length !== prices.length) return null;
+    if (protocolVersion === "v2") {
+      const decoded = decodePolymarketV2AssetId(item.tokenId);
+      const assetConditionId = normalizeProtocolConditionId(
+        decoded.conditionId,
+        "v2"
+      );
+      const assetOutcomeIndex = decoded.outcomeIndex;
+      if (
+        conditionId &&
+        assetConditionId.toLowerCase() !== conditionId.toLowerCase()
+      )
+        return null;
+      conditionId = assetConditionId;
+      if (index === undefined) index = assetOutcomeIndex;
+      if (!Number.isInteger(index) || index !== assetOutcomeIndex || index > 1)
+        return null;
+    } else if (!Number.isInteger(index)) {
+      if (!conditionId) return null;
+      const gammaConditionId = conditionId;
+      // Older watchlist rows did not store an outcome index. Gamma supplies
+      // only the token ordering; settlement values always come from the SDK.
+      const gammaUrl = `${GAMMA_MARKETS_BASE}?condition_ids=${encodeURIComponent(gammaConditionId)}`;
+      const gammaResponse = await fetcher(gammaUrl, {
+        signal: controller.signal,
+      });
+      if (!gammaResponse.ok) return null;
+      const gammaData = (await gammaResponse.json()) as GammaMarketShape[];
+      const market = Array.isArray(gammaData)
+        ? gammaData.find(
+            (entry) =>
+              String(entry.conditionId ?? "").toLowerCase() ===
+              gammaConditionId.toLowerCase()
+          )
+        : undefined;
+      const tokens = market ? parseStringList(market.clobTokenIds) : null;
+      if (!tokens) return null;
+      index = tokens.indexOf(item.tokenId);
+    }
 
-    const idx = tokens.indexOf(item.tokenId);
-    if (idx === -1) return null;
+    if (!conditionId) return null;
+    if (typeof index !== "number" || !Number.isInteger(index) || index < 0)
+      return null;
 
-    const settlementPrice = prices[idx];
-    // Canceled or refunded markets settle 50/50 with prices like ["0.5","0.5"].
-    // Ambiguous for binary scoring — skip until we have a separate handling path.
-    if (settlementPrice === "0.5") return null;
-
-    const outcomeYes: 0 | 1 = new Decimal(settlementPrice).gte("0.5") ? 1 : 0;
+    const client: ResolutionClient = (resolutionClient ??
+      createUnifiedPolymarketPublicClient()) as unknown as ResolutionClient;
+    const resolutions = await client.fetchResolutions({
+      conditionIds: [conditionId],
+    });
+    const resolution = resolutions.find(
+      (entry: ProtocolResolutionShape) =>
+        entry.conditionId &&
+        normalizeProtocolConditionId(
+          entry.conditionId,
+          protocolVersion
+        ).toLowerCase() === conditionId.toLowerCase()
+    );
+    if (
+      resolution?.status !== "resolved" ||
+      !Array.isArray(resolution.payouts) ||
+      index >= resolution.payouts.length
+    )
+      return null;
+    const payouts = resolution.payouts.map((value: unknown) => {
+      if (typeof value !== "string") return null;
+      const decimal = new Decimal(value);
+      return decimal.isFinite() && decimal.gte(0) && decimal.lte(1)
+        ? decimal
+        : null;
+    });
+    if (
+      payouts.length === 0 ||
+      payouts.some((value: Decimal | null) => value === null)
+    )
+      return null;
+    const payout = resolution.payouts[index];
+    const parsed = payouts[index];
+    if (typeof payout !== "string" || !parsed) return null;
 
     return {
       tokenId: item.tokenId,
-      conditionId: item.conditionId,
+      protocolVersion,
+      conditionId,
       marketSlug: item.marketSlug,
-      outcomeYes,
-      settlementPrice,
+      outcomeYes: parsed.gte("0.5") ? 1 : 0,
+      settlementPrice: payout,
       resolvedAt: new Date().toISOString(),
     };
   } catch (error) {

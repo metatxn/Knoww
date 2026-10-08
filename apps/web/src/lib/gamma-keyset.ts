@@ -67,6 +67,8 @@ export function toSlimGammaEvent(event: GammaEvent, fullMarkets = false) {
             image: market.image,
             icon: market.icon,
             clobTokenIds: parseGammaStringArray(market.clobTokenIds),
+            positionIds: parseGammaStringArray(market.positionIds),
+            version: market.version,
             conditionId: market.conditionId,
             gameStartTime: market.gameStartTime,
             sportsMarketType: market.sportsMarketType,

@@ -82,3 +82,39 @@ describe("fetchOpenMarketRecordByIdentifier", () => {
     ).rejects.toSatisfy(isUpstreamMarketError);
   });
 });
+
+describe("V2 lookup by position ID", () => {
+  const conditionId = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const positionIds = [0, 1].map((index) =>
+    BigInt(`${conditionId}0${index}`).toString()
+  );
+  const market = {
+    id: "v2",
+    conditionId,
+    version: "v2",
+    outcomes: ["Yes", "No"],
+    positionIds,
+    clobTokenIds: ["11", "22"],
+  };
+
+  it("resolves a structured position to a Gamma condition lookup and verifies the outcome", async () => {
+    const { client, calls } = createClient(() => jsonResponse([market]));
+    const result = await client.fetchMarketByIdentifier({
+      kind: "tokenId",
+      value: positionIds[1],
+    });
+    expect(result?.positionIds).toEqual(positionIds);
+    expect(calls[0].searchParams.get("condition_ids")).toBe(conditionId);
+    expect(calls[0].searchParams.has("clob_token_ids")).toBe(false);
+    expect(calls[0].searchParams.has("position_ids")).toBe(false);
+  });
+
+  it("rejects a response with missing V2 metadata instead of using CTF IDs", async () => {
+    const { client } = createClient(() =>
+      jsonResponse([{ ...market, positionIds: undefined }])
+    );
+    await expect(
+      client.fetchMarketByIdentifier({ kind: "tokenId", value: positionIds[0] })
+    ).rejects.toThrow();
+  });
+});

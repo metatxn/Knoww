@@ -1,5 +1,5 @@
 import {
-  parseGammaStringArray,
+  getGammaTokenIdForOutcome,
   resolveNegRisk,
 } from "@knoww/shared-types/polymarket";
 import type { Market } from "../../types/market";
@@ -107,7 +107,7 @@ function getTokenIdForOutcome(
   if (!market.markets || market.markets.length === 0) return null;
 
   const nestedMarket = market.markets[marketIndex] ?? market.markets[0];
-  if (!nestedMarket?.clobTokenIds) return null;
+  if (!nestedMarket) return null;
   if (
     nestedMarket.active === false ||
     nestedMarket.closed === true ||
@@ -116,7 +116,11 @@ function getTokenIdForOutcome(
     return null;
   }
 
-  return parseGammaStringArray(nestedMarket.clobTokenIds)[outcomeIndex] ?? null;
+  try {
+    return getGammaTokenIdForOutcome(nestedMarket, outcomeIndex) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -130,7 +134,7 @@ function getTokenIdForMultiOutcome(
   if (!market.markets) return null;
 
   const nestedMarket = market.markets[marketIndex];
-  if (!nestedMarket?.clobTokenIds) return null;
+  if (!nestedMarket) return null;
   if (
     nestedMarket.active === false ||
     nestedMarket.closed === true ||
@@ -139,7 +143,11 @@ function getTokenIdForMultiOutcome(
     return null;
   }
 
-  return parseGammaStringArray(nestedMarket.clobTokenIds)[0] ?? null;
+  try {
+    return getGammaTokenIdForOutcome(nestedMarket, 0) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -207,10 +215,11 @@ async function resolveTokenAndShowPanel(
 
     if (nestedMarket) {
       conditionId = nestedMarket.conditionId as string | undefined;
-      const ids = parseGammaStringArray(nestedMarket.clobTokenIds);
-      if (ids.length >= 2) {
-        yesTokenId = ids[0];
-        noTokenId = ids[1];
+      try {
+        yesTokenId = getGammaTokenIdForOutcome(nestedMarket, 0);
+        noTokenId = getGammaTokenIdForOutcome(nestedMarket, 1);
+      } catch {
+        throw new Error("Invalid market outcome metadata");
       }
     }
 
@@ -221,6 +230,7 @@ async function resolveTokenAndShowPanel(
       price,
       side: "BUY",
       tokenId: tokenId as string,
+      protocolVersion: nestedMarket?.version,
       negRisk: resolveNegRisk(nestedMarket, market),
       isMultiOutcome,
       anchorElement: panelAnchor,

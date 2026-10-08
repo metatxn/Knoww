@@ -199,11 +199,11 @@ export function SportEventRow({
 
     if (
       !isYesNoOutcomes(primaryOutcomes) &&
-      primaryMarketObj.clobTokenIds?.length
+      parseMarketOutcomes(primaryMarketObj.outcomes).length
     ) {
       return ml.primaryLine.outcomes
         .map((name, i) => {
-          const tokenId = primaryMarketObj.clobTokenIds?.[i] || "";
+          const tokenId = tokenIdForOutcome(primaryMarketObj, i);
           return tokenId
             ? { tokenId, name, color: CHART_COLORS[i % CHART_COLORS.length] }
             : null;
@@ -723,11 +723,11 @@ export function CompactEventRow({
     const primaryOutcomes = parseMarketOutcomes(primaryMarketObj.outcomes);
     if (
       !isYesNoOutcomes(primaryOutcomes) &&
-      primaryMarketObj.clobTokenIds?.length
+      parseMarketOutcomes(primaryMarketObj.outcomes).length
     ) {
       return ml.primaryLine.outcomes
         .map((name, i) => {
-          const tokenId = primaryMarketObj.clobTokenIds?.[i] || "";
+          const tokenId = tokenIdForOutcome(primaryMarketObj, i);
           return tokenId
             ? { tokenId, name, color: CHART_COLORS[i % CHART_COLORS.length] }
             : null;

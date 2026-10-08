@@ -834,6 +834,36 @@ describe("TradingForm", () => {
     expect(setShares).toHaveBeenCalledWith(1.5873);
   });
 
+  it.each([
+    ["SELL", "MARKET"],
+    ["SELL", "LIMIT"],
+    ["BUY", "LIMIT"],
+  ])("preserves decimal share entry for %s %s orders", (side, orderType) => {
+    const setShares = vi.fn();
+    useTradingFormStateMock.mockReturnValue(
+      makeTradingFormState({ side, orderType, shares: 0, setShares })
+    );
+    renderDefaultForm();
+    const input = screen.getByRole("textbox", { name: "Share quantity" });
+    for (const value of ["0.", "0.1", "0.123456"]) {
+      fireEvent.change(input, { target: { value } });
+      expect(input).toHaveValue(value);
+    }
+    expect(setShares).toHaveBeenLastCalledWith(0.123456);
+    const calls = setShares.mock.calls.length;
+    for (const value of [
+      "-1",
+      "1e3",
+      "1.2.3",
+      "0.1234567",
+      "9007199254740992",
+    ]) {
+      fireEvent.change(input, { target: { value } });
+      expect(input).toHaveValue("0.123456");
+    }
+    expect(setShares).toHaveBeenCalledTimes(calls);
+  });
+
   it("renders simultaneous warning banners without duplicate React keys", () => {
     const consoleError = vi
       .spyOn(console, "error")

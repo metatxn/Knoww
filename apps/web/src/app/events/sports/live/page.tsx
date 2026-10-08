@@ -2,6 +2,7 @@
 
 import type { CanonicalOutcome } from "@knoww/services/core";
 import {
+  getGammaTokenIdForOutcome,
   parseGammaStringArray,
   resolveNegRisk,
 } from "@knoww/shared-types/polymarket";
@@ -358,6 +359,10 @@ export default function LiveMarketsPage() {
               clobTokenIds: parseGammaStringArray(
                 m.clobTokenIds as string | string[] | undefined
               ),
+              positionIds: parseGammaStringArray(
+                m.positionIds as string | string[] | undefined
+              ),
+              version: m.version as "v1" | "v2" | undefined,
               conditionId: m.conditionId as string | undefined,
               gameStartTime: m.gameStartTime as string | undefined,
             })),
@@ -491,7 +496,9 @@ export default function LiveMarketsPage() {
 
     const rawOutcomeNames = parseStringArray(market.outcomes);
     const outcomePrices = parseStringArray(market.outcomePrices).map(Number);
-    const tokenIds = market.clobTokenIds || [];
+    const tokenIds = rawOutcomeNames.map((_, index) =>
+      getGammaTokenIdForOutcome(market, index)
+    );
 
     const refreshedOutcomes = rawOutcomeNames
       .map((name, i) => ({
@@ -570,6 +577,7 @@ export default function LiveMarketsPage() {
             outcomes: tradingOutcomes,
             selectedIndex: selectedOutcomeIndex,
             negRisk: selectedMarket.negRisk ?? false,
+            protocolVersion: selectedMarket.protocolVersion,
           })
         : null,
     [selectedMarket, tradingOutcomes, selectedOutcomeIndex]

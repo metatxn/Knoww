@@ -4,6 +4,7 @@ import {
   fetchClobJson,
   fetchClobPriceHistory,
 } from "@knoww/shared-types/clob";
+import { getGammaTokenIdForOutcome } from "@knoww/shared-types/polymarket";
 import Decimal from "decimal.js";
 import { collectSearchEvidenceWithDiagnostics } from "./search-tools.ts";
 import type {
@@ -587,7 +588,16 @@ function gammaRelatedMarkets(
     if (!entry || typeof entry !== "object") return [];
     const market = entry as Record<string, unknown>;
     const outcomes = parseGammaStringArray(market.outcomes);
-    const tokenIds = parseGammaStringArray(market.clobTokenIds);
+    let tokenIds: string[];
+    try {
+      tokenIds = outcomes.map((_, index) =>
+        getGammaTokenIdForOutcome(market, index)
+      );
+    } catch {
+      // An incomplete or malformed V2 market cannot safely produce tradeable
+      // related outcomes. Keep the rest of the event available.
+      return [];
+    }
     const prices = parseGammaStringArray(market.outcomePrices);
     const marketType = classifyGammaMarketType(outcomes);
     return outcomes.flatMap((outcomeLabel, index) => {

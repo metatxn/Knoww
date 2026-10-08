@@ -1011,3 +1011,50 @@ describe("createPolymarketTradingAdapter region policy", () => {
     expect(evaluateRegionTrading(policy, { country: "IE" })).toBe("open");
   });
 });
+
+describe("V2 trading readiness", () => {
+  const conditionId = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const positionIds = [0, 1].map((index) =>
+    BigInt(`${conditionId}0${index}`).toString()
+  );
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  it("accepts V2 CLOB token_id assets while retaining readiness and protocol metadata", async () => {
+    const market: RecordedMarket = {
+      ...markets.plain,
+      conditionId,
+      tokenId: positionIds[0],
+      byToken: {
+        condition_id: conditionId,
+        primary_token_id: positionIds[0],
+        secondary_token_id: positionIds[1],
+      },
+      market: {
+        ...markets.plain.market,
+        condition_id: conditionId,
+        tokens: positionIds.map((token_id, index) => ({
+          token_id,
+          outcome: index === 0 ? "Yes" : "No",
+        })),
+      },
+    };
+    installFetchCapture(clobRoutes({ ...markets, plain: market }));
+    const draft = await createPolymarketTradingAdapter().previewOrder(
+      intentFor(market, GTC_BUY)
+    );
+    expect(draft.marketStatus).toBe("active");
+    expect(draft.sourceOutcomeId).toBe(positionIds[0]);
+    expect(draft.platformDetails?.protocolVersion).toBe("v2");
+  });
+  it("rejects V2 assets attached to a different condition before network access", async () => {
+    const calls = installFetchCapture(clobRoutes(markets));
+    await expect(
+      createPolymarketTradingAdapter().previewOrder(
+        intentFor({ ...markets.plain, tokenId: positionIds[0] }, GTC_BUY)
+      )
+    ).rejects.toMatchObject({ kind: "invalid_input" });
+    expect(calls).toHaveLength(0);
+  });
+});

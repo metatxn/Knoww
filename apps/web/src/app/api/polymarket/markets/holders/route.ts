@@ -1,4 +1,5 @@
 import { createLogger } from "@knoww/logger";
+import { isPolymarketV2AssetId } from "@knoww/shared-types/polymarket";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -7,7 +8,15 @@ import { fetchWalletDataResponse } from "@/polymarket/wallet-reads";
 
 const log = createLogger("api.market.holders");
 const querySchema = z.object({
-  market: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
+  market: z
+    .string()
+    .regex(/^0x(?:[0-9a-fA-F]{62}|[0-9a-fA-F]{64})$/)
+    .refine(
+      (value) =>
+        value.length === 66 ||
+        (/^0x[0-9a-fA-F]{62}$/.test(value) &&
+          isPolymarketV2AssetId(BigInt(`${value}00`)))
+    ),
   limit: z.coerce.number().int().min(1).max(20).default(20),
 });
 
@@ -21,7 +30,7 @@ const querySchema = z.object({
  *       - in: query
  *         name: market
  *         required: true
- *         schema: { type: string, pattern: '^0x[0-9a-fA-F]{64}$' }
+ *         schema: { type: string, pattern: '^0x(?:[0-9a-fA-F]{62}|[0-9a-fA-F]{64})$' }
  *       - in: query
  *         name: limit
  *         schema: { type: integer, minimum: 1, maximum: 20, default: 20 }

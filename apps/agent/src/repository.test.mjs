@@ -109,6 +109,39 @@ test("upsertWatchlistItem dedupes imported rows by token id", async () => {
   assert.equal(matches.length, 1);
 });
 
+test("watchlist keeps V2 asset identity and outcome index", async () => {
+  const repo = createAgentRepository();
+  const item = await repo.upsertWatchlistItem(
+    watchlistInput({
+      tokenId: (1n << 248n).toString(),
+      protocolVersion: "v2",
+      outcomeIndex: 1,
+    })
+  );
+  const stored = (await repo.listWatchlist()).find(
+    (entry) => entry.id === item.id
+  );
+  assert.equal(stored?.tokenId, item.tokenId);
+  assert.equal(stored?.protocolVersion, "v2");
+  assert.equal(stored?.outcomeIndex, 1);
+});
+
+test("watchlist deduplication keeps equal token strings on separate protocol ledgers", async () => {
+  const repo = createAgentRepository();
+  const v1 = await repo.upsertWatchlistItem(
+    watchlistInput({ tokenId: "same-id", protocolVersion: "v1" })
+  );
+  const v2 = await repo.upsertWatchlistItem(
+    watchlistInput({ tokenId: "same-id", protocolVersion: "v2" })
+  );
+  assert.notEqual(v1.id, v2.id);
+  assert.equal(
+    (await repo.listWatchlist()).filter((item) => item.tokenId === "same-id")
+      .length,
+    2
+  );
+});
+
 test("D1 repository persists encrypted CLOB credentials without plaintext columns", async () => {
   const db = createFakeD1();
   const repo = createAgentRepository(db);
@@ -202,6 +235,7 @@ test("repository preserves live order lifecycle reconciliation fields", async ()
     runId: "run-live",
     watchlistItemId: "watch-live",
     tokenId: "token-live",
+    protocolVersion: "v2",
     side: "BUY",
     requestedSizeUsd: "5",
     price: "0.50",
@@ -222,6 +256,7 @@ test("repository preserves live order lifecycle reconciliation fields", async ()
   const record = await repo.getLiveOrderByIdempotencyKey(idempotencyKey);
 
   assert.equal(record?.status, "PARTIALLY_FILLED");
+  assert.equal(record?.protocolVersion, "v2");
   assert.equal(record?.filledNotionalUsd, "2.5");
   assert.equal(record?.filledShares, "5");
   assert.equal(record?.averageFillPrice, "0.5");

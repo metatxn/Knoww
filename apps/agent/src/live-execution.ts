@@ -2,23 +2,31 @@ import { createLogger } from "@knoww/logger";
 import {
   buildTradingApprovalTransactions,
   getPusdExchangeApprovalSpender,
+  readClobOrderPusdAllowance,
   readErc1155Approval,
-  readPusdExchangeAllowance,
   readTradingApprovalStatus,
   type TradingApprovalStatus,
 } from "@knoww/shared-types/approvals";
 import { readTradingWalletBalance } from "@knoww/shared-types/balances";
 import { fetchClobBuilderFeeRates } from "@knoww/shared-types/clob";
-import { PUSD_DECIMALS } from "@knoww/shared-types/contracts";
-import { CTF_JSON_ABI } from "@knoww/shared-types/ctf";
+import {
+  POSITION_MANAGER_ADDRESS,
+  PUSD_DECIMALS,
+} from "@knoww/shared-types/contracts";
+import {
+  normalizeProtocolConditionId,
+  readPolymarketOutcomeBalance,
+} from "@knoww/shared-types/ctf";
 import {
   type ApiKeyCreds,
   assertClobPostOrderSuccess,
   CLOB_ORDER_TYPES,
   type ClobBalanceAllowanceClient,
   type ClobOrderType,
+  decodePolymarketV2AssetId,
   POLYGON_CHAIN_ID,
   POLYMARKET_API,
+  resolvePolymarketProtocolVersion,
   syncClobBalanceAllowance,
   TRADING_SIDES,
 } from "@knoww/shared-types/polymarket";
@@ -153,12 +161,13 @@ export interface LiveExecutionRuntime {
   }): Promise<LiveClobClient>;
   readTradingWalletBalance: typeof readTradingWalletBalance;
   readTradingApprovalStatus: typeof readTradingApprovalStatus;
-  readPusdExchangeAllowance: typeof readPusdExchangeAllowance;
+  readPusdExchangeAllowance: typeof readClobOrderPusdAllowance;
   readErc1155Approval: typeof readErc1155Approval;
   readConditionalBalanceRaw(input: {
     publicClient: PublicClient;
     owner: Address;
     tokenId: string;
+    protocolVersion?: "v1" | "v2";
   }): Promise<bigint>;
   sendTransactions(input: {
     publicClient: PublicClient;
@@ -172,6 +181,7 @@ export interface LiveExecutionRuntime {
       tokenId?: string;
       includeCollateral?: boolean;
       includeConditional?: boolean;
+      protocolVersion?: "v1" | "v2";
     }
   ): Promise<void>;
   /** Injectable delay so tests can run the settlement poll without real time. */
@@ -421,17 +431,21 @@ const defaultRuntime: LiveExecutionRuntime = {
 
   readTradingWalletBalance,
   readTradingApprovalStatus,
-  readPusdExchangeAllowance,
+  readPusdExchangeAllowance: readClobOrderPusdAllowance,
   readErc1155Approval,
 
-  async readConditionalBalanceRaw({ publicClient, owner, tokenId }) {
-    const balances = (await publicClient.readContract({
-      address: "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" as Address,
-      abi: CTF_JSON_ABI,
-      functionName: "balanceOfBatch",
-      args: [[owner], [BigInt(tokenId)]],
-    })) as readonly bigint[];
-    return balances[0] ?? BigInt(0);
+  async readConditionalBalanceRaw({
+    publicClient,
+    owner,
+    tokenId,
+    protocolVersion,
+  }) {
+    return readPolymarketOutcomeBalance(
+      publicClient,
+      owner,
+      tokenId,
+      protocolVersion
+    );
   },
 
   async sendTransactions({
@@ -809,6 +823,49 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
   }
 
   async execute(request: PaperOrderRequest): Promise<PaperFill> {
+    let protocolVersion: "v1" | "v2";
+    try {
+      protocolVersion = resolvePolymarketProtocolVersion(
+        request.tokenId,
+        request.protocolVersion
+      );
+    } catch {
+      return blockedFill(
+        request,
+        "live execution blocked: token ID does not match its Polymarket protocol version"
+      );
+    }
+
+    let validatedRequest: PaperOrderRequest = {
+      ...request,
+      protocolVersion,
+    };
+    if (protocolVersion === "v2") {
+      try {
+        const decoded = decodePolymarketV2AssetId(request.tokenId);
+        const assetConditionId = normalizeProtocolConditionId(
+          decoded.conditionId,
+          "v2"
+        );
+        const conditionId = request.conditionId
+          ? normalizeProtocolConditionId(request.conditionId, "v2")
+          : assetConditionId;
+        if (conditionId.toLowerCase() !== assetConditionId.toLowerCase()) {
+          return blockedFill(
+            request,
+            "live execution blocked: V2 position does not match its condition ID"
+          );
+        }
+        validatedRequest = { ...validatedRequest, conditionId };
+      } catch {
+        return blockedFill(
+          request,
+          "live execution blocked: V2 position has an invalid condition ID"
+        );
+      }
+    }
+    request = validatedRequest;
+
     const config = getLiveExecutionConfig();
 
     // Step 1 — kill switch. The env flag MUST be set explicitly. Default
@@ -996,18 +1053,23 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
             this.runtime.readTradingApprovalStatus(
               wallet.publicClient,
               funderAddress,
-              { approvalAmountRaw: preflight.buy.requiredCollateralRaw }
+              {
+                approvalAmountRaw: preflight.buy.requiredCollateralRaw,
+                protocolVersion: request.protocolVersion,
+              }
             ),
           ]);
           const allowance = await this.runtime.readPusdExchangeAllowance(
             wallet.publicClient,
             funderAddress,
-            request.negRisk
+            request.negRisk,
+            { protocolVersion: request.protocolVersion }
           );
           await this.ensureTradingApprovals({
             wallet,
             funderAddress,
             approvalStatus,
+            protocolVersion: request.protocolVersion,
             requiredRaw:
               preflight.buy.requiredCollateralRaw > allowance
                 ? preflight.buy.requiredCollateralRaw
@@ -1046,6 +1108,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
               publicClient: wallet.publicClient,
               owner: funderAddress,
               tokenId: request.tokenId,
+              protocolVersion: request.protocolVersion,
             });
           if (conditionalBalanceRaw < preflight.sell.requiredConditionalRaw) {
             return blockedFill(
@@ -1057,19 +1120,27 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
               )}`
             );
           }
-          const exchange = getPusdExchangeApprovalSpender(request.negRisk);
+          const exchange = getPusdExchangeApprovalSpender(
+            request.negRisk,
+            request.protocolVersion
+          );
           const approved = await this.runtime.readErc1155Approval(
             wallet.publicClient,
             funderAddress,
-            exchange
+            exchange,
+            request.protocolVersion === "v2"
+              ? { token: POSITION_MANAGER_ADDRESS }
+              : undefined
           );
           if (!approved) {
             await this.ensureTradingApprovals({
               wallet,
               funderAddress,
+              protocolVersion: request.protocolVersion,
               approvalStatus: await this.runtime.readTradingApprovalStatus(
                 wallet.publicClient,
-                funderAddress
+                funderAddress,
+                { protocolVersion: request.protocolVersion }
               ),
               requiredRaw: BigInt(0),
             });
@@ -1086,6 +1157,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
             tokenId: request.tokenId,
             includeCollateral: request.action === TRADING_SIDES.BUY,
             includeConditional: true,
+            protocolVersion: request.protocolVersion,
           });
         } catch (error) {
           log.warn("live.balance_allowance_sync.failed", {
@@ -1105,6 +1177,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
           wallet,
           funderAddress,
           tokenId: request.tokenId,
+          protocolVersion: request.protocolVersion,
         });
         // Fail closed for BUYs: without this anchor the settlement debit can
         // never be derived, so a fill would be unreconcilable forever.
@@ -1152,6 +1225,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
         runId: request.runId,
         watchlistItemId: request.watchlistItemId,
         tokenId: request.tokenId,
+        protocolVersion: request.protocolVersion ?? "v1",
         side: request.action,
         requestedSizeUsd: notional.toDecimalPlaces(6).toString(),
         price: request.price,
@@ -1228,6 +1302,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
           wallet,
           funderAddress,
           tokenId: request.tokenId,
+          protocolVersion: request.protocolVersion,
           preSubmissionAnchor,
           filledNotionalUsd: execution.filledNotionalUsd,
           filledShares: execution.filledShares,
@@ -1248,6 +1323,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
             wallet,
             funderAddress,
             tokenId: request.tokenId,
+            protocolVersion: request.protocolVersion,
           })
         );
       }
@@ -1256,6 +1332,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
         runId: request.runId,
         watchlistItemId: request.watchlistItemId,
         tokenId: request.tokenId,
+        protocolVersion: request.protocolVersion ?? "v1",
         side: request.action,
         requestedSizeUsd: notional.toDecimalPlaces(6).toString(),
         price: request.price,
@@ -1327,6 +1404,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
           runId: request.runId,
           watchlistItemId: request.watchlistItemId,
           tokenId: request.tokenId,
+          protocolVersion: request.protocolVersion ?? "v1",
           side: request.action,
           requestedSizeUsd: notional.toDecimalPlaces(6).toString(),
           price: request.price,
@@ -1595,6 +1673,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
     wallet: LiveWalletContext;
     funderAddress: Address;
     tokenId: string;
+    protocolVersion?: "v1" | "v2";
     preSubmissionAnchor: LiveBalanceAnchor;
     filledNotionalUsd: Decimal;
     filledShares: Decimal;
@@ -1716,6 +1795,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
         wallet,
         funderAddress,
         tokenId: order.tokenId,
+        protocolVersion: order.protocolVersion ?? "v1",
       });
       if (!anchor) return;
       // Fill-specific evidence: settlement credits the filled shares to the
@@ -1793,6 +1873,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
     wallet: LiveWalletContext;
     funderAddress: Address;
     tokenId: string;
+    protocolVersion?: "v1" | "v2";
   }): Promise<LiveBalanceAnchor | null> {
     try {
       const [walletBalance, conditionalBalanceRaw] = await Promise.all([
@@ -1804,6 +1885,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
           publicClient: input.wallet.publicClient,
           owner: input.funderAddress,
           tokenId: input.tokenId,
+          protocolVersion: input.protocolVersion,
         }),
       ]);
       return {
@@ -1827,6 +1909,7 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
     funderAddress: Address;
     approvalStatus: TradingApprovalStatus;
     requiredRaw: bigint;
+    protocolVersion?: "v1" | "v2";
   }): Promise<void> {
     const needsBaseline = !input.approvalStatus.allApproved;
     const needsRequired = input.requiredRaw > BigInt(0);
@@ -1837,7 +1920,8 @@ export class LiveExecutionAdapter implements ExecutionAdapter {
         : DEFAULT_TRADING_APPROVAL_RAW;
     const transactions = buildTradingApprovalTransactions(
       input.approvalStatus,
-      approvalRaw
+      approvalRaw,
+      input.protocolVersion
     );
     if (transactions.length === 0) return;
     await this.runtime.sendTransactions({

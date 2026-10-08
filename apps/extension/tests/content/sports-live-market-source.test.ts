@@ -112,3 +112,35 @@ test("maps a matched sports event into an injectable Polymarket market result", 
   );
   assert.equal(result?.market.markets?.[0].sportsMarketType, "moneyline");
 });
+
+test("retains V2-only sports markets with validated position metadata", () => {
+  const conditionId = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+  const positionIds = [0, 1].map((index) =>
+    BigInt(`${conditionId}0${index}`).toString()
+  );
+  const source = fifaEvent();
+  const event = {
+    ...source,
+    markets: [
+      {
+        ...source.markets[0],
+        conditionId,
+        version: "v2" as const,
+        clobTokenIds: undefined,
+        positionIds,
+      },
+    ],
+  };
+  const result = buildSportsMarketSearchResult(event, {
+    homeTeam: "Spain",
+    awayTeam: "Cabo Verde",
+    eventTime: "2026-06-15T16:00:00Z",
+    leagueSlug: "fifa-world-cup",
+  });
+  assert.ok(result);
+  assert.equal(result.market.markets?.[0]?.version, "v2");
+  assert.equal(
+    result.market.markets?.[0]?.positionIds,
+    JSON.stringify(positionIds)
+  );
+});

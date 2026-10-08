@@ -37,6 +37,7 @@ import { useUserPositions } from "@/hooks/use-user-positions";
 import { useUserTrades } from "@/hooks/use-user-trades";
 import { resolveClosedTimes } from "@/lib/closed-time-resolver";
 import { openWalletModal, preloadWalletModal } from "@/lib/wallet-modal";
+import { getPositionRedemption } from "@/polymarket/position-redemption";
 import { buildPortfolioTabUrl, parsePortfolioTab } from "./url-state";
 
 function areClosedTimesEqual(
@@ -207,12 +208,14 @@ export default function PortfolioPage() {
 
   const handleCloseLostPosition = async (
     conditionId: string,
-    negRisk = false
+    negRisk = false,
+    asset?: string
   ) => {
     // Per-id set (not a single slot): a shared slot lets a second row's click
     // steal it and its `finally` re-enable the first row mid-flight, allowing
     // duplicate concurrent redeems of the same condition.
-    if (!tradingAddress || closingConditionIds.has(conditionId)) return;
+    const redemptionKey = asset ?? conditionId;
+    if (!tradingAddress || closingConditionIds.has(redemptionKey)) return;
     posthog.capture("position_redeem_submitted", {
       product: "web",
       condition_id: conditionId,
@@ -220,14 +223,21 @@ export default function PortfolioPage() {
     });
     setClosingConditionIds((current) => {
       const next = new Set(current);
-      next.add(conditionId);
+      next.add(redemptionKey);
       return next;
     });
     try {
+      const position = lostPositions.find(
+        (item) => item.asset === asset && item.conditionId === conditionId
+      );
+      if (!position) throw new Error("Missing selected position metadata");
+      const { protocolVersion, redemption } = getPositionRedemption(position);
       const result = await redeemPositions(
         conditionId,
         tradingAddress,
-        negRisk
+        negRisk,
+        protocolVersion,
+        redemption
       );
       if (result.success) {
         posthog.capture("position_redeemed", {
@@ -238,7 +248,7 @@ export default function PortfolioPage() {
         });
         setClosedConditionIds((current) => {
           const next = new Set(current);
-          next.add(conditionId);
+          next.add(redemptionKey);
           return next;
         });
         toast.success("Position closed successfully");
@@ -261,7 +271,7 @@ export default function PortfolioPage() {
     } finally {
       setClosingConditionIds((current) => {
         const next = new Set(current);
-        next.delete(conditionId);
+        next.delete(redemptionKey);
         return next;
       });
     }
@@ -287,10 +297,16 @@ export default function PortfolioPage() {
       surface: "winning_position",
     });
     try {
+      const { protocolVersion, redemption } = getPositionRedemption({
+        ...position,
+        conditionId: position.conditionId,
+      });
       const result = await redeemPositions(
         position.conditionId,
         tradingAddress,
-        position.negRisk ?? false
+        position.negRisk ?? false,
+        protocolVersion,
+        redemption
       );
 
       if (result.success) {

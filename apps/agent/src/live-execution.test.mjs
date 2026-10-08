@@ -3,6 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
+  EXCHANGE_V3_ADDRESS,
+  POSITION_MANAGER_ADDRESS,
+  PUSD_ADDRESS,
+} from "@knoww/shared-types/contracts";
+import { decodeFunctionData, erc20Abi, erc1155Abi } from "viem";
+import {
   isSettlementPendingLiveOrder,
   isUnresolvedLiveOrder,
 } from "./live-accounting.ts";
@@ -15,6 +21,10 @@ import {
 import { createAgentRepository } from "./repository.ts";
 
 const ORIGINAL_ENV = { ...process.env };
+const V2_CONDITION_ID = `0x01${"11".repeat(17)}${"00".repeat(13)}`;
+const V2_TOKEN_IDS = [0, 1].map((index) =>
+  BigInt(`${V2_CONDITION_ID}${index.toString(16).padStart(2, "0")}`).toString()
+);
 
 function restoreEnv() {
   process.env = { ...ORIGINAL_ENV };
@@ -54,6 +64,11 @@ function createDeps(runtimeOverrides = {}, options = {}) {
     postOrder: 0,
     syncBalanceAllowance: 0,
     sendTransactions: 0,
+    conditionalReads: [],
+    approvalReads: [],
+    approvalStatusOptions: [],
+    syncOptions: [],
+    sentTransactions: [],
   };
   const client = {
     getOpenOrders: async () => [],
@@ -131,30 +146,47 @@ function createDeps(runtimeOverrides = {}, options = {}) {
           polBalanceRaw: "1000000000000000000",
           tokenBalances: [],
         }),
-        readTradingApprovalStatus: async () => ({
-          pusdCtf: true,
-          pusdCtfExchange: true,
-          pusdNegRiskExchange: true,
-          pusdCtfCollateralAdapter: true,
-          pusdNegRiskCtfCollateralAdapter: true,
-          usdcOnramp: true,
-          ctfExchangeApproval: true,
-          ctfNegRiskExchangeApproval: true,
-          ctfCollateralAdapterApproval: true,
-          ctfNegRiskCollateralAdapterApproval: true,
-          allApproved: true,
-          clobTradingApproved: true,
-          autoWrapApproved: true,
-          ctfOperationsApproved: true,
-          negRiskConversionApproved: true,
-        }),
-        readPusdExchangeAllowance: async () => BigInt("100000000"),
-        readErc1155Approval: async () => true,
-        readConditionalBalanceRaw: async () => BigInt("100000000"),
-        sendTransactions: async () => {
-          calls.sendTransactions += 1;
+        readTradingApprovalStatus: async (_publicClient, _owner, options) => {
+          calls.approvalStatusOptions.push(options);
+          return {
+            pusdCtf: true,
+            pusdCtfExchange: true,
+            pusdNegRiskExchange: true,
+            pusdCtfCollateralAdapter: true,
+            pusdNegRiskCtfCollateralAdapter: true,
+            usdcOnramp: true,
+            ctfExchangeApproval: true,
+            ctfNegRiskExchangeApproval: true,
+            ctfCollateralAdapterApproval: true,
+            ctfNegRiskCollateralAdapterApproval: true,
+            allApproved: true,
+            clobTradingApproved: true,
+            autoWrapApproved: true,
+            ctfOperationsApproved: true,
+            negRiskConversionApproved: true,
+            pusdExchangeV3: true,
+            positionExchangeApproval: true,
+            pusdRouter: true,
+            positionRouterApproval: true,
+            v2TradingApproved: true,
+            v2OperationsApproved: true,
+          };
         },
-        syncBalanceAllowance: async (syncClient) => {
+        readPusdExchangeAllowance: async () => BigInt("100000000"),
+        readErc1155Approval: async (_client, _owner, operator, options) => {
+          calls.approvalReads.push({ operator, options });
+          return true;
+        },
+        readConditionalBalanceRaw: async (input) => {
+          calls.conditionalReads.push(input);
+          return BigInt("100000000");
+        },
+        sendTransactions: async (input) => {
+          calls.sendTransactions += 1;
+          calls.sentTransactions.push(...input.transactions);
+        },
+        syncBalanceAllowance: async (syncClient, options) => {
+          calls.syncOptions.push(options);
           await syncClient.updateBalanceAllowance({ assetType: "COLLATERAL" });
         },
         // Instant sleep so the settlement poll doesn't run in real time.
@@ -243,6 +275,179 @@ test("posts a live order when real mode is explicitly enabled", async () => {
   assert.equal(calls.deriveApiCreds, 1);
   assert.equal(calls.syncBalanceAllowance > 0, true);
   assert.equal(calls.sendTransactions, 0);
+});
+
+test("V2 BUY plans ExchangeV3 approval and retains protocol in cache and order", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"aa".repeat(32)}`;
+  const approvalReads = [];
+  const { deps, calls } = createDeps({
+    readTradingApprovalStatus: async (_client, _owner, options) => {
+      approvalReads.push(options);
+      return {
+        allApproved: false,
+        pusdExchangeV3: false,
+        positionExchangeApproval: false,
+      };
+    },
+    readPusdExchangeAllowance: async () => 0n,
+  });
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(
+    baseRequest({
+      tokenId: V2_TOKEN_IDS[0],
+      conditionId: V2_CONDITION_ID,
+      protocolVersion: "v2",
+    })
+  );
+  const record = await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY");
+  assert.equal(fill.status, "FILLED");
+  assert.deepEqual(approvalReads, [
+    { approvalAmountRaw: 5_150_000n, protocolVersion: "v2" },
+  ]);
+  assert.deepEqual(
+    calls.sentTransactions.map((tx) => tx.to),
+    [PUSD_ADDRESS, POSITION_MANAGER_ADDRESS]
+  );
+  assert.equal(
+    decodeFunctionData({ abi: erc20Abi, data: calls.sentTransactions[0].data })
+      .args[0],
+    EXCHANGE_V3_ADDRESS
+  );
+  assert.deepEqual(
+    decodeFunctionData({
+      abi: erc1155Abi,
+      data: calls.sentTransactions[1].data,
+    }).args,
+    [EXCHANGE_V3_ADDRESS, true]
+  );
+  assert.equal(calls.syncOptions[0].protocolVersion, "v2");
+  assert.equal(calls.conditionalReads[0].protocolVersion, "v2");
+  assert.equal(record.protocolVersion, "v2");
+});
+
+test("infers V2 for direct callers that omit protocol metadata", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"aa".repeat(32)}`;
+  const { deps, calls } = createDeps({
+    readTradingApprovalStatus: async () => ({
+      allApproved: false,
+      pusdExchangeV3: false,
+      positionExchangeApproval: false,
+    }),
+    readPusdExchangeAllowance: async () => 0n,
+  });
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(
+    baseRequest({ tokenId: V2_TOKEN_IDS[0], conditionId: undefined })
+  );
+  const record = await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:BUY");
+
+  assert.equal(fill.status, "FILLED");
+  assert.deepEqual(
+    calls.sentTransactions.map((tx) => tx.to),
+    [PUSD_ADDRESS, POSITION_MANAGER_ADDRESS]
+  );
+  assert.equal(calls.syncOptions[0].protocolVersion, "v2");
+  assert.equal(calls.conditionalReads[0].protocolVersion, "v2");
+  assert.equal(record.protocolVersion, "v2");
+});
+
+test("blocks V2 assets mislabeled as V1 before wallet work or submission", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"aa".repeat(32)}`;
+  const { deps, calls } = createDeps();
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(
+    baseRequest({
+      tokenId: V2_TOKEN_IDS[0],
+      conditionId: V2_CONDITION_ID,
+      protocolVersion: "v1",
+    })
+  );
+
+  assert.equal(fill.status, "BLOCKED");
+  assert.match(fill.reason, /does not match its Polymarket protocol version/);
+  assert.equal(calls.deriveApiCreds, 0);
+  assert.equal(calls.sendTransactions, 0);
+  assert.equal(calls.postOrder, 0);
+});
+
+test("blocks a V2 condition mismatch before wallet work or submission", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"aa".repeat(32)}`;
+  const { deps, calls } = createDeps();
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(
+    baseRequest({
+      tokenId: V2_TOKEN_IDS[0],
+      conditionId: `0x02${"11".repeat(17)}${"00".repeat(13)}`,
+      protocolVersion: "v2",
+    })
+  );
+
+  assert.equal(fill.status, "BLOCKED");
+  assert.match(fill.reason, /does not match its condition ID/);
+  assert.equal(calls.deriveApiCreds, 0);
+  assert.equal(calls.sendTransactions, 0);
+  assert.equal(calls.postOrder, 0);
+});
+
+test("V2 SELL reads PositionManager approval and repairs the V2 operator", async () => {
+  restoreEnv();
+  process.env.AGENT_LIVE_ENABLED = "true";
+  process.env.AGENT_LIVE_DRY_RUN = "false";
+  process.env.AGENT_LIVE_CONFIRMED = "I_UNDERSTAND_THIS_IS_REAL_MONEY";
+  process.env.AGENT_WALLET_PRIVATE_KEY = `0x${"aa".repeat(32)}`;
+  const { deps, calls } = createDeps({
+    readErc1155Approval: async (_client, _owner, operator, options) => {
+      calls.approvalReads.push({ operator, options });
+      return false;
+    },
+    readTradingApprovalStatus: async (_client, _owner, options) => {
+      calls.approvalStatusOptions.push(options);
+      return {
+        allApproved: false,
+        pusdExchangeV3: false,
+        positionExchangeApproval: false,
+      };
+    },
+  });
+  const adapter = new LiveExecutionAdapter(deps);
+  const fill = await adapter.execute(
+    baseRequest({
+      tokenId: V2_TOKEN_IDS[1],
+      conditionId: V2_CONDITION_ID,
+      protocolVersion: "v2",
+      action: "SELL",
+    })
+  );
+  const record = await deps.getLiveOrderByIdempotencyKey("run-1:watch-1:SELL");
+  assert.equal(fill.status, "FILLED");
+  assert.deepEqual(calls.approvalReads[0], {
+    operator: EXCHANGE_V3_ADDRESS,
+    options: { token: POSITION_MANAGER_ADDRESS },
+  });
+  assert.equal(calls.approvalStatusOptions[0].protocolVersion, "v2");
+  assert.deepEqual(
+    calls.sentTransactions.map((tx) => tx.to),
+    [PUSD_ADDRESS, POSITION_MANAGER_ADDRESS]
+  );
+  assert.equal(calls.syncOptions[0].protocolVersion, "v2");
+  assert.equal(calls.conditionalReads[0].protocolVersion, "v2");
+  assert.equal(record.protocolVersion, "v2");
 });
 
 test("blocks a live BUY when the portfolio drawdown stop is active", async () => {

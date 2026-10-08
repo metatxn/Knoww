@@ -143,7 +143,8 @@ export function useCtfOperations() {
     async (
       yesTokenId: string,
       noTokenId: string,
-      ownerAddress?: string
+      ownerAddress?: string,
+      protocolVersion?: "v1" | "v2"
     ): Promise<OutcomeTokenBalances> => {
       const owner = ownerAddress || address;
       if (!owner) {
@@ -156,7 +157,8 @@ export function useCtfOperations() {
         publicClient,
         owner as `0x${string}`,
         yesTokenId,
-        noTokenId
+        noTokenId,
+        protocolVersion
       );
     },
     [address]
@@ -171,7 +173,8 @@ export function useCtfOperations() {
       conditionId: string,
       amount: number,
       proxyAddress: string,
-      negRisk = false
+      negRisk = false,
+      protocolVersion: "v1" | "v2" = "v1"
     ): Promise<OperationResult> => {
       const publicClient = await createCtfPublicClient();
       const plan = await planCtfOperationTransactions({
@@ -179,6 +182,7 @@ export function useCtfOperations() {
         conditionId,
         amount: amount.toString(),
         negRisk,
+        protocolVersion,
         client: publicClient,
         collateralOwner: proxyAddress as `0x${string}`,
       });
@@ -196,7 +200,8 @@ export function useCtfOperations() {
       conditionId: string,
       amount: number,
       proxyAddress: string,
-      negRisk = false
+      negRisk = false,
+      protocolVersion: "v1" | "v2" = "v1"
     ): Promise<OperationResult> => {
       const publicClient = await createCtfPublicClient();
       const plan = await planCtfOperationTransactions({
@@ -204,6 +209,7 @@ export function useCtfOperations() {
         conditionId,
         amount: amount.toString(),
         negRisk,
+        protocolVersion,
         client: publicClient,
         collateralOwner: proxyAddress as `0x${string}`,
       });
@@ -219,13 +225,17 @@ export function useCtfOperations() {
     async (
       conditionId: string,
       proxyAddress: string,
-      negRisk = false
+      negRisk = false,
+      protocolVersion: "v1" | "v2" = "v1",
+      redemption?: { outcomeIndex: 0 | 1; amount: string }
     ): Promise<OperationResult> => {
       const publicClient = await createCtfPublicClient();
       const plan = await planCtfOperationTransactions({
         operation: "redeemPositions",
+        ...redemption,
         conditionId,
         negRisk,
+        protocolVersion,
         client: publicClient,
         collateralOwner: proxyAddress as `0x${string}`,
       });

@@ -223,7 +223,10 @@ export function TagEventsContent({
           )}
 
           {isLoading && !error && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+            <div
+              aria-busy="true"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5"
+            >
               {[...Array(10)].map((_, i) => (
                 <EventCardSkeleton
                   key={`skeleton-${i}`}
@@ -235,7 +238,10 @@ export function TagEventsContent({
 
           {!isLoading && events.length > 0 && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+              <div
+                aria-busy={isFetchingNextPage}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5"
+              >
                 {events.map((event, index) => (
                   <EventCard
                     key={`${event.id}-${index}`}
@@ -244,18 +250,14 @@ export function TagEventsContent({
                     priority={index < PRIORITY_EVENT_CARD_COUNT}
                   />
                 ))}
-              </div>
-
-              {isFetchingNextPage && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 mt-5">
-                  {[...Array(10)].map((_, i) => (
+                {isFetchingNextPage &&
+                  [...Array(10)].map((_, i) => (
                     <EventCardSkeleton
                       key={`loading-${i}`}
-                      className={skeletonVisibilityClass(i)}
+                      className={skeletonVisibilityClass(i, events.length)}
                     />
                   ))}
-                </div>
-              )}
+              </div>
 
               {hasMore && !isFetchingNextPage && (
                 <div ref={loadMoreRef} className="h-20 w-full" />

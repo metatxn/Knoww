@@ -1,7 +1,7 @@
 {
   "name": "knoww-monorepo",
   "private": true,
-  "packageManager": "pnpm@10.34.5",
+  "packageManager": "pnpm@10.34.6",
   "scripts": {
     "dev:web": "pnpm --filter @knoww/web dev",
     "dev:ext": "pnpm --filter @knoww/extension dev",
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "husky": "9.1.7",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "typescript": "catalog:"
   }
 }

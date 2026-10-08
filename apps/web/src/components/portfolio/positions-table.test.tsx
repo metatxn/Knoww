@@ -71,6 +71,20 @@ function renderPositionsTable(
 }
 
 describe("PositionsTable", () => {
+  it("links Explore markets to All regardless of the previously selected view", () => {
+    renderPositionsTable([]);
+    expect(
+      screen.getByRole("link", { name: /Explore markets/i })
+    ).toHaveAttribute("href", "/markets?view=categories");
+  });
+
+  it("links the empty-state trending action to the markets view parameter", () => {
+    renderPositionsTable([]);
+    expect(
+      screen.getByRole("link", { name: /View trending/i })
+    ).toHaveAttribute("href", "/markets?view=trending");
+  });
+
   it("renders redeem actions for redeemable resolved positions", async () => {
     const onRedeem = vi.fn();
 

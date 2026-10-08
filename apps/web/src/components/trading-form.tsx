@@ -216,6 +216,9 @@ function TradingTicket(props: TradingTicketProps) {
   const { setShowOnboarding } = useOnboarding();
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [shareQuantityInput, setShareQuantityInput] = useState<string | null>(
+    null
+  );
 
   const handleConnect = async () => {
     if (connecting) return;
@@ -722,14 +725,20 @@ function TradingTicket(props: TradingTicketProps) {
                 </button>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   name="shares"
                   className="tk-step-input"
-                  value={shares}
+                  value={shareQuantityInput ?? String(shares)}
+                  onBlur={() => setShareQuantityInput(null)}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/[^0-9]/g, "");
-                    const n = Number.parseInt(raw || "0", 10);
-                    setShares(Number.isFinite(n) ? n : 0);
+                    const raw = e.target.value;
+                    if (!/^\d*(?:\.\d{0,6})?$/.test(raw)) return;
+                    const quantity = new Decimal(
+                      raw === "" || raw === "." ? "0" : raw
+                    );
+                    if (quantity.gt(Number.MAX_SAFE_INTEGER)) return;
+                    setShareQuantityInput(raw);
+                    setShares(quantity.toNumber());
                   }}
                   aria-label="Share quantity"
                 />
@@ -870,7 +879,9 @@ function TradingTicket(props: TradingTicketProps) {
                 <div className="tk-warn">
                   <AlertCircle className="ic h-4 w-4" />
                   <span className="body">
-                    No {selectedOutcome?.name || "shares"} to sell
+                    You have no{" "}
+                    {selectedOutcome?.name ? `"${selectedOutcome.name}" ` : ""}
+                    shares to sell.
                   </span>
                 </div>
               </m.div>

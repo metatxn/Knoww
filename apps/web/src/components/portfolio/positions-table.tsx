@@ -360,12 +360,12 @@ export function PositionsTable({
         }
         action={
           !searchQuery && pnlFilter === "all"
-            ? { label: "Explore markets", href: "/markets" }
+            ? { label: "Explore markets", href: "/markets?view=categories" }
             : undefined
         }
         secondaryAction={
           !searchQuery && pnlFilter === "all"
-            ? { label: "View trending", href: "/markets?sort=trending" }
+            ? { label: "View trending", href: "/markets?view=trending" }
             : undefined
         }
       />

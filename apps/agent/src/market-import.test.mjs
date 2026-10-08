@@ -132,6 +132,47 @@ test("normalizes a requested outcome when importing a Gamma event", () => {
   );
 });
 
+test("selects and persists a V2 position ID when legacy IDs are also present", () => {
+  const event = {
+    ...gammaEvent,
+    markets: [
+      {
+        ...gammaEvent.markets[0],
+        version: "v2",
+        positionIds: [(1n << 248n).toString(), ((1n << 248n) + 1n).toString()],
+      },
+    ],
+  };
+
+  const item = normalizeGammaEventToWatchlistItem(event, {
+    outcomeLabel: "Down",
+  });
+
+  assert.equal(item.tokenId, ((1n << 248n) + 1n).toString());
+  assert.equal(item.protocolVersion, "v2");
+  assert.equal(item.outcomeIndex, 1);
+});
+
+test("imports a V2-only market without CTF token IDs", () => {
+  const event = {
+    ...gammaEvent,
+    markets: [
+      {
+        ...gammaEvent.markets[0],
+        version: "v2",
+        positionIds: [(1n << 248n).toString(), ((1n << 248n) + 1n).toString()],
+        clobTokenIds: undefined,
+      },
+    ],
+  };
+
+  const item = normalizeGammaEventToWatchlistItem(event);
+
+  assert.equal(item.tokenId, (1n << 248n).toString());
+  assert.equal(item.protocolVersion, "v2");
+  assert.equal(item.outcomeIndex, 0);
+});
+
 test("imports the highest-probability open market from a multi-market event", () => {
   const item = normalizeGammaEventToWatchlistItem(peaceDealEvent);
 

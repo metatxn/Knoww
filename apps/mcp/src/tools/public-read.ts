@@ -13,7 +13,7 @@ import { requireToolQuota } from "../quota";
 import { isAbortLike } from "./gamma";
 
 export const WALLET_ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
-export const CONDITION_ID_PATTERN = /^0x[0-9a-f]{64}$/;
+export const CONDITION_ID_PATTERN = /^0x(?:[0-9a-f]{62}|[0-9a-f]{64})$/;
 export const TOKEN_ID_PATTERN = /^[0-9]{1,80}$/;
 
 export function cleanQuotedText(

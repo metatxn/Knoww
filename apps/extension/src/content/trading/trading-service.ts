@@ -9,8 +9,13 @@
 import { createLogger } from "@knoww/logger";
 import { sameAddress } from "@knoww/shared-types/bridge";
 import {
+  EXCHANGE_V3_ADDRESS,
+  POSITION_MANAGER_ADDRESS,
+} from "@knoww/shared-types/contracts";
+import {
   type ClobOrderType,
   POLYGON_CHAIN_ID_HEX,
+  resolvePolymarketProtocolVersion,
   resolvePreferredTradingWalletMode,
 } from "@knoww/shared-types/polymarket";
 import type { OrderBook } from "@knoww/shared-types/slippage";
@@ -105,6 +110,8 @@ export interface TradingContext {
   minOrderSize: number;
   tickSize: number;
   hasTradingApproval: boolean;
+  usdcAllowanceV2?: number;
+  positionApprovalV2?: boolean;
   usdcAllowance: number;
   usdcAllowanceNegRisk: number;
   approvalReadStatus: TradingSetupAllowanceReadStatus | "unknown";
@@ -1012,7 +1019,17 @@ export const TradingService = {
               ownerAddress,
             },
             "Setup allowance check"
-          )
+          ).then((result) => {
+            update({
+              usdcAllowanceV2:
+                result.allowances[`pusd:${EXCHANGE_V3_ADDRESS}`] ?? 0,
+              positionApprovalV2:
+                result.allowances[
+                  `erc1155:${POSITION_MANAGER_ADDRESS}:${EXCHANGE_V3_ADDRESS}`
+                ] === 1,
+            });
+            return result;
+          })
       );
       if (approvalStatus.allowanceReadStatus === "degraded") {
         consecutiveDegradedApprovalReads++;
@@ -1136,6 +1153,7 @@ export const TradingService = {
 
   async placeOrder(params: {
     tokenId: string;
+    protocolVersion?: "v1" | "v2";
     conditionId?: string;
     outcomeIndex: number;
     side: "BUY" | "SELL";
@@ -1151,6 +1169,10 @@ export const TradingService = {
       throw new Error("Trading setup incomplete");
     }
 
+    params.protocolVersion = resolvePolymarketProtocolVersion(
+      params.tokenId,
+      params.protocolVersion
+    );
     update({ state: "placing-order", error: null });
 
     const analytics = {
@@ -1280,7 +1302,8 @@ export const TradingService = {
 
   async approveUsdc(
     _negRisk = false,
-    approvalAmount?: number
+    approvalAmount?: number,
+    protocolVersion?: "v1" | "v2"
   ): Promise<string> {
     if (!ctx.address) throw new Error("Wallet not connected");
     if (ctx.state === "approving") {
@@ -1304,6 +1327,7 @@ export const TradingService = {
         }>(
           {
             type: "trading:relayer-approve",
+            protocolVersion,
             address: ctx.address,
             walletMode: ctx.walletMode,
             approvalAmount:
@@ -1346,7 +1370,8 @@ export const TradingService = {
     amount: string,
     yesTokenId?: string,
     noTokenId?: string,
-    negRisk = false
+    negRisk = false,
+    protocolVersion?: "v1" | "v2"
   ): Promise<unknown> {
     if (!ctx.address) throw new Error("Wallet not connected");
 
@@ -1361,6 +1386,7 @@ export const TradingService = {
             amount,
             address: ctx.address,
             negRisk,
+            protocolVersion,
             proxyAddress: ctx.proxyAddress ?? undefined,
             walletMode: ctx.walletMode,
             yesTokenId,
@@ -1388,7 +1414,8 @@ export const TradingService = {
     amount: string,
     yesTokenId?: string,
     noTokenId?: string,
-    negRisk = false
+    negRisk = false,
+    protocolVersion?: "v1" | "v2"
   ): Promise<unknown> {
     if (!ctx.address) throw new Error("Wallet not connected");
 
@@ -1403,6 +1430,7 @@ export const TradingService = {
             amount,
             address: ctx.address,
             negRisk,
+            protocolVersion,
             proxyAddress: ctx.proxyAddress ?? undefined,
             walletMode: ctx.walletMode,
             yesTokenId,
@@ -1427,7 +1455,8 @@ export const TradingService = {
 
   async getOutcomeBalances(
     yesTokenId: string,
-    noTokenId: string
+    noTokenId: string,
+    protocolVersion?: "v1" | "v2"
   ): Promise<OutcomeBalances> {
     if (!ctx.proxyAddress) throw new Error("Proxy wallet not derived");
     return sendMsg(
@@ -1435,6 +1464,7 @@ export const TradingService = {
         type: "trading:get-outcome-balances",
         yesTokenId,
         noTokenId,
+        protocolVersion,
         ownerAddress: ctx.proxyAddress,
       },
       "Failed to get outcome balances"

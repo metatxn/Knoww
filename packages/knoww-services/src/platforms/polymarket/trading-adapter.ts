@@ -4,6 +4,9 @@ import {
   CLOB_ASSET_TYPES,
   CLOB_ORDER_TYPES,
   type ClobOrderType,
+  decodePolymarketV2AssetId,
+  type PolymarketProtocolVersion,
+  resolvePolymarketProtocolVersion,
   syncClobBalanceAllowance,
   TRADING_SIDES,
   type TradingSide,
@@ -151,6 +154,7 @@ interface TradingAccount {
 interface MarketSnapshot {
   conditionId: string;
   tokenId: string;
+  protocolVersion: PolymarketProtocolVersion;
   status: MarketStatus;
   tickSize?: string;
   minSize?: string;
@@ -397,6 +401,7 @@ function snapshotOf(record: ClobMarketRecord, tokenId: string): MarketSnapshot {
   return {
     conditionId: record.condition_id,
     tokenId,
+    protocolVersion: resolvePolymarketProtocolVersion(tokenId),
     status: marketStatusOf(record),
     tickSize: decimalText(record.minimum_tick_size),
     minSize: decimalText(record.minimum_order_size),
@@ -437,6 +442,8 @@ function draftDrift(before: MarketSnapshot, after: MarketSnapshot): string[] {
   if (before.tickSize !== after.tickSize) drift.push("tickSize");
   if (before.minSize !== after.minSize) drift.push("minSize");
   if (before.negRisk !== after.negRisk) drift.push("negRisk");
+  if (before.protocolVersion !== after.protocolVersion)
+    drift.push("protocolVersion");
   return drift;
 }
 
@@ -745,6 +752,19 @@ export function createPolymarketTradingAdapter(
     tokenId: string,
     operation: PlatformOperation
   ): Promise<MarketSnapshot> {
+    if (resolvePolymarketProtocolVersion(tokenId) === "v2") {
+      const assetCondition = decodePolymarketV2AssetId(tokenId).conditionId;
+      if (
+        conditionId.toLowerCase() !== assetCondition &&
+        conditionId.toLowerCase() !== `${assetCondition}00`
+      ) {
+        throw fail(
+          operation,
+          "invalid_input",
+          "Position ID does not belong to the requested condition"
+        );
+      }
+    }
     const record = await clobMarket.fetchClobMarket(conditionId);
     if (!record) {
       throw fail(
@@ -896,6 +916,7 @@ export function createPolymarketTradingAdapter(
           conditionId,
           tokenId,
           negRisk: market.negRisk,
+          protocolVersion: market.protocolVersion,
           tradingAddress: account.tradingAddress,
           signatureType: account.signatureType,
           clobOrderType: clobOrderType(intent),
@@ -935,7 +956,8 @@ export function createPolymarketTradingAdapter(
   async function syncBalanceAllowance(
     client: LegacyClobCompatibleClient,
     tokenId: string,
-    requiredConditionalRaw: bigint | null
+    requiredConditionalRaw: bigint | null,
+    protocolVersion: PolymarketProtocolVersion
   ): Promise<void> {
     const requireSellBalance = requiredConditionalRaw !== null;
     let lastSyncError: unknown;
@@ -945,13 +967,17 @@ export function createPolymarketTradingAdapter(
       try {
         await syncClobBalanceAllowance(client, {
           tokenId,
+          protocolVersion,
           includeCollateral: !requireSellBalance,
         });
         if (!requireSellBalance) return;
 
         const balanceAllowance = balanceAllowanceSchema.safeParse(
           await client.getBalanceAllowance({
-            assetType: CLOB_ASSET_TYPES.CONDITIONAL,
+            assetType:
+              protocolVersion === "v2"
+                ? CLOB_ASSET_TYPES.CONDITIONAL_V2
+                : CLOB_ASSET_TYPES.CONDITIONAL,
             tokenId,
           })
         );
@@ -1051,11 +1077,12 @@ export function createPolymarketTradingAdapter(
       tokenId,
       intent.side === "sell"
         ? (stored.plan.sell?.requiredConditionalRaw ?? null)
-        : null
+        : null,
+      fresh.protocolVersion
     );
     const order = await signOrder(client, intent, tokenId);
     // Resync once more after signing, best-effort like the hook.
-    await syncBalanceAllowance(client, tokenId, null);
+    await syncBalanceAllowance(client, tokenId, null, fresh.protocolVersion);
     let response: unknown;
     try {
       response = await client.postOrder(order, clobOrderType(intent));

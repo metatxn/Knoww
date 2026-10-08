@@ -37,6 +37,14 @@ export const NEG_RISK_CTF_COLLATERAL_ADAPTER_ADDRESS =
 export const CTF_ADDRESS =
   "0x4d97dcd97ec945f40cf65f87097ace5ea0476045" as const;
 
+/** Protocol V2 outcome ledger and position operations on Polygon. */
+export const POSITION_MANAGER_ADDRESS =
+  "0x006F54F7f9A22e0000CC2AB60031000000ae9fEF" as const;
+export const ROUTER_ADDRESS =
+  "0x12121212006e4CD160D18e3f00711DA5c3372600" as const;
+export const EXCHANGE_V3_ADDRESS =
+  "0xe3333700cA9d93003F00f0F71f8515005F6c00Aa" as const;
+
 /** CTF Exchange V2 — Standard binary markets */
 export const CTF_EXCHANGE_ADDRESS =
   "0xE111180000d2663C0091e4f400237545B87B996B" as const;

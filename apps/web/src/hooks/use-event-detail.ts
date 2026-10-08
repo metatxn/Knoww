@@ -21,6 +21,8 @@ interface Market {
   outcomePrices?: string;
   /** CLOB token IDs - JSON string array of token IDs for each outcome */
   clobTokenIds?: string;
+  positionIds?: string | string[];
+  version?: "v1" | "v2";
   /** Tokens array with token_id for YES and NO outcomes */
   tokens?: MarketToken[];
   /** Condition ID for the market */

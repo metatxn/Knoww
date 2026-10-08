@@ -1,11 +1,12 @@
 "use client";
 
+import { parseGammaStringArray } from "@knoww/shared-types/polymarket";
 import { Calendar } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useOrderBookStore } from "@/hooks/use-orderbook-store";
 import { useOrderBookWebSocket } from "@/hooks/use-shared-websocket";
 import { getGameStartTime } from "./sportsbook/dates";
-import { resolveLivePrice } from "./sportsbook/format";
+import { resolveLivePrice, tokenIdForOutcome } from "./sportsbook/format";
 import {
   getLeagueFromTags,
   sortLeagueEntriesForRegion,
@@ -92,7 +93,9 @@ export function LiveSportsbook({
     const ids = new Set<string>();
     for (const event of events) {
       for (const market of event.markets || []) {
-        for (const tokenId of market.clobTokenIds || []) {
+        for (const tokenId of parseGammaStringArray(market.outcomes).map(
+          (_, index) => tokenIdForOutcome(market, index)
+        )) {
           if (tokenId) ids.add(tokenId);
         }
       }
@@ -109,7 +112,7 @@ export function LiveSportsbook({
       fallbackPrice: number
     ) => {
       if (!market) return fallbackPrice;
-      const tokenId = market.clobTokenIds?.[outcomeIndex];
+      const tokenId = tokenIdForOutcome(market, outcomeIndex);
       return resolveLivePrice(tokenId, fallbackPrice, orderBooks, lastTrades);
     },
     [orderBooks, lastTrades]
@@ -220,7 +223,7 @@ export function ScheduledSportsbook({
       fallbackPrice: number
     ) => {
       if (!market) return fallbackPrice;
-      const tokenId = market.clobTokenIds?.[outcomeIndex];
+      const tokenId = tokenIdForOutcome(market, outcomeIndex);
       return resolveLivePrice(tokenId, fallbackPrice, orderBooks, lastTrades);
     },
     [orderBooks, lastTrades]
