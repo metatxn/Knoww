@@ -379,3 +379,36 @@ it("rejects unsupported legacy position sorts before calling upstream", async ()
   ).rejects.toMatchObject({ status: 400 });
   expect(fetchImpl).not.toHaveBeenCalled();
 });
+
+it("validates first acquisition timestamps as integer epoch seconds with zero sentinel", async () => {
+  const client = createPolymarketClient({
+    fetchImpl: async () =>
+      envelope([
+        { ...position, first_entry_at: 1_800_000_000 },
+        { ...position, first_entry_at: 0 },
+        position,
+      ]),
+  });
+  const rows = await client.fetchWalletPositions({
+    walletAddress: "wallet",
+    limit: 3,
+    offset: 0,
+  });
+  expect(rows.map((row) => row.firstEntryAt)).toEqual([
+    1_800_000_000,
+    0,
+    undefined,
+  ]);
+  for (const value of [-1, 0.5, "1800000000"]) {
+    const invalidClient = createPolymarketClient({
+      fetchImpl: async () => envelope([{ ...position, first_entry_at: value }]),
+    });
+    await expect(
+      invalidClient.fetchWalletPositions({
+        walletAddress: "wallet",
+        limit: 1,
+        offset: 0,
+      })
+    ).rejects.toThrow("invalid page");
+  }
+});

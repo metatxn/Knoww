@@ -12,6 +12,8 @@ export interface Position {
   id: string;
   asset: string;
   conditionId: string;
+  /** Epoch seconds of first acquisition; 0 means unrecorded. */
+  firstEntryAt?: number;
   outcomeIndex: number;
   outcome: string;
   size: number;
@@ -42,6 +44,7 @@ export interface LostPosition {
   id: string;
   asset: string;
   conditionId: string;
+  firstEntryAt?: number;
   outcomeIndex: number;
   outcome: string;
   size: number;

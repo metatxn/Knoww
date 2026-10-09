@@ -10,6 +10,7 @@ import { createGammaEvents } from "./gamma-events";
 import { createGammaSearch } from "./gamma-search";
 import { createProfiles } from "./profiles";
 import { createPublicData } from "./public-data";
+import { createTokenLookup } from "./token-lookup";
 
 /**
  * One Polymarket client per base-URL set. The registry builds the production
@@ -45,6 +46,7 @@ export function createPolymarketClient(init: PolymarketClientInit = {}) {
     ...createGammaEvents(ctx),
     ...createClobOrderbook(ctx),
     ...createClobPriceHistory(ctx),
+    ...createTokenLookup(ctx),
     ...publicData,
     ...createProfiles(ctx, publicData),
   };

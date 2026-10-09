@@ -35,6 +35,7 @@ interface PolymarketPosition {
   proxyWallet: string;
   asset: string;
   conditionId: string;
+  firstEntryAt?: number;
   size: number;
   avgPrice: number;
   initialValue: number;
@@ -442,6 +443,7 @@ export async function GET(request: NextRequest) {
       id: `${p.conditionId}-${p.outcomeIndex}`,
       asset: p.asset,
       conditionId: p.conditionId,
+      ...(p.firstEntryAt === undefined ? {} : { firstEntryAt: p.firstEntryAt }),
       outcomeIndex: p.outcomeIndex,
       outcome: p.outcome,
       oppositeOutcome: p.oppositeOutcome,
@@ -482,6 +484,7 @@ export async function GET(request: NextRequest) {
       id: `${p.conditionId}-${p.outcomeIndex}`,
       asset: p.asset,
       conditionId: p.conditionId,
+      ...(p.firstEntryAt === undefined ? {} : { firstEntryAt: p.firstEntryAt }),
       outcomeIndex: p.outcomeIndex,
       outcome: p.outcome,
       size: p.size,

@@ -19,6 +19,7 @@ import {
   type SelectedMarketInfo,
 } from "@/components/live-sportsbook";
 import { findOutcomeIndex } from "@/components/trading/ticket-props";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBestPrices, useOrderBookStore } from "@/hooks/use-orderbook-store";
 import { usePaginatedEvents } from "@/hooks/use-paginated-events";
@@ -297,7 +298,7 @@ export function SportsbookView({
   seriesId,
   label,
   liveOnly = false,
-  pageLimit = 50,
+  pageLimit = 6,
 }: SportsbookViewProps) {
   const [selectedMarket, setSelectedMarket] =
     useState<SelectedMarketInfo | null>(null);
@@ -314,6 +315,10 @@ export function SportsbookView({
     data: paginatedData,
     error: scheduledError,
     isLoading: scheduledLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
   } = usePaginatedEvents({
     limit: pageLimit,
     order: "volume24hr",
@@ -678,7 +683,8 @@ export function SportsbookView({
   );
 
   const isLoading = liveLoading || scheduledLoading;
-  const error = liveError || scheduledError;
+  const error =
+    liveError || (paginatedData?.pages.length ? null : scheduledError);
   const labelText = label?.toLowerCase() ?? "sports";
   const displayLeagueLabel =
     labelText.length <= 4
@@ -741,7 +747,8 @@ export function SportsbookView({
             {!error &&
               !isLoading &&
               liveCount === 0 &&
-              scheduledCount === 0 && (
+              scheduledCount === 0 &&
+              !hasNextPage && (
                 <div className="py-16 text-center border-y border-border/40">
                   <p className="font-mono text-[12px] uppercase tracking-[0.08em] text-muted-foreground/90 mb-3">
                     No Markets
@@ -754,6 +761,33 @@ export function SportsbookView({
                   </p>
                 </div>
               )}
+
+            {!error && !isLoading && hasNextPage && (
+              <div className="mt-6 flex flex-col items-center gap-3">
+                {isFetchNextPageError && (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    More markets could not be loaded. Try again.
+                  </p>
+                )}
+                {liveCount === 0 && scheduledCount === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No current markets in this batch. Load more to continue.
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isFetchingNextPage}
+                  onClick={() => void fetchNextPage()}
+                >
+                  {isFetchingNextPage
+                    ? "Loading markets..."
+                    : isFetchNextPageError
+                      ? "Retry loading markets"
+                      : "Load more markets"}
+                </Button>
+              </div>
+            )}
           </m.div>
         </AnimatePresence>
 
