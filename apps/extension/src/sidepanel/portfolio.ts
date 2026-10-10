@@ -10,6 +10,10 @@ import {
   sendRuntimeMessage,
 } from "./messaging";
 import {
+  loadOrderTokenMarkets,
+  type OrderMarketResponse,
+} from "./order-token-markets";
+import {
   setSidepanelView as applySidepanelView,
   escapeHtml,
   formatAddress,
@@ -1361,17 +1365,6 @@ export function createPortfolioSidepanel(
     expiration?: string | number;
   };
 
-  type MarketByTokenResponse = {
-    success?: boolean;
-    market?: {
-      question?: string;
-      outcome?: string;
-      eventSlug?: string;
-      slug?: string;
-      icon?: string;
-    };
-  };
-
   function normalizePortfolioOpenOrder(
     order: RawPortfolioOpenOrder
   ): PortfolioOpenOrder {
@@ -1408,16 +1401,9 @@ export function createPortfolioSidepanel(
     const tokenIds = Array.from(
       new Set(orders.map((order) => order.tokenId).filter(Boolean))
     );
-    const marketEntries = await Promise.all(
-      tokenIds.map(async (tokenId) => {
-        const market = await fetchKnowwJson<MarketByTokenResponse>(
-          `/api/polymarket/markets/by-token/${encodeURIComponent(tokenId)}`,
-          KNOWW_APP_URL
-        );
-        return [tokenId, market?.market] as const;
-      })
+    const marketsByToken = await loadOrderTokenMarkets(tokenIds, (path) =>
+      fetchKnowwJson<OrderMarketResponse>(path, KNOWW_APP_URL)
     );
-    const marketsByToken = new Map(marketEntries.filter((entry) => entry[1]));
 
     return {
       count: typeof payload?.count === "number" ? payload.count : orders.length,

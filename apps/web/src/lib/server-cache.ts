@@ -23,6 +23,7 @@ import {
   fetchTagRecord,
   upstreamStatus,
 } from "@/polymarket/profile-reads";
+import { fetchSportsInitialEvents } from "@/polymarket/sports-initial-events";
 
 /**
  * Server-side Cache Utilities using React.cache()
@@ -200,6 +201,22 @@ export const getInitialEventsByTagStrict = cache(
     } catch (error) {
       logger.error("server_cache.events_by_tag.strict_fetch_failed", {
         tagSlug: normalizeTagSlug(tagSlug),
+        seriesId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+);
+
+/** Sports metadata and image preloads share a bounded inventory per render. */
+export const getInitialSportsEventsStrict = cache(
+  async (tagSlug: string, seriesId?: number) => {
+    try {
+      return await fetchSportsInitialEvents(tagSlug, seriesId);
+    } catch (error) {
+      logger.error("server_cache.sports.strict_fetch_failed", {
+        tagSlug,
         seriesId,
         error: error instanceof Error ? error.message : String(error),
       });

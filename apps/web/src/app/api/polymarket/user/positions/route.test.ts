@@ -745,3 +745,38 @@ describe("GET /api/polymarket/user/positions", () => {
     expect(upstreamFetch).not.toHaveBeenCalled();
   });
 });
+
+it.each([0, 1_800_000_000])(
+  "exposes firstEntryAt %i on active and lost positions",
+  async (firstEntryAt) => {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const redeemable =
+        new URL(String(input)).searchParams.get("redeemable") === "true";
+      return Response.json(
+        redeemable
+          ? [
+              {
+                ...openPosition,
+                asset: "222",
+                outcomeIndex: 1,
+                redeemable: true,
+                curPrice: 0,
+                currentValue: 0,
+                firstEntryAt,
+              },
+            ]
+          : [{ ...openPosition, firstEntryAt }]
+      );
+    });
+    const response = await GET(
+      new NextRequest(
+        "https://knoww.app/api/polymarket/user/positions?user=0x0000000000000000000000000000000000000001"
+      )
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      positions: [{ firstEntryAt }],
+      lostPositions: [{ firstEntryAt }],
+    });
+  }
+);

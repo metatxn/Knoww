@@ -135,6 +135,11 @@ export {
 export { POLYMARKET_REGION_POLICY } from "./region-policy";
 export { type GammaStatusFlags, mapPolymarketStatus } from "./status";
 export {
+  type PolymarketToken,
+  type TokenLookupInput,
+  tokenLookupInputSchema,
+} from "./token-lookup";
+export {
   createPolymarketTradingAdapter,
   type PolymarketTradingAdapter,
   type PolymarketTradingAdapterInit,

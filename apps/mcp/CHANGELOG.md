@@ -4,6 +4,8 @@
 
 ### Added
 
+- Public wallet positions and closed positions expose `firstEntryAt` in epoch seconds, with `0` meaning unrecorded. Public wallet activity includes `outcomeIndex`, including index `0`.
+
 - Seven trading tools (`get_trading_connection`, `get_account_positions`, `get_account_activity`, `get_account_orders`, `preview_order`, `place_order`, `cancel_order`) implemented over `TradingAdapter`, registered only behind `EXPOSE_TRADING_TOOLS` (off) and gated by reserved scopes that nothing grants yet, so the public tool list is unchanged.
 - Conversational discovery guidance and a `show_markets` MCP App with current prices, outcome history, refresh, Knoww links, and text-only fallback. Includes a local fixture preview and bridge regression tests.
 

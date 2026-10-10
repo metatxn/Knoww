@@ -111,6 +111,9 @@ function projectPosition(
     proxyWallet: row.proxyWallet,
     tokenId: row.asset,
     conditionId: row.conditionId,
+    ...(row.firstEntryAt !== undefined
+      ? { firstEntryAt: row.firstEntryAt }
+      : {}),
     size: row.size,
     avgPrice: row.avgPrice,
     initialValue: row.initialValue,
@@ -436,6 +439,9 @@ function registerWalletActivity(server: McpServer) {
                 ...(row.price ? { price: row.price } : {}),
                 ...(row.asset ? { tokenId: row.asset } : {}),
                 ...(row.side ? { side: row.side } : {}),
+                ...(row.outcomeIndex !== undefined
+                  ? { outcomeIndex: row.outcomeIndex }
+                  : {}),
                 ...(cleanQuotedText(row.title, 500)
                   ? { title: cleanQuotedText(row.title, 500) }
                   : {}),
@@ -542,6 +548,9 @@ function registerClosedPositions(server: McpServer) {
                 realizedPnl: row.realizedPnl,
                 currentPrice: row.curPrice,
                 timestamp: row.timestamp,
+                ...(row.firstEntryAt !== undefined
+                  ? { firstEntryAt: row.firstEntryAt }
+                  : {}),
                 ...(cleanQuotedText(row.title, 500)
                   ? { title: cleanQuotedText(row.title, 500) }
                   : {}),

@@ -48,6 +48,8 @@ const positionSchema = z
     proxyWallet: z.string(),
     asset: z.string(),
     conditionId: z.string(),
+    /** First acquisition in epoch seconds; 0 means no acquisition is recorded. */
+    firstEntryAt: z.number().int().nonnegative().optional(),
     size: nonNegativeDecimalStringSchema,
     avgPrice: probabilityStringSchema,
     initialValue: nonNegativeDecimalStringSchema,
@@ -103,6 +105,7 @@ const closedPositionSchema = z
     proxyWallet: z.string(),
     asset: z.string(),
     conditionId: z.string(),
+    firstEntryAt: z.number().int().nonnegative().optional(),
     avgPrice: probabilityStringSchema,
     totalBought: nonNegativeDecimalStringSchema,
     realizedPnl: decimalStringSchema,

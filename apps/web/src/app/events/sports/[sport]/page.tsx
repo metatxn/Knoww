@@ -9,7 +9,7 @@ import {
   PRIORITY_EVENT_CARD_IMAGE_WIDTH,
 } from "@/lib/lcp-images";
 import { buildPageMetadata, canonicalUrl } from "@/lib/seo";
-import { getInitialEventsByTagStrict } from "@/lib/server-cache";
+import { getInitialSportsEventsStrict } from "@/lib/server-cache";
 import { getSportEntry, isSportSubSlug } from "@/lib/sport-categories";
 
 interface SportSubPageProps {
@@ -26,7 +26,7 @@ export async function generateMetadata({
   }
   const entry = getSportEntry(normalized);
   const label = entry?.label || normalized.toUpperCase();
-  const initialData = await getInitialEventsByTagStrict(
+  const initialData = await getInitialSportsEventsStrict(
     entry?.tagSlug || normalized,
     entry?.seriesId
   );
@@ -62,7 +62,7 @@ export default async function SportSubPage({ params }: SportSubPageProps) {
   // When the entry has a Polymarket series ID, prefer that — it filters to
   // exactly the events Polymarket's own UI shows for that league/season.
   const entry = getSportEntry(normalized);
-  const initialData = await getInitialEventsByTagStrict(
+  const initialData = await getInitialSportsEventsStrict(
     entry?.tagSlug || normalized,
     entry?.seriesId
   );
@@ -113,7 +113,7 @@ export default async function SportSubPage({ params }: SportSubPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <SportsContent initialData={initialData} selectedSport={normalized} />
+      <SportsContent selectedSport={normalized} />
     </>
   );
 }
