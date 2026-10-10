@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SportsbookView } from "./sportsbook-view";
 
@@ -84,14 +90,66 @@ function renderFeed() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <SportsbookView tagSlug="nfl" label="NFL" />
     </QueryClientProvider>
   );
+  return { ...view, client };
 }
 
 describe("sports feed continuation", () => {
+  it("blocks pagination during a background refetch and enables it afterward", async () => {
+    const calls: URL[] = [];
+    let releaseRefetch!: () => void;
+    const refetchGate = new Promise<void>((resolve) => {
+      releaseRefetch = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input), "https://knoww.app");
+        calls.push(url);
+        if (calls.length === 2) await refetchGate;
+        return Response.json({
+          success: true,
+          data: [event(url.searchParams.has("after_cursor") ? "2" : "1")],
+          pagination: {
+            nextCursor: url.searchParams.has("after_cursor") ? null : "next",
+          },
+        });
+      })
+    );
+    const { client } = renderFeed();
+    const loadMore = await screen.findByRole("button", {
+      name: "Load more markets",
+    });
+    let refetch!: Promise<void>;
+    act(() => {
+      refetch = client.refetchQueries({ type: "active" });
+    });
+    try {
+      await waitFor(() => expect(loadMore).toBeDisabled());
+      expect(
+        screen.getByRole("button", { name: "Game 1" })
+      ).toBeInTheDocument();
+      fireEvent.click(loadMore);
+      expect(calls).toHaveLength(2);
+      expect(calls.every((url) => !url.searchParams.has("after_cursor"))).toBe(
+        true
+      );
+    } finally {
+      await act(async () => {
+        releaseRefetch();
+        await refetch;
+      });
+    }
+    await waitFor(() => expect(loadMore).toBeEnabled());
+    fireEvent.click(loadMore);
+    await screen.findByRole("button", { name: "Game 2" });
+    expect(calls[2].searchParams.get("after_cursor")).toBe("next");
+  });
+
   it("loads the next small page without losing the selected market or duplicating the boundary", async () => {
     const calls: URL[] = [];
     vi.stubGlobal(

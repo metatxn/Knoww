@@ -317,6 +317,7 @@ export function SportsbookView({
     isLoading: scheduledLoading,
     fetchNextPage,
     hasNextPage,
+    isFetching,
     isFetchingNextPage,
     isFetchNextPageError,
   } = usePaginatedEvents({
@@ -777,7 +778,7 @@ export function SportsbookView({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isFetchingNextPage}
+                  disabled={isFetchingNextPage || isFetching}
                   onClick={() => void fetchNextPage()}
                 >
                   {isFetchingNextPage
