@@ -481,10 +481,7 @@ test("side panel exposes a compact portfolio view without charts", () => {
   assert.equal(/cashBalance/.test(sidepanelSource), true);
   assert.equal(/Cash/.test(sidepanelSource), true);
   assert.equal(/KNOWW_GET_PORTFOLIO_OPEN_ORDERS/.test(sidepanelSource), true);
-  assert.equal(
-    /\/api\/polymarket\/markets\/by-token/.test(sidepanelSource),
-    true
-  );
+  // Metadata batching and Gamma fallback are covered in order-token-markets.test.ts.
   assert.equal(/renderPortfolioSummary/.test(sidepanelSource), true);
   assert.equal(/renderCompactPositions/.test(sidepanelSource), true);
   assert.equal(/renderCompactOpenOrders/.test(sidepanelSource), true);
