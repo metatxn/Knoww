@@ -19,18 +19,18 @@
     "@fontsource/fraunces": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/plus-jakarta-sans": "^5.3.0",
-    "@remotion/cli": "4.0.530",
-    "@remotion/fonts": "4.0.530",
-    "@remotion/shapes": "4.0.530",
-    "@remotion/tailwind-v4": "4.0.530",
+    "@remotion/cli": "4.0.533",
+    "@remotion/fonts": "4.0.533",
+    "@remotion/shapes": "4.0.533",
+    "@remotion/tailwind-v4": "4.0.533",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "remotion": "4.0.530",
+    "remotion": "4.0.533",
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
     "@types/react": "catalog:",
     "typescript": "catalog:",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   }
 }

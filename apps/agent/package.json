@@ -25,11 +25,11 @@
     "ai": "7.0.123",
     "decimal.js": "catalog:",
     "viem": "catalog:",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "typescript": "catalog:"
   }
 }
