@@ -537,6 +537,74 @@ describe("MCP Google OAuth flow", () => {
     ]);
   });
 
+  it("rejects a valid issuer token minted for a different resource", async () => {
+    const clientId = await registerClient();
+    const otherResource = "https://other.example/mcp";
+    const issuerOptions = {
+      apiRoute: "/mcp",
+      apiHandler: { fetch: async () => new Response() },
+      defaultHandler: { fetch: async () => new Response() },
+      authorizeEndpoint: "/authorize",
+      tokenEndpoint: "/oauth/token",
+      resourceMetadata: { resource: otherResource },
+    };
+    const issuer = new OAuthProvider(issuerOptions);
+    const api = getOAuthApi(issuerOptions, env);
+    const authorization = new URL(
+      authorizationPath({
+        clientId,
+        codeChallenge: await pkceChallenge(TEST_VERIFIER),
+        scope: MARKETS_READ_SCOPE,
+      }),
+      ORIGIN
+    );
+    authorization.searchParams.set("resource", otherResource);
+    const request = await api.parseAuthRequest(new Request(authorization));
+    const { redirectTo } = await api.completeAuthorization({
+      request,
+      userId: `mcp_${"a".repeat(64)}`,
+      metadata: {},
+      scope: [MARKETS_READ_SCOPE],
+      props: {
+        authMethod: "google-oidc",
+        googleSubject: GOOGLE_SUBJECT,
+        principalId: `google-${GOOGLE_SUBJECT}`,
+        plan: "free",
+        scopes: [MARKETS_READ_SCOPE],
+      },
+    });
+    const ctx = createExecutionContext();
+    const exchange = await issuer.fetch(
+      tokenRequest(clientId, {
+        grant_type: "authorization_code",
+        code: new URL(redirectTo).searchParams.get("code") ?? "",
+        code_verifier: TEST_VERIFIER,
+        redirect_uri: REDIRECT_URI,
+        resource: otherResource,
+      }),
+      env,
+      ctx
+    );
+    await waitOnExecutionContext(ctx);
+    expect(exchange.status).toBe(200);
+    const tokens = await exchange.json<{ access_token: string }>();
+    const response = await dispatchGoogleFlow(
+      oauthRequest("/mcp", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${tokens.access_token}`,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      })
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "invalid_token",
+    });
+  });
+
   it("requires reauthorization for legacy codes and refresh tokens", async () => {
     const clientId = await registerClient();
     const legacyOptions = {

@@ -1,6 +1,7 @@
 import { createLogger } from "@knoww/logger";
 import { createMcpHandler, type StatelessMcpHandler } from "agents/mcp/server";
 import { MCP_ANALYTICS_EVENTS, parseMcpProtocolMessages } from "./analytics";
+import { MAX_MCP_BODY_BYTES } from "./body-limit";
 import type { WorkerConfig } from "./config";
 import {
   currentAnalytics,
@@ -25,6 +26,8 @@ function handlerFor(config: WorkerConfig): StatelessMcpHandler {
   if (!handler) {
     handler = createMcpHandler(() => createKnowwMcpServer(), {
       route: "/mcp",
+      // The Worker also enforces this before Agents parses legacy requests.
+      maxRequestBodySize: MAX_MCP_BODY_BYTES,
       allowedHostnames: config.allowedHostnames,
       allowedOriginHostnames: config.allowedOriginHostnames,
       onerror(error) {

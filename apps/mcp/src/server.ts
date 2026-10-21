@@ -19,6 +19,8 @@ import { registerShowMarketsTool } from "./tools/show-markets";
 import { registerTradingTools } from "./tools/trading";
 
 export const SERVER_INFO = { name: "knoww-mcp", version: "0.1.0" } as const;
+// Count nested members before schema validation can allocate an error per entry.
+export const MAX_MCP_TOOL_INPUT_ELEMENTS = 1000;
 
 type ToolCallback = (...args: unknown[]) => unknown;
 type RegisterTool = (
@@ -110,7 +112,10 @@ export interface KnowwMcpServerOptions {
 export function createKnowwMcpServer(
   options: KnowwMcpServerOptions = {}
 ): McpServer {
-  const server = new McpServer(SERVER_INFO, { capabilities: { tools: {} } });
+  const server = new McpServer(SERVER_INFO, {
+    capabilities: { tools: {} },
+    maxToolInputElements: MAX_MCP_TOOL_INPUT_ELEMENTS,
+  });
   instrumentToolRegistration(server);
   registerSearchMarketsTool(server);
   registerGetMarketTool(server);
