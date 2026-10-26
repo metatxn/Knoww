@@ -5,6 +5,7 @@ import openNextConfig from "../../open-next.config";
 
 type WranglerConfig = {
   name?: string;
+  previews?: Record<string, unknown>;
   r2_buckets?: Array<{
     binding?: string;
     bucket_name?: string;
@@ -91,6 +92,22 @@ const resolveOverride = async (override: unknown) =>
   typeof override === "function" ? await override() : override;
 
 describe("OpenNext Cloudflare config", () => {
+  it("opts into Worker Previews and builds before publishing a branch preview", () => {
+    expect(parseWranglerConfig().previews).toEqual(expect.any(Object));
+    const webPackage = JSON.parse(
+      readFileSync(join(process.cwd(), "package.json"), "utf8")
+    );
+    expect(webPackage.scripts["deploy:preview"]).toBe(
+      "opennextjs-cloudflare build && wrangler preview"
+    );
+    const rootPackage = JSON.parse(
+      readFileSync(join(process.cwd(), "../../package.json"), "utf8")
+    );
+    expect(rootPackage.scripts["deploy:preview"]).toBe(
+      "pnpm --filter @knoww/web run deploy:preview"
+    );
+  });
+
   it("parses JSONC comments without corrupting string literals", () => {
     const parsed = JSON.parse(
       stripJsonComments(`{

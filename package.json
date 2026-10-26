@@ -16,6 +16,7 @@
     "package:knoww-plugin": "python3 tooling/knoww-hooks/package_plugin.py",
     "preview": "pnpm --filter @knoww/web preview",
     "deploy": "pnpm --filter @knoww/web run deploy",
+    "deploy:preview": "pnpm --filter @knoww/web run deploy:preview",
     "upload": "pnpm --filter @knoww/web run upload",
     "lint": "biome check",
     "lint:ext": "pnpm --filter @knoww/extension lint",

@@ -8,6 +8,8 @@
   // Keep the production workers.dev URL disabled while allowing branch previews.
   "workers_dev": false,
   "preview_urls": true,
+  // Worker Previews require this block and use separate runtime bindings.
+  "previews": {},
   "main": "custom-worker.ts",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],

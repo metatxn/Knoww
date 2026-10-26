@@ -119,6 +119,7 @@ pnpm typecheck:ext  # Type-check the extension only
 pnpm audit:security # Run a high-severity dependency audit
 pnpm brand:render   # Render the brand mark asset
 pnpm deploy         # Deploy the web app to Cloudflare
+pnpm deploy:preview # Build and publish the current branch as a Worker Preview
 pnpm prepare        # Install Husky hooks
 pnpm release:ext    # Bump, build, and zip the extension release
 ```
@@ -139,6 +140,14 @@ pnpm --filter @knoww/web test:e2e       # Web Playwright smoke test
 pnpm --filter @knoww/extension test     # Extension scoring tests
 pnpm --filter @knoww/agent test         # Agent node tests
 ```
+
+### Cloudflare branch previews
+
+For Workers Builds running from the repository root, set the dashboard's **Preview command** to `pnpm deploy:preview`. This command builds the OpenNext Worker and assets, then runs the Wrangler version pinned in `apps/web`. The `previews` block in `apps/web/wrangler.jsonc` enables Worker Previews. The root `pnpm preview` command serves a local preview.
+
+Worker Previews require their own runtime bindings and secrets. Configure these in Cloudflare's Previews Base settings and copy the generated binding configuration into the `previews` block, using staging resources. Production settings do not supply Preview bindings automatically. Keep secret values out of the configuration file.
+
+See [Cloudflare Preview configuration](https://developers.cloudflare.com/workers/previews/configuration/) and [Workers Builds settings](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#preview-command).
 
 ## Documentation
 
