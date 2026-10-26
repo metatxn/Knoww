@@ -12,7 +12,8 @@ const ROUTE_ENTRIES = {
 
 export const CSS_BUDGETS = {
   shared: 32 * 1024,
-  landing: 42 * 1024,
+  // The LTFM page's console and chart bring its trimmed CSS to 42.4 KB gzip.
+  landing: 43 * 1024,
   privacy: 35 * 1024,
   markets: 40 * 1024,
   eventDetail: 40 * 1024,

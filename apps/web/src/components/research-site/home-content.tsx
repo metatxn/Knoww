@@ -17,7 +17,6 @@ export function LtfmHome() {
         <div className="wrap">
           <div className="hx-head">
             <div>
-              <span className="label">{"// how it works"}</span>
               <h1 className="hx-h" id="hx-title">
                 {"Train once on millions of worlds. "}
                 <span className="hx-accent">{"Infer on yours."}</span>

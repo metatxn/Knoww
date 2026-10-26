@@ -12,6 +12,18 @@ const globals = [
   .map((path) => readFileSync(path, "utf8"))
   .join("\n");
 const landing = readFileSync("src/app/page.tsx", "utf8");
+const researchHome = readFileSync(
+  "src/components/research-site/home-content.tsx",
+  "utf8"
+);
+const researchStyles = readFileSync(
+  "src/components/research-site/home.css",
+  "utf8"
+);
+const inferenceChart = readFileSync(
+  "src/components/research-site/inference-chart.tsx",
+  "utf8"
+);
 const landingChrome = readFileSync(
   "src/components/landing/landing-chrome.tsx",
   "utf8"
@@ -43,10 +55,12 @@ test("theme picker accessible name includes the visible theme label", () => {
   assert.match(themePicker, /hidden min-w-0 truncate sm:inline/);
 });
 
-test("ticker exposes motion controls", () => {
-  assert.match(landing, /hover:paused/);
-  assert.match(landing, /focus-within:paused/);
-  assert.match(landing, /motion-reduce:animate-none/);
+test("LTFM chart exposes motion controls and respects reduced motion", () => {
+  assert.match(researchHome, /<InferenceChart hero/);
+  assert.match(inferenceChart, /prefers-reduced-motion: reduce/);
+  assert.match(inferenceChart, /if \(motion\.matches\) setPlaying\(false\)/);
+  assert.match(inferenceChart, /\{playing \? "Pause" : "Play"\}/);
+  assert.match(inferenceChart, /if \(!visible \|\| document\.hidden\) return/);
 });
 
 test("decorative hero mock feeds do not add document headings", () => {
@@ -108,15 +122,15 @@ test("landing focus-visible outline clears the stronger focus target", () => {
   );
 });
 
-test("hero mock card uses compact laptop fit constraints", () => {
-  assert.match(landing, /kw-hero-inner/);
+test("LTFM hero allows content to grow on short laptop screens", () => {
+  assert.match(researchHome, /className="hx"/);
   assert.match(
-    globals,
-    /@media \(min-width: 1280px\) and \(max-width: 1535px\)\s*\{[\s\S]*?\.kw-hero-inner\s*\{[\s\S]*?padding-top:\s*2\.5rem;[\s\S]*?padding-bottom:\s*2\.5rem;/s
+    researchStyles,
+    /@media \(min-width: 1101px\) and \(max-height: 760px\)\s*\{\s*\.kw-research-site \.hx\s*\{\s*height:\s*auto;\s*min-height:\s*calc\(100svh - 73px\);/s
   );
   assert.match(
-    globals,
-    /@media \(min-width: 1280px\) and \(max-width: 1535px\)\s*\{[\s\S]*?\.kwt-card\s*\{[\s\S]*?height:\s*min\(656px,\s*calc\(100svh - 161px\)\);/s
+    researchStyles,
+    /\.kw-research-site \.hx-chart\s*\{\s*min-height:\s*240px;/
   );
 });
 

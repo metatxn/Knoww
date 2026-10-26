@@ -33,13 +33,13 @@ test("data-nosnippet is only attached to Google-supported wrapper elements", () 
   assert.match(leagueRail, /<(?:div|section)\s+data-nosnippet/);
 });
 
-// The SEO audit proposed "Prediction Markets While You Browse"; the owner kept
-// the original title, which already leads with the primary keyword. This test
-// locks in that decision so the audit variant is not reintroduced.
-test("homepage metadata uses the owner-approved positioning title", () => {
+test("homepage metadata describes the LTFM research site", () => {
   const homepage = read("src/app/page.tsx");
 
-  assert.match(homepage, /Knoww — Prediction markets for every opinion/);
+  assert.match(
+    homepage,
+    /Knoww Research Lab \| Longitudinal tabular foundation models/
+  );
   assert.doesNotMatch(homepage, /Prediction Markets While You Browse/);
 });
 

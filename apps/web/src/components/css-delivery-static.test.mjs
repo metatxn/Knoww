@@ -7,8 +7,7 @@ function read(path) {
 }
 
 const globals = read("src/app/globals.css");
-const landingPage = read("src/app/page.tsx");
-const landingStyles = read("src/app/styles/landing-route.css");
+const researchShell = read("src/components/research-site/site-shell.tsx");
 const privacyPage = read("src/app/privacy/page.tsx");
 const productStyles = read("src/app/styles/product.css");
 
@@ -44,10 +43,23 @@ test("root CSS contains only shared foundation styles", () => {
 });
 
 test("marketing routes own their required styles", () => {
-  assert.match(landingPage, /import "\.\/styles\/landing-route\.css";/);
-  assert.match(landingStyles, /@import "\.\/marketing\.css";/);
-  assert.match(landingStyles, /@import "\.\/landing\.css";/);
-  assert.match(landingStyles, /@import "\.\/tweet-overlay\.css";/);
+  assert.match(researchShell, /import "\.\/site\.css";/);
+  for (const [route, stylesheet] of [
+    ["", "home"],
+    ["research/", "research"],
+    ["use-cases/", "usecases"],
+    ["company/", "company"],
+  ]) {
+    const page = read(`src/app/${route}page.tsx`);
+    assert.match(page, /<ResearchSiteShell>/);
+    assert.ok(
+      page.includes(`import "@/components/research-site/${stylesheet}.css";`),
+      `${route || "/"} must import its own stylesheet`
+    );
+    const styles = read(`src/components/research-site/${stylesheet}.css`);
+    assert.match(styles, /@reference "\.\.\/\.\.\/app\/globals\.css";/);
+    assert.match(styles, /@layer components/);
+  }
   assert.match(privacyPage, /import "\.\.\/styles\/marketing\.css";/);
 });
 
