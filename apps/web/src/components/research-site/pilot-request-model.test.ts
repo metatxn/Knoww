@@ -20,7 +20,7 @@ describe("pilot request validation", () => {
     if (!result.success) return;
     const url = new URL(result.draft.mailto);
     expect(url.protocol).toBe("mailto:");
-    expect(url.pathname).toBe("invest@knoww.app");
+    expect(url.pathname).toBe("contact@knoww.app");
     expect(url.searchParams.get("subject")).toBe(
       "LTFM pilot request - Example team"
     );

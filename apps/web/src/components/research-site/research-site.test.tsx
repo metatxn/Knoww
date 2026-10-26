@@ -91,7 +91,7 @@ describe("LTFM landing interactions", () => {
       screen
         .getByRole("link", { name: "Open email draft" })
         .getAttribute("href")
-    ).toMatch(/^mailto:invest@knoww.app\?/);
+    ).toMatch(/^mailto:contact@knoww.app\?/);
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("Organisation")).toHaveValue("Example team");
   });

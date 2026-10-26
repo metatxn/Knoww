@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PILOT_EMAIL = "invest@knoww.app";
+export const PILOT_EMAIL = "contact@knoww.app";
 export const PILOT_INDUSTRIES = [
   "Financial services",
   "Insurance",

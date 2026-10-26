@@ -26,9 +26,10 @@
     align-items: baseline;
     flex-wrap: wrap;
   }
-  .kw-research-site .c-title b {
+  .kw-research-site .c-title h2 {
     font-family: var(--font-head);
     font-size: 20px;
+    letter-spacing: normal;
   }
   .kw-research-site .c-bar .label {
     color: var(--panel-muted);
@@ -676,12 +677,14 @@
   }
   .kw-research-site .promises .card {
     min-height: 250px;
-    grid-template-rows: auto 1fr auto;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: --spacing(3);
   }
   .kw-research-site .promises .card h3 {
     font-size: 30px;
     line-height: 32px;
-    align-self: end;
+    align-self: start;
   }
   .kw-research-site .race {
     margin-top: --spacing(12);
@@ -899,6 +902,48 @@
     transition: opacity 1100ms cubic-bezier(0.45, 0, 0.2, 1);
     will-change: opacity;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .kw-research-site #industries .ind::before {
+      animation: industry-highlight 24s ease-in-out 3s infinite;
+    }
+    .kw-research-site #industries .ind:nth-child(2)::before {
+      animation-delay: 6s;
+    }
+    .kw-research-site #industries .ind:nth-child(3)::before {
+      animation-delay: 9s;
+    }
+    .kw-research-site #industries .ind:nth-child(4)::before {
+      animation-delay: 12s;
+    }
+    .kw-research-site #industries .ind:nth-child(5)::before {
+      animation-delay: 15s;
+    }
+    .kw-research-site #industries .ind:nth-child(6)::before {
+      animation-delay: 18s;
+    }
+    .kw-research-site #industries .ind:nth-child(7)::before {
+      animation-delay: 21s;
+    }
+    .kw-research-site #industries .ind:nth-child(8)::before {
+      animation-delay: 24s;
+    }
+    .kw-research-site
+      #industries
+      .ind-grid:is(:hover, :focus-within)
+      .ind::before {
+      animation-play-state: paused;
+    }
+  }
+  @keyframes industry-highlight {
+    0%,
+    12.5%,
+    100% {
+      opacity: 0;
+    }
+    6.25% {
+      opacity: 0.22;
+    }
+  }
   .kw-research-site .ind,
   .kw-research-site .ind .label,
   .kw-research-site .ind .ind-more {
@@ -1033,21 +1078,6 @@
     color: var(--h-ink);
     overflow: hidden;
     isolation: isolate;
-  }
-  .kw-research-site .hx::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(var(--h-line), 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(var(--h-line), 0.045) 1px, transparent 1px);
-    background-size: 32px 32px;
-    mask-image: radial-gradient(120% 90% at 70% 40%, #000 30%, transparent 80%);
-    -webkit-mask-image: radial-gradient(
-      120% 90% at 70% 40%,
-      #000 30%,
-      transparent 80%
-    );
   }
   .kw-research-site .hx .label {
     color: var(--h-muted);
@@ -1238,11 +1268,53 @@
   }
   .kw-research-site .hx-xf i {
     display: block;
+    position: relative;
+    overflow: hidden;
     height: 10px;
     border-radius: 2px;
     background: var(--h-bg);
     transform-origin: left;
     transition: background-color 0.3s;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .kw-research-site .hx-xf i::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, var(--k2), var(--k3));
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: hxLayerFill 4.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+    }
+    .kw-research-site .hx-xf i:nth-child(2)::after {
+      animation-delay: 0.35s;
+    }
+    .kw-research-site .hx-xf i:nth-child(3)::after {
+      animation-delay: 0.7s;
+    }
+    .kw-research-site .hx-xf i:nth-child(4)::after {
+      animation-delay: 1.05s;
+    }
+    .kw-research-site .hx-xf i:nth-child(5)::after {
+      animation-delay: 1.4s;
+    }
+    .kw-research-site .hx-xf i:nth-child(6)::after {
+      animation-delay: 1.75s;
+    }
+  }
+  @keyframes hxLayerFill {
+    0%,
+    12%,
+    100% {
+      transform: scaleX(0);
+    }
+    28%,
+    72% {
+      transform: scaleX(1);
+    }
+    92% {
+      transform: scaleX(0);
+    }
   }
   .kw-research-site .hx-xf b {
     font-family: var(--research-font-mono);
@@ -1437,10 +1509,6 @@
   .kw-research-site .hx {
     padding-block: --spacing(8) --spacing(6);
     background: var(--h-bg);
-  }
-  .kw-research-site .hx::before {
-    z-index: -1;
-    opacity: 0.9;
   }
   .kw-research-site .hx-bg {
     position: absolute;

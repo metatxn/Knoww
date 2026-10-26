@@ -224,7 +224,7 @@ export function CompanyContent() {
             <div className="ct-r">
               <span className="label">{"Everyone else"}</span>
               <div className="copyrow">
-                <code id="email2">{"invest@knoww.app"}</code>
+                <code id="email2">{"contact@knoww.app"}</code>
                 <CopyButton targetId="email2" />
               </div>
               <p className="status" data-status="email2" aria-live="polite"></p>

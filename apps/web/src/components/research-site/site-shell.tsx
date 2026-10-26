@@ -85,8 +85,8 @@ export function ResearchSiteShell({ children }: { children: ReactNode }) {
           </div>
           <div className="foot-bottom">
             <span className="label">© 2026 Knoww Research Lab</span>
-            <a className="label" href="mailto:invest@knoww.app">
-              invest@knoww.app
+            <a className="label" href="mailto:contact@knoww.app">
+              contact@knoww.app
             </a>
             <Link className="label" href="/privacy">
               Privacy

@@ -1205,7 +1205,7 @@
     color: var(--text-muted);
   }
 
-  .kw-research-site .c-title b {
+  .kw-research-site .c-title h2 {
     font-family: var(--font-display);
     font-weight: 700;
   }
@@ -1430,11 +1430,6 @@
 
   .kw-research-site .panel {
     background-color: var(--panel);
-    background-image:
-      linear-gradient(var(--panel-rule) 1px, transparent 1px),
-      linear-gradient(90deg, var(--panel-rule) 1px, transparent 1px);
-    background-size: 28px 28px;
-    background-position: -1px -1px;
   }
 
   .kw-research-site .panel > .wrap {

@@ -82,21 +82,6 @@ export function LtfmHome() {
         </div>
       </section>
 
-      <section
-        id="console"
-        className="console-sec"
-        aria-labelledby="console-title"
-      >
-        <div className="wrap">
-          <ModelConsole />
-          <p className="c-note">
-            {
-              "Switch the table: same model, a different question, no retraining. Select a row to see why it scored the way it did. All rows and scores here are synthetic examples that show how LTFM reports results; they are not model output."
-            }
-          </p>
-        </div>
-      </section>
-
       <section id="shift" className="rule-top">
         <div className="wrap">
           <div className="sec-head">
@@ -167,84 +152,6 @@ export function LtfmHome() {
               </tbody>
             </table>
           </div>
-        </div>
-      </section>
-
-      <section id="reads" className="panel">
-        <div className="wrap">
-          <div className="sec-head">
-            <span className="label c">{"What LTFM reads"}</span>
-            <h2>
-              {"Entities, their state, their history and every transition."}
-            </h2>
-            <p>
-              {
-                "AI reads language, images and code. No LLM understands tables. LTFM is built for the rows and columns every business runs on: spreadsheets, databases, ledgers, logs."
-              }
-            </p>
-          </div>
-          <section
-            className="ledger-wrap"
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll the wide example table.
-            tabIndex={0}
-            aria-label="Example of a longitudinal table"
-          >
-            <EntityLedger />
-          </section>
-          <div className="ledger-key">
-            <span className="label" style={{ color: "inherit" }}>
-              {"Example · a supply-to-customer chain"}
-            </span>
-            <span>
-              <i className="st s0"></i>
-              {"Normal"}
-            </span>
-            <span>
-              <i className="st s1"></i>
-              {"Watch"}
-            </span>
-            <span>
-              <i className="st s2"></i>
-              {"Stressed"}
-            </span>
-            <span>
-              <i className="st s3"></i>
-              {"Flagged"}
-            </span>
-            <span>{"▸ Transition"}</span>
-            <span>{"└ Relation"}</span>
-          </div>
-          <div className="equation">
-            <div className="eq-box">
-              <h3>{"Time-series"}</h3>
-              <p>{"TimesFM, Chronos-2"}</p>
-            </div>
-            <div className="eq-op" aria-hidden="true">
-              {"+"}
-            </div>
-            <div className="eq-box">
-              <h3>{"Tabular"}</h3>
-              <p>{"TabPFN → acquired by SAP"}</p>
-            </div>
-            <div className="eq-op" aria-hidden="true">
-              {"+"}
-            </div>
-            <div className="eq-box">
-              <h3>{"Relational"}</h3>
-              <p>{"KumoRFM → NVIDIA"}</p>
-            </div>
-            <div className="eq-op" aria-hidden="true">
-              {"="}
-            </div>
-            <div className="eq-result">
-              <b>{"LTFM"}</b>
-              <p>{"entities + state + history + transitions"}</p>
-            </div>
-          </div>
-          <p className="statement" style={{ marginTop: "64px" }}>
-            <span className="dim">{"Existing models see a piece."}</span>
-            {" LTFM sees the whole."}
-          </p>
         </div>
       </section>
 
@@ -335,6 +242,162 @@ export function LtfmHome() {
         </div>
       </section>
 
+      <section id="reads" className="panel">
+        <div className="wrap">
+          <div className="sec-head">
+            <span className="label c">{"What LTFM reads"}</span>
+            <h2>
+              {"Entities, their state, their history and every transition."}
+            </h2>
+            <p>
+              {
+                "AI reads language, images and code. No LLM understands tables. LTFM is built for the rows and columns every business runs on: spreadsheets, databases, ledgers, logs."
+              }
+            </p>
+          </div>
+          <section
+            className="ledger-wrap"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll the wide example table.
+            tabIndex={0}
+            aria-label="Example of a longitudinal table"
+          >
+            <EntityLedger />
+          </section>
+          <div className="ledger-key">
+            <span className="label" style={{ color: "inherit" }}>
+              {"Example · a supply-to-customer chain"}
+            </span>
+            <span>
+              <i className="st s0"></i>
+              {"Normal"}
+            </span>
+            <span>
+              <i className="st s1"></i>
+              {"Watch"}
+            </span>
+            <span>
+              <i className="st s2"></i>
+              {"Stressed"}
+            </span>
+            <span>
+              <i className="st s3"></i>
+              {"Flagged"}
+            </span>
+            <span>{"▸ Transition"}</span>
+            <span>{"└ Relation"}</span>
+          </div>
+          <div className="equation">
+            <div className="eq-box">
+              <h3>{"Time-series"}</h3>
+              <p>{"TimesFM, Chronos-2"}</p>
+            </div>
+            <div className="eq-op" aria-hidden="true">
+              {"+"}
+            </div>
+            <div className="eq-box">
+              <h3>{"Tabular"}</h3>
+              <p>{"TabPFN → acquired by SAP"}</p>
+            </div>
+            <div className="eq-op" aria-hidden="true">
+              {"+"}
+            </div>
+            <div className="eq-box">
+              <h3>{"Relational"}</h3>
+              <p>{"KumoRFM → NVIDIA"}</p>
+            </div>
+            <div className="eq-op" aria-hidden="true">
+              {"="}
+            </div>
+            <div className="eq-result">
+              <b>{"LTFM"}</b>
+              <p>{"entities + state + history + transitions"}</p>
+            </div>
+          </div>
+          <p className="statement" style={{ marginTop: "64px" }}>
+            <span className="dim">{"Existing models see a piece."}</span>
+            {" LTFM sees the whole."}
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="console"
+        className="console-sec"
+        aria-labelledby="console-title"
+      >
+        <div className="wrap">
+          <ModelConsole />
+          <p className="c-note">
+            {
+              "Switch the table: same model, a different question, no retraining. Select a row to see why it scored the way it did. All rows and scores here are synthetic examples that show how LTFM reports results; they are not model output."
+            }
+          </p>
+        </div>
+      </section>
+
+      <section id="industries" className="rule-top">
+        <div className="wrap">
+          <div className="sec-head">
+            <span className="label">{"Who it's for"}</span>
+            <h2>{"Anyone with a table and a question about tomorrow."}</h2>
+            <p>
+              {
+                "Every industry runs on rows and columns that change over time. The same model answers each one's question. We start with financial services."
+              }
+            </p>
+          </div>
+          <div className="ind-grid">
+            <Link className="ind first" href="/use-cases#finance">
+              <span className="label">{"Financial services · first"}</span>
+              <b>{"Will this account default?"}</b>
+              <span className="ind-more">
+                {"Fraud · credit · underwriting · collections"}
+              </span>
+            </Link>
+            <Link className="ind" href="/use-cases#insurance">
+              <span className="label">{"Insurance"}</span>
+              <b>{"Is this claim genuine?"}</b>
+              <span className="ind-more">{"Claims · renewals · pricing"}</span>
+            </Link>
+            <Link className="ind" href="/use-cases#healthcare">
+              <span className="label">{"Healthcare"}</span>
+              <b>{"Will this patient return?"}</b>
+              <span className="ind-more">
+                {"Readmissions · no-shows · demand"}
+              </span>
+            </Link>
+            <Link className="ind" href="/use-cases#supply">
+              <span className="label">{"Supply chain"}</span>
+              <b>{"Will this shipment be late?"}</b>
+              <span className="ind-more">
+                {"Delays · supplier risk · lead times"}
+              </span>
+            </Link>
+            <Link className="ind" href="/use-cases#retail">
+              <span className="label">{"Retail & inventory"}</span>
+              <b>{"How much sells next week?"}</b>
+              <span className="ind-more">{"Demand · churn · stock-outs"}</span>
+            </Link>
+            <Link className="ind" href="/use-cases#macro">
+              <span className="label">{"Policy & macro"}</span>
+              <b>{"Will rates be cut?"}</b>
+              <span className="ind-more">{"Rates · inflation · events"}</span>
+            </Link>
+            <Link className="ind" href="/use-cases#geopolitics">
+              <span className="label">{"Geopolitics"}</span>
+              <b>{"Will this conflict escalate?"}</b>
+              <span className="ind-more">
+                {"Escalation · sanctions · trade"}
+              </span>
+            </Link>
+            <a className="ind own" href="#pilot">
+              <span className="label">{"Your table"}</span>
+              <b>{"What do you need to predict?"}</b>
+              <span className="ind-more">{"Tell us the question →"}</span>
+            </a>
+          </div>
+        </div>
+      </section>
       <section id="risk" className="panel">
         <div className="wrap">
           <div className="sec-head">
@@ -514,69 +577,6 @@ export function LtfmHome() {
         </div>
       </section>
 
-      <section id="industries" className="rule-top">
-        <div className="wrap">
-          <div className="sec-head">
-            <span className="label">{"Who it's for"}</span>
-            <h2>{"Anyone with a table and a question about tomorrow."}</h2>
-            <p>
-              {
-                "Every industry runs on rows and columns that change over time. The same model answers each one's question. We start with financial services."
-              }
-            </p>
-          </div>
-          <div className="ind-grid">
-            <Link className="ind first" href="/use-cases#finance">
-              <span className="label">{"Financial services · first"}</span>
-              <b>{"Will this account default?"}</b>
-              <span className="ind-more">
-                {"Fraud · credit · underwriting · collections"}
-              </span>
-            </Link>
-            <Link className="ind" href="/use-cases#insurance">
-              <span className="label">{"Insurance"}</span>
-              <b>{"Is this claim genuine?"}</b>
-              <span className="ind-more">{"Claims · renewals · pricing"}</span>
-            </Link>
-            <Link className="ind" href="/use-cases#healthcare">
-              <span className="label">{"Healthcare"}</span>
-              <b>{"Will this patient return?"}</b>
-              <span className="ind-more">
-                {"Readmissions · no-shows · demand"}
-              </span>
-            </Link>
-            <Link className="ind" href="/use-cases#supply">
-              <span className="label">{"Supply chain"}</span>
-              <b>{"Will this shipment be late?"}</b>
-              <span className="ind-more">
-                {"Delays · supplier risk · lead times"}
-              </span>
-            </Link>
-            <Link className="ind" href="/use-cases#retail">
-              <span className="label">{"Retail & inventory"}</span>
-              <b>{"How much sells next week?"}</b>
-              <span className="ind-more">{"Demand · churn · stock-outs"}</span>
-            </Link>
-            <Link className="ind" href="/use-cases#macro">
-              <span className="label">{"Policy & macro"}</span>
-              <b>{"Will rates be cut?"}</b>
-              <span className="ind-more">{"Rates · inflation · events"}</span>
-            </Link>
-            <Link className="ind" href="/use-cases#geopolitics">
-              <span className="label">{"Geopolitics"}</span>
-              <b>{"Will this conflict escalate?"}</b>
-              <span className="ind-more">
-                {"Escalation · sanctions · trade"}
-              </span>
-            </Link>
-            <a className="ind own" href="#pilot">
-              <span className="label">{"Your table"}</span>
-              <b>{"What do you need to predict?"}</b>
-              <span className="ind-more">{"Tell us the question →"}</span>
-            </a>
-          </div>
-        </div>
-      </section>
       <PilotRequest />
       <section className="rule-top" style={{ paddingBlock: "48px 96px" }}>
         <div className="wrap">

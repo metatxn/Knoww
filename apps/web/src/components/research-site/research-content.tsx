@@ -501,7 +501,7 @@ export function ResearchContent() {
               {
                 "…and more. We open research intake every 8 weeks. Researchers working on tabular or longitudinal models: write to "
               }
-              <span className="tnum">{"invest@knoww.app"}</span>
+              <span className="tnum">{"contact@knoww.app"}</span>
               {"."}
             </p>
           </div>

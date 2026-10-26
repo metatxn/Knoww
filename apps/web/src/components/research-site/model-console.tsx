@@ -88,7 +88,7 @@ export function ModelConsole() {
     <div className={`console${running ? " scoring" : ""}`} id="ltfmConsole">
       <div className="c-bar">
         <div className="c-title">
-          <b id="console-title">LTFM console</b>
+          <h2 id="console-title">LTFM console</h2>
           <span className="label">
             {data.file} · 8 {data.units} · 12 months
           </span>
