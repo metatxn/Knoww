@@ -359,19 +359,19 @@
   .kw-research-site .flow .ar {
     color: var(--text-muted);
   }
-  .kw-research-site .dots {
+  .kw-research-site .research-evidence-dots {
     display: grid;
     grid-template-columns: repeat(11, minmax(0, 1fr));
     gap: 10px;
     max-width: 560px;
   }
-  .kw-research-site .dots i {
+  .kw-research-site .research-evidence-dots i {
     aspect-ratio: 1;
     border-radius: 50%;
     border: 2px solid var(--text);
     display: block;
   }
-  .kw-research-site .dots i.r {
+  .kw-research-site .research-evidence-dots i.r {
     background: var(--text);
   }
   .kw-research-site .brier {
@@ -499,7 +499,7 @@
     line-height: 0.85;
     color: var(--citron);
   }
-  .kw-research-site .st {
+  .kw-research-site .research-state-transition {
     display: flex;
     align-items: center;
     gap: --spacing(3);
@@ -508,16 +508,16 @@
     font-weight: 700;
     font-size: 16px;
   }
-  .kw-research-site .st span {
+  .kw-research-site .research-state-transition span {
     border: 1px solid var(--border-control);
     padding: 4px 10px;
     background: var(--surface);
   }
-  .kw-research-site .st span.ar {
+  .kw-research-site .research-state-transition span.ar {
     border: 0;
     background: none;
   }
-  .kw-research-site .st span.n {
+  .kw-research-site .research-state-transition span.n {
     background: var(--text);
     color: var(--canvas);
     border-color: var(--text);

@@ -29,8 +29,14 @@ describe("LTFM landing interactions", () => {
     );
   });
 
-  it("validates a pilot request, prepares it without sending, and preserves edits", () => {
+  it("requires explicit dropdown choices, prepares a pilot request, and preserves edits", async () => {
     render(<PilotRequest />);
+    expect(screen.getByRole("button", { name: /Industry/ })).toHaveTextContent(
+      "Select an option"
+    );
+    expect(
+      screen.getByRole("button", { name: /Current model/ })
+    ).toHaveTextContent("Select an option");
     fireEvent.click(
       screen.getByRole("button", { name: "Prepare pilot request" })
     );
@@ -45,6 +51,38 @@ describe("LTFM landing interactions", () => {
     fireEvent.change(screen.getByLabelText("The question"), {
       target: { value: "Will this shipment be late?" },
     });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare pilot request" })
+    );
+    expect(screen.queryByRole("link", { name: "Open email draft" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Industry/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("button", { name: /Industry/ }), {
+      key: "ArrowDown",
+    });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Financial services" })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Industry/ })).toHaveFocus()
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare pilot request" })
+    );
+    expect(screen.queryByRole("link", { name: "Open email draft" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Current model/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("button", { name: /Current model/ }), {
+      key: "ArrowDown",
+    });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", {
+        name: "Gradient-boosted trees (XGBoost, LightGBM)",
+      })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Current model/ })
+      ).toHaveFocus()
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Prepare pilot request" })
     );

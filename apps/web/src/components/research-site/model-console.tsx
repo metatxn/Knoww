@@ -8,6 +8,13 @@ import {
   score,
 } from "./console-model";
 
+const PIP_CLASSES: Readonly<Record<string, string | undefined>> = {
+  O: "o",
+  L: "l",
+  M: "m",
+  "-": "n",
+};
+
 const tabs: {
   id: Domain;
   label: string;
@@ -209,7 +216,7 @@ export function ModelConsole() {
                         {row.e.split("").map((code, i) => (
                           <i
                             key={i}
-                            className={`pip ${{ O: "o", L: "l", M: "m", "-": "n" }[code]}`}
+                            className={`pip ${PIP_CLASSES[code]}`}
                             aria-hidden="true"
                           />
                         ))}

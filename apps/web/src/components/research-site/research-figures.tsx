@@ -1,7 +1,7 @@
 export function EvidenceDots() {
   return (
     <div
-      className="dots"
+      className="research-evidence-dots"
       role="img"
       aria-label="22 dated calls. 17 right, shown filled, and 5 wrong, shown open."
     >

@@ -299,7 +299,7 @@ export function ResearchContent() {
                     }
                   </p>
                   <div
-                    className="st"
+                    className="research-state-transition"
                     aria-label="state t to state t plus 1"
                     role="img"
                   >

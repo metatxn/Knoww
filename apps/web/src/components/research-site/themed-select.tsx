@@ -17,7 +17,7 @@ export function ThemedSelect({
   describedBy?: string;
   invalid?: boolean;
 }) {
-  const [value, setValue] = useState(options[0]);
+  const [value, setValue] = useState("");
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -40,7 +40,7 @@ export function ThemedSelect({
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
         >
-          <span id={`${id}-value`}>{value}</span>
+          <span id={`${id}-value`}>{value || "Select an option"}</span>
           <ChevronDown size={16} aria-hidden="true" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal container={container}>

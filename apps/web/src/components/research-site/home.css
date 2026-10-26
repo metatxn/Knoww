@@ -138,7 +138,7 @@
     gap: --spacing(4);
     padding: 6px --spacing(3);
   }
-  .kw-research-site .c-.kw-research-site {
+  .kw-research-site .c-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
   }
@@ -447,7 +447,7 @@
     max-width: 60em;
   }
   @media (max-width: 1239px) {
-    .kw-research-site .c-.kw-research-site {
+    .kw-research-site .c-body {
       grid-template-columns: minmax(0, 1fr);
     }
     .kw-research-site .c-table {
@@ -729,10 +729,9 @@
   }
   .kw-research-site .equation {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(
-        0,
-        1fr
-      ) auto minmax(0, 1.3fr);
+    grid-template-columns:
+      minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)
+      auto minmax(0, 1.3fr);
     gap: --spacing(4);
     align-items: stretch;
     margin-top: --spacing(16);

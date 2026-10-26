@@ -54,9 +54,9 @@ export function SiteNavigation() {
           >
             Experiment one <span aria-hidden="true">→</span>
           </Link>
-          <a className="btn btn-accent btn-sm" href="#pilot">
+          <Link className="btn btn-accent btn-sm" href="#pilot">
             Request a pilot
-          </a>
+          </Link>
         </div>
         <button
           ref={button}
