@@ -96,6 +96,9 @@ export function buildEventSitemapRoutes(
 export function buildStaticSitemapRoutes(): SitemapRoute[] {
   return dedupeSitemapRoutes([
     { url: canonicalUrl() },
+    { url: canonicalUrl("/research") },
+    { url: canonicalUrl("/use-cases") },
+    { url: canonicalUrl("/company") },
     { url: canonicalUrl("/markets") },
     { url: canonicalUrl("/extension") },
     { url: canonicalUrl("/leaderboard") },

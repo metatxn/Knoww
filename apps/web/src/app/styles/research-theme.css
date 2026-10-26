@@ -1,0 +1,56 @@
+/* Shared design tokens for the public research site. */
+@theme static {
+  --color-research-canvas: #f1ece2;
+  --color-research-surface: #fbf8f2;
+  --color-research-surface-raised: #fff;
+  --color-research-sunken: #e6e0d4;
+  --color-research-text: #15171c;
+  --color-research-text-muted: #5a554b;
+  --color-research-border-subtle: #dcd5c8;
+  --color-research-border-control: #15171c;
+  --color-research-action: #15171c;
+  --color-research-action-text: #f1ece2;
+  --color-research-action-hover: #2a2d33;
+  --color-research-focus: #15171c;
+  --color-research-accent: #e9b44c;
+  --color-research-accent-hover: #f0c36a;
+  --color-research-ink: #15171c;
+  --color-research-pale-sage: #cfe5e3;
+  --color-research-panel: #15171c;
+  --color-research-panel-text: #f2f1ec;
+  --color-research-panel-muted: #b9b4aa;
+  --color-research-panel-rule: #2a2d33;
+  --color-research-panel-raised: #1d2025;
+  --color-research-panel-control: #5a5f68;
+  --color-research-panel-accent: #e9b44c;
+  --color-research-success: #196b42;
+  --color-research-warning: #765500;
+  --color-research-error: #b42318;
+  --color-research-info: #145da0;
+  --color-research-navy: #1e3a5f;
+  --color-research-blue: #2f6f8f;
+  --color-research-sea: #6fa3a0;
+  --color-research-amber: #e9b44c;
+  --color-research-coral: #c8402f;
+  --color-research-burgundy: #8e1b2f;
+  --color-research-hero-background: #f1ece2;
+  --color-research-hero-ink: #15171c;
+  --color-research-hero-secondary: #3a3d44;
+  --color-research-hero-muted: #5e594f;
+  --color-research-hero-glass: #fffcf6bd;
+  --color-research-hero-glass-raised: #ffffffe6;
+  --color-research-hero-glass-muted: #f6f1e8db;
+  --color-research-sage: #5f7d66;
+  --radius-research-compact: 0.125rem;
+  --radius-research-control: 0.625rem;
+  --radius-research-panel: 1rem;
+  --radius-research-hero: 1.25rem;
+  --spacing-research-control: 3.25rem;
+  --container-research: 88rem;
+}
+
+@theme inline {
+  --font-research-sans: var(--font-sans), sans-serif;
+  --font-research-editorial: var(--font-editorial), serif;
+  --font-research-mono: var(--font-mono), ui-monospace, monospace;
+}
